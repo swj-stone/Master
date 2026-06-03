@@ -1,0 +1,33 @@
+# Preprocessing configuration for Spambase (UCI ML Repository)
+# Dataset: 57 features, 4601 samples, binary classification (spam/non-spam)
+
+dataset:
+  name: "Spambase"
+  source: "https://archive.ics.uci.edu/ml/machine-learning-databases/spambase/spambase.data"
+  url: "https://archive.ics.uci.edu/ml/machine-learning-databases/spambase/spambase.data"
+  n_features: 57
+  n_samples: 4601
+  classes: 2
+  target_name: "is_spam"
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  raw_filename: "spambase.csv"
+  file_prefix: "spambase"
+
+feature_engineering:
+  drop_duplicates: true
+  variance_threshold: 0.01
+  max_features: 100000
+
+preprocessing:
+  standardize: true
+  shuffle: false
+
+split:
+  feature_seed: 42
+  seeds: [42, 123, 456, 789, 1024]
+  test_size: 0.2
+  val_size: 0.25
+  stratify: true
