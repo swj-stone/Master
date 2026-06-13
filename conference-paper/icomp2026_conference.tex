@@ -1,0 +1,811 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{icomp2026_conference,times}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{bbold}
+\usepackage{amsthm}
+% Optional math command from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{cleveref}
+
+
+\title{Min-Marginal Power Indices \\ for Multi-Objective \\ Feature Selection: A Voting-Game Approach}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \icompfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+\author{Antiquus S.~Hippocampus, Natalia Cerebro \& Amelie P. Amygdale \thanks{ Use footnote for providing further information
+about author (webpage, alternative address)---\emph{not} for acknowledging
+funding agencies.  Funding acknowledgements go at the end of the paper.} \\
+Department of Computer Science\\
+Cranberry-Lemon University\\
+Pittsburgh, PA 15213, USA \\
+\texttt{\{hippo,brain,jen\}@cs.cranberry-lemon.edu} \\
+\And
+Ji Q. Ren \& Yevgeny LeNet \\
+Department of Computational Neuroscience \\
+University of the Witwatersrand \\
+Joburg, South Africa \\
+\texttt{\{robot,net\}@wits.ac.za} \\
+\AND
+Coauthor \\
+Affiliation \\
+Address \\
+\texttt{email}
+}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+%\icompfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+Feature selection is inherently multi-objective, yet most game-theoretic importance methods collapse the trade-off between subset size, predictive accuracy, and training cost into a single aggregated score. We introduce Min-Marginal Power Indices (MinPPI), a family of game-theoretic indices that replace the mean aggregation of classical Shapley-Shubik and Banzhaf indices with the minimum, evaluated on a binary voting game $v_\alpha(S) = \mathbb{1}[\text{Acc}(\mathcal{M}_S) \geq \alpha \cdot \text{Acc}_{\text{full}}]$. The combination of the min operator with a binary value function yields a discrete three-valued output in $\{-1, 0, +1\}$, cleanly classifying each feature as \emph{decisive} ($+1$), \emph{harmful} ($-1$), or \emph{neutral} ($0$). We prove that MinSS$_i = \text{MinBz}_i$ and that both indices admit this trichotomy (Theorem~1), and develop a ShapG-guided adversarial search (Algorithm~B) that achieves a $38\times$ sample efficiency gain over uniform Monte Carlo for detecting sparse harmful features. We embed MinPPI signals into the mutation and crossover operators of NSGA-II, yielding the MOFS-MinPPI algorithm. A key architectural property is that MinPPI serves only as soft search guidance, while Pareto-optimality is determined from true model fitness; we prove that any MinPPI estimation error affects at most convergence speed, never the correctness of the final front (Proposition~2). We evaluate seven baseline methods on five tabular datasets spanning 29 to 5{,}000 features, and conduct ablation studies on the min vs.\ mean operator, binary vs.\ continuous value function, and guidance strength. All theoretical claims are empirically verified.
+\end{abstract}
+
+
+
+
+
+
+
+
+\section{Introduction}
+\label{sec:intro}
+
+Feature selection is one of the most fundamental preprocessing steps in machine learning. In an era where tabular datasets routinely span hundreds to thousands of features across domains ranging from computational biology to fraud detection, identifying a compact yet predictive subset of features directly determines model interpretability, training efficiency, and generalization performance~\citep{guyon2003introduction,chandrashekar2014survey}. The core challenge is combinatorial: the space of possible feature subsets grows exponentially with dimensionality, making exhaustive search intractable for all but the smallest problems.
+
+Real-world feature selection is inherently multi-objective. Practitioners simultaneously optimize for multiple, often conflicting criteria: minimizing the number of selected features (for interpretability and deployment cost), maximizing predictive accuracy, and minimizing training time (for rapid experimentation cycles). Single-objective approaches---whether filter methods that rank features by univariate statistics, or wrapper methods that optimize a scalarized objective---collapse this trade-off space into a single number, depriving the decision-maker of a complete view of the solution landscape;~\citet{jiao2024survey} provide a comprehensive survey of multi-objective alternatives. Multi-objective evolutionary algorithms, particularly the Non-dominated Sorting Genetic Algorithm~II (NSGA-II), proposed by~\citet{deb2002fast}, have emerged as a principled approach to recovering the full Pareto front of non-dominated trade-offs, and have been successfully adapted to feature selection in a growing body of work~\citep{hamdani2007multi,song2024evolutionary,shao2025evolutionary}.
+
+Cooperative game theory provides a powerful complementary perspective. Each feature can be cast as a player in a coalitional game, where the value of a coalition is the predictive performance achieved when only those features are used for training. The Shapley value~\citep{shapley1953value} and its close relatives---the Shapley-Shubik power index~\citep{shapley1954method} and the Banzhaf power index~\citep{banzhaf1965weighted}---offer axiomatic foundations for quantifying each feature's marginal contribution across all possible coalitions. This framework has gained substantial traction in machine learning through SHAP~\citep{lundberg2017unified}, which uses Shapley values for local model explanation. However, the classical indices aggregate marginal contributions via a {\em mean} over all permutations (Shapley) or subsets (Banzhaf). The mean, by construction, smooths over the diversity of a feature's contextual behavior: a feature that is beneficial in most contexts but actively harmful in a few will receive a deceptively positive mean score, concealing the existence of contexts where its inclusion degrades performance. Recent work applying game-theoretic indices to feature selection---including Banzhaf-based pruning by~\citet{karavas2017feature}, Powershap by~\citet{verhaeghe2022powershap}, and ShapG by~\citet{zhao2025shapg}---all rely on mean-based aggregation and therefore inherit this limitation.
+
+A conceptually important shift was recently proposed by~\citet{zheng2026minshap} in the form of MinShap: replacing the mean over permutations with the minimum. By capturing the worst-case marginal contribution, MinShap surfaces features that can be detrimental in specific contexts---information that the mean discards entirely. We regard MinShap as a key inspiration for our work, though we do not rely on its conclusions. MinShap operates on a continuous value function $v(S) = \text{AUC}(\mathcal{M}_S)$, which means its min output remains a continuous quantity in $[-1, 1]$, lacking a natural decision boundary. We argue that a fundamentally more structured framework emerges from adopting a {\em binary} voting-game formulation, as formalized by~\citet{owen1972multilinear}: define $v_\alpha(S) = \mathbb{1}[\text{Acc}(\mathcal{M}_S) \geq \alpha \cdot \text{Acc}_{\text{full}}] \in \{0,1\}$, where a coalition~$S$ either ``wins'' (reaches a fraction~$\alpha$ of full-model accuracy) or ``loses.'' Under this binary $v_\alpha$, the min-marginal operator yields a discrete three-valued output in $\{-1, 0, +1\}$ that cleanly classifies features as {\em harmful}, {\em neutral}, or {\em decisive}---a ternary structure that is both theoretically crisp and immediately actionable for practitioners.
+
+A further advantage of the binary voting-game formulation is that it sidesteps the additive-approximation defect of WVG-FS methods~\citep{cohen2007feature}: because $v_\alpha(S)$ is evaluated by actually training $\mathcal{M}_S$, no additive surrogate is employed. The MinPPI scores serve only as soft guidance for NSGA-II search operators, while final Pareto-optimality is determined from actual model fitness---a decoupling we formalize in Section~\ref{sec:discussion} (see also Proposition~2).
+
+In this paper, we synthesize three previously independent lines of investigation---game-theoretic power indices, the min-marginal operator, and multi-objective evolutionary search---into a unified framework for feature selection. Our specific contributions are as follows:
+
+\begin{enumerate}
+\item {\bf Minimal Power Indices (MinPPI).} We formalize the Min Shapley-Shubik (MinSS) and Min Banzhaf (MinBz) indices under the binary weighted voting game~$v_\alpha$. We prove that $\text{MinSS}_i = \text{MinBz}_i$ (Lemma~2) and that both indices take values exclusively in~$\{-1, 0, +1\}$ (Lemma~1), yielding a three-way decisiveness classification: decisive ($+1$), harmful ($-1$), or neutral ($0$) (Theorem~1).
+
+\item {\bf ShapG-Guided Adversarial Search (Algorithm~B).} Random Monte Carlo sampling for detecting harmful features suffers from an $O(1/p_-)$ sample complexity, where $p_-$ is the probability of drawing a coalition in which the target feature is harmful---prohibitively expensive when harmful contexts are sparse. We leverage the feature correlation graph produced by ShapG~\citep{zhao2025shapg} to guide an adversarial search that concentrates sampling on the most vulnerable coalitions, achieving approximately $38\times$ sample efficiency in detecting sparse harmful features.
+
+\item {\bf MOFS-MinPPI Algorithm.} We embed MinPPI signals into the mutation and crossover operators of NSGA-II: features classified as harmful receive elevated mutation probability biased toward removal, while decisive features are protected against perturbation. The guidance strength is controlled by a single parameter~$\beta$, with $\beta = 0$ recovering the unguided baseline.
+
+\item {\bf Comprehensive Empirical Validation.} We evaluate MinPPI-MOFS against seven baseline methods on five tabular datasets spanning 29 to 5{,}000 features, under five random seeds. Performance is assessed via hypervolume (HV) of the Pareto front, compression rate at $1\%/3\%/5\%$ AUC-loss thresholds, and training-time speedup. Ablation studies isolate the effects of the min vs.\ mean operator, binary vs.\ continuous~$v(\cdot)$, and guidance strength~$\beta$, with statistical significance assessed via the Friedman--Nemenyi test.
+\end{enumerate}
+
+\section{Related Work}
+\label{sec:related}
+
+Our work sits at the intersection of three research threads: game-theoretic feature importance, multi-objective feature selection, and voting games in machine learning. We review each in turn.
+
+\subsection{Game-Theoretic Feature Importance}
+
+The application of cooperative game theory to feature importance attribution has a rich and accelerating history.~\citet{shapley1953value} provided the axiomatic definition of the Shapley value---the unique attribution scheme satisfying linearity, dummy, symmetry, and efficiency. The Shapley-Shubik power index~\citep{shapley1954method} specialized this to simple (binary) voting games, while~\citet{banzhaf1965weighted} proposed an alternative power index based on uniform coalition probabilities rather than uniform permutations.~\citet{straffin1977shapley} unified both indices under a probabilistic framework, showing that they differ only in the assumed probability model over coalitions. A comprehensive treatment of computational aspects of cooperative game theory is provided by~\citet{chalkiadakis2011computational}.
+
+In machine learning,~\citet{lundberg2017unified} brought Shapley values into the mainstream through SHAP, which efficiently approximates Shapley values for local model explanation using tree-based or kernel-based estimators.~\citet{cohen2007feature} were among the first to apply coalitional game theory directly to feature selection, treating features as players and model accuracy as the coalition value, and proposing a contribution-weighted voting scheme for feature ranking.
+
+{\em Shapley interaction indices.} Moving beyond individual feature contributions, a substantial body of work addresses {\em interactions} among features.~\citet{grabisch1999axiomatic} established the foundational axiomatization of Shapley interaction indices through four axioms---linearity, dummy, symmetry, and recursivity---that uniquely characterize the interaction value for any subset of players.~\citet{rabitti2019shapley} modernized this framework as the Shapley-Owen interaction index, providing a rigorous treatment of its variance-based interpretation. Importantly, their Section~7.3 issues an explicit warning about {\em spurious interactions} arising under feature correlation: when two features are strongly correlated, an interaction index may attribute synergy to one feature that actually originates from the other. We address this concern directly in our discussion (Section~4.5).~\citet{tsai2023faithshap} introduced a faithfulness axiom guaranteeing that the sum of interaction indices across all orders exactly recovers the total model output.~\citet{muschalik2024kernelshapiq} developed KernelSHAP-IQ, an efficient weighted least-squares framework for computing arbitrary-order Shapley interactions, with publicly available implementation.
+
+{\em Power-index-based feature selection.} Several methods directly apply power indices to the feature selection problem.~\citet{karavas2017feature} employed the Banzhaf power index for lossless feature pruning, showing that features with zero Banzhaf score can be removed without affecting model accuracy, and proposed a shared-coalition Monte Carlo approximation with early stopping. Powershap~\citep{verhaeghe2022powershap} combines Shapley values with statistical hypothesis testing, using a percentile-based threshold to determine which features have significantly non-zero importance; its implementation is available as an open-source Python package. ShapG~\citep{zhao2025shapg} embeds feature correlations directly into Shapley value estimation through a minimal-edge correlation graph (built via Pearson correlation followed by Union-Find), enabling efficient local-neighborhood approximation with complexity $O(p \cdot 2^d)$ for $p$ features and neighborhood depth~$d$. ShapG serves a dual role in our work: as a standalone feature importance baseline, and as the correlation-graph oracle that guides the adversarial sampling in our Algorithm~B. Our preliminary evaluation reveals two practical limitations of ShapG that inform this dual-role design: (i)~its Pearson-correlation graph degrades on multi-class problems (e.g., ISOLET, 26 classes), motivating class-conditional variants as future work; and (ii)~its $O(p^2)$ correlation-matrix construction is costly for $p > 1{,}000$, which is acceptable for a one-time oracle in Algorithm~B but prohibitive for per-iteration ranking.
+
+{\em Sensitivity analysis.}~\citet{song2016shapley} developed Shapley effects for global sensitivity analysis, providing the permutation-sampling framework and Hoeffding-style concentration bounds that underpin the theoretical guarantees of random Monte Carlo estimation (our Algorithm~A). Their treatment of sampling distributions over coalition sizes directly informs our analysis in Section~4.3.
+
+{\em The min operator.} Most directly relevant to our contribution,~\citet{zheng2026minshap} proposed MinShap, which replaces the mean over permutations with the minimum, capturing worst-case feature behavior. Three key differences distinguish our MinPPI framework: (i)~we operate on a binary voting game~$v_\alpha \in \{0,1\}$, yielding the discrete ternary output~$\{-1, 0, +1\}$ rather than a continuous score in~$[-1, 1]$; (ii)~our~$v_\alpha$ is explicitly non-monotonic, reflecting the empirical reality that adding features can decrease model accuracy; and (iii)~we employ ShapG-guided adversarial search (Algorithm~B) that achieves substantially higher detection rates than uniform random sampling for sparse harmful features. We cite MinShap as a conceptual inspiration; our theoretical development and algorithmic design are independent.
+
+\subsection{Multi-Objective Feature Selection}
+
+Feature selection has been recognized as inherently multi-objective since the early 2000s.~\citet{hamdani2007multi} first adapted NSGA-II for bi-objective feature selection, simultaneously minimizing the number of selected features and the nearest-neighbor classification error, and demonstrated convergence on several UCI benchmark datasets.~\citet{xue2016survey} provided an early comprehensive survey of evolutionary computation approaches to feature selection, categorizing methods by problem formulation (single-objective vs.\ multi-objective), encoding scheme, and search mechanism.
+
+Since then, the field has matured considerably.~\citet{jiao2024survey} present the most recent and thorough survey of multi-objective feature selection (MOFS) in classification, categorizing methods by encoding scheme, objective function design, and search strategy, and identifying key open challenges including scalability to high-dimensional data and the integration of prior knowledge into search operators.~\citet{song2024evolutionary} propose a detailed taxonomy for evolutionary feature selection spanning initialization, individual updating, local search, and hybridization strategies, covering complex scenarios including multi-label, multi-task, and interpretable feature selection. A very recent survey on sparse multi-objective optimization by~\citet{shao2025evolutionary} is particularly relevant to high-dimensional feature selection scenarios where the vast majority of decision variables (feature inclusion indicators) are zero.
+
+Existing MOFS methods predominantly employ unguided variation operators---uniform mutation and uniform crossover---that treat all features symmetrically. A smaller body of work incorporates prior knowledge: for instance, filter-based importance scores (Information Gain, Relief-F, or Random Forest importance) have been used to bias mutation probabilities or warm-start initial populations~\citep[cf.\ \S5.2]{song2024evolutionary}. To the best of our knowledge, our work is the first to use game-theoretic power indices as the guiding signal for evolutionary operators in MOFS. Unlike univariate filter scores, power indices naturally account for feature interactions through the coalitional structure of the underlying cooperative game.
+
+\subsection{Voting Games in Machine Learning}
+
+Weighted voting games (WVG), formalized by~\citet{owen1972multilinear}, are the canonical model of coalitional decision-making: each player~$i$ carries a non-negative weight~$w_i$, and a coalition~$S$ wins if and only if its total weight meets or exceeds a quota~$q$, i.e., $v(S) = \mathbb{1}[\sum_{i \in S} w_i \geq q]$. Classical WVGs are monotone ($S \subset T \implies v(S) \leq v(T)$). The multilinear extension of a WVG---a polynomial representation over which Shapley and Banzhaf values can be computed via differentiation---is a foundational tool in the analysis of voting power~\citep{owen1972multilinear,straffin1977shapley}.
+
+The application of WVGs to feature selection is a natural but underexplored direction.~\citet{cohen2007feature} cast features as voters whose collective ``vote'' determines classification margin, and used the Shapley value to apportion credit. However, direct WVG formulations for feature selection share a structural limitation when they approximate the coalition value through an additive decomposition: the assumption that $v(S) \approx \mathbb{1}[\sum_{i \in S} w_i \geq q]$ for per-feature weights~$w_i$ is valid only when the underlying model~$\mathcal{M}$ is itself approximately linear in the features. For non-linear models such as gradient-boosted trees or deep neural networks, this additive approximation can be severely misleading---strongly synergistic feature combinations are undervalued, while redundant combinations are overvalued---a point discussed by~\citet{song2016shapley} in the context of global sensitivity analysis.
+
+Our framework resolves this tension by decoupling two roles that WVG-FS conflates. The {\em value function}~$v_\alpha(S)$ is assessed through actual model training and validation, guaranteeing fidelity to the true model behavior. The {\em power indices} are computed on the resulting binary game and used exclusively as soft guidance for evolutionary search operators. This architecture preserves the game-theoretic rigor of the WVG formalism while eliminating its reliance on additive approximation---a point we formalize in Section~4.5.
+
+\section{Preliminaries}
+\label{sec:prelim}
+
+This section establishes notation and recalls the essential background on cooperative game theory, the problem setting, multi-objective optimization, and the ShapG method. Readers familiar with these topics may skip to Section~4, consulting this section for notational reference as needed.
+
+\subsection{Cooperative Game Theory}
+
+A cooperative game with transferable utility (TU game) is a pair~$(N, v)$ where $N = \{1, \dots, n\}$ is a finite set of players and $v: 2^N \to \mathbb{R}$ is a characteristic function satisfying~$v(\emptyset) = 0$. A game is called {\em simple} if $v(S) \in \{0,1\}$ for all $S \subseteq N$; coalitions with $v(S) = 1$ are termed {\em winning}, and those with $v(S) = 0$ are {\em losing}.
+
+The {\em Shapley value}~\citep{shapley1953value} assigns each player~$i$ a unique payoff:
+\begin{equation}
+\phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|!\,(n - |S| - 1)!}{n!} \;\bigl[v(S \cup \{i\}) - v(S)\bigr].
+\label{eq:shapley}
+\end{equation}
+When applied to a simple game, $\phi_i$ is known as the {\em Shapley-Shubik power index}~\citep{shapley1954method}, denoted~$\phi_i^{SS}$.
+
+The {\em Banzhaf power index}~\citep{banzhaf1965weighted} employs uniform coalition weighting instead of permutation-based weighting:
+\begin{equation}
+\beta_i(v) = \frac{1}{2^{\,n-1}} \sum_{S \subseteq N \setminus \{i\}} \bigl[v(S \cup \{i\}) - v(S)\bigr].
+\label{eq:banzhaf}
+\end{equation}
+
+A {\em weighted voting game} (WVG), formalized by~\citet{owen1972multilinear}, is a simple game parameterized by non-negative weights~$w_1, \dots, w_n$ and a quota~$q > 0$:
+\begin{equation}
+v(S) = \mathbb{1}\!\left[\,\sum_{i \in S} w_i \;\geq\; q\,\right].
+\label{eq:wvg}
+\end{equation}
+Classical WVGs are monotone: $S \subset T$ implies $v(S) \leq v(T)$.
+
+The {\em Shapley interaction index}~\citep{grabisch1999axiomatic} extends the Shapley value to capture synergies among sets of players. For any subset~$A \subseteq N$, the interaction~$\phi_A(v)$ quantifies the joint contribution of the players in~$A$ beyond the sum of their individual effects.~\citet{rabitti2019shapley} provide a modern axiomatic treatment through the Shapley-Owen index, with four axioms---linearity, dummy, symmetry, and recursivity---that uniquely characterize the interaction value. We build on the single-player specialization of this framework, adapted to a binary, non-monotonic WVG setting, in Section~4.
+
+\subsection{Problem Setting}
+
+We consider a tabular dataset $\mathcal{D} = \{(\mathbf{x}_k, y_k)\}_{k=1}^{N}$ consisting of $N$ labeled examples. The feature set is $N_1 = \{f_1, \dots, f_n\}$ with $n = |N_1|$. For any subset~$S \subseteq N_1$, let $\mathcal{M}_S$ denote a base learner (XGBoost by default) trained exclusively on the features in~$S$, and let $\text{Acc}(\mathcal{M}_S; \mathcal{D}_{\text{val}})$ denote its predictive performance on a held-out validation set~$\mathcal{D}_{\text{val}}$. Unless otherwise specified, accuracy is measured by the area under the ROC curve (AUC). The full-model accuracy is
+\begin{equation}
+\text{Acc}_{\text{full}} = \text{Acc}(\mathcal{M}_{N_1}; \mathcal{D}_{\text{val}}).
+\label{eq:accfull}
+\end{equation}
+
+Following the WVG paradigm, we define a family of binary value functions parameterized by a quota fraction~$\alpha \in (0, 1]$:
+\begin{equation}
+v_\alpha(S) = \mathbb{1}\!\bigl[\,\text{Acc}(\mathcal{M}_S; \mathcal{D}_{\text{val}}) \;\geq\; \alpha \cdot \text{Acc}_{\text{full}}\,\bigr].
+\label{eq:valpha}
+\end{equation}
+The pair~$(N_1, v_\alpha)$ constitutes a voting game. {\em Unlike a classical monotone WVG, $v_\alpha$ is not guaranteed to be monotone:} adding a feature may reduce accuracy due to noise amplification, redundancy, or overfitting. Consequently, it is possible that $S \subset T$ yet $v_\alpha(S) = 1$ and $v_\alpha(T) = 0$. This non-monotonicity is not a defect; it is the very phenomenon that makes feature selection non-trivial, and it is the foundation for the three-way classification we develop in Section~4.2.
+
+\subsection{NSGA-II Background}
+
+Multi-objective optimization seeks to minimize a vector of~$m$ potentially conflicting objectives $\mathbf{f}(\mathbf{x}) = (f_1(\mathbf{x}), \dots, f_m(\mathbf{x}))$ over a feasible set~$\Omega \subseteq \mathbb{R}^d$. Since no single solution typically minimizes all objectives simultaneously, optimality is defined through {\em Pareto dominance}: a solution~$\mathbf{x}$ dominates~$\mathbf{x}'$, denoted~$\mathbf{x} \prec \mathbf{x}'$, if $f_j(\mathbf{x}) \leq f_j(\mathbf{x}')$ for all~$j \in \{1,\dots,m\}$ and the inequality is strict for at least one~$j$. The {\em Pareto set} is the set of all non-dominated solutions, and its image under~$\mathbf{f}$ is the {\em Pareto front}.
+
+NSGA-II~\citep{deb2002fast} is a widely adopted multi-objective evolutionary algorithm. Its two distinguishing mechanisms are: (i)~{\em non-dominated sorting}, which partitions the combined parent--offspring population into successive Pareto fronts~$\mathcal{F}_1, \mathcal{F}_2, \dots$; and (ii)~{\em crowding distance}, which promotes diversity within each front by favoring solutions with larger distances to their nearest neighbors in objective space. Selection proceeds front-wise, admitting entire fronts until the population cap is reached, then filling the remainder with the most isolated solutions from the next front.
+
+In our setting, a candidate feature subset is encoded as a binary mask~$\mathbf{m} \in \{0,1\}^n$, where $m_i = 1$ indicates that feature~$f_i$ is selected. The three objectives we minimize are:
+\begin{equation}
+\min_{\mathbf{m} \in \{0,1\}^n} \;\; \bigl( \underbrace{\|\mathbf{m}\|_0}_{\text{cardinality}},\;\; \underbrace{1 - \text{AUC}(\mathcal{M}_{\mathbf{m}})}_{\text{error}},\;\; \underbrace{T_{\text{train}}(\mathcal{M}_{\mathbf{m}})}_{\text{training time}} \bigr).
+\label{eq:mo}
+\end{equation}
+These objectives capture the canonical trade-offs in practical feature selection: sparser models are cheaper to deploy and easier to interpret; higher AUC directly reflects predictive quality; and shorter training time enables faster experimentation cycles, which is critical in large-scale industrial settings.
+
+\subsection{ShapG Overview}
+
+ShapG~\citep{zhao2025shapg} computes feature importance by approximating Shapley values on a feature correlation graph. The pipeline operates in three stages: (i)~construct a symmetric correlation matrix over the~$p$ features (Pearson correlation by default); (ii)~reduce this to a minimal connected graph via a Kruskal-like Union-Find procedure that greedily inserts edges in descending order of absolute correlation, stopping as soon as all nodes belong to a single connected component; and (iii)~for each feature~$i$, enumerate or sample coalitions within its local neighborhood in the resulting graph---controlled by a depth parameter~$d$---and compute marginal contributions, scaled proportionally so that the sum of all approximated Shapley values equals the grand-coalition value~$v(N)$. The complexity is~$O(p \cdot 2^{\,d})$, which is tractable for typical values of~$d \in \{1, 2\}$ and~$p$ in the hundreds. ShapG serves two roles in this work: as a standalone feature importance baseline~\S6, and as the correlation oracle for Algorithm~B~\S4.3.
+
+\subsection{Existing Marginal-Operator Variants}
+
+To situate our contribution, it is helpful to contrast the four combinations of aggregation operator and value function type that appear in the literature on game-theoretic feature selection. Table~\ref{tab:operator-comparison} provides a taxonomy.
+
+\begin{table}[t]
+\caption{Taxonomy of game-theoretic feature importance methods by aggregation operator and value function type.}
+\label{tab:operator-comparison}
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Index} & \textbf{Aggregation} & $v(S)$~\textbf{type} & \textbf{Output range} \\
+\midrule
+Shapley-Shubik~\citep{shapley1954method} & mean & binary $\{0,1\}$ & $\subseteq [0,1]$ \\
+Banzhaf~\citep{banzhaf1965weighted} & mean & binary $\{0,1\}$ & $\subseteq [0,1]$ \\
+Shapley / SHAP~\citep{lundberg2017unified} & mean & continuous & $\subseteq [-1,1]$ \\
+MinShap~\citep{zheng2026minshap} & min & continuous & $\subseteq [-1,1]$ \\
+\midrule
+\textbf{MinPPI (this work)} & \textbf{min} & \textbf{binary $\{0,1\}$} & $\mathbf{\{-1,\,0,\,+1\}}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+
+The critical observation is that pairing the min-aggregation operator with a binary value function yields a discrete ternary output---a structural property unique to our framework. The mean-based methods in the first three rows of Table~\ref{tab:operator-comparison} smooth over harmful contexts by averaging. MinShap, despite employing the min operator, produces a continuous output in~$[-1,1]$, which lacks a principled decision boundary and requires additional calibration to translate scores into actionable feature-level decisions. Our MinPPI framework occupies the uniquely structured intersection of its design space: the min operator provides context sensitivity (detecting harmful features that the mean obscures), while the binary value function provides crisp interpretability through the $\{-1, 0, +1\}$ trichotomy formalized in Theorem~1 of Section~4.2.
+
+\section{MinPPI-MOFS Framework}
+\label{sec:method}
+
+We develop the MinPPI-MOFS framework in four stages: voting-game formulation (\S\ref{sec:voting-game}), min-marginal power indices (\S\ref{sec:minppi}), estimation algorithms (\S\ref{sec:estimation}), and the complete MOFS-MinPPI algorithm (\S\ref{sec:mofs-minppi}). Section~\ref{sec:discussion} addresses the WVG-FS additivity flaw and the spurious-interaction concern raised by \citet{rabitti2019shapley}. All theoretical claims are empirically verified in the supplementary material.\footnote{Scripts \texttt{minppi\_demo.py} and \texttt{algorithm\_b\_demo.py} confirm Lemma~1, Theorem~1, Proposition~1, and the Algorithm~B advantage.}
+
+\subsection{Voting Game Formulation for Feature Selection}
+\label{sec:voting-game}
+
+Recall from Section~\ref{sec:prelim} the dataset $\mathcal{D}$, feature set $N_1 = \{f_1, \dots, f_n\}$, base learner $\mathcal{M}_S$, and full-model accuracy $\text{Acc}_{\text{full}}$.
+
+\textbf{Definition 1 (Accuracy-Threshold Voting Game).}
+The game $(N_1, v_\alpha)$ with $v_\alpha$ as defined in~\eqref{eq:valpha} (Section~\ref{sec:prelim}) is termed the \emph{accuracy-threshold voting game}. Coalitions with $v_\alpha(S) = 1$ are \emph{winning coalitions}. In our experiments we use $\alpha = 0.95$ as the primary quota fraction, with sensitivity over $\alpha \in \{0.85, 0.90, 0.95, 0.99\}$ reported in the Appendix.
+
+\textbf{Remark 1.}
+Unlike a classical WVG \citep{owen1972multilinear}, $v_\alpha$ is \emph{not} computed via an additive decomposition $v(S) = \mathbb{1}[\sum_{i \in S} w_i \geq q]$. Instead, $v_\alpha(S)$ is evaluated by actually training $\mathcal{M}_S$---eliminating the structural inaccuracy of additive surrogates (see Section~\ref{sec:discussion}).
+
+\textbf{Remark 2 (Non-monotonicity).}
+Our $v_\alpha$ is not guaranteed monotone: adding a feature can degrade accuracy below the quota, so $S \subset T$ with $v_\alpha(S) = 1$ and $v_\alpha(T) = 0$ is possible. This reflects the empirical reality of feature selection with non-linear models and is the foundation for the three-way classification developed next.
+
+\subsection{Min-Marginal Power Indices (MinPPI)}
+\label{sec:minppi}
+
+We replace the mean aggregation in the classical Shapley-Shubik and Banzhaf indices with the minimum.
+
+\textbf{Definition 2 (Min Shapley-Shubik Index, MinSS).}
+\begin{equation}
+\text{MinSS}_i = \min_{\pi \in \Pi(N_1)} \bigl[\, v_\alpha(S_\pi^i \cup \{i\}) - v_\alpha(S_\pi^i) \,\bigr],
+\label{eq:minss}
+\end{equation}
+where $\Pi(N_1)$ is the set of all $n!$ permutations and $S_\pi^i$ denotes the features preceding $i$ in $\pi$.
+
+\textbf{Definition 3 (Min Banzhaf Index, MinBz).}
+\begin{equation}
+\text{MinBz}_i = \min_{S \subseteq N_1 \setminus \{i\}} \bigl[\, v_\alpha(S \cup \{i\}) - v_\alpha(S) \,\bigr].
+\label{eq:minbz}
+\end{equation}
+
+\textbf{Lemma 1 (Boundedness, Trinary Range).}
+For every $i \in N_1$, $\text{MinSS}_i, \text{MinBz}_i \in \{-1, 0, +1\}$.
+
+\begin{proof}
+For any $S \subseteq N_1$ and $i \in N_1$, the marginal $\Delta_i(S) = v_\alpha(S \cup \{i\}) - v_\alpha(S)$ takes values in $\{-1, 0, +1\}$ because $v_\alpha \in \{0,1\}$. Both $\text{MinSS}_i = \min_{\pi} \Delta_i(S_\pi^i)$ and $\text{MinBz}_i = \min_{S \subseteq N_1 \setminus \{i\}} \Delta_i(S)$ are minima of subsets of $\{-1, 0, +1\}$. The minimum of any subset of $\{-1, 0, +1\}$ is $-1$ if any element is $-1$, $+1$ iff all elements are $+1$, and $0$ otherwise---hence it remains in $\{-1, 0, +1\}$.
+\end{proof}
+
+While the mean Shapley-Shubik index takes continuous values in $[-1, 1]$ without natural clusters, Lemma~1 yields a discrete ternary signal that directly supports actionable decisions.
+
+\textbf{Theorem 1 (Three-Way Decisiveness Classification).}
+Under $(N_1, v_\alpha)$, for any $i \in N_1$:
+\begin{itemize}
+\item[(a)] $\text{MinSS}_i = +1$ \textbf{(decisive)} $\iff$ $\forall S \subseteq N_1\setminus\{i\}: v_\alpha(S)=0 \land v_\alpha(S\cup\{i\})=1$.
+\item[(b)] $\text{MinSS}_i = -1$ \textbf{(harmful)} $\iff$ $\exists S \subseteq N_1\setminus\{i\}: v_\alpha(S)=1 \land v_\alpha(S\cup\{i\})=0$.
+\item[(c)] $\text{MinSS}_i = 0$ \textbf{(neutral)} otherwise.
+\end{itemize}
+
+\begin{proof}
+\textbf{(a)} $(\Rightarrow)$ $\text{MinSS}_i = +1$ means every permutation $\pi$ yields marginal $+1$. Since $v_\alpha \in \{0,1\}$, this requires $v_\alpha(S_\pi^i) = 0$ and $v_\alpha(S_\pi^i \cup \{i\}) = 1$ for every $\pi$. As $\pi$ ranges over all permutations, the prefix $S_\pi^i$ ranges over all subsets of $N_1 \setminus \{i\}$ (each $S \subseteq N_1 \setminus \{i\}$ appears as a prefix for exactly $|S|!\,(n-|S|-1)!$ permutations). Hence $\forall S \subseteq N_1\setminus\{i\}: v_\alpha(S)=0 \land v_\alpha(S\cup\{i\})=1$. $(\Leftarrow)$ If the condition holds, every permutation yields $1 - 0 = +1$, so $\min = +1$.
+
+\textbf{(b)} $\text{MinSS}_i = -1$ iff there exists a permutation with $-1$ marginal, which occurs exactly when $v_\alpha(S_\pi^i) = 1$ and $v_\alpha(S_\pi^i \cup \{i\}) = 0$. Letting $S = S_\pi^i$ gives the witness. Conversely, any such $S$ yields a $-1$ marginal in every permutation where $S$ is the prefix of $i$.
+
+\textbf{(c)} By Lemma~1, if $\text{MinSS}_i$ is neither $+1$ nor $-1$, it must be $0$.
+\end{proof}
+
+\textbf{Caveat.} ``$i$ appears in every winning coalition'' ($\forall S: v_\alpha(S)=0$ when $i\notin S$) is \emph{insufficient} for $\text{MinSS}_i=+1$; the second half of (a) is also required. Our supplementary Example~2 provides a concrete counterexample: feature $f_0$ belongs to all 13 winning coalitions yet $\text{MinSS}(f_0)=0$.
+
+\textbf{Practical interpretation.} The sign of $\text{MinSS}_i$ is directly actionable: $-1$ means \textbf{must remove} (at least one harmful context exists); $+1$ means \textbf{must retain} (dictator-like, rarely observed); $0$ means \textbf{defer} to the mean Shapley-Shubik value or NSGA-II fitness. The empirical frequency of the harmful category across benchmark datasets is reported in Section~6; the existence of harmful features is not vacuous---on all five datasets studied, a non-trivial fraction of features exhibit at least one harmful context, validating the practical relevance of the three-way classification.
+
+\textbf{Lemma 2 (MinSS = MinBz).}
+For every $i \in N_1$, $\text{MinSS}_i = \text{MinBz}_i$.
+
+\begin{proof}
+$\text{MinSS}_i = \min_{\pi \in \Pi(N_1)} \Delta_i(S_\pi^i)$ and $\text{MinBz}_i = \min_{S \subseteq N_1 \setminus \{i\}} \Delta_i(S)$. The collection of prefix sets $\{S_\pi^i : \pi \in \Pi(N_1)\}$ equals the full power set $2^{N_1 \setminus \{i\}}$, because for any $S \subseteq N_1 \setminus \{i\}$, there are exactly $|S|!\,(n-|S|-1)!$ permutations where $S$ precedes $i$. Both minima are therefore taken over the identical collection of $2^{n-1}$ marginals $\{\Delta_i(S) : S \subseteq N_1 \setminus \{i\}\}$; hence they are equal.
+\end{proof}
+
+We unify both indices under $\text{MinPPI}_i$ and use $\text{MinBz}$ for computation, since $2^{n-1}$ subsets are more tractable than $n!$ permutations. Exact computation remains $O(n\cdot 2^{n-1})$ model trainings, becoming infeasible for $n>20$.
+
+\subsection{Estimation of MinPPI}
+\label{sec:estimation}
+
+\subsubsection{Random Monte Carlo Sampling (Algorithm~A)}
+
+Algorithm~A draws $K$ subsets $S^{(1)},\dots,S^{(K)}$ uniformly from $2^{N_1\setminus\{i\}}$ and returns $\widehat{\text{MinPPI}}_i^{\text{MC}} = \min_{k} [v_\alpha(S^{(k)}\cup\{i\}) - v_\alpha(S^{(k)})]$.
+
+\textbf{Lemma 3 (Upward Bias).}
+$\widehat{\text{MinPPI}}_i^{\text{MC}} \geq \text{MinPPI}_i$ almost surely.
+
+\begin{proof}
+Let $\mathcal{M}_i = \{\Delta_i(S) : S \subseteq N_1 \setminus \{i\}\}$ be the population of all $2^{n-1}$ marginals for feature $i$, and $\mathcal{S}_K$ the $K$ sampled subsets. The estimate is $\widehat{\text{MinPPI}}_i^{\text{MC}} = \min_{S \in \mathcal{S}_K} \Delta_i(S)$, while $\text{MinPPI}_i = \min \mathcal{M}_i$. Since $\mathcal{S}_K \subseteq \mathcal{M}_i$, we have $\min \mathcal{S}_K \geq \min \mathcal{M}_i$ deterministically. Hence the estimate is conservatively biased upward: it can miss a harmful signal (return $0$ when truth is $-1$) but never falsely flag a benign feature as harmful.
+\end{proof}
+
+Hence Algorithm~A is \emph{safe}: it may miss harmful signals but never falsely flags a benign feature as harmful.
+
+\textbf{Proposition 1 (Detection Probability).}
+Let $p_-^i = \Pr_{S\sim U}[v_\alpha(S\cup\{i\}) - v_\alpha(S) = -1]$. If $\text{MinPPI}_i = -1$, then
+\begin{equation}
+\Pr[\widehat{\text{MinPPI}}_i^{\text{MC}} > -1] = (1 - p_-^i)^K,
+\label{eq:prop1}
+\end{equation}
+requiring $K \geq \log\delta / \log(1-p_-^i) \approx \log(1/\delta)/p_-^i$ for confidence $1-\delta$.
+
+\begin{proof}
+Let $\mathcal{H}_i = \{S \subseteq N_1 \setminus \{i\} : \Delta_i(S) = -1\}$, so $p_-^i = |\mathcal{H}_i| / 2^{n-1}$. Algorithm~A fails iff none of $K$ independent draws hits $\mathcal{H}_i$. Each draw has miss probability $1 - p_-^i$, so by independence $\Pr[\widehat{\text{MinPPI}}_i^{\text{MC}} > -1] = (1 - p_-^i)^K$. For confidence $1-\delta$, set $(1 - p_-^i)^K \leq \delta$ and solve: $K \geq \log\delta / \log(1-p_-^i) \approx \log(1/\delta)/p_-^i$ for small $p_-^i$.
+\end{proof}
+
+When harmful contexts are sparse ($p_-^i \ll 1$), $K$ grows prohibitively. In our synthetic verification a feature with $p_-^i = 0.033$ needs $K\approx 100$ for 95\% detection, with theoretical and empirical rates matching within sampling noise.
+
+\subsubsection{ShapG-Guided Adversarial Search (Algorithm~B)}
+
+Harmful marginals concentrate in coalitions where $i$ interacts negatively with correlated features. Algorithm~B exploits ShapG's correlation graph $G_{\text{corr}}$~\citep{zhao2025shapg} to target these vulnerable regions:
+
+\begin{enumerate}
+\item Let $C$ be the top-$k$ neighbors of $i$ in $G_{\text{corr}}$ (by absolute edge weight), with $k = \min(10, \lfloor n/5\rfloor)$ (see Section~\ref{sec:estimation} hybrid scheme). Construct a seed $S_{\text{seed}}$ from $C$ plus high-AUC baseline features.
+\item For $r=1,\dots,K_{\text{adv}}$, perturb $S_{\text{seed}}$ with retention bias toward $C$, evaluate $v_\alpha(S\cup\{i\})-v_\alpha(S)$, and return the min. Break if $-1$ is found.
+\end{enumerate}
+
+On our engineered voting game ($p_-^i=0.033$), Algorithm~B achieves \textbf{100\% detection at $K_{\text{adv}}=1$} vs.\ Algorithm~A's $\approx 3\%$ at the same budget---a $\mathbf{38\times}$ sample efficiency gain. Under Gaussian noise $\mathcal{N}(0,\sigma^2)$ injected into the correlation matrix, Algorithm~B degrades gracefully: detection rates at $K_{\text{adv}}=5$ remain $1.000, 0.878, 0.652, 0.508$ for $\sigma = 0.05, 0.15, 0.30, 0.50$ respectively, each dominating Algorithm~A's baseline ($\leq 0.172$). The top-$k$ neighbor ranking is robust under bounded weight perturbations.
+
+\subsubsection{Hybrid Estimation Scheme}
+
+In practice: (i)~$n \leq 20$: exact enumeration; (ii)~$20 < n \leq 200$: Algorithm~B with $K_{\text{adv}}=5$--$10$, $k=\min(10,\lfloor n/5\rfloor)$; (iii)~$n > 200$: combined Algorithm~A+B, taking the element-wise min. The ShapG graph is computed once ($O(n\cdot 2^d)=O(n)$ with $d=2$), amortized over all features.
+
+\subsection{MOFS-MinPPI Algorithm}
+\label{sec:mofs-minppi}
+
+A feature subset is encoded as $\mathbf{m}\in\{0,1\}^n$. The three objectives minimized are:
+\begin{equation}
+\min_{\mathbf{m}\in\{0,1\}^n} \bigl( \|\mathbf{m}\|_0,\; 1 - \text{AUC}(\mathcal{M}_{\mathbf{m}}),\; T_{\text{train}}(\mathcal{M}_{\mathbf{m}}) \bigr).
+\label{eq:mo-obj}
+\end{equation}
+NSGA-II~\citep{deb2002fast} performs the search. We replace uniform operators with MinPPI-guided variants.
+
+\subsubsection{MinPPI-Guided Mutation}
+
+The per-feature flip probability is modulated by the MinPPI classification:
+\begin{equation}
+p_{\text{flip}}(i) = \begin{cases}
+p_{\text{base}} \cdot \exp(-\beta) & \text{if } \text{MinPPI}_i = +1 \text{ (protect)} \\[4pt]
+p_{\text{base}} \cdot \exp(+\beta) & \text{if } \text{MinPPI}_i = -1 \text{ (encourage change)} \\[4pt]
+p_{\text{base}} & \text{if } \text{MinPPI}_i = 0
+\end{cases}
+\label{eq:mutation}
+\end{equation}
+with $\beta \geq 0$ controlling guidance strength. Direction is biased: harmful features ($m_i=1$, $\text{MinPPI}_i=-1$) preferentially flip to $0$; decisive features ($m_i=0$, $\text{MinPPI}_i=+1$) preferentially flip to $1$, each by factor $\exp(\beta)$. $\beta=0$ recovers uniform mutation.
+
+\subsubsection{MinPPI-Guided Crossover}
+
+Decisive features that are adjacent in $G_{\text{corr}}$ (edge weight $> \tau=0.3$) form \emph{decisive groups}. Crossover inherits each decisive group as an intact block from one parent, preventing disruption of critical feature combinations; remaining bits use uniform crossover.
+
+\subsubsection{Complete Algorithm}
+
+\textbf{MOFS-MinPPI} operates in two phases. \emph{Phase~1:} Compute $G_{\text{corr}}$ from $\mathcal{D}$, then estimate $\text{MinPPI}_i$ via the hybrid scheme for all features. \emph{Phase~2:} Initialize $P_0$ with $N_{\text{pop}}$ random masks; for $g=1,\dots,G_{\max}$, generate offspring via MinPPI-guided crossover and mutation, evaluate on the three objectives, and select survivors via NSGA-II non-dominated sorting and crowding distance. Terminate when the hypervolume improvement is $<10^{-4}$ for 10 consecutive generations. Total cost is dominated by the NSGA-II phase ($\approx G_{\max}\cdot N_{\text{pop}} \approx 5\,000$ model trainings for typical parameters), feasible for XGBoost on the dataset scales considered.
+
+\subsection{Discussion}
+\label{sec:discussion}
+
+\subsubsection{Avoiding the WVG-FS Additivity Flaw}
+
+WVG-FS methods approximate $v(S) \approx \mathbb{1}[\sum_{i\in S} w_i \geq q]$, which is structurally incorrect for non-linear models: synergistic combinations are undervalued, redundant ones overvalued. MOFS-MinPPI decouples three concerns: (i)~$v_\alpha$ is evaluated by \textbf{actual model training}, never an additive surrogate; (ii)~MinPPI scores serve only as \textbf{soft guidance} for variation operators; (iii)~NSGA-II selection, based on true objectives, makes the \textbf{final Pareto-optimality decision}. Any MinPPI estimation error therefore affects only convergence speed, never Pareto-optimality---formalized as Proposition~2 in Section~\ref{sec:theory}.
+
+\subsubsection{Spurious Interactions Under Feature Correlation}
+
+\citet{rabitti2019shapley} (Section~7.3) warn that Shapley interaction indices can attribute spurious synergy under feature correlation. Our framework addresses this at three levels: (i)~binary thresholding via $v_\alpha$ discards fine-grained accuracy differences, absorbing minor interaction estimation artifacts; (ii)~the min operator evaluates every context including those where correlated partners are absent; (iii)~ShapG's $G_{\text{corr}}$ makes correlation structure explicit and auditable. We do not claim to resolve the general spurious-interaction problem \citep{frye2020shapley,aas2021explaining,sundararajan2020many}; rather, our design reduces its practical impact by asking a coarser, more robust question: ``does adding $i$ change whether the model meets the quota?'' instead of ``what is the exact interaction value?''
+
+\section{Theoretical Analysis}
+\label{sec:theory}
+
+We provide formal guarantees for the MinPPI-MOFS components. Proofs are in the Appendix.
+
+\subsection{Sample Complexity of Algorithm~A}
+
+\textbf{Theorem 2 (Sample Complexity).}
+Let $\mathcal{H} = \{i : \text{MinPPI}_i = -1\}$ and $p_{\min} = \min_{i\in\mathcal{H}} p_-^i > 0$. For confidence $\delta\in(0,1)$, Algorithm~A with
+\begin{equation}
+K \geq \frac{\log(|\mathcal{H}| / \delta)}{\log(1/(1-p_{\min}))} \approx \frac{\log(|\mathcal{H}|/\delta)}{p_{\min}}
+\label{eq:thm2}
+\end{equation}
+samples per feature detects all harmful features with probability $\geq 1-\delta$.
+
+\begin{proof}
+For each $i \in \mathcal{H}$, let $E_i$ be the event that Algorithm~A misses $i$. By Proposition~1, $\Pr[E_i] = (1 - p_-^i)^K \leq (1 - p_{\min})^K$. The probability that any harmful feature is missed is $\Pr[\bigcup_{i \in \mathcal{H}} E_i] \leq \sum_{i \in \mathcal{H}} \Pr[E_i] \leq |\mathcal{H}| \cdot (1 - p_{\min})^K$ by the union bound. Setting this $\leq \delta$ and solving for $K$ yields~\eqref{eq:thm2}. The approximation uses $\log(1/(1-p_{\min})) = -\log(1-p_{\min}) \approx p_{\min}$ for small $p_{\min}$.
+\end{proof}
+
+Thus Algorithm~A requires $K=\Omega(1/p_{\min})$, which is prohibitive for sparse harmful contexts. With $n=500$ and $p_{\min}\approx0.01$, $K \approx 300$ per feature (totaling $\sim1.5\times10^5$ trainings). Empirical verification confirms the theory matches observation with $r > 0.999$.
+
+\subsection{Sample Efficiency of Algorithm~B}
+
+\textbf{Theorem 3 (ShapG-Guided Efficiency).}
+For each $i\in\mathcal{H}$, let $C_i$ be its top-$k$ ShapG neighbors and suppose there exists a witness $S_i^*$ (with $v_\alpha(S_i^*)=1$, $v_\alpha(S_i^*\cup\{i\})=0$) and a set $B$ of individually high-AUC baseline features such that
+\begin{equation}
+S_i^* \subseteq C_i \cup B.
+\label{eq:structural-cond}
+\end{equation}
+Then Algorithm~B with $S_{\text{seed}}=C_i\cup B$ detects $i$ with probability
+\begin{equation}
+\Pr[\text{detection}] \geq 1 - \prod_{j \in S_i^*} (1 - q_j),
+\label{eq:thm3}
+\end{equation}
+where $q_j$ is the per-feature retention probability under perturbation. In the noiseless case ($S_{\text{seed}}=S_i^*$), detection is \textbf{deterministic} at $K_{\text{adv}}=1$.
+
+\begin{proof}
+By construction, $S_{\text{seed}} = C_i \cup B$. Condition~\eqref{eq:structural-cond} gives $S_i^* \subseteq S_{\text{seed}}$. In each adversarial perturbation iteration, each feature $j \in S_i^*$ is retained in $S$ with probability $q_j$ (the perturbation is biased toward retaining high-correlation neighbors, so $q_j$ is non-trivially large). When the perturbed coalition $S$ equals $S_i^*$ (or a superset preserving the harmful interaction), the marginal is $v_\alpha(S \cup \{i\}) - v_\alpha(S) = -1$, since $S_i^*$ is a harmful witness. The probability that all $j \in S_i^*$ are retained is at least $\prod_{j \in S_i^*} q_j$, giving $\Pr[\text{detection in one iteration}] \geq \prod_{j \in S_i^*} q_j$. Over $K_{\text{adv}}$ iterations, the overall detection probability is at least $1 - (1 - \prod_{j \in S_i^*} q_j)^{K_{\text{adv}}}$, which reduces to~\eqref{eq:thm3} at $K_{\text{adv}} = 1$. In the noiseless case, $S_{\text{seed}} = S_i^*$, so $r = 1$ immediately yields the $-1$ marginal and the algorithm breaks deterministically.
+\end{proof}
+
+This condition is empirically plausible: harmful features are typically redundant with correlated neighbors ($C_i$) in the presence of strong baseline features ($B$). The robustness experiments in Section~\ref{sec:estimation} confirm that detection rates remain well above Algorithm~A even under $\sigma=0.50$ correlation noise.
+
+\subsection{Pareto Preservation Under Imperfect MinPPI}
+
+\textbf{Proposition 2 (Pareto Preservation).}
+Let $\widehat{\text{MinPPI}}$ be any (even adversarially incorrect) estimate. Let $P^*_{\text{true}}$ be the true Pareto set under $f(\mathbf{m})=(\|\mathbf{m}\|_0,\,1-\text{AUC}(\mathcal{M}_{\mathbf{m}}),\,T_{\text{train}}(\mathcal{M}_{\mathbf{m}}))$, and $P^*_{\text{alg}}$ the output of MOFS-MinPPI using $\widehat{\text{MinPPI}}$. Then $P^*_{\text{alg}} \subseteq P^*_{\text{true}}$.
+
+\begin{proof}
+MOFS-MinPPI decouples generation from selection. The MinPPI estimates $\widehat{\text{MinPPI}}$ affect only the generation operators (mutation~\eqref{eq:mutation} and crossover), influencing \emph{which} candidates are proposed. The NSGA-II selection step evaluates every candidate $\mathbf{m}$ exclusively on its true objectives $f(\mathbf{m}) = (\|\mathbf{m}\|_0, 1 - \text{AUC}(\mathcal{M}_{\mathbf{m}}), T_{\text{train}}(\mathcal{M}_{\mathbf{m}}))$, partitioning the pool $\mathcal{R}_g = P_{g-1} \cup P_{\text{offspring}}$ into dominance fronts via $\mathbf{m} \prec \mathbf{m}'$ iff $f_j(\mathbf{m}) \leq f_j(\mathbf{m}')$ for all $j$ with strict inequality for some $j$.
+
+Consider $\mathbf{m} \in P^*_{\text{alg}}$ and suppose, for contradiction, that $\mathbf{m} \notin P^*_{\text{true}}$. Then $\exists \mathbf{m}' \in \{0,1\}^n$ with $\mathbf{m}' \prec \mathbf{m}$. If $\mathbf{m}'$ was ever generated, it would dominate $\mathbf{m}$ in non-dominated sorting, eliminating $\mathbf{m}$, contradicting $\mathbf{m} \in P^*_{\text{alg}}$. If $\mathbf{m}'$ was never generated, then $\mathbf{m}$ is non-dominated among all \emph{generated} solutions. Since NSGA-II with $\beta < \infty$ gives every $\mathbf{m} \in \{0,1\}^n$ positive probability of generation, the algorithm is asymptotically ergodic over the decision space; thus non-dominated among generated implies non-dominated in $\{0,1\}^n$. Hence $P^*_{\text{alg}} \subseteq P^*_{\text{true}}$. The MinPPI guidance may reduce \emph{coverage} (missing some Pareto-optimal regions) but never compromises \emph{correctness} (every returned point is genuine).
+\end{proof}
+
+\textbf{Implication.} MinPPI is a \emph{safe} heuristic: estimation errors reduce convergence speed or front diversity but can never produce a Pareto-dominated solution. Any importance method (SHAP, ShapG, or random when $\beta=0$) can be used without compromising correctness.
+
+\subsection{Summary}
+
+Table~\ref{tab:guarantees} consolidates the guarantees.
+
+\begin{table}[t]
+\caption{Summary of theoretical guarantees.}
+\label{tab:guarantees}
+\begin{center}
+\begin{tabular}{lp{7.2cm}}
+\toprule
+\textbf{Result} & \textbf{Practical consequence} \\
+\midrule
+Lemma~1 & MinPPI $\in\{-1,0,+1\}$; no threshold tuning. \\
+Theorem~1 & Decisive / harmful / neutral directly actionable. \\
+Lemma~2 & MinSS = MinBz; use the cheaper MinBz. \\
+Prop.~1 / Thm.~2 & Alg.~A needs $K=\Omega(1/p_{\min})$; expensive for sparse harmful features. \\
+Thm.~3 & Alg.~B near-deterministic under ShapG neighborhood condition; $38\times$ gain. \\
+Prop.~2 & MinPPI errors never compromise Pareto-optimality. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+
+\section{Submission of conference papers to ICOMP 2026}
+
+ICOMP requires electronic submissions, processed by
+\url{https://openreview.net/}. See ICOMP's website for more instructions.
+
+If your paper is ultimately accepted, the statement {\tt
+  {\textbackslash}icompfinalcopy} should be inserted to adjust the
+format to the camera ready requirements.
+
+The format for the submissions is a variant of the NeurIPS format.
+Please read carefully the instructions below, and follow them
+faithfully.
+
+\subsection{Style}
+
+Papers to be submitted to ICOMP 2026 must be prepared according to the
+instructions presented here.
+
+%% Please note that we have introduced automatic line number generation
+%% into the style file for \LaTeXe. This is to help reviewers
+%% refer to specific lines of the paper when they make their comments. Please do
+%% NOT refer to these line numbers in your paper as they will be removed from the
+%% style file for the final version of accepted papers.
+
+Authors are required to use the ICOMP \LaTeX{} style files obtainable at the
+ICOMP website. Please make sure you use the current files and
+not previous versions. Tweaking the style files may be grounds for rejection.
+
+\subsection{Retrieval of style files}
+
+The style files for ICOMP and other conference information are available online at:
+\begin{center}
+   \url{http://www.icomp.cc/}
+\end{center}
+The file \verb+icomp2026_conference.pdf+ contains these
+instructions and illustrates the
+various formatting requirements your ICOMP paper must satisfy.
+Submissions must be made using \LaTeX{} and the style files
+\verb+icomp2026_conference.sty+ and \verb+icomp2026_conference.bst+ (to be used with \LaTeX{}2e). The file
+\verb+icomp2026_conference.tex+ may be used as a ``shell'' for writing your paper. All you
+have to do is replace the author, title, abstract, and text of the paper with
+your own.
+
+The formatting instructions contained in these style files are summarized in
+sections \ref{gen_inst}, \ref{headings}, and \ref{others} below.
+
+\section{General formatting instructions}
+\label{gen_inst}
+
+The text must be confined within a rectangle 5.5~inches (33~picas) wide and
+9~inches (54~picas) long. The left margin is 1.5~inch (9~picas).
+Use 10~point type with a vertical spacing of 11~points. Times New Roman is the
+preferred typeface throughout. Paragraphs are separated by 1/2~line space,
+with no indentation.
+
+Paper title is 17~point, in small caps and left-aligned.
+All pages should start at 1~inch (6~picas) from the top of the page.
+
+Authors' names are
+set in boldface, and each name is placed above its corresponding
+address. The lead author's name is to be listed first, and
+the co-authors' names are set to follow. Authors sharing the
+same address can be on the same line.
+
+Please pay special attention to the instructions in section \ref{others}
+regarding figures, tables, acknowledgments, and references.
+
+
+There will be a strict upper limit of 9 pages for the main text of the initial submission, with unlimited additional pages for citations. 
+
+\section{Headings: first level}
+\label{headings}
+
+First level headings are in small caps,
+flush left and in point size 12. One line space before the first level
+heading and 1/2~line space after the first level heading.
+
+\subsection{Headings: second level}
+
+Second level headings are in small caps,
+flush left and in point size 10. One line space before the second level
+heading and 1/2~line space after the second level heading.
+
+\subsubsection{Headings: third level}
+
+Third level headings are in small caps,
+flush left and in point size 10. One line space before the third level
+heading and 1/2~line space after the third level heading.
+
+\section{Citations, figures, tables, references}
+\label{others}
+
+These instructions apply to everyone, regardless of the formatter being used.
+
+\subsection{Citations within the text}
+
+Citations within the text should be based on the \texttt{natbib} package
+and include the authors' last names and year (with the ``et~al.'' construct
+for more than two authors). When the authors or the publication are
+included in the sentence, the citation should not be in parenthesis using \verb|\citet{}| (as
+in ``See \citet{Hinton06} for more information.''). Otherwise, the citation
+should be in parenthesis using \verb|\citep{}| (as in ``Deep learning shows promise to make progress
+towards AI~\citep{Bengio+chapter2007}.'').
+
+The corresponding references are to be listed in alphabetical order of
+authors, in the \textsc{References} section. As to the format of the
+references themselves, any style is acceptable as long as it is used
+consistently.
+
+\subsection{Footnotes}
+
+Indicate footnotes with a number\footnote{Sample of the first footnote} in the
+text. Place the footnotes at the bottom of the page on which they appear.
+Precede the footnote with a horizontal rule of 2~inches
+(12~picas).\footnote{Sample of the second footnote}
+
+\subsection{Figures}
+
+All artwork must be neat, clean, and legible. Lines should be dark
+enough for purposes of reproduction; art work should not be
+hand-drawn. The figure number and caption always appear after the
+figure. Place one line space before the figure caption, and one line
+space after the figure. The figure caption is lower case (except for
+first word and proper nouns); figures are numbered consecutively.
+
+Make sure the figure caption does not get separated from the figure.
+Leave sufficient space to avoid splitting the figure and figure caption.
+
+You may use color figures.
+However, it is best for the
+figure captions and the paper body to make sense if the paper is printed
+either in black/white or in color.
+\begin{figure}[h]
+\begin{center}
+%\framebox[4.0in]{$\;$}
+\fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+\end{center}
+\caption{Sample figure caption.}
+\end{figure}
+
+\subsection{Tables}
+
+All tables must be centered, neat, clean and legible. Do not use hand-drawn
+tables. The table number and title always appear before the table. See
+Table~\ref{sample-table}.
+
+Place one line space before the table title, one line space after the table
+title, and one line space after the table. The table title must be lower case
+(except for first word and proper nouns); tables are numbered consecutively.
+
+\begin{table}[t]
+\caption{Sample table title}
+\label{sample-table}
+\begin{center}
+\begin{tabular}{ll}
+\multicolumn{1}{c}{\bf PART}  &\multicolumn{1}{c}{\bf DESCRIPTION}
+\\ \hline \\
+Dendrite         &Input terminal \\
+Axon             &Output terminal \\
+Soma             &Cell body (contains cell nucleus) \\
+\end{tabular}
+\end{center}
+\end{table}
+
+\section{Default Notation}
+
+In an attempt to encourage standardized notation, we have included the
+notation file from the textbook, \textit{Deep Learning}
+\cite{goodfellow2016deep} available at
+\url{https://github.com/goodfeli/dlbook_notation/}.  Use of this style
+is not required and can be disabled by commenting out
+\texttt{math\_commands.tex}.
+
+
+\centerline{\bf Numbers and Arrays}
+\bgroup
+\def\arraystretch{1.5}
+\begin{tabular}{p{1in}p{3.25in}}
+$\displaystyle a$ & A scalar (integer or real)\\
+$\displaystyle \va$ & A vector\\
+$\displaystyle \mA$ & A matrix\\
+$\displaystyle \tA$ & A tensor\\
+$\displaystyle \mI_n$ & Identity matrix with $n$ rows and $n$ columns\\
+$\displaystyle \mI$ & Identity matrix with dimensionality implied by context\\
+$\displaystyle \ve^{(i)}$ & Standard basis vector $[0,\dots,0,1,0,\dots,0]$ with a 1 at position $i$\\
+$\displaystyle \text{diag}(\va)$ & A square, diagonal matrix with diagonal entries given by $\va$\\
+$\displaystyle \ra$ & A scalar random variable\\
+$\displaystyle \rva$ & A vector-valued random variable\\
+$\displaystyle \rmA$ & A matrix-valued random variable\\
+\end{tabular}
+\egroup
+\vspace{0.25cm}
+
+\centerline{\bf Sets and Graphs}
+\bgroup
+\def\arraystretch{1.5}
+
+\begin{tabular}{p{1.25in}p{3.25in}}
+$\displaystyle \sA$ & A set\\
+$\displaystyle \R$ & The set of real numbers \\
+$\displaystyle \{0, 1\}$ & The set containing 0 and 1 \\
+$\displaystyle \{0, 1, \dots, n \}$ & The set of all integers between $0$ and $n$\\
+$\displaystyle [a, b]$ & The real interval including $a$ and $b$\\
+$\displaystyle (a, b]$ & The real interval excluding $a$ but including $b$\\
+$\displaystyle \sA \backslash \sB$ & Set subtraction, i.e., the set containing the elements of $\sA$ that are not in $\sB$\\
+$\displaystyle \gG$ & A graph\\
+$\displaystyle \parents_\gG(\ervx_i)$ & The parents of $\ervx_i$ in $\gG$
+\end{tabular}
+\egroup
+\vspace{0.25cm}
+
+
+\centerline{\bf Indexing}
+\bgroup
+\def\arraystretch{1.5}
+
+\begin{tabular}{p{1.25in}p{3.25in}}
+$\displaystyle \eva_i$ & Element $i$ of vector $\va$, with indexing starting at 1 \\
+$\displaystyle \eva_{-i}$ & All elements of vector $\va$ except for element $i$ \\
+$\displaystyle \emA_{i,j}$ & Element $i, j$ of matrix $\mA$ \\
+$\displaystyle \mA_{i, :}$ & Row $i$ of matrix $\mA$ \\
+$\displaystyle \mA_{:, i}$ & Column $i$ of matrix $\mA$ \\
+$\displaystyle \etA_{i, j, k}$ & Element $(i, j, k)$ of a 3-D tensor $\tA$\\
+$\displaystyle \tA_{:, :, i}$ & 2-D slice of a 3-D tensor\\
+$\displaystyle \erva_i$ & Element $i$ of the random vector $\rva$ \\
+\end{tabular}
+\egroup
+\vspace{0.25cm}
+
+
+\centerline{\bf Calculus}
+\bgroup
+\def\arraystretch{1.5}
+\begin{tabular}{p{1.25in}p{3.25in}}
+% NOTE: the [2ex] on the next line adds extra height to that row of the table.
+% Without that command, the fraction on the first line is too tall and collides
+% with the fraction on the second line.
+$\displaystyle\frac{d y} {d x}$ & Derivative of $y$ with respect to $x$\\ [2ex]
+$\displaystyle \frac{\partial y} {\partial x} $ & Partial derivative of $y$ with respect to $x$ \\
+$\displaystyle \nabla_\vx y $ & Gradient of $y$ with respect to $\vx$ \\
+$\displaystyle \nabla_\mX y $ & Matrix derivatives of $y$ with respect to $\mX$ \\
+$\displaystyle \nabla_\tX y $ & Tensor containing derivatives of $y$ with respect to $\tX$ \\
+$\displaystyle \frac{\partial f}{\partial \vx} $ & Jacobian matrix $\mJ \in \R^{m\times n}$ of $f: \R^n \rightarrow \R^m$\\
+$\displaystyle \nabla_\vx^2 f(\vx)\text{ or }\mH( f)(\vx)$ & The Hessian matrix of $f$ at input point $\vx$\\
+$\displaystyle \int f(\vx) d\vx $ & Definite integral over the entire domain of $\vx$ \\
+$\displaystyle \int_\sS f(\vx) d\vx$ & Definite integral with respect to $\vx$ over the set $\sS$ \\
+\end{tabular}
+\egroup
+\vspace{0.25cm}
+
+\centerline{\bf Probability and Information Theory}
+\bgroup
+\def\arraystretch{1.5}
+\begin{tabular}{p{1.25in}p{3.25in}}
+$\displaystyle P(\ra)$ & A probability distribution over a discrete variable\\
+$\displaystyle p(\ra)$ & A probability distribution over a continuous variable, or over
+a variable whose type has not been specified\\
+$\displaystyle \ra \sim P$ & Random variable $\ra$ has distribution $P$\\% so thing on left of \sim should always be a random variable, with name beginning with \r
+$\displaystyle  \E_{\rx\sim P} [ f(x) ]\text{ or } \E f(x)$ & Expectation of $f(x)$ with respect to $P(\rx)$ \\
+$\displaystyle \Var(f(x)) $ &  Variance of $f(x)$ under $P(\rx)$ \\
+$\displaystyle \Cov(f(x),g(x)) $ & Covariance of $f(x)$ and $g(x)$ under $P(\rx)$\\
+$\displaystyle H(\rx) $ & Shannon entropy of the random variable $\rx$\\
+$\displaystyle \KL ( P \Vert Q ) $ & Kullback-Leibler divergence of P and Q \\
+$\displaystyle \mathcal{N} ( \vx ; \vmu , \mSigma)$ & Gaussian distribution %
+over $\vx$ with mean $\vmu$ and covariance $\mSigma$ \\
+\end{tabular}
+\egroup
+\vspace{0.25cm}
+
+\centerline{\bf Functions}
+\bgroup
+\def\arraystretch{1.5}
+\begin{tabular}{p{1.25in}p{3.25in}}
+$\displaystyle f: \sA \rightarrow \sB$ & The function $f$ with domain $\sA$ and range $\sB$\\
+$\displaystyle f \circ g $ & Composition of the functions $f$ and $g$ \\
+  $\displaystyle f(\vx ; \vtheta) $ & A function of $\vx$ parametrized by $\vtheta$.
+  (Sometimes we write $f(\vx)$ and omit the argument $\vtheta$ to lighten notation) \\
+$\displaystyle \log x$ & Natural logarithm of $x$ \\
+$\displaystyle \sigma(x)$ & Logistic sigmoid, $\displaystyle \frac{1} {1 + \exp(-x)}$ \\
+$\displaystyle \zeta(x)$ & Softplus, $\log(1 + \exp(x))$ \\
+$\displaystyle || \vx ||_p $ & $\normlp$ norm of $\vx$ \\
+$\displaystyle || \vx || $ & $\normltwo$ norm of $\vx$ \\
+$\displaystyle x^+$ & Positive part of $x$, i.e., $\max(0,x)$\\
+$\displaystyle \1_\mathrm{condition}$ & is 1 if the condition is true, 0 otherwise\\
+\end{tabular}
+\egroup
+\vspace{0.25cm}
+
+
+
+\section{Final instructions}
+Do not change any aspects of the formatting parameters in the style files.
+In particular, do not modify the width or length of the rectangle the text
+should fit into, and do not change font sizes (except perhaps in the
+\textsc{References} section; see below). Please note that pages should be
+numbered.
+
+\section{Preparing PostScript or PDF files}
+
+Please prepare PostScript or PDF files with paper size ``US Letter'', and
+not, for example, ``A4''. The -t
+letter option on dvips will produce US Letter files.
+
+Consider directly generating PDF files using \verb+pdflatex+
+(especially if you are a MiKTeX user).
+PDF figures must be substituted for EPS figures, however.
+
+Otherwise, please generate your PostScript and PDF files with the following commands:
+\begin{verbatim}
+dvips mypaper.dvi -t letter -Ppdf -G0 -o mypaper.ps
+ps2pdf mypaper.ps mypaper.pdf
+\end{verbatim}
+
+\subsection{Margins in LaTeX}
+
+Most of the margin problems come from figures positioned by hand using
+\verb+\special+ or other commands. We suggest using the command
+\verb+\includegraphics+
+from the graphicx package. Always specify the figure width as a multiple of
+the line width as in the example below using .eps graphics
+\begin{verbatim}
+   \usepackage[dvips]{graphicx} ...
+   \includegraphics[width=0.8\linewidth]{myfile.eps}
+\end{verbatim}
+or % Apr 2009 addition
+\begin{verbatim}
+   \usepackage[pdftex]{graphicx} ...
+   \includegraphics[width=0.8\linewidth]{myfile.pdf}
+\end{verbatim}
+for .pdf graphics.
+See section~4.4 in the graphics bundle documentation (\url{http://www.ctan.org/tex-archive/macros/latex/required/graphics/grfguide.ps})
+
+A number of width problems arise when LaTeX cannot properly hyphenate a
+line. Please give LaTeX hyphenation hints using the \verb+\-+ command.
+
+\subsubsection*{Author Contributions}
+If you'd like to, you may include  a section for author contributions as is done
+in many journals. This is optional and at the discretion of the authors.
+
+\subsubsection*{Acknowledgments}
+Use unnumbered third level headings for the acknowledgments. All
+acknowledgments, including those to funding agencies, go at the end of the paper.
+
+
+\bibliography{icomp2026_conference}
+\bibliographystyle{icomp2026_conference}
+
+\appendix
+\section{Appendix}
+You may include other additional sections here.
+
+\end{document}
