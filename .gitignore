@@ -3,3 +3,11 @@ data/
 results/
 __pycache__/
 catboost_info/
+icomp2026_conference.aux
+icomp2026_conference.bbl
+icomp2026_conference.blg
+icomp2026_conference.log
+icomp2026_conference.out
+icomp2026_conference.synctex.gz
+icomp2026_conference.fdb_latexmk
+icomp2026_conference.fls
