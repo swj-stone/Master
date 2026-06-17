@@ -1,0 +1,36 @@
+{
+  "run_id": "2026-06-05_08-12-59",
+  "git_commit": "34c616a",
+  "timestamp_utc": "2026-06-05T08:12:59.836593+00:00",
+  "seeds": [
+    42,
+    123,
+    456,
+    789,
+    1024
+  ],
+  "datasets": [
+    "spambase",
+    "madelon",
+    "isolet",
+    "gisette",
+    "credit_card_fraud"
+  ],
+  "baselines": [
+    "shaptopk",
+    "mofs_shap",
+    "nsga2_uniform",
+    "banzhaf",
+    "minshap",
+    "shapg",
+    "powershap"
+  ],
+  "topk_kpis": [
+    1,
+    3,
+    5,
+    10,
+    20,
+    50
+  ]
+}
