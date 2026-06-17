@@ -1,0 +1,5 @@
+dataset,banzhaf,minshap,mofs_shap,nsga2_uniform,powershap,shapg,shaptopk
+credit_card_fraud,0.9648,0.9609,0.9772,0.9735,0.9824,0.9718,0.9813
+gisette,0.8994,0.8996,0.9262,0.9256,0.9176,0.8927,0.9232
+madelon,0.7706,0.7739,0.7731,0.7299,0.7884,0.7834,0.7744
+spambase,0.9452,0.9338,0.9557,0.9433,0.9598,0.9421,0.9574
