@@ -1,0 +1,496 @@
+"""
+Main-table experiment: all 7 baselines × 5 datasets × 5 seeds.
+
+Methods
+-------
+  - SHAP-Top-k       (classic TreeExplainer ranking)
+  - MOFS-SHAP        (SHAP-guided NSGA-II ablation)
+  - NSGA-II-uniform  (no-guidance multi-objective control)
+  - Banzhaf FS       (Karavas et al. 2017)
+  - MinShap          (Zheng & Raskutti 2026)
+  - ShapG            (Zhao, Liu, Parilina 2025)
+  - Powershap        (Verhaeghe et al. 2022)
+
+Outputs
+-------
+``results/logs/<run_id>/<method>/``  — per-method per-seed details.
+
+``results/tables/<run_id>/``          — aggregated tables (mean ± std):
+  - ``main_metrics.csv``              raw all-seed data (method × dataset × seed)
+  - ``aggregated_metrics.csv``        mean ± std by (method, dataset)
+  - ``table_AUC_at_1.csv`` …          dataset × method pivot per KPI
+  - ``metadata.json``
+
+Run:
+    python -u experiments/run_main_table.py
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import yaml
+from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.model_selection import train_test_split
+from xgboost import XGBClassifier
+
+from minppi_mofs.baselines.banzhaf_fs import (
+    compute_banzhaf_importance,
+    rank_features as rank_banzhaf,
+)
+from minppi_mofs.baselines.min_shap import (
+    compute_minshap_importance,
+    rank_features as rank_minshap,
+)
+from minppi_mofs.baselines.mofs_shap import (
+    compute_mofs_shap_importance,
+    rank_features as rank_mofs_shap,
+)
+from minppi_mofs.baselines.nsga2_uniform import (
+    compute_nsga2_uniform_importance,
+    rank_features as rank_nsga2u,
+)
+from minppi_mofs.baselines.powershap import (
+    compute_powershap_importance,
+    rank_features as rank_powershap,
+)
+from minppi_mofs.baselines.shap_top_k import (
+    compute_shap_topk_importance,
+    rank_features as rank_shaptopk,
+)
+from minppi_mofs.baselines.shapg import (
+    compute_shapg_importance,
+    rank_features as rank_shapg,
+)
+
+
+# ---------------------------------------------------------------------------
+# Registry — all 7 baselines
+# ---------------------------------------------------------------------------
+BASELINES: dict[str, dict] = {
+    "shaptopk": {
+        "compute": compute_shap_topk_importance,
+        "rank": rank_shaptopk,
+        "kwargs": {"seed": 42, "verbose": True},
+        "score_col": "shap_value",
+    },
+    "mofs_shap": {
+        "compute": compute_mofs_shap_importance,
+        "rank": rank_mofs_shap,
+        "kwargs": {"n_samples": 100, "seed": 42, "verbose": True},
+        "score_col": "mofs_shap_value",
+    },
+    "nsga2_uniform": {
+        "compute": compute_nsga2_uniform_importance,
+        "rank": rank_nsga2u,
+        "kwargs": {"pop_size": 30, "generations": 15, "seed": 42, "verbose": True},
+        "score_col": "nsga2u_freq",
+    },
+    "banzhaf": {
+        "compute": compute_banzhaf_importance,
+        "rank": rank_banzhaf,
+        "kwargs": {
+            "n_coalitions": 300,
+            "per_coalition": 10,
+            "seed": 42,
+            "verbose": True,
+        },
+        "score_col": "banzhaf_value",
+    },
+    "minshap": {
+        "compute": compute_minshap_importance,
+        "rank": rank_minshap,
+        "kwargs": {
+            "n_coalitions": 300,
+            "per_coalition": 5,
+            "seed": 42,
+            "verbose": True,
+        },
+        "score_col": "minshap_value",
+    },
+    "shapg": {
+        "compute": compute_shapg_importance,
+        "rank": rank_shapg,
+        "kwargs": {"depth": 1, "m": 3, "seed": 42, "verbose": True},
+        "score_col": "shapg_value",
+    },
+    "powershap": {
+        "compute": compute_powershap_importance,
+        "rank": rank_powershap,
+        "kwargs": {"power_iterations": 10, "alpha": 0.01, "seed": 42, "verbose": True},
+        "score_col": "powershap_value",
+    },
+}
+
+DATASETS: list[tuple[str, str, bool]] = [
+    ("spambase", "is_spam", False),
+    ("madelon", "label", False),
+    ("isolet", "letter", True),
+    ("gisette", "label", False),
+    ("credit_card_fraud", "Class", False),
+]
+
+DATASET_BANZHAF_BUDGET: dict[str, dict] = {
+    "gisette": {"per_coalition": 50},
+}
+
+DATASET_MINSHAP_BUDGET: dict[str, dict] = {
+    "spambase": {"n_coalitions": 100, "per_coalition": 5},
+    "madelon": {"n_coalitions": 100, "per_coalition": 10},
+    "isolet": {"n_coalitions": 100, "per_coalition": 10},
+    "gisette": {"n_coalitions": 100, "per_coalition": 15},
+    "credit_card_fraud": {"n_coalitions": 100, "per_coalition": 5},
+}
+
+TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50)
+
+SEEDS: list[int] = [42, 123, 456, 789, 1024]
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _now_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+
+
+def _git_commit(repo_root: Path) -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(repo_root),
+            text=True,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+class _Tee:
+    def __init__(self, log_path: Path) -> None:
+        self._console = sys.stdout
+        self._file = log_path.open("w", encoding="utf-8")
+
+    def write(self, msg: str) -> None:
+        self._console.write(msg)
+        self._file.write(msg)
+
+    def flush(self) -> None:
+        self._console.flush()
+        self._file.flush()
+
+    def close(self) -> None:
+        sys.stdout = self._console
+        sys.stderr = self._console
+        self._file.close()
+
+
+def load_data(
+    prefix: str,
+    target: str,
+    processed_dir: Path,
+    *,
+    seed: int = 42,
+) -> tuple[pd.DataFrame, np.ndarray]:
+    """Load a preprocessed train split for a given seed."""
+    path = processed_dir / f"{prefix}_s{seed}_train.csv"
+    df = pd.read_csv(path)
+    y = df[target].values.astype(int)
+    return df.drop(columns=[target]), y
+
+
+def evaluate_topk(
+    X: pd.DataFrame,
+    y: np.ndarray,
+    ranking: list[str],
+    *,
+    ks: tuple[int, ...] = TOP_K_KPIS,
+    seed: int = 42,
+) -> pd.DataFrame:
+    rows: list[dict] = []
+    n_classes = len(np.unique(y))
+    for k in ks:
+        feats = ranking[: min(k, len(ranking))]
+        X_tr, X_te, y_tr, y_te = train_test_split(
+            X[feats].values,
+            y,
+            test_size=0.2,
+            random_state=seed,
+            stratify=y,
+        )
+        model = XGBClassifier(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
+        )
+        model.fit(X_tr, y_tr)
+        y_prob = model.predict_proba(X_te)
+        if n_classes == 2:
+            val = float(roc_auc_score(y_te, y_prob[:, 1]))
+            rows.append(
+                {"k": k, "n_features": len(feats), "metric": "AUC", "value": val}
+            )
+        else:
+            val = float(accuracy_score(y_te, model.predict(X_te)))
+            rows.append(
+                {"k": k, "n_features": len(feats), "metric": "Accuracy", "value": val}
+            )
+    return pd.DataFrame(rows)
+
+
+def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
+    """Build per-seed raw table and aggregated (mean ± std) tables."""
+    tables_dir.mkdir(parents=True, exist_ok=True)
+
+    raw_df.to_csv(tables_dir / "main_metrics.csv", index=False)
+    print(f"\n  main_metrics.csv  ({len(raw_df)} rows)", flush=True)
+
+    kpi_cols = [
+        c for c in raw_df.columns if "@" in c and c.split("@")[0] in {"AUC", "Accuracy"}
+    ]
+    num_cols = ["n_features", "time_s"] + kpi_cols
+    group_cols = ["method", "dataset"]
+
+    # Mean aggregation
+    mean_df = raw_df.groupby(group_cols, as_index=False)[num_cols].mean()
+    mean_df.to_csv(tables_dir / "mean_metrics.csv", index=False)
+    print(f"  mean_metrics.csv  ({len(mean_df)} rows)", flush=True)
+
+    # Mean ± std aggregation
+    agg_mean = raw_df.groupby(group_cols)[num_cols].mean()
+    agg_std = raw_df.groupby(group_cols)[num_cols].std().fillna(0)
+    combined = pd.DataFrame(index=agg_mean.index)
+    for col in num_cols:
+        combined[col] = agg_mean[col].round(4)
+        combined[f"{col}_std"] = agg_std[col].round(4)
+    combined = combined.reset_index()
+    combined.to_csv(tables_dir / "aggregated_metrics.csv", index=False)
+    print(f"  aggregated_metrics.csv  ({len(combined)} rows)", flush=True)
+
+    # Per-KPI pivot tables (dataset × method, mean values)
+    for kpi_col in kpi_cols:
+        pivot = mean_df.pivot_table(
+            index="dataset",
+            columns="method",
+            values=kpi_col,
+            aggfunc="first",
+        )
+        metric, k = kpi_col.split("@")
+        pivot = pivot.round(4)
+        pivot_sorted = pivot.reindex(columns=sorted(pivot.columns))
+        pivot_sorted.to_csv(tables_dir / f"table_{metric}_at_{k}.csv")
+        print(f"  table_{metric}_at_{k}.csv", flush=True)
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
+    project_root = Path(__file__).resolve().parent.parent
+    git_root = project_root.parent
+    processed_dir = project_root / "data" / "processed"
+
+    run_id = _now_stamp()
+    run_dir = project_root / "results" / "logs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    tables_dir = project_root / "results" / "tables" / run_id
+
+    log_path = run_dir / "output.log"
+    tee = _Tee(log_path)
+    sys.stdout = tee  # type: ignore[assignment]
+    sys.stderr = tee  # type: ignore[assignment]
+    _orig_cwd = os.getcwd()
+    os.chdir(str(run_dir))
+
+    commit = _git_commit(git_root)
+
+    def _header(msg: str) -> None:
+        print("\n" + "=" * 72, flush=True)
+        print(msg, flush=True)
+        print("=" * 72, flush=True)
+
+    _header(f"Main Table — {run_id}")
+
+    # ---- Metadata ----
+    metadata: dict = {
+        "run_id": run_id,
+        "git_commit": commit,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "seeds": SEEDS,
+        "datasets": [d[0] for d in DATASETS],
+        "baselines": list(BASELINES.keys()),
+        "topk_kpis": list(TOP_K_KPIS),
+    }
+    (run_dir / "metadata.json").write_text(
+        json.dumps(metadata, indent=2), encoding="utf-8"
+    )
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    (tables_dir / "metadata.json").write_text(
+        json.dumps(metadata, indent=2), encoding="utf-8"
+    )
+    print("metadata.json saved")
+
+    # ---- config.yaml ----
+    run_config: dict = {
+        "description": "Main table — 7 baselines × 5 datasets × 5 seeds",
+        "baselines": {},
+        "seeds": SEEDS,
+        "datasets": [
+            {"prefix": d[0], "target": d[1], "multiclass": d[2]} for d in DATASETS
+        ],
+        "topk_kpis": list(TOP_K_KPIS),
+    }
+    for name, c in BASELINES.items():
+        entry: dict = {
+            "module": c["compute"].__module__,
+            "kwargs": c["kwargs"],
+            "score_col": c["score_col"],
+        }
+        if name == "banzhaf":
+            entry["dataset_budget"] = DATASET_BANZHAF_BUDGET
+        if name == "minshap":
+            entry["dataset_budget"] = DATASET_MINSHAP_BUDGET
+        run_config["baselines"][name] = entry
+    with (run_dir / "config.yaml").open("w", encoding="utf-8") as f:
+        yaml.safe_dump(run_config, f, sort_keys=False, allow_unicode=True)
+    print("config.yaml saved")
+
+    # ---- Run all baselines × seeds ----
+    all_rows: list[dict] = []
+
+    for method, cfg in BASELINES.items():
+        method_dir = run_dir / method
+        method_dir.mkdir(parents=True, exist_ok=True)
+        (method_dir / "metadata.json").write_text(
+            json.dumps(
+                {
+                    "method": method,
+                    "kwargs": cfg["kwargs"],
+                    "score_col": cfg["score_col"],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        compute_fn = cfg["compute"]
+        rank_fn = cfg["rank"]
+        base_kwargs = cfg["kwargs"]
+        score_col = cfg["score_col"]
+        method_metrics: list[dict] = []
+
+        for prefix, target, is_mc in DATASETS:
+            if prefix in cfg.get("skip_datasets", set()):
+                print(f"\n  Skipping {prefix} (excluded for {method})", flush=True)
+                continue
+
+            for seed in SEEDS:
+                _header(f"{method.upper()} — {prefix}  seed={seed}")
+
+                X, y = load_data(prefix, target, processed_dir, seed=seed)
+                print(f"  Shape: {X.shape}", flush=True)
+                print(f"  Classes: {len(np.unique(y))}", flush=True)
+
+                call_kwargs = dict(base_kwargs, seed=seed)
+                if method == "banzhaf" and prefix in DATASET_BANZHAF_BUDGET:
+                    call_kwargs.update(DATASET_BANZHAF_BUDGET[prefix])
+                if method == "minshap" and prefix in DATASET_MINSHAP_BUDGET:
+                    call_kwargs.update(DATASET_MINSHAP_BUDGET[prefix])
+
+                t0 = time.perf_counter()
+                try:
+                    scores = compute_fn(X, y, **call_kwargs)
+                except Exception:
+                    import traceback
+
+                    print(f"  FAILED: {method}/{prefix}/seed={seed}", flush=True)
+                    traceback.print_exc()
+                    failed: dict = {
+                        "method": method,
+                        "dataset": prefix,
+                        "seed": seed,
+                        "n_features": 0,
+                        "time_s": 0,
+                        "top1": "FAILED",
+                        "top1_score": 0.0,
+                    }
+                    for k in TOP_K_KPIS:
+                        failed[f"AUC@{k}"] = None
+                        failed[f"Accuracy@{k}"] = None
+                    method_metrics.append(failed)
+                    all_rows.append(failed)
+                    print()
+                    continue
+                elapsed = time.perf_counter() - t0
+
+                ranking = rank_fn(scores)
+                n_feat = len(ranking)
+                print(f"  Time: {elapsed:.1f} s  ({n_feat} features ranked)")
+                print("  Top-5 features:")
+                for feat, val in ranking[:5]:
+                    print(f"    {feat:30s}  {val:.6f}")
+
+                imp_path = method_dir / f"{prefix}_s{seed}_importance.csv"
+                pd.DataFrame(ranking, columns=["feature", score_col]).to_csv(
+                    imp_path, index=False
+                )
+
+                kpi_df = evaluate_topk(X, y, [f for f, _ in ranking], seed=seed)
+                kpi_path = method_dir / f"{prefix}_s{seed}_topk_kpi.csv"
+                kpi_df.to_csv(kpi_path, index=False)
+                for _, kpi_row in kpi_df.iterrows():
+                    print(
+                        f"  top-{int(kpi_row['k']):>3d}: {kpi_row['metric']}={kpi_row['value']:.4f}"
+                    )
+
+                row: dict = {
+                    "method": method,
+                    "dataset": prefix,
+                    "seed": seed,
+                    "n_features": n_feat,
+                    "time_s": round(elapsed, 1),
+                    "top1": ranking[0][0],
+                    "top1_score": round(ranking[0][1], 6),
+                }
+                metric_name = kpi_df["metric"].iloc[0]
+                for _, kpi_row in kpi_df.iterrows():
+                    row[f"{metric_name}@{int(kpi_row['k'])}"] = round(
+                        float(kpi_row["value"]), 6
+                    )
+                method_metrics.append(row)
+                all_rows.append(row)
+                print()
+
+        pd.DataFrame(method_metrics).to_csv(method_dir / "metrics.csv", index=False)
+        print(f"metrics.csv saved for {method}")
+
+    # ---- Global summary ----
+    raw_df = pd.DataFrame(all_rows)
+    raw_df.to_csv(run_dir / "metrics.csv", index=False)
+
+    # ---- Tables ----
+    _header("Building tables")
+    _build_tables(raw_df, tables_dir)
+
+    _header("Done")
+    print(f"Logs:    {run_dir}")
+    print(f"Tables:  {tables_dir}")
+
+    os.chdir(_orig_cwd)
+    tee.close()
+
+
+if __name__ == "__main__":
+    main()
