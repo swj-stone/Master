@@ -17,7 +17,7 @@ Processing steps:
   6. Save train/val/test CSV files to data/processed/.
 
 Run:
-    python experiments/preprocess_Gisette.py --config configs/gisette.yaml
+    python experiments/preprocess_data/preprocess_Gisette.py --config configs/gisette.yaml
 """
 
 from __future__ import annotations
