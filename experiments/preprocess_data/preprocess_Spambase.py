@@ -16,7 +16,7 @@ Processing steps:
   6. Save train/val/test CSV files to data/processed/.
 
 Run:
-    python experiments/preprocess_Spambase.py --config configs/spambase.yaml
+    python experiments/preprocess_data/preprocess_Spambase.py --config configs/spambase.yaml
 """
 
 from __future__ import annotations
