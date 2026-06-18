@@ -1,0 +1,2 @@
+dataset,banzhaf,minshap,mofs_shap,nsga2_uniform,powershap,shapg,shaptopk
+isolet,0.285,0.3122,0.3348,0.319,0.3382,0.1991,0.3577

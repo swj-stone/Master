@@ -30,7 +30,11 @@ conference-paper/*.zip
 .LSOverride
 
 # Icon must end with two \r
+<<<<<<< HEAD
 Icon
+=======
+Icon
+>>>>>>> 7a28100fdd58d7ab28dd666fac46c7f5b27c700a
 
 # Thumbnails
 ._*
@@ -253,4 +257,9 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+<<<<<<< HEAD
 # End of https://www.toptal.com/developers/gitignore/api/macos,python,linux,windows
+=======
+# End of https://www.toptal.com/developers/gitignore/api/macos,python,linux,windows
+
+>>>>>>> 7a28100fdd58d7ab28dd666fac46c7f5b27c700a

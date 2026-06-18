@@ -1,0 +1,103 @@
+description: Main table — 7 baselines × 5 datasets × 5 seeds
+baselines:
+  shaptopk:
+    module: minppi_mofs.baselines.shap_top_k
+    kwargs:
+      seed: 42
+      verbose: true
+    score_col: shap_value
+  mofs_shap:
+    module: minppi_mofs.baselines.mofs_shap
+    kwargs:
+      n_samples: 100
+      seed: 42
+      verbose: true
+    score_col: mofs_shap_value
+  nsga2_uniform:
+    module: minppi_mofs.baselines.nsga2_uniform
+    kwargs:
+      pop_size: 30
+      generations: 15
+      seed: 42
+      verbose: true
+    score_col: nsga2u_freq
+  banzhaf:
+    module: minppi_mofs.baselines.banzhaf_fs
+    kwargs:
+      n_coalitions: 300
+      per_coalition: 10
+      seed: 42
+      verbose: true
+    score_col: banzhaf_value
+    dataset_budget:
+      gisette:
+        per_coalition: 50
+  minshap:
+    module: minppi_mofs.baselines.min_shap
+    kwargs:
+      n_coalitions: 300
+      per_coalition: 5
+      seed: 42
+      verbose: true
+    score_col: minshap_value
+    dataset_budget:
+      spambase:
+        n_coalitions: 100
+        per_coalition: 5
+      madelon:
+        n_coalitions: 100
+        per_coalition: 10
+      isolet:
+        n_coalitions: 100
+        per_coalition: 10
+      gisette:
+        n_coalitions: 100
+        per_coalition: 15
+      credit_card_fraud:
+        n_coalitions: 100
+        per_coalition: 5
+  shapg:
+    module: minppi_mofs.baselines.shapg
+    kwargs:
+      depth: 1
+      m: 3
+      seed: 42
+      verbose: true
+    score_col: shapg_value
+  powershap:
+    module: minppi_mofs.baselines.powershap
+    kwargs:
+      power_iterations: 10
+      alpha: 0.01
+      seed: 42
+      verbose: true
+    score_col: powershap_value
+seeds:
+- 42
+- 123
+- 456
+- 789
+- 1024
+datasets:
+- prefix: spambase
+  target: is_spam
+  multiclass: false
+- prefix: madelon
+  target: label
+  multiclass: false
+- prefix: isolet
+  target: letter
+  multiclass: true
+- prefix: gisette
+  target: label
+  multiclass: false
+- prefix: credit_card_fraud
+  target: Class
+  multiclass: false
+topk_kpis:
+- 1
+- 3
+- 5
+- 10
+- 20
+- 50
