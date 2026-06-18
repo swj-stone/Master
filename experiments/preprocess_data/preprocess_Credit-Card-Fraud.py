@@ -17,7 +17,7 @@ Processing steps:
   6. Save train/val/test CSV files to data/processed/.
 
 Run:
-    python experiments/preprocess_Credit-Card-Fraud.py --config configs/credit_card_fraud.yaml
+    python experiments/preprocess_data/preprocess_Credit-Card-Fraud.py --config configs/credit_card_fraud.yaml
 """
 
 from __future__ import annotations
