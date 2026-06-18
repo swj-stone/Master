@@ -1,8 +1,8 @@
-PWD c:/work/学校/A.SPBU/paper/Zhao CHI/to_student/to_student/conference-paper/paper
+PWD c:/work/学校/A.SPBU/paper/Zhao CHI/Paper/Master/conference-paper/paper
 INPUT c:/work/Latex/texlive/2026/texmf.cnf
 INPUT c:/work/Latex/texlive/2026/texmf-dist/web2c/texmf.cnf
 INPUT c:/work/Latex/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT c:/work/学校/A.SPBU/paper/Zhao CHI/to_student/to_student/conference-paper/paper/icomp2026_conference.tex
+INPUT c:/work/学校/A.SPBU/paper/Zhao CHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex
 OUTPUT icomp2026_conference.log
 INPUT c:/work/Latex/texlive/2026/texmf-dist/tex/latex/base/article.cls
 INPUT c:/work/Latex/texlive/2026/texmf-dist/tex/latex/base/article.cls
@@ -244,13 +244,13 @@ INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/courier/pcrr8r.tfm
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/courier/pcrr7t.tfm
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/courier/pcrr7t.tfm
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/courier/pcrr7t.tfm
+INPUT ../figures/figure_1_minppi_trichotomy.pdf
+INPUT ../figures/figure_1_minppi_trichotomy.pdf
+INPUT ../figures/figure_1_minppi_trichotomy.pdf
+INPUT ../figures/figure_1_minppi_trichotomy.pdf
+INPUT ../figures/figure_1_minppi_trichotomy.pdf
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/vf/adobe/courier/pcrr7t.vf
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/courier/pcrr8r.tfm
-INPUT ../figures/figure_1_minppi_trichotomy.pdf
-INPUT ../figures/figure_1_minppi_trichotomy.pdf
-INPUT ../figures/figure_1_minppi_trichotomy.pdf
-INPUT ../figures/figure_1_minppi_trichotomy.pdf
-INPUT ../figures/figure_1_minppi_trichotomy.pdf
 INPUT ../figures/figure_2_prop1_detection.pdf
 INPUT ../figures/figure_2_prop1_detection.pdf
 INPUT ../figures/figure_2_prop1_detection.pdf

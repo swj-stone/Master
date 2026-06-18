@@ -61,7 +61,7 @@ Address \\
 \begin{abstract}
 Existing game-theoretic feature selection methods mostly score each feature by its \emph{mean} marginal contribution across coalitions. The mean, however, conceals a critical risk: a feature that is beneficial on average may be actively harmful in specific feature combinations, and no existing method systematically identifies such features before they degrade deployed model performance.
 We address this gap by introducing Min-Marginal Power Indices (MinPPI). Rather than averaging, MinPPI takes the \emph{minimum} marginal contribution of each feature under a binary voting game $v_\alpha(S) = \mathbb{1}[\text{Acc}(\mathcal{M}_S) \geq \alpha \cdot \text{Acc}_{\text{full}}]$. This min--binary pairing yields a discrete output in $\{-1, 0, +1\}$, cleanly classifying every feature as \emph{harmful} (must remove), \emph{neutral}, or \emph{decisive} (must retain).
-We prove the equivalence of the min Shapley-Shubik and min Banzhaf formulations, and develop a ShapG-guided adversarial search that achieves a better sample efficiency gain over uniform Monte Carlo for detecting sparse harmful features. Embedding MinPPI into the mutation and crossover operators of NSGA-II yields the MOFS-MinPPI algorithm, with a provable safety guarantee: MinPPI estimation errors affect convergence speed but never compromise Pareto-optimality.
+We prove the equivalence of the min Shapley-Shubik and min Banzhaf formulations, and develop a ShapG-guided adversarial search that achieves a better sample efficiency gain over uniform Monte Carlo for detecting sparse harmful features. Embedding MinPPI into the mutation and crossover operators of NSGA-II yields the MOFS-MinPPI algorithm with a safety property: because selection always defers to the true objective, any (even adversarial) MinPPI error affects only convergence speed---the returned front stays internally non-dominated under finite budget and converges to the true Pareto front asymptotically.
 On five tabular datasets (29--5{,}000 features), MOFS-MinPPI significantly outperforms seven baselines---SHAP, ShapG, MinShap, Banzhaf, Powershap, MOFS-SHAP, and NSGA2-uniform---in Pareto-front hypervolume and compression rate at 1\%/3\%/5\% AUC-loss thresholds ($p < 0.05$, Friedman--Nemenyi). Ablation confirms that the min operator consistently dominates the mean and that binary $v_\alpha$ dominates continuous $v(\cdot)$ across all conditions.
 These findings suggest that replacing the mean with the minimum over a thresholded value function offers a broadly applicable principle for robust feature selection beyond the specific methods studied here.
 \end{abstract}
@@ -91,7 +91,7 @@ We synthesize three independent lines of investigation---game-theoretic power in
 \begin{enumerate}
 \item {\bf Minimal Power Indices (MinPPI).} We formalize the Min Shapley-Shubik (MinSS) and Min Banzhaf (MinBz) indices under $v_\alpha$. We prove $\text{MinSS}_i = \text{MinBz}_i$ (Lemma~2) and that both take values in $\{-1, 0, +1\}$ (Lemma~1), yielding a three-way classification: decisive ($+1$), harmful ($-1$), neutral ($0$) (Theorem~1).
 
-\item {\bf ShapG-Guided Adversarial Search (Algorithm~B).} Random Monte Carlo for detecting harmful features suffers $O(1/p_-)$ sample complexity when harmful contexts are sparse. We leverage the ShapG correlation graph~\citep{zhao2025shapg} to guide adversarial search toward vulnerable coalitions, achieving a $\mathbf{38\times}$ sample efficiency gain in detecting sparse harmful features.
+\item {\bf ShapG-Guided Adversarial Search (Algorithm~B).} Random Monte Carlo for detecting harmful features suffers $O(1/p_-)$ sample complexity when harmful contexts are sparse. We leverage the ShapG correlation graph~\citep{zhao2025shapg} to guide adversarial search toward vulnerable coalitions, recovering sparse harmful features in a single evaluation where uniform sampling needs $K\approx 90$ for $95\%$ detection---nearly two orders of magnitude fewer model evaluations on our engineered benchmark---under a structural condition on the ShapG neighborhood (Theorem~3).
 
 \item {\bf MOFS-MinPPI Algorithm.} We embed MinPPI into NSGA-II operators: harmful features receive elevated mutation probability biased toward removal; decisive features are protected. Guidance strength is controlled by a single parameter~$\beta$, with $\beta = 0$ recovering the unguided baseline.
 
@@ -311,7 +311,7 @@ Exact computation of $\text{MinPPI}_i$ requires $2^{n-1}$ model trainings per fe
 
 \subsubsection{Random Monte Carlo Sampling (Algorithm~A)}
 
-Algorithm~A draws $K$ subsets $S^{(1)},\dots,S^{(K)}$ uniformly from $2^{N_1\setminus\{i\}}$ and returns $\widehat{\text{MinPPI}}_i^{\text{MC}} = \min_{k} [v_\alpha(S^{(k)}\cup\{i\}) - v_\alpha(S^{(k)})]$.
+Algorithm~A draws $K$ coalitions $S^{(1)},\dots,S^{(K)}$ by, for each draw, sampling a size $\kappa$ uniformly from $\{0,1,\dots,n-1\}$ and then a $\kappa$-subset of $N_1\setminus\{i\}$ uniformly at random; it returns $\widehat{\text{MinPPI}}_i^{\text{MC}} = \min_{k} [v_\alpha(S^{(k)}\cup\{i\}) - v_\alpha(S^{(k)})]$. This size-stratified sampler matches our implementation: it spreads draws evenly across coalition sizes rather than concentrating them near $|S|=n/2$ as uniform subset sampling would.
 
 \textbf{Lemma 3 (Upward Bias).}
 $\widehat{\text{MinPPI}}_i^{\text{MC}} \geq \text{MinPPI}_i$ almost surely.
@@ -323,7 +323,7 @@ Let $\mathcal{M}_i = \{\Delta_i(S) : S \subseteq N_1 \setminus \{i\}\}$ be the p
 Algorithm~A is \emph{safe}: it may miss harmful features but never misclassifies a neutral feature.
 
 \textbf{Proposition 1 (Detection Probability).}
-Let $p_-^i = \Pr_{S\sim U}[v_\alpha(S\cup\{i\}) - v_\alpha(S) = -1]$. If $\text{MinPPI}_i = -1$, then
+Let $p_-^i$ be the probability that a single draw $S$ from the size-stratified sampler above yields $v_\alpha(S\cup\{i\}) - v_\alpha(S) = -1$. If $\text{MinPPI}_i = -1$, then
 \begin{equation}
 \Pr[\widehat{\text{MinPPI}}_i^{\text{MC}} > -1] = (1 - p_-^i)^K,
 \label{eq:prop1}
@@ -331,16 +331,16 @@ Let $p_-^i = \Pr_{S\sim U}[v_\alpha(S\cup\{i\}) - v_\alpha(S) = -1]$. If $\text{
 requiring $K \geq \log\delta / \log(1-p_-^i) \approx \log(1/\delta)/p_-^i$ for confidence $1-\delta$.
 
 \begin{proof}
-Let $\mathcal{H}_i = \{S \subseteq N_1 \setminus \{i\} : \Delta_i(S) = -1\}$, so $p_-^i = |\mathcal{H}_i| / 2^{n-1}$. Algorithm~A fails iff none of $K$ independent draws hits $\mathcal{H}_i$; independence gives $\Pr[\text{miss}] = (1 - p_-^i)^K$. Setting this $\leq \delta$ and solving yields the bound.
+Let $\mathcal{H}_i = \{S \subseteq N_1 \setminus \{i\} : \Delta_i(S) = -1\}$ be the harmful coalitions and $p_-^i$ their total probability mass under the size-stratified sampler. Algorithm~A fails iff none of the $K$ i.i.d.\ draws lands in $\mathcal{H}_i$; independence gives $\Pr[\text{miss}] = (1 - p_-^i)^K$. Setting this $\leq \delta$ and solving yields the bound.
 \end{proof}
 
-When harmful contexts are sparse ($p_-^i \ll 1$), $K$ grows prohibitively. Figure~\ref{fig:prop1} validates~\eqref{eq:prop1} on an engineered game with $p_-^i = 0.0333$ (500 trials per $K$, Pearson $r = 0.9993$). The target feature requires $K \approx 100$ for 95\% detection, motivating Algorithm~B.
+When harmful contexts are sparse ($p_-^i \ll 1$), $K$ grows prohibitively. Figure~\ref{fig:prop1} validates~\eqref{eq:prop1} on an engineered game with $p_-^i = 0.0333$ (500 trials per $K$, Pearson $r = 0.9993$). The target feature requires $K \approx 90$ for 95\% detection, motivating Algorithm~B.
 
 \begin{figure}[t]
 \begin{center}
 \includegraphics[width=0.55\linewidth]{../figures/figure_2_prop1_detection.pdf}
 \end{center}
-\caption{Empirical verification of Proposition~1 on an engineered voting game with $p_-^i = 0.0333$ (500 trials per $K$). Theory (solid line) and empirical rates (open circles) agree closely ($r = 0.9993$). For sparse harmful contexts ($p_- \ll 1$), Algorithm~A requires $K \approx 100$ to reach 95\% detection.}
+\caption{Empirical verification of Proposition~1 on an engineered voting game with $p_-^i = 0.0333$ (500 trials per $K$). Theory (solid line) and empirical rates (open circles) agree closely ($r = 0.9993$). For sparse harmful contexts ($p_- \ll 1$), Algorithm~A requires $K \approx 90$ to reach 95\% detection.}
 \label{fig:prop1}
 \end{figure}
 
@@ -353,13 +353,13 @@ Harmful marginals concentrate in coalitions where $i$ conflicts with correlated 
 \item For $r=1,\dots,K_{\text{adv}}$, perturb $S_{\text{seed}}$ with retention bias toward $C$, evaluate $v_\alpha(S\cup\{i\})-v_\alpha(S)$, and return the min; break if $-1$ is found.
 \end{enumerate}
 
-On the engineered voting game ($p_-^i=0.033$), Algorithm~B achieves \textbf{100\% detection at $K_{\text{adv}}=1$} vs.\ Algorithm~A's $\approx 3\%$---a $\mathbf{38\times}$ sample efficiency gain (Figure~\ref{fig:alg_b_vs_a}(a), Table~\ref{tab:alg_ab_comparison}). Under Gaussian noise $\mathcal{N}(0,\sigma^2)$ on the correlation matrix (Figure~\ref{fig:alg_b_vs_a}(b)), Algorithm~B degrades gracefully: detection at $K_{\text{adv}}=5$ remains $1.000, 0.878, 0.652, 0.508$ for $\sigma = 0.05, 0.15, 0.30, 0.50$, each dominating Algorithm~A's baseline ($\leq 0.172$).
+On the engineered voting game ($p_-^i=0.033$), Algorithm~B achieves \textbf{100\% detection at $K_{\text{adv}}=1$} versus Algorithm~A's $\approx 3\%$ at the same budget; equivalently, Algorithm~A needs $K\approx 90$ to reach $95\%$ detection while Algorithm~B needs a single evaluation---nearly two orders of magnitude fewer model evaluations on this benchmark (Figure~\ref{fig:alg_b_vs_a}(a), Table~\ref{tab:alg_ab_comparison}). This gain is contingent on the harmful witness lying in the ShapG neighborhood (Theorem~3) and shrinks under correlation-matrix noise. Under Gaussian noise $\mathcal{N}(0,\sigma^2)$ on the correlation matrix (Figure~\ref{fig:alg_b_vs_a}(b)), Algorithm~B degrades gracefully: detection at $K_{\text{adv}}=5$ remains $1.000, 0.878, 0.652, 0.508$ for $\sigma = 0.05, 0.15, 0.30, 0.50$, each dominating Algorithm~A's baseline ($\leq 0.172$).
 
 \begin{figure}[t]
 \begin{center}
 \includegraphics[width=0.95\linewidth]{../figures/figure_3_algorithm_b_vs_a.pdf}
 \end{center}
-\caption{Algorithm~B vs.\ Algorithm~A on the engineered voting game of Section~\ref{sec:minppi} ($p_-^i=0.033$, 500 trials). (a)~Detection rate vs.\ budget $K$: Algorithm~B deterministically detects the harmful feature at $K=1$; Algorithm~A requires $K \approx 100$. (b)~Robustness to Gaussian noise on the ShapG correlation matrix: even at $\sigma=0.50$, Algorithm~B detects the harmful feature in $>50\%$ of trials, well above uniform sampling.}
+\caption{Algorithm~B vs.\ Algorithm~A on the engineered voting game of Section~\ref{sec:minppi} ($p_-^i=0.033$, 500 trials). (a)~Detection rate vs.\ budget $K$: Algorithm~B deterministically detects the harmful feature at $K=1$; Algorithm~A requires $K \approx 90$. (b)~Robustness to Gaussian noise on the ShapG correlation matrix: even at $\sigma=0.50$, Algorithm~B detects the harmful feature in $>50\%$ of trials, well above uniform sampling.}
 \label{fig:alg_b_vs_a}
 \end{figure}
 
@@ -474,32 +474,41 @@ Thus $K = \Omega(1/p_{\min})$: with $n=500$ and $p_{\min} \approx 0.01$, detecti
 \textbf{Theorem 3 (ShapG-Guided Efficiency).}
 For each $i\in\mathcal{H}$, let $C_i$ be its top-$k$ ShapG neighbors and suppose there exists a harmful witness $S_i^*$ ($v_\alpha(S_i^*)=1$, $v_\alpha(S_i^*\cup\{i\})=0$) and a set $B$ of individually high-AUC baseline features such that
 \begin{equation}
-S_i^* \subseteq C_i \cup B.
+S_i^* \subseteq C_i \cup B \;=:\; S_{\text{seed}}.
 \label{eq:structural-cond}
 \end{equation}
-Then Algorithm~B with $S_{\text{seed}}=C_i\cup B$ detects $i$ with probability
+Suppose each adversarial perturbation independently retains every $j\in S_{\text{seed}}$ with probability $q_j\in(0,1]$ (biased high for correlated neighbors) and excludes every $j\notin S_{\text{seed}}$. Let
 \begin{equation}
-\Pr[\text{detection}] \geq 1 - \prod_{j \in S_i^*} (1 - q_j),
+\rho_i \;=\; \Big(\prod_{j \in S_i^*} q_j\Big)\Big(\prod_{j \in S_{\text{seed}}\setminus S_i^*} (1 - q_j)\Big) \;>\; 0.
 \label{eq:thm3}
 \end{equation}
-where $q_j$ is the per-feature retention probability under perturbation. In the noiseless case ($S_{\text{seed}}=S_i^*$), detection is \textbf{deterministic} at $K_{\text{adv}}=1$.
+Then Algorithm~B with seed $S_{\text{seed}}$ detects $i$ within $K_{\text{adv}}$ perturbations with probability $\Pr[\text{detection}] \geq 1 - (1-\rho_i)^{K_{\text{adv}}}$. In the noiseless case ($S_{\text{seed}}=S_i^*$), the unperturbed seed is itself the witness, so detection is \textbf{deterministic} at $K_{\text{adv}}=1$.
 
 \begin{proof}
-Condition~\eqref{eq:structural-cond} gives $S_i^* \subseteq S_{\text{seed}}$. In each adversarial perturbation, $j \in S_i^*$ is retained with probability $q_j$ (biased high for correlated neighbors). When the perturbed coalition equals $S_i^*$ (or a superset preserving the harmful interaction), the marginal is $-1$. The probability of this event is at least $\prod_{j \in S_i^*} q_j$, yielding the single-iteration bound; $K_{\text{adv}}$ iterations amplify this via $1 - (1 - \prod q_j)^{K_{\text{adv}}}$. In the noiseless case, $S_{\text{seed}} = S_i^*$, so $r=1$ deterministically hits the witness.
+By~\eqref{eq:structural-cond}, $S_i^*\subseteq S_{\text{seed}}$. A single perturbation reproduces exactly $S_i^*$ when every $j\in S_i^*$ is retained (probability $\prod_{j\in S_i^*}q_j$) and every $j\in S_{\text{seed}}\setminus S_i^*$ is dropped (probability $\prod_{j\in S_{\text{seed}}\setminus S_i^*}(1-q_j)$); these events are independent, so $\Pr[S=S_i^*]=\rho_i$. When $S=S_i^*$ the marginal is $v_\alpha(S_i^*\cup\{i\})-v_\alpha(S_i^*)=-1$ and $i$ is detected. Over $K_{\text{adv}}$ independent perturbations, the probability of at least one hit is $1-(1-\rho_i)^{K_{\text{adv}}}$. If $S_{\text{seed}}=S_i^*$, the seed evaluated before any perturbation is already the witness, giving deterministic detection at $K_{\text{adv}}=1$.
 \end{proof}
+
+\textbf{Remark 3 (monotone-harm variant).} If the harmful interaction persists on supersets of the witness within the seed---i.e.\ $v_\alpha(S)=1 \wedge v_\alpha(S\cup\{i\})=0$ for all $S$ with $S_i^*\subseteq S\subseteq S_{\text{seed}}$---then retaining $S_i^*$ alone suffices irrespective of the other seed members, and the bound sharpens to $\Pr[\text{detection}]\geq 1-(1-\prod_{j\in S_i^*}q_j)^{K_{\text{adv}}}$. We do \emph{not} assume this in general, since $v_\alpha$ is non-monotone (Remark~2); equation~\eqref{eq:thm3} keeps the exclusion factor for that reason.
 
 The structural condition is empirically plausible: harmful features are typically redundant with correlated neighbors ($C_i$) in the presence of strong baseline features ($B$). Robustness experiments (Section~\ref{sec:estimation}) confirm detection rates remain well above Algorithm~A even under $\sigma=0.50$ noise.
 
 \subsection{Pareto Preservation Under Imperfect MinPPI}
 
-\textbf{Proposition 2 (Pareto Preservation).}
-Let $\widehat{\text{MinPPI}}$ be any (even adversarially incorrect) estimate, and $P^*_{\text{true}}$ the true Pareto set under $f(\mathbf{m})=(\|\mathbf{m}\|_0,\,1-\text{AUC}(\mathcal{M}_{\mathbf{m}}),\,T_{\text{train}}(\mathcal{M}_{\mathbf{m}}))$. Let $P^*_{\text{alg}}$ be the output of MOFS-MinPPI using $\widehat{\text{MinPPI}}$. Then $P^*_{\text{alg}} \subseteq P^*_{\text{true}}$.
+\textbf{Proposition 2a (Selection Soundness, finite $G_{\max}$).}
+Let $\widehat{\text{MinPPI}}$ be any (even adversarially incorrect) estimate. In each generation, MOFS-MinPPI selects survivors from the merged pool $\mathcal{R}_g = P_{g-1} \cup P_{\text{offspring}}$ by non-dominated sorting and crowding distance applied to the true objective $f(\mathbf{m})=(\|\mathbf{m}\|_0,\,1-\text{AUC}(\mathcal{M}_{\mathbf{m}}),\,T_{\text{train}}(\mathcal{M}_{\mathbf{m}}))$ alone. Then (i) the selection outcome is independent of $\widehat{\text{MinPPI}}$; (ii) whenever the population size $N\geq|\mathcal{F}_1(\mathcal{R}_g)|$, the entire first non-dominated front of $\mathcal{R}_g$ survives, so no $f$-dominated solution displaces an $f$-non-dominated one; and (iii) the returned set $P_{\text{out}}$ is mutually non-dominated under $f$.
 
 \begin{proof}
-MOFS-MinPPI decouples generation from selection. $\widehat{\text{MinPPI}}$ affects only the generation operators (mutation~\eqref{eq:mutation}, crossover); it influences \emph{which} candidates are proposed. The NSGA-II selection step evaluates every candidate $\mathbf{m}$ exclusively on $f(\mathbf{m})$, partitioning $\mathcal{R}_g = P_{g-1} \cup P_{\text{offspring}}$ into dominance fronts. Any $\mathbf{m}$ that is Pareto-dominated under $f$ is eliminated during selection regardless of how it was generated. Hence only non-dominated solutions survive to $P^*_{\text{alg}}$. Conversely, if a solution $\mathbf{m}'$ dominates $\mathbf{m}$ but was never generated, NSGA-II with $\beta < \infty$ gives every $\mathbf{m} \in \{0,1\}^n$ positive generation probability, so asymptotic ergodicity ensures $\mathbf{m}'$ is eventually generated and eliminates $\mathbf{m}$. Thus $P^*_{\text{alg}} \subseteq P^*_{\text{true}}$: MinPPI guidance may reduce \emph{coverage} but never compromises \emph{correctness}.
+$\widehat{\text{MinPPI}}$ enters only the generation operators (mutation~\eqref{eq:mutation}, crossover), which determine \emph{which} candidates populate $P_{\text{offspring}}$; once generated, a candidate is scored solely by $f$. Non-dominated sorting and crowding distance are functions of the $f$-values of $\mathcal{R}_g$ only, giving (i). The first front $\mathcal{F}_1(\mathcal{R}_g)$ ranks ahead of all dominated solutions; if $N\geq|\mathcal{F}_1(\mathcal{R}_g)|$ it is admitted in full, so dominated solutions can occupy only the remaining slots, giving (ii). At termination $P_{\text{out}}\subseteq\mathcal{F}_1(\mathcal{R}_{G_{\max}})$, whose members are pairwise non-dominated, giving (iii).
 \end{proof}
 
-\textbf{Implication.} MinPPI is a \emph{safe} heuristic: estimation errors affect convergence speed or front diversity, but never produce a Pareto-dominated solution. Any reasonable importance method can be substituted without compromising the integrity of the final front.
+\textbf{Proposition 2b (Asymptotic Optimality).}
+If $\beta<\infty$---so bit-flip mutation~\eqref{eq:mutation} assigns every $\mathbf{m}\in\{0,1\}^n$ positive probability each generation---and selection is elitist, then as $G_{\max}\to\infty$ the returned front converges almost surely to the true Pareto front $P^*_{\text{true}}$.
+
+\begin{proof}
+With $\beta<\infty$ the per-bit flip probability lies in $(0,1)$, so from any state the offspring distribution places positive probability on every point of $\{0,1\}^n$; the induced Markov chain over populations is therefore irreducible. Elitism guarantees that an $f$-non-dominated solution, once present, is never replaced by a solution it dominates (Prop.~2a(ii)). Irreducibility ensures every $\mathbf{m}\in P^*_{\text{true}}$ is generated in finite expected time and, being non-dominated, retained thereafter, while any dominated incumbent is displaced once a dominating point is sampled. Hence the front converges almost surely to $P^*_{\text{true}}$. The estimate $\widehat{\text{MinPPI}}$ alters the transition kernel but preserves its positivity, so it affects only the expected hitting times---the convergence speed---not the limit.
+\end{proof}
+
+\textbf{Scope and implication.} For finite $G_{\max}$ we guarantee only that $P_{\text{out}}$ is internally non-dominated (Prop.~2a), \emph{not} $P_{\text{out}}\subseteq P^*_{\text{true}}$; global optimality is the asymptotic statement (Prop.~2b). Within this scope MinPPI is a \emph{safe} guidance signal: it shapes which candidates are proposed and how fast the front converges, while selection always defers to the true objective. Any importance method may thus be substituted without compromising the internal consistency of the returned front.
 
 \subsection{Summary}
 
@@ -517,8 +526,8 @@ Lemma~1 & MinPPI $\in\{-1,0,+1\}$; no threshold tuning required. \\
 Theorem~1 & Clean semantic interpretation: decisive / harmful / neutral. \\
 Lemma~2 & MinSS = MinBz; use the computationally cheaper MinBz. \\
 Prop.~1 / Thm.~2 & Alg.~A requires $K=\Omega(1/p_{\min})$; prohibitive for sparse harmful features. \\
-Thm.~3 & Alg.~B near-deterministic under ShapG neighborhood condition ($38\times$ gain). \\
-Prop.~2 & MinPPI errors never compromise Pareto-optimality; guidance is provably safe. \\
+Thm.~3 & Alg.~B near-deterministic when the witness lies in the ShapG neighborhood ($\sim$two orders of magnitude fewer evaluations). \\
+Prop.~2a/b & MinPPI errors affect only convergence speed: finite-$G_{\max}$ front stays internally non-dominated, optimal as $G_{\max}\to\infty$. \\
 \bottomrule
 \end{tabular}
 \end{center}
