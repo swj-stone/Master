@@ -1,0 +1,33 @@
+# Preprocessing configuration for Madelon (OpenML ID 1485, originally UCI)
+# Dataset: 500 features, 2600 samples, binary classification (NIPS 2003 challenge)
+
+dataset:
+  name: "Madelon"
+  source: "openml"
+  openml_id: 1485
+  n_features: 500
+  n_samples: 2600
+  classes: 2
+  target_name: "label"
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  raw_filename: "madelon.csv"
+  file_prefix: "madelon"
+
+feature_engineering:
+  drop_duplicates: true
+  variance_threshold: 0.01
+  max_features: 100000
+
+preprocessing:
+  standardize: true
+  shuffle: true
+
+split:
+  feature_seed: 42
+  seeds: [42, 123, 456, 789, 1024]
+  test_size: 0.2
+  val_size: 0.25
+  stratify: true

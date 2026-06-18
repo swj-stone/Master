@@ -1,0 +1,34 @@
+# Preprocessing configuration for Gisette (OpenML, originally UCI)
+# Dataset: 5000 features, 7000 samples, binary classification (NIPS 2003 challenge)
+
+dataset:
+  name: "Gisette"
+  source: "openml"
+  openml_name: "gisette"
+  openml_version: 1
+  n_features: 5000
+  n_samples: 7000
+  classes: 2
+  target_name: "label"
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  raw_filename: "gisette.csv"
+  file_prefix: "gisette"
+
+feature_engineering:
+  drop_duplicates: true
+  variance_threshold: 0.01
+  max_features: 100000
+
+preprocessing:
+  standardize: true
+  shuffle: true
+
+split:
+  feature_seed: 42
+  seeds: [42, 123, 456, 789, 1024]
+  test_size: 0.2
+  val_size: 0.25
+  stratify: true
