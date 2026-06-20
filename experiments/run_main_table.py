@@ -1,8 +1,9 @@
 """
-Main-table experiment: all 7 baselines × 5 datasets × 5 seeds.
+Main-table experiment: MOFS-MinPPI + 7 baselines × 5 datasets × 5 seeds.
 
 Methods
 -------
+  - MOFS-MinPPI      (proposed: MinPPI-guided NSGA-II)
   - SHAP-Top-k       (classic TreeExplainer ranking)
   - MOFS-SHAP        (SHAP-guided NSGA-II ablation)
   - NSGA-II-uniform  (no-guidance multi-objective control)
@@ -11,15 +12,20 @@ Methods
   - ShapG            (Zhao, Liu, Parilina 2025)
   - Powershap        (Verhaeghe et al. 2022)
 
+Metrics
+-------
+All methods:
+  - top-k AUC @ {1, 3, 5, 10, 20, 50}
+NSGA-II methods (MOFS-MinPPI, MOFS-SHAP, NSGA2-uniform):
+  - Pareto-front hypervolume (HV)
+  - Compression rate @ 1% / 3% / 5% AUC-loss
+Statistical:
+  - Friedman + Nemenyi (all methods × datasets)
+
 Outputs
 -------
-``results/logs/<run_id>/<method>/``  — per-method per-seed details.
-
-``results/tables/<run_id>/``          — aggregated tables (mean ± std):
-  - ``main_metrics.csv``              raw all-seed data (method × dataset × seed)
-  - ``aggregated_metrics.csv``        mean ± std by (method, dataset)
-  - ``table_AUC_at_1.csv`` …          dataset × method pivot per KPI
-  - ``metadata.json``
+``results/logs/<run_id>/``   — per-method per-seed details + global metrics.
+``results/tables/<run_id>/``  — aggregated tables (mean ± std), pivots, HV, CR.
 
 Run:
     python -u experiments/run_main_table.py
@@ -50,6 +56,10 @@ from minppi_mofs.baselines.min_shap import (
     compute_minshap_importance,
     rank_features as rank_minshap,
 )
+from minppi_mofs.baselines.mofs_minppi_baseline import (
+    compute_mofs_minppi_importance,
+    rank_features as rank_mofs_minppi,
+)
 from minppi_mofs.baselines.mofs_shap import (
     compute_mofs_shap_importance,
     rank_features as rank_mofs_shap,
@@ -70,12 +80,23 @@ from minppi_mofs.baselines.shapg import (
     compute_shapg_importance,
     rank_features as rank_shapg,
 )
+from minppi_mofs.mofs_minppi import compute_hypervolume
 
 
 # ---------------------------------------------------------------------------
-# Registry — all 7 baselines
+# Registry — 8 methods (MOFS-MinPPI + 7 baselines)
 # ---------------------------------------------------------------------------
+
+NSGA2_METHODS: set[str] = {"mofs_minppi", "mofs_shap", "nsga2_uniform"}
+
 BASELINES: dict[str, dict] = {
+    "mofs_minppi": {
+        "compute": compute_mofs_minppi_importance,
+        "rank": rank_mofs_minppi,
+        "kwargs": {"alpha": 0.95, "beta": 1.0, "verbose": True},
+        "score_col": "mofs_minppi_freq",
+        "nsga2": True,
+    },
     "shaptopk": {
         "compute": compute_shap_topk_importance,
         "rank": rank_shaptopk,
@@ -87,12 +108,14 @@ BASELINES: dict[str, dict] = {
         "rank": rank_mofs_shap,
         "kwargs": {"n_samples": 100, "seed": 42, "verbose": True},
         "score_col": "mofs_shap_value",
+        "nsga2": True,
     },
     "nsga2_uniform": {
         "compute": compute_nsga2_uniform_importance,
         "rank": rank_nsga2u,
         "kwargs": {"pop_size": 30, "generations": 15, "seed": 42, "verbose": True},
         "score_col": "nsga2u_freq",
+        "nsga2": True,
     },
     "banzhaf": {
         "compute": compute_banzhaf_importance,
@@ -150,7 +173,16 @@ DATASET_MINSHAP_BUDGET: dict[str, dict] = {
     "credit_card_fraud": {"n_coalitions": 100, "per_coalition": 5},
 }
 
+DATASET_MOFSPPI_BUDGET: dict[str, dict] = {
+    "spambase":    {"K_adv": 30, "pop_size": 30, "generations": 20},
+    "madelon":     {"K_adv": 20, "pop_size": 20, "generations": 15},
+    "isolet":      {"K_adv": 15, "pop_size": 20, "generations": 10},
+    "gisette":     {"K_adv": 10, "pop_size": 15, "generations": 8},
+    "credit_card_fraud": {"K_adv": 30, "pop_size": 30, "generations": 20},
+}
+
 TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50)
+AUC_LOSS_THRESHOLDS: tuple[float, ...] = (0.01, 0.03, 0.05)
 
 SEEDS: list[int] = [42, 123, 456, 789, 1024]
 
@@ -249,17 +281,44 @@ def evaluate_topk(
     return pd.DataFrame(rows)
 
 
+def compression_rate_from_fitness(
+    full_auc: float,
+    fitness: np.ndarray,
+    auc_loss: float,
+    n_total: int,
+) -> float:
+    """Compression ratio (1 − |F|/n) for best solution within AUC-loss budget.
+
+    *fitness* has columns (|F|, 1−AUC, time).  Returns 0 if no solution
+    meets the budget.
+    """
+    threshold = full_auc - auc_loss
+    auc_col = 1.0 - fitness[:, 1]
+    candidates = np.where(auc_col >= threshold)[0]
+    if len(candidates) == 0:
+        return 0.0
+    best = candidates[np.argmin(fitness[candidates, 0])]
+    return 1.0 - float(fitness[best, 0]) / max(1, n_total)
+
+
 def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
-    """Build per-seed raw table and aggregated (mean ± std) tables."""
+    """Build per-seed raw table, aggregated (mean ± std), and per-KPI pivots."""
     tables_dir.mkdir(parents=True, exist_ok=True)
 
     raw_df.to_csv(tables_dir / "main_metrics.csv", index=False)
     print(f"\n  main_metrics.csv  ({len(raw_df)} rows)", flush=True)
 
+    # Separate top-k KPI columns from HV/compression columns
     kpi_cols = [
-        c for c in raw_df.columns if "@" in c and c.split("@")[0] in {"AUC", "Accuracy"}
+        c
+        for c in raw_df.columns
+        if "@" in c and c.split("@")[0] in {"AUC", "Accuracy"}
     ]
-    num_cols = ["n_features", "time_s"] + kpi_cols
+    hv_cr_cols = [
+        c for c in raw_df.columns if c.startswith("hv") or c.startswith("cr_")
+    ]
+    num_cols = ["n_features", "time_s"] + kpi_cols + hv_cr_cols
+    num_cols = [c for c in num_cols if c in raw_df.columns]
     group_cols = ["method", "dataset"]
 
     # Mean aggregation
@@ -291,6 +350,47 @@ def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
         pivot_sorted = pivot.reindex(columns=sorted(pivot.columns))
         pivot_sorted.to_csv(tables_dir / f"table_{metric}_at_{k}.csv")
         print(f"  table_{metric}_at_{k}.csv", flush=True)
+
+    # HV / compression pivot tables (NSGA-II methods only)
+    for cr_col in hv_cr_cols:
+        if cr_col in mean_df.columns:
+            pivot = mean_df.pivot_table(
+                index="dataset",
+                columns="method",
+                values=cr_col,
+                aggfunc="first",
+            )
+            pivot = pivot.round(4)
+            pivot_sorted = pivot.reindex(columns=sorted(pivot.columns))
+            short = cr_col.replace("compression", "cr").replace("_pct", "pct")
+            pivot_sorted.to_csv(tables_dir / f"table_{short}.csv")
+            print(f"  table_{short}.csv", flush=True)
+
+
+def friedman_nemenyi(
+    df: pd.DataFrame,
+    value_col: str,
+    method_col: str = "method",
+    dataset_col: str = "dataset",
+) -> dict:
+    """Friedman test + Nemenyi post-hoc on *df* aggregated by seed."""
+    from scipy.stats import friedmanchisquare
+
+    # Aggregate: mean over seeds per (method, dataset)
+    agg = df.groupby([method_col, dataset_col])[value_col].mean().reset_index()
+    pivot = agg.pivot(index=dataset_col, columns=method_col, values=value_col)
+    pivot = pivot.dropna(axis=1)
+
+    if pivot.shape[1] < 2 or pivot.shape[0] < 3:
+        return {"friedman_stat": None, "p_value": None, "n_methods": 0}
+
+    stat, p = friedmanchisquare(*[pivot[c] for c in pivot.columns])
+    return {
+        "friedman_stat": float(stat),
+        "p_value": float(p),
+        "n_methods": pivot.shape[1],
+        "n_datasets": pivot.shape[0],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -331,7 +431,8 @@ def main() -> None:
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "seeds": SEEDS,
         "datasets": [d[0] for d in DATASETS],
-        "baselines": list(BASELINES.keys()),
+        "methods": list(BASELINES.keys()),
+        "nsga2_methods": sorted(NSGA2_METHODS),
         "topk_kpis": list(TOP_K_KPIS),
     }
     (run_dir / "metadata.json").write_text(
@@ -345,13 +446,14 @@ def main() -> None:
 
     # ---- config.yaml ----
     run_config: dict = {
-        "description": "Main table — 7 baselines × 5 datasets × 5 seeds",
+        "description": "Main table — MOFS-MinPPI + 7 baselines × 5 datasets × 5 seeds",
         "baselines": {},
         "seeds": SEEDS,
         "datasets": [
             {"prefix": d[0], "target": d[1], "multiclass": d[2]} for d in DATASETS
         ],
         "topk_kpis": list(TOP_K_KPIS),
+        "nsga2_metrics": ["hv", "cr_1pct", "cr_3pct", "cr_5pct"],
     }
     for name, c in BASELINES.items():
         entry: dict = {
@@ -363,12 +465,14 @@ def main() -> None:
             entry["dataset_budget"] = DATASET_BANZHAF_BUDGET
         if name == "minshap":
             entry["dataset_budget"] = DATASET_MINSHAP_BUDGET
+        if name == "mofs_minppi":
+            entry["dataset_budget"] = DATASET_MOFSPPI_BUDGET
         run_config["baselines"][name] = entry
     with (run_dir / "config.yaml").open("w", encoding="utf-8") as f:
         yaml.safe_dump(run_config, f, sort_keys=False, allow_unicode=True)
     print("config.yaml saved")
 
-    # ---- Run all baselines × seeds ----
+    # ---- Run all methods × seeds ----
     all_rows: list[dict] = []
 
     for method, cfg in BASELINES.items():
@@ -380,6 +484,7 @@ def main() -> None:
                     "method": method,
                     "kwargs": cfg["kwargs"],
                     "score_col": cfg["score_col"],
+                    "nsga2": cfg.get("nsga2", False),
                 },
                 indent=2,
             ),
@@ -389,6 +494,7 @@ def main() -> None:
         rank_fn = cfg["rank"]
         base_kwargs = cfg["kwargs"]
         score_col = cfg["score_col"]
+        is_nsga2 = cfg.get("nsga2", False)
         method_metrics: list[dict] = []
 
         for prefix, target, is_mc in DATASETS:
@@ -400,6 +506,7 @@ def main() -> None:
                 _header(f"{method.upper()} — {prefix}  seed={seed}")
 
                 X, y = load_data(prefix, target, processed_dir, seed=seed)
+                n_features = X.shape[1]
                 print(f"  Shape: {X.shape}", flush=True)
                 print(f"  Classes: {len(np.unique(y))}", flush=True)
 
@@ -408,6 +515,13 @@ def main() -> None:
                     call_kwargs.update(DATASET_BANZHAF_BUDGET[prefix])
                 if method == "minshap" and prefix in DATASET_MINSHAP_BUDGET:
                     call_kwargs.update(DATASET_MINSHAP_BUDGET[prefix])
+                if method == "mofs_minppi" and prefix in DATASET_MOFSPPI_BUDGET:
+                    call_kwargs.update(DATASET_MOFSPPI_BUDGET[prefix])
+
+                # ---- NSGA-II methods: capture Pareto front via side-channel ----
+                result_box: list = []
+                if is_nsga2:
+                    call_kwargs["_result_box"] = result_box
 
                 t0 = time.perf_counter()
                 try:
@@ -452,7 +566,8 @@ def main() -> None:
                 kpi_df.to_csv(kpi_path, index=False)
                 for _, kpi_row in kpi_df.iterrows():
                     print(
-                        f"  top-{int(kpi_row['k']):>3d}: {kpi_row['metric']}={kpi_row['value']:.4f}"
+                        f"  top-{int(kpi_row['k']):>3d}: "
+                        f"{kpi_row['metric']}={kpi_row['value']:.4f}"
                     )
 
                 row: dict = {
@@ -469,6 +584,49 @@ def main() -> None:
                     row[f"{metric_name}@{int(kpi_row['k'])}"] = round(
                         float(kpi_row["value"]), 6
                     )
+
+                # ---- NSGA-II: HV + compression rate ----
+                if is_nsga2 and result_box:
+                    pf_data = result_box[0]
+                    pf_fitness = pf_data["fitness"]
+                    # HV
+                    ref = np.array([
+                        max(n_features, pf_fitness[:, 0].max()) * 1.1,
+                        1.1,
+                        pf_fitness[:, 2].max() * 1.1 if pf_fitness.shape[1] > 2 else 1.0,
+                    ])
+                    hv_val = compute_hypervolume(pf_fitness, ref)
+                    row["hv"] = round(float(hv_val), 4)
+
+                    # Compression rate: need full-feature AUC
+                    X_tr, X_te, y_tr, y_te = train_test_split(
+                        X, y, test_size=0.2, random_state=seed, stratify=y
+                    )
+                    full_model = XGBClassifier(
+                        n_estimators=100, max_depth=4, learning_rate=0.1,
+                        verbosity=0, random_state=seed,
+                    )
+                    full_model.fit(X_tr, y_tr)
+                    full_prob = full_model.predict_proba(X_te)
+                    full_auc = float(
+                        roc_auc_score(y_te, full_prob[:, 1])
+                        if len(np.unique(y)) == 2
+                        else accuracy_score(y_te, full_model.predict(X_te))
+                    )
+                    for loss in AUC_LOSS_THRESHOLDS:
+                        cr = compression_rate_from_fitness(
+                            full_auc, pf_fitness, loss, n_features
+                        )
+                        row[f"cr_{int(loss * 100):d}pct"] = round(cr, 4)
+                    print(
+                        f"  HV={hv_val:.4f}  "
+                        + "  ".join(
+                            f"CR@{int(loss * 100)}%={row[f'cr_{int(loss * 100):d}pct']:.3f}"
+                            for loss in AUC_LOSS_THRESHOLDS
+                        ),
+                        flush=True,
+                    )
+
                 method_metrics.append(row)
                 all_rows.append(row)
                 print()
@@ -483,6 +641,28 @@ def main() -> None:
     # ---- Tables ----
     _header("Building tables")
     _build_tables(raw_df, tables_dir)
+
+    # ---- Statistical tests ----
+    _header("Statistical tests")
+    fn_results: list[dict] = []
+    for kpi in ["AUC@10", "AUC@20"]:
+        if kpi in raw_df.columns:
+            res = friedman_nemenyi(raw_df, kpi)
+            fn_results.append({"kpi": kpi, **res})
+            sig = "***" if res.get("p_value", 1) < 0.001 else (
+                "**" if res.get("p_value", 1) < 0.01 else (
+                    "*" if res.get("p_value", 1) < 0.05 else "n.s."
+                )
+            )
+            print(
+                f"  Friedman {kpi}: χ²={res['friedman_stat']:.2f}, "
+                f"p={res['p_value']:.4f} {sig} "
+                f"({res['n_methods']} methods, {res['n_datasets']} datasets)",
+                flush=True,
+            )
+    if fn_results:
+        pd.DataFrame(fn_results).to_csv(tables_dir / "friedman_tests.csv", index=False)
+        print("  friedman_tests.csv saved", flush=True)
 
     _header("Done")
     print(f"Logs:    {run_dir}")

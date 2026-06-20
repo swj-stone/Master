@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import time
 import warnings
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -143,6 +144,7 @@ def compute_nsga2_uniform_importance(
     mutation_rate: float = 0.1,
     seed: int = 42,
     verbose: bool = False,
+    _result_box: Optional[list] = None,
 ) -> dict[str, float]:
     """Compute NSGA-II-uniform feature importance.
 
@@ -338,6 +340,13 @@ def compute_nsga2_uniform_importance(
             f"feat counts: {sorted(elite_feat_counts)[:10]}...",
             flush=True,
         )
+
+    # Side-channel for HV / compression
+    if _result_box is not None and len(elite) > 0:
+        _result_box.append({
+            "fitness": fitness[elite],
+            "masks": pop[elite],
+        })
 
     freq = pop[elite].mean(axis=0)  # type: ignore[call-overload]
     result = dict(zip(features, freq.astype(float)))

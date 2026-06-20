@@ -17,7 +17,7 @@ cleaner signal from the voting-game formulation.
 
 Usage::
 
-    from minppi_mofs.nsga2 import mofs_minppi_search
+    from minppi_mofs.mofs_minppi import mofs_minppi_search
     result = mofs_minppi_search(X_train, X_val, y_train, y_val,
                                  minppi=minppi_dict, alpha=0.95, seed=42)
     # result.pareto_front: list of (mask, fitness) tuples

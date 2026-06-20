@@ -71,7 +71,7 @@ from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
 from minppi_mofs.min_ppi import estimate_minppi, minppi_stats
-from minppi_mofs.nsga2 import (
+from minppi_mofs.mofs_minppi import (
     mofs_minppi_search,
     pareto_feature_importance,
 )

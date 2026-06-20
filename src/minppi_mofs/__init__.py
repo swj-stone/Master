@@ -25,7 +25,7 @@ from minppi_mofs.min_ppi import (
     estimate_minppi_random_mc,
     estimate_minppi_shapg_guided,
 )
-from minppi_mofs.nsga2 import (
+from minppi_mofs.mofs_minppi import (
     crowding_distance,
     minppi_crossover,
     minppi_mutation,

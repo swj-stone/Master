@@ -56,7 +56,7 @@ from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
 from minppi_mofs.min_ppi import estimate_minppi, minppi_stats
-from minppi_mofs.nsga2 import mofs_minppi_search, pareto_feature_importance
+from minppi_mofs.mofs_minppi import mofs_minppi_search, pareto_feature_importance
 from minppi_mofs.shapg_integration import build_guidance_from_data
 from minppi_mofs.voting_game import make_acc_full_cache
 

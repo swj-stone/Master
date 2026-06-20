@@ -34,6 +34,7 @@ Run (stand-alone)::
 from __future__ import annotations
 
 import warnings
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -54,6 +55,7 @@ def compute_mofs_shap_importance(
     n_samples: int = 100,
     seed: int = 42,
     verbose: bool = False,
+    _result_box: Optional[list] = None,
 ) -> dict[str, float]:
     """Compute MOFS-SHAP via SHAP-guided stochastic subset search.
 
@@ -63,6 +65,8 @@ def compute_mofs_shap_importance(
         n_samples: Number of candidate subsets to evaluate.
         seed: Random seed.
         verbose: Print progress.
+        _result_box: If a list, ``{"fitness": ndarray, "masks": ndarray}`` is
+            appended so callers can compute HV / compression without re-running.
 
     Returns:
         Dict ``{feature_name: mofs_shap_score}`` sorted descending.
@@ -189,6 +193,21 @@ def compute_mofs_shap_importance(
             f"feat counts: {sorted(elite_feat_counts)[:10]}...",
             flush=True,
         )
+
+    # ------------------------------------------------------------------
+    # 3b. Side-channel for HV / compression
+    # ------------------------------------------------------------------
+    if _result_box is not None and len(elite_idx) > 0:
+        # Pad to 3D: (|F|, 1-AUC, 0) — MOFS-SHAP doesn't measure time
+        elite_fit = fitness[elite_idx]
+        _result_box.append({
+            "fitness": np.column_stack([
+                elite_fit[:, 0],
+                elite_fit[:, 1],
+                np.zeros(len(elite_idx)),
+            ]),
+            "masks": masks[elite_idx],
+        })
 
     # ------------------------------------------------------------------
     # 4.  Score = gain × elite frequency

@@ -1,5 +1,5 @@
 """
-Tests for ``minppi_mofs.nsga2`` — NSGA-II core, guided operators, hypervolume.
+Tests for ``minppi_mofs.mofs_minppi`` — MOFS-MinPPI: NSGA-II core, guided operators, hypervolume.
 
 Covers (per tests/README.md):
 - non_dominated_sort correctness on known 2D/3D cases
@@ -13,7 +13,7 @@ Covers (per tests/README.md):
 
 Run::
 
-    pytest tests/test_nsga2.py -v
+    pytest tests/test_mofs_minppi.py -v
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import train_test_split
 
-from minppi_mofs.nsga2 import (
+from minppi_mofs.mofs_minppi import (
     MOFSMinPPIResult,
     compute_hypervolume,
     crowding_distance,
