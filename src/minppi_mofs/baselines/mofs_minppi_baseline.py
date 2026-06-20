@@ -61,29 +61,6 @@ DATASET_BUDGET: dict[str, dict] = {
     "credit_card_fraud": {"K_adv": 30, "pop": 30, "gen": 20},
 }
 
-MAX_FEATURES_FULL_MINPPI: int = 200
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
-def _prefilter_features(
-    X: pd.DataFrame,
-    y: np.ndarray,
-    max_features: int,
-    seed: int = 42,
-) -> pd.DataFrame:
-    """Phase-1 ShapG filter: keep top *max_features*."""
-    n = X.shape[1]
-    if n <= max_features:
-        return X
-    sg_scores, _ = build_guidance_from_data(X, y, depth=1, m=3, seed=seed)
-    ranked = sorted(sg_scores.items(), key=lambda kv: kv[1], reverse=True)
-    keep = [f for f, _ in ranked[:max_features]]
-    return X[keep]
-
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -124,16 +101,13 @@ def compute_mofs_minppi_importance(
     Returns:
         Dict ``{feature_name: frequency_in_pareto_front}`` sorted descending.
     """
-    # ---- Pre-filter high-dimensional datasets ----
-    X = _prefilter_features(X, y, max_features=MAX_FEATURES_FULL_MINPPI, seed=seed)
-
     # ---- Split for MinPPI estimation ----
     X_tr, X_val, y_tr, y_val = train_test_split(
         X, y, test_size=val_size, random_state=seed, stratify=y
     )
 
     if verbose:
-        print(f"  MOFS-MinPPI: {X.shape[1]} features (after pre-filter)", flush=True)
+        print(f"  MOFS-MinPPI: {X.shape[1]} features", flush=True)
 
     # ---- ShapG guidance ----
     sg_scores, sg_neighbors = build_guidance_from_data(
@@ -172,7 +146,10 @@ def compute_mofs_minppi_importance(
 
     # ---- Side-channel for HV / compression ----
     if _result_box is not None:
-        _result_box.append(result)
+        _result_box.append({
+            "fitness": result.pareto_fitness,
+            "masks": result.pareto_masks,
+        })
 
     return pareto_feature_importance(result)
 

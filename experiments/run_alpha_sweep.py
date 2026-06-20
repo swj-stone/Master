@@ -86,7 +86,6 @@ DATASET_BUDGET: dict[str, dict] = {
     "gisette":     {"K": 50,  "K_adv": 10, "pop": 15, "gen": 8},
     "credit_card_fraud": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
 }
-MAX_FEATURES_FULL_MINPPI: int = 200
 
 
 # ---------------------------------------------------------------------------
@@ -139,24 +138,6 @@ def load_data(
     df = pd.read_csv(path)
     y = df[target].values.astype(int)
     return df.drop(columns=[target]), y
-
-
-def _prefilter_features(
-    X: pd.DataFrame,
-    y: np.ndarray,
-    max_features: int,
-    seed: int = 42,
-) -> pd.DataFrame:
-    """Phase-1 filter: keep top *max_features* by ShapG score."""
-    n = X.shape[1]
-    if n <= max_features:
-        return X
-    from minppi_mofs.shapg_integration import compute_shapg_guidance_signal
-
-    scores = compute_shapg_guidance_signal(X, y, depth=1, m=3, seed=seed)
-    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-    keep = [f for f, _ in ranked[:max_features]]
-    return X[keep]
 
 
 def _budget_for(prefix: str) -> dict:
@@ -303,7 +284,6 @@ def main() -> None:
         _header(f"Alpha sweep — {prefix}")
 
         X, y = load_data(prefix, target, processed_dir)
-        X = _prefilter_features(X, y, max_features=MAX_FEATURES_FULL_MINPPI, seed=42)
         X_tr, X_val, y_tr, y_val = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y
         )

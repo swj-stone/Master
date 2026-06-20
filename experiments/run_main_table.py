@@ -250,10 +250,14 @@ def evaluate_topk(
 ) -> pd.DataFrame:
     rows: list[dict] = []
     n_classes = len(np.unique(y))
+    # XGBoost forbids [, ], < in feature names
+    safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
+    X_safe = X.rename(columns=safe_cols)
+    ranking_safe = [safe_cols.get(f, f) for f in ranking]
     for k in ks:
-        feats = ranking[: min(k, len(ranking))]
+        feats = ranking_safe[: min(k, len(ranking_safe))]
         X_tr, X_te, y_tr, y_te = train_test_split(
-            X[feats].values,
+            X_safe[feats],
             y,
             test_size=0.2,
             random_state=seed,
@@ -507,6 +511,9 @@ def main() -> None:
 
                 X, y = load_data(prefix, target, processed_dir, seed=seed)
                 n_features = X.shape[1]
+                # XGBoost forbids [, ], < in column names
+                safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
+                X_safe = X.rename(columns=safe_cols)
                 print(f"  Shape: {X.shape}", flush=True)
                 print(f"  Classes: {len(np.unique(y))}", flush=True)
 
@@ -591,16 +598,16 @@ def main() -> None:
                     pf_fitness = pf_data["fitness"]
                     # HV
                     ref = np.array([
-                        max(n_features, pf_fitness[:, 0].max()) * 1.1,
+                        max(float(n_features), float(pf_fitness[:, 0].max())) * 1.1,
                         1.1,
-                        pf_fitness[:, 2].max() * 1.1 if pf_fitness.shape[1] > 2 else 1.0,
+                        max(1.0, float(pf_fitness[:, 2].max()) * 1.1),
                     ])
                     hv_val = compute_hypervolume(pf_fitness, ref)
                     row["hv"] = round(float(hv_val), 4)
 
-                    # Compression rate: need full-feature AUC
+                    # Compression rate: need full-feature AUC (use safe names)
                     X_tr, X_te, y_tr, y_te = train_test_split(
-                        X, y, test_size=0.2, random_state=seed, stratify=y
+                        X_safe, y, test_size=0.2, random_state=seed, stratify=y
                     )
                     full_model = XGBClassifier(
                         n_estimators=100, max_depth=4, learning_rate=0.1,

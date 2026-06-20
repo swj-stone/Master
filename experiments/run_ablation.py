@@ -116,10 +116,6 @@ DATASET_BUDGET: dict[str, dict] = {
     "credit_card_fraud": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
 }
 
-# For datasets with > MAX_FEATURES_EXACT, pre-filter to top features
-# via ShapG before running MinPPI estimation.
-MAX_FEATURES_FULL_MINPPI: int = 200
-
 # ---------------------------------------------------------------------------
 # Ablation dimension definitions
 # ---------------------------------------------------------------------------
@@ -204,27 +200,6 @@ def load_data(
     df = pd.read_csv(path)
     y = df[target].values.astype(int)
     return df.drop(columns=[target]), y
-
-
-def _prefilter_features(
-    X: pd.DataFrame,
-    y: np.ndarray,
-    max_features: int,
-    seed: int = 42,
-) -> pd.DataFrame:
-    """Drop low-importance features to stay within *max_features*.
-
-    Uses fast ShapG-guided ranking as a Phase-1 filter.  Returns a DataFrame
-    with at most *max_features* columns.  If X already has ≤ max_features,
-    returns X unchanged.
-    """
-    n = X.shape[1]
-    if n <= max_features:
-        return X
-    scores = compute_shapg_guidance_signal(X, y, depth=1, m=3, seed=seed)
-    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-    keep = [f for f, _ in ranked[:max_features]]
-    return X[keep]
 
 
 def _budget_for(prefix: str) -> dict:
@@ -343,9 +318,7 @@ def run_ablation_min_vs_mean(
         print(f"\n{'=' * 60}\n  min vs mean — {prefix}\n{'=' * 60}", flush=True)
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
-        # Pre-filter high-dimensional datasets
         budget = _budget_for(prefix)
-        X = _prefilter_features(X, y, max_features=MAX_FEATURES_FULL_MINPPI, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
             X, y, test_size=0.2, random_state=seed, stratify=y
         )
@@ -531,7 +504,6 @@ def run_ablation_binary_vs_continuous(
         )
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
-        X = _prefilter_features(X, y, max_features=MAX_FEATURES_FULL_MINPPI, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
             X, y, test_size=0.2, random_state=seed, stratify=y
         )
@@ -660,7 +632,6 @@ def run_ablation_beta_sweep(
         print(f"\n{'=' * 60}\n  β sweep — {prefix}\n{'=' * 60}", flush=True)
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
-        X = _prefilter_features(X, y, max_features=MAX_FEATURES_FULL_MINPPI, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
             X, y, test_size=0.2, random_state=seed, stratify=y
         )
@@ -793,7 +764,6 @@ def run_ablation_shapg_vs_shap(
         print(f"\n{'=' * 60}\n  ShapG vs SHAP — {prefix}\n{'=' * 60}", flush=True)
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
-        X = _prefilter_features(X, y, max_features=MAX_FEATURES_FULL_MINPPI, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
             X, y, test_size=0.2, random_state=seed, stratify=y
         )
