@@ -87,8 +87,4 @@ $(ZIP_NAME): $(SRC_FILES)
 
 clean:
 	rm -rf $(BUILDDIR)
-<<<<<<< HEAD
 	rm -f $(PDF_NAME) $(ZIP_NAME)
-=======
-	rm -f $(PDF_NAME) $(ZIP_NAME)
->>>>>>> 7a28100fdd58d7ab28dd666fac46c7f5b27c700a
