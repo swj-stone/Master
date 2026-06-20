@@ -82,7 +82,7 @@ AUC_LOSS_THRESHOLDS: tuple[float, ...] = (0.01, 0.03, 0.05)
 DATASET_BUDGET: dict[str, dict] = {
     "spambase":    {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
     "madelon":     {"K": 100, "K_adv": 20, "pop": 20, "gen": 15},
-    "isolet":      {"K": 80,  "K_adv": 15, "pop": 20, "gen": 10},
+    "isolet":      {"K": 80,  "K_adv": 8, "pop": 20, "gen": 10},
     "gisette":     {"K": 50,  "K_adv": 10, "pop": 15, "gen": 8},
     "credit_card_fraud": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
 }

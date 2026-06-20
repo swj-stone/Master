@@ -218,7 +218,7 @@ def select_top_features(
     Rule:
       - p <= 100  → keep all
       - 100 < p <= 1000 → keep top 100
-      - p > 1000  → keep top 200
+      - all p > 100 → keep top 100
 
     Args:
         X: Feature DataFrame.
@@ -232,14 +232,14 @@ def select_top_features(
     if p <= 100:
         return X, list(X.columns)
 
-    k = 100 if p <= 1000 else 200
+    k = 100
     mi = mutual_info_classif(X, y, random_state=seed)
     scores = pd.Series(mi, index=X.columns)
     top_cols = scores.abs().sort_values(ascending=False).head(k).index.tolist()
 
     print(
         f"  Feature selection (mutual info): {p} -> {len(top_cols)} "
-        f"(rule: {'top100' if p <= 1000 else 'top200'})",
+        f"(rule: top100)",
     )
     return X[top_cols], top_cols
 
@@ -370,7 +370,7 @@ def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
 
-    project_root = Path(__file__).resolve().parent.parent
+    project_root = Path(__file__).resolve().parent.parent.parent
     raw_dir = project_root / cfg["paths"]["raw_dir"]
     processed_dir = project_root / cfg["paths"]["processed_dir"]
     raw_path = raw_dir / cfg["paths"]["raw_filename"]

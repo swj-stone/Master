@@ -430,9 +430,13 @@ class TestMOFSMinPPIResult:
             features=["a", "b", "c"],
         )
         imp = pareto_feature_importance(result)
-        # Feature 'a' appears in all 3 solutions → highest importance
-        assert imp["a"] > imp["b"]
-        assert imp["a"] > imp["c"]
+        # New metric: max AUC among solutions containing the feature.
+        # a appears in sols with AUC {0.9, 0.8, 0.85} → max 0.9
+        # b appears in sol  with AUC 0.8               → max 0.8
+        # c appears in sol  with AUC 0.9               → max 0.9
+        assert imp["a"] >= imp["c"]  # both tied at 0.9
+        assert imp["a"] > imp["b"]   # 0.9 > 0.8
+        assert imp["c"] > imp["b"]   # 0.9 > 0.8
 
 
 # ---------------------------------------------------------------------------

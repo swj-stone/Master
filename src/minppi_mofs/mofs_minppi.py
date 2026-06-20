@@ -624,8 +624,14 @@ def pareto_feature_importance(
 ) -> dict[str, float]:
     """Extract feature importance from a MOFS-MinPPI Pareto front.
 
-    Importance = frequency of each feature in the elite front,
-    weighted by crowding distance (more isolated solutions count more).
+    Computes importance as the **best AUC achieved by any elite solution that
+    includes the feature**.  This is a monotone measure of predictive value:
+    if a feature participates in a high-AUC solution it receives a high
+    score; features that appear only in mediocre solutions or are absent
+    from the elite front receive low scores.
+
+    This replaces the old frequency-based ranking which conflated
+    "versatile" (appears in many solutions) with "predictive".
 
     Args:
         result: A :class:`MOFSMinPPIResult`.
@@ -634,10 +640,24 @@ def pareto_feature_importance(
         Dict ``{feature_name: score}`` sorted descending.
     """
     masks = result.pareto_masks
+    fitness = result.pareto_fitness
+
     if len(masks) == 0:
         return {}
-    freq = masks.mean(axis=0)
-    scores = dict(zip(result.features, freq.astype(float)))
+
+    # Convert 1−AUC back to AUC; fitness[:, 1] is 1−AUC
+    auc_col = 1.0 - fitness[:, 1]
+
+    scores: dict[str, float] = {}
+    for j, f in enumerate(result.features):
+        in_solutions = masks[:, j] == 1
+        if in_solutions.any():
+            # Best AUC among elite solutions containing this feature
+            scores[f] = float(auc_col[in_solutions].max())
+        else:
+            # Feature absent from entire elite front → low score
+            scores[f] = float(auc_col.min()) - 0.01
+
     return dict(sorted(scores.items(), key=lambda kv: kv[1], reverse=True))
 
 

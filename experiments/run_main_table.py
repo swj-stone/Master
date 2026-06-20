@@ -15,7 +15,7 @@ Methods
 Metrics
 -------
 All methods:
-  - top-k AUC @ {1, 3, 5, 10, 20, 50}
+  - top-k AUC @ {1, 3, 5, 10, 20, 50, 100}
 NSGA-II methods (MOFS-MinPPI, MOFS-SHAP, NSGA2-uniform):
   - Pareto-front hypervolume (HV)
   - Compression rate @ 1% / 3% / 5% AUC-loss
@@ -176,12 +176,12 @@ DATASET_MINSHAP_BUDGET: dict[str, dict] = {
 DATASET_MOFSPPI_BUDGET: dict[str, dict] = {
     "spambase":    {"K_adv": 30, "pop_size": 30, "generations": 20},
     "madelon":     {"K_adv": 20, "pop_size": 20, "generations": 15},
-    "isolet":      {"K_adv": 15, "pop_size": 20, "generations": 10},
+    "isolet":      {"K_adv": 8, "pop_size": 20, "generations": 10},
     "gisette":     {"K_adv": 10, "pop_size": 15, "generations": 8},
     "credit_card_fraud": {"K_adv": 30, "pop_size": 30, "generations": 20},
 }
 
-TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50)
+TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50, 100)
 AUC_LOSS_THRESHOLDS: tuple[float, ...] = (0.01, 0.03, 0.05)
 
 SEEDS: list[int] = [42, 123, 456, 789, 1024]
@@ -510,10 +510,8 @@ def main() -> None:
                 _header(f"{method.upper()} — {prefix}  seed={seed}")
 
                 X, y = load_data(prefix, target, processed_dir, seed=seed)
-                n_features = X.shape[1]
-                # XGBoost forbids [, ], < in column names
-                safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
-                X_safe = X.rename(columns=safe_cols)
+                n_total = X.shape[1]
+                n_classes = len(np.unique(y))
                 print(f"  Shape: {X.shape}", flush=True)
                 print(f"  Classes: {len(np.unique(y))}", flush=True)
 
@@ -550,6 +548,10 @@ def main() -> None:
                     for k in TOP_K_KPIS:
                         failed[f"AUC@{k}"] = None
                         failed[f"Accuracy@{k}"] = None
+                    if is_nsga2:
+                        failed["hv"] = None
+                        for loss in AUC_LOSS_THRESHOLDS:
+                            failed[f"cr_{int(loss * 100):d}pct"] = None
                     method_metrics.append(failed)
                     all_rows.append(failed)
                     print()
@@ -581,7 +583,7 @@ def main() -> None:
                     "method": method,
                     "dataset": prefix,
                     "seed": seed,
-                    "n_features": n_feat,
+                    "n_features": n_total,
                     "time_s": round(elapsed, 1),
                     "top1": ranking[0][0],
                     "top1_score": round(ranking[0][1], 6),
@@ -598,14 +600,16 @@ def main() -> None:
                     pf_fitness = pf_data["fitness"]
                     # HV
                     ref = np.array([
-                        max(float(n_features), float(pf_fitness[:, 0].max())) * 1.1,
+                        max(float(n_total), float(pf_fitness[:, 0].max())) * 1.1,
                         1.1,
                         max(1.0, float(pf_fitness[:, 2].max()) * 1.1),
                     ])
                     hv_val = compute_hypervolume(pf_fitness, ref)
                     row["hv"] = round(float(hv_val), 4)
 
-                    # Compression rate: need full-feature AUC (use safe names)
+                    # Compression rate — train full model for reference metric
+                    safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
+                    X_safe = X.rename(columns=safe_cols)
                     X_tr, X_te, y_tr, y_te = train_test_split(
                         X_safe, y, test_size=0.2, random_state=seed, stratify=y
                     )
@@ -615,14 +619,14 @@ def main() -> None:
                     )
                     full_model.fit(X_tr, y_tr)
                     full_prob = full_model.predict_proba(X_te)
-                    full_auc = float(
+                    full_metric = float(
                         roc_auc_score(y_te, full_prob[:, 1])
-                        if len(np.unique(y)) == 2
+                        if n_classes == 2
                         else accuracy_score(y_te, full_model.predict(X_te))
                     )
                     for loss in AUC_LOSS_THRESHOLDS:
                         cr = compression_rate_from_fitness(
-                            full_auc, pf_fitness, loss, n_features
+                            full_metric, pf_fitness, loss, n_total
                         )
                         row[f"cr_{int(loss * 100):d}pct"] = round(cr, 4)
                     print(

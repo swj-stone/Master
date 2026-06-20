@@ -33,7 +33,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import accuracy_score, roc_auc_score
 from xgboost import XGBClassifier
 
 
@@ -118,7 +118,12 @@ class AccFullCache:
             elif y_prob.shape[1] == 2:
                 val = float(roc_auc_score(self._y_val, y_prob[:, 1]))
             else:
-                val = float(roc_auc_score(self._y_val, y_prob, multi_class="ovr"))
+                # Multiclass: use accuracy to avoid O(K) OVR ROC overhead
+                # (26-class isolet runs K_adv × p × 2 evaluations — ~3000
+                # calls; OVR AUC per call is ~26× slower than accuracy).
+                # v_alpha uses the same metric for Acc_full, so the
+                # binary threshold semantics are unchanged.
+                val = float(accuracy_score(self._y_val, model.predict(X_val_sub)))
         self._cache[key] = val
         return val
 
