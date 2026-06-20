@@ -62,6 +62,7 @@ class AccFullCache:
         y_val: np.ndarray,
         *,
         seed: int = 42,
+        model_params: Optional[dict] = None,
     ) -> None:
         """Compute Acc_full and initialise the subset cache.
 
@@ -71,6 +72,10 @@ class AccFullCache:
             y_train: Training target.
             y_val: Validation target.
             seed: Random seed for XGBoost.
+            model_params: Override for XGBoost params, e.g.
+                ``{"n_estimators": 50, "max_depth": 3}``.
+                Defaults to the fast (15, 2) used during NSGA-II search;
+                use stronger params when finer AUC separation is needed.
         """
         self._X_train = X_train
         self._X_val = X_val
@@ -78,6 +83,9 @@ class AccFullCache:
         self._y_val = y_val
         self._seed = seed
         self._cache: dict[tuple[str, ...], float] = {}
+        self._model_params = model_params or {
+            "n_estimators": 15, "max_depth": 2, "learning_rate": 0.3,
+        }
 
         # Compute Acc_full
         self.acc_full = self._evaluate_subset(set(X_train.columns), _seed_base=seed)
@@ -102,9 +110,9 @@ class AccFullCache:
             y_val_classes = np.unique(self._y_val)
 
             model = XGBClassifier(
-                n_estimators=15,
-                max_depth=2,
-                learning_rate=0.3,
+                n_estimators=self._model_params.get("n_estimators", 15),
+                max_depth=self._model_params.get("max_depth", 2),
+                learning_rate=self._model_params.get("learning_rate", 0.3),
                 verbosity=0,
                 random_state=_seed_base,
             )
@@ -184,6 +192,7 @@ def make_acc_full_cache(
     y_val: np.ndarray,
     *,
     seed: int = 42,
+    model_params: Optional[dict] = None,
 ) -> AccFullCache:
     """Create an :class:`AccFullCache` with Acc_full pre-computed.
 
@@ -193,11 +202,14 @@ def make_acc_full_cache(
         y_train: Training target.
         y_val: Validation target.
         seed: Random seed.
+        model_params: Optional XGBoost param overrides (see AccFullCache).
 
     Returns:
         Initialised cache with ``acc_full`` available.
     """
-    return AccFullCache(X_train, X_val, y_train, y_val, seed=seed)
+    return AccFullCache(
+        X_train, X_val, y_train, y_val, seed=seed, model_params=model_params,
+    )
 
 
 # ---------------------------------------------------------------------------

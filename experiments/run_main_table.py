@@ -181,6 +181,24 @@ DATASET_MOFSPPI_BUDGET: dict[str, dict] = {
     "credit_card_fraud": {"K_adv": 30, "pop_size": 30, "generations": 20},
 }
 
+# NSGA2-uniform shares MOFS-MinPPI's pop/gen per dataset for fair HV comparison
+DATASET_NSGA2U_BUDGET: dict[str, dict] = {
+    "spambase":    {"pop_size": 30, "generations": 20},
+    "madelon":     {"pop_size": 20, "generations": 15},
+    "isolet":      {"pop_size": 20, "generations": 10},
+    "gisette":     {"pop_size": 15, "generations": 8},
+    "credit_card_fraud": {"pop_size": 30, "generations": 20},
+}
+
+# MOFS-SHAP n_samples scaled per dataset
+DATASET_MOFSSHAP_BUDGET: dict[str, dict] = {
+    "spambase":    {"n_samples": 100},
+    "madelon":     {"n_samples": 80},
+    "isolet":      {"n_samples": 80},
+    "gisette":     {"n_samples": 60},
+    "credit_card_fraud": {"n_samples": 100},
+}
+
 TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50, 100)
 AUC_LOSS_THRESHOLDS: tuple[float, ...] = (0.01, 0.03, 0.05)
 
@@ -274,15 +292,61 @@ def evaluate_topk(
         y_prob = model.predict_proba(X_te)
         if n_classes == 2:
             val = float(roc_auc_score(y_te, y_prob[:, 1]))
-            rows.append(
-                {"k": k, "n_features": len(feats), "metric": "AUC", "value": val}
-            )
         else:
-            val = float(accuracy_score(y_te, model.predict(X_te)))
-            rows.append(
-                {"k": k, "n_features": len(feats), "metric": "Accuracy", "value": val}
-            )
+            val = float(roc_auc_score(y_te, y_prob, multi_class="ovr"))
+        rows.append(
+            {"k": k, "n_features": len(feats), "metric": "AUC", "value": val}
+        )
     return pd.DataFrame(rows)
+
+
+def refit_pareto_front(
+    masks: np.ndarray,
+    X: pd.DataFrame,
+    y: np.ndarray,
+    features: list[str],
+    *,
+    n_classes: int = 2,
+    seed: int = 42,
+) -> np.ndarray:
+    """Re-evaluate Pareto masks with strong XGBoost (100 estimators, depth 4).
+
+    All NSGA-II methods share this refit so HV and compression are computed
+    on equal footing regardless of the weak model used during search.
+    """
+    import warnings
+    import time as _time
+
+    safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
+    X_s = X.rename(columns=safe_cols)
+    features_s = [safe_cols.get(f, f) for f in features]
+    n_masks = len(masks)
+    fitness = np.zeros((n_masks, 3), dtype=float)
+    for i in range(n_masks):
+        cols = [features_s[j] for j in range(len(features_s)) if masks[i, j]]
+        if len(cols) == 0:
+            fitness[i] = (0.0, 1.0, 0.0)
+            continue
+        X_tr, X_te, y_tr, y_te = train_test_split(
+            X_s[cols], y, test_size=0.2, random_state=seed, stratify=y,
+        )
+        t0 = _time.perf_counter()
+        model = XGBClassifier(
+            n_estimators=100, max_depth=4, learning_rate=0.1,
+            verbosity=0, random_state=seed,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            model.fit(X_tr, y_tr)
+        y_prob = model.predict_proba(X_te)
+        perf = float(
+            roc_auc_score(y_te, y_prob[:, 1])
+            if n_classes == 2
+            else accuracy_score(y_te, model.predict(X_te))
+        )
+        elapsed = _time.perf_counter() - t0
+        fitness[i] = (float(len(cols)), 1.0 - perf, float(elapsed))
+    return fitness
 
 
 def compression_rate_from_fitness(
@@ -316,7 +380,7 @@ def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
     kpi_cols = [
         c
         for c in raw_df.columns
-        if "@" in c and c.split("@")[0] in {"AUC", "Accuracy"}
+        if "@" in c and c.split("@")[0] == "AUC"
     ]
     hv_cr_cols = [
         c for c in raw_df.columns if c.startswith("hv") or c.startswith("cr_")
@@ -471,6 +535,10 @@ def main() -> None:
             entry["dataset_budget"] = DATASET_MINSHAP_BUDGET
         if name == "mofs_minppi":
             entry["dataset_budget"] = DATASET_MOFSPPI_BUDGET
+        if name == "nsga2_uniform":
+            entry["dataset_budget"] = DATASET_NSGA2U_BUDGET
+        if name == "mofs_shap":
+            entry["dataset_budget"] = DATASET_MOFSSHAP_BUDGET
         run_config["baselines"][name] = entry
     with (run_dir / "config.yaml").open("w", encoding="utf-8") as f:
         yaml.safe_dump(run_config, f, sort_keys=False, allow_unicode=True)
@@ -522,6 +590,10 @@ def main() -> None:
                     call_kwargs.update(DATASET_MINSHAP_BUDGET[prefix])
                 if method == "mofs_minppi" and prefix in DATASET_MOFSPPI_BUDGET:
                     call_kwargs.update(DATASET_MOFSPPI_BUDGET[prefix])
+                if method == "nsga2_uniform" and prefix in DATASET_NSGA2U_BUDGET:
+                    call_kwargs.update(DATASET_NSGA2U_BUDGET[prefix])
+                if method == "mofs_shap" and prefix in DATASET_MOFSSHAP_BUDGET:
+                    call_kwargs.update(DATASET_MOFSSHAP_BUDGET[prefix])
 
                 # ---- NSGA-II methods: capture Pareto front via side-channel ----
                 result_box: list = []
@@ -594,10 +666,21 @@ def main() -> None:
                         float(kpi_row["value"]), 6
                     )
 
-                # ---- NSGA-II: HV + compression rate ----
+                # ---- NSGA-II: HV + compression rate (strong-model refit) ----
                 if is_nsga2 and result_box:
                     pf_data = result_box[0]
                     pf_fitness = pf_data["fitness"]
+
+                    # MOFS-MinPPI refits inside its wrapper; the other two use
+                    # weak models during search — refit here for fair comparison.
+                    if method != "mofs_minppi":
+                        pf_fitness = refit_pareto_front(
+                            pf_data["masks"], X, y,
+                            features=list(X.columns),
+                            n_classes=n_classes,
+                            seed=seed,
+                        )
+
                     # HV
                     ref = np.array([
                         max(float(n_total), float(pf_fitness[:, 0].max())) * 1.1,
@@ -607,11 +690,11 @@ def main() -> None:
                     hv_val = compute_hypervolume(pf_fitness, ref)
                     row["hv"] = round(float(hv_val), 4)
 
-                    # Compression rate — train full model for reference metric
+                    # Compression rate — full-model baseline
                     safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
                     X_safe = X.rename(columns=safe_cols)
                     X_tr, X_te, y_tr, y_te = train_test_split(
-                        X_safe, y, test_size=0.2, random_state=seed, stratify=y
+                        X_safe, y, test_size=0.2, random_state=seed, stratify=y,
                     )
                     full_model = XGBClassifier(
                         n_estimators=100, max_depth=4, learning_rate=0.1,
@@ -626,7 +709,7 @@ def main() -> None:
                     )
                     for loss in AUC_LOSS_THRESHOLDS:
                         cr = compression_rate_from_fitness(
-                            full_metric, pf_fitness, loss, n_total
+                            full_metric, pf_fitness, loss, n_total,
                         )
                         row[f"cr_{int(loss * 100):d}pct"] = round(cr, 4)
                     print(

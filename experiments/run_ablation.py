@@ -66,7 +66,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import yaml
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
@@ -240,10 +240,9 @@ def evaluate_topk(
         if n_classes == 2:
             val = float(roc_auc_score(y_te, y_prob[:, 1]))
         else:
-            val = float(accuracy_score(y_te, model.predict(X_te)))
-        metric_name = "AUC" if n_classes == 2 else "Accuracy"
+            val = float(roc_auc_score(y_te, y_prob, multi_class="ovr"))
         rows.append(
-            {"k": k, "n_features": len(feats), "metric": metric_name, "value": val}
+            {"k": k, "n_features": len(feats), "metric": "AUC", "value": val}
         )
     return pd.DataFrame(rows)
 
