@@ -1,13 +1,13 @@
 # Fdb version 4
-["bibtex icomp2026_conference"] 1781790672.33388 "icomp2026_conference.aux" "icomp2026_conference.bbl" "icomp2026_conference" 1781793693.6042 0
+["bibtex icomp2026_conference"] 1781970041.60398 "icomp2026_conference.aux" "icomp2026_conference.bbl" "icomp2026_conference" 1781970263.22549 0
   "./icomp2026_conference.bib" 1781427140 10631 10ac48fd9d6b8855d9e4312ce389d914 ""
   "./icomp2026_conference.bst" 1779366397 26974 b1fa9868993c83455e3347c51621e256 ""
-  "icomp2026_conference.aux" 1781793692 16956 d5db7b92842a6c3dd570869f64d2e75e "pdflatex"
+  "icomp2026_conference.aux" 1781970262 16956 2703f78262a9582935067083dd414ec4 "pdflatex"
   (generated)
   "icomp2026_conference.bbl"
   "icomp2026_conference.blg"
   (rewritten before read)
-["pdflatex"] 1781793691.35449 "c:/work/学校/A.SPBU/paper/Zhao CHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" "icomp2026_conference.pdf" "icomp2026_conference" 1781793693.60464 0
+["pdflatex"] 1781970261.6216 "c:/work/学校/A.SPBU/paper/Zhao CHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" "icomp2026_conference.pdf" "icomp2026_conference" 1781970263.22597 0
   "../figures/figure_1_minppi_trichotomy.pdf" 1781345690 36664 09a5b79e7896f625f366e02720aa8904 ""
   "../figures/figure_2_prop1_detection.pdf" 1781345690 29499 ac3d2221f00c11d95ffb9a2d7a403000 ""
   "../figures/figure_3_algorithm_b_vs_a.pdf" 1781345690 35932 6d1d1e03f6f3f2e9734f6b9643061a3a ""
@@ -145,13 +145,13 @@
   "c:/work/Latex/texlive/2026/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1780218776 5587506 bfccaadafa15c64d804aaff7756ac6dd ""
   "c:/work/Latex/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt" 1780218923 3636846 0291aa99435d085f5a777e36ddca91dc ""
   "c:/work/Latex/texlive/2026/texmf.cnf" 1780218758 713 e69b156964470283e0530f5060668171 ""
-  "c:/work/学校/A.SPBU/paper/Zhao CHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" 1781793690 50574 b55bb1955a993eb4a6b956b1328a4300 ""
+  "c:/work/学校/A.SPBU/paper/Zhao CHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" 1781970086 50651 f6ab1c2599b50320789fa90777d80799 ""
   "fancyhdr.sty" 1779366397 20521 e5d13d98d57bd53d4fed3aa61bd29c86 ""
-  "icomp2026_conference.aux" 1781793692 16956 d5db7b92842a6c3dd570869f64d2e75e "pdflatex"
-  "icomp2026_conference.bbl" 1781790672 8772 81efc3408f2a05441749d26d68159386 "bibtex icomp2026_conference"
-  "icomp2026_conference.out" 1781793692 5933 31112a360f938545a60914c8ded539cc "pdflatex"
+  "icomp2026_conference.aux" 1781970262 16956 2703f78262a9582935067083dd414ec4 "pdflatex"
+  "icomp2026_conference.bbl" 1781970129 8856 5c53e4421040fb9efeb73b23aa3bfe49 "bibtex icomp2026_conference"
+  "icomp2026_conference.out" 1781970262 5933 31112a360f938545a60914c8ded539cc "pdflatex"
   "icomp2026_conference.sty" 1779366397 9181 1ef73fa0f4a021d75fda9f06f666bb3f ""
-  "icomp2026_conference.tex" 1781793690 50574 b55bb1955a993eb4a6b956b1328a4300 ""
+  "icomp2026_conference.tex" 1781970086 50651 f6ab1c2599b50320789fa90777d80799 ""
   "math_commands.tex" 1779366397 12284 a71653715108dc62b66e3a0bde0307d8 ""
   "natbib.sty" 1779366397 45154 40088ce024445d7ee2bca59e704cdd01 ""
   (generated)

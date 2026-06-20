@@ -61,7 +61,7 @@ Address \\
 \begin{abstract}
 Existing game-theoretic feature selection methods mostly score each feature by its \emph{mean} marginal contribution across coalitions. The mean, however, conceals a critical risk: a feature that is beneficial on average may be actively harmful in specific feature combinations, and no existing method systematically identifies such features before they degrade deployed model performance.
 We address this gap by introducing Min-Marginal Power Indices (MinPPI). Rather than averaging, MinPPI takes the \emph{minimum} marginal contribution of each feature under a binary voting game $v_\alpha(S) = \mathbb{1}[\text{Acc}(\mathcal{M}_S) \geq \alpha \cdot \text{Acc}_{\text{full}}]$. This min--binary pairing yields a discrete output in $\{-1, 0, +1\}$, cleanly classifying every feature as \emph{harmful} (must remove), \emph{neutral}, or \emph{decisive} (must retain).
-We prove the equivalence of the min Shapley-Shubik and min Banzhaf formulations, and develop a ShapG-guided adversarial search that achieves a better sample efficiency gain over uniform Monte Carlo for detecting sparse harmful features. Embedding MinPPI into the mutation and crossover operators of NSGA-II yields the MOFS-MinPPI algorithm with a safety property: because selection always defers to the true objective, any (even adversarial) MinPPI error affects only convergence speed---the returned front stays internally non-dominated under finite budget and converges to the true Pareto front asymptotically.
+We prove the equivalence of the min Shapley-Shubik and min Banzhaf formulations (Lemma~2), and develop a ShapG-guided adversarial search (Algorithm~B) that, under a structural condition on the ShapG neighborhood, detects sparse harmful features in a single evaluation where uniform Monte Carlo needs $K\approx 90$ for $95\%$ detection (Theorem~3). Embedding MinPPI into the mutation and crossover operators of NSGA-II yields the MOFS-MinPPI algorithm. Selection is always deferred to the true training-based objective, so MinPPI error cannot create spurious Pareto dominance: the returned front of any finite run is internally non-dominated (Proposition~2a), and the algorithm converges almost surely to the true Pareto front as the generation budget increases (Proposition~2b).
 On five tabular datasets (29--5{,}000 features), MOFS-MinPPI significantly outperforms seven baselines---SHAP, ShapG, MinShap, Banzhaf, Powershap, MOFS-SHAP, and NSGA2-uniform---in Pareto-front hypervolume and compression rate at 1\%/3\%/5\% AUC-loss thresholds ($p < 0.05$, Friedman--Nemenyi). Ablation confirms that the min operator consistently dominates the mean and that binary $v_\alpha$ dominates continuous $v(\cdot)$ across all conditions.
 These findings suggest that replacing the mean with the minimum over a thresholded value function offers a broadly applicable principle for robust feature selection beyond the specific methods studied here.
 \end{abstract}
@@ -549,8 +549,4 @@ acknowledgments, including those to funding agencies, go at the end of the paper
 \section{Appendix}
 You may include other additional sections here.
 
-<<<<<<< HEAD
 \end{document}
-=======
-\end{document}
->>>>>>> 7a28100fdd58d7ab28dd666fac46c7f5b27c700a

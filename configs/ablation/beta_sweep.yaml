@@ -1,0 +1,66 @@
+# Beta sweep — guidance strength β ∈ {0, 1, 2, 5}
+#
+# Purpose: measure how MinPPI-guided mutation strength affects MOFS-MinPPI
+# convergence speed and final Pareto-front quality.
+#
+# β = 0  → uniform baseline (mutation degrades to standard bit-flip)
+# β = 1  → moderate guidance
+# β = 2  → strong guidance
+# β = 5  → near-deterministic for decisive/harmful features
+#
+# Key hypothesis (§4.4.1): β > 0 should accelerate convergence with no
+# degradation of final Pareto-front quality (Proposition 2 — Pareto
+# preservation under arbitrary MinPPI estimates).
+#
+# Evaluation (§6):
+#   - Hypervolume (HV) trajectory across generations
+#   - Convergence speed (generations to reach 95% of final HV)
+#   - Final Pareto-front HV
+#   - Compression rate at 1% / 3% / 5% AUC loss
+
+ablation:
+  name: "beta_sweep"
+  description: "Guidance strength: how β affects NSGA-II convergence and solution quality"
+  type: "sweep"
+  parameter: "beta"
+  values: [0, 1, 2, 5]
+
+minppi:
+  method: "shapg_guided"
+  K: 200
+  K_adv: 30
+  alpha: 0.95         # fixed at recommended value
+  seed: 42
+
+nsga2:
+  pop_size: 30
+  generations: 30     # more generations to see convergence curves
+  p_base: 0.1
+  seed: 42
+
+datasets:
+  - prefix: "spambase"
+    target: "is_spam"
+    multiclass: false
+  - prefix: "madelon"
+    target: "label"
+    multiclass: false
+  - prefix: "isolet"
+    target: "letter"
+    multiclass: true
+  - prefix: "gisette"
+    target: "label"
+    multiclass: false
+  - prefix: "credit_card_fraud"
+    target: "Class"
+    multiclass: false
+
+evaluation:
+  topk_kpis: [1, 3, 5, 10, 20, 50]
+  auc_loss_thresholds: [0.01, 0.03, 0.05]
+  convergence_threshold: 0.95    # 95% of final HV
+  statistical_test: "friedman_nemenyi"
+
+output:
+  log_dir: "results/logs"
+  table_dir: "results/tables"
