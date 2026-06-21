@@ -508,12 +508,21 @@ def main() -> None:
         if len(ds_rows) == 0:
             continue
 
-        # Criterion 1: harmful% must be ≥ 2% for meaningful MinPPI signal
-        usable = ds_rows[ds_rows["pct_harmful"] >= 2.0].copy()
+        # Criterion 1: harmful% ≥ 5% (meaningful signal floor).
+        # Fallback: if no α meets threshold, pick the lowest α that gives ≥ 2%
+        # or the lowest α with any harmful — avoid extreme α when the dataset
+        # is too "easy" for MinPPI to add value.
+        threshold_strong = 5.0
+        threshold_weak = 2.0
+        usable = ds_rows[ds_rows["pct_harmful"] >= threshold_strong].copy()
         if len(usable) == 0:
-            usable = ds_rows  # fallback if no α clears threshold
+            usable = ds_rows[ds_rows["pct_harmful"] >= threshold_weak].copy()
+        if len(usable) == 0:
+            usable = ds_rows[ds_rows["pct_harmful"] > 0].copy()
+        # Prefer lower α among ties (avoid over-selective extremes)
+        usable = usable.sort_values("alpha")
 
-        # Criterion 2: best AUC@10
+        # Criterion 2: best AUC@10 among usable
         idx_best_auc = usable["AUC@10"].idxmax() if "AUC@10" in usable.columns else usable.index[0]
         best_row = usable.loc[idx_best_auc]
 

@@ -70,7 +70,11 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
-from minppi_mofs.min_ppi import estimate_minppi, minppi_stats
+from minppi_mofs.min_ppi import (
+    estimate_minppi,
+    estimate_minppi_random_mc,
+    minppi_stats,
+)
 from minppi_mofs.mofs_minppi import (
     mofs_minppi_search,
     pareto_feature_importance,
@@ -322,30 +326,38 @@ def run_ablation_min_vs_mean(
             X, y, test_size=0.2, random_state=seed, stratify=y
         )
         n_features = X.shape[1]
+        n_classes = len(np.unique(y_val))
 
-        # Pre-compute ShapG neighbors and scores (shared across runs)
-        sg_scores, sg_neighbors = build_guidance_from_data(
-            X_tr, y_tr, depth=1, m=5, seed=seed
-        )
+        # ShapG guidance — only for binary datasets.
+        # Multiclass uses shared-coalition Algorithm A (same rationale as
+        # run_alpha_sweep.py: 26-class XGBoost is ~15× slower per eval).
+        sg_scores: dict[str, float] = {}
+        sg_neighbors = None
+        if n_classes == 2:
+            sg_scores, sg_neighbors = build_guidance_from_data(
+                X_tr, y_tr, depth=1, m=5, seed=seed,
+            )
 
         # --- MinPPI-guided (our method) ---
         print(
             f"  Computing MinPPI (K_adv={budget['K_adv']})...", flush=True
         )
         t0 = time.perf_counter()
-        minppi = estimate_minppi(
-            X_tr,
-            X_val,
-            y_tr,
-            y_val,
-            alpha=alpha,
-            method="shapg_guided",
-            K_adv=budget["K_adv"],
-            shapg_neighbors=sg_neighbors,
-            shapg_scores=sg_scores,
-            seed=seed,
-            verbose=False,
-        )
+        if n_classes > 2:
+            minppi = estimate_minppi_random_mc(
+                X_tr, X_val, y_tr, y_val,
+                alpha=alpha, K=200, shared_coalitions=True,
+                per_coalition=5, seed=seed, verbose=False,
+            )
+        else:
+            minppi = estimate_minppi(
+                X_tr, X_val, y_tr, y_val,
+                alpha=alpha, method="shapg_guided",
+                K_adv=budget["K_adv"],
+                shapg_neighbors=sg_neighbors,
+                shapg_scores=sg_scores,
+                seed=seed, verbose=False,
+            )
         t_minppi = time.perf_counter() - t0
 
         result_minppi = mofs_minppi_search(
@@ -508,6 +520,7 @@ def run_ablation_binary_vs_continuous(
         )
         n_features = X.shape[1]
         budget = _budget_for(prefix)
+        n_classes = len(np.unique(y_val))
         cache = make_acc_full_cache(X_tr, X_val, y_tr, y_val, seed=seed)
 
         # --- Binary v_alpha at multiple alpha ---
@@ -519,17 +532,18 @@ def run_ablation_binary_vs_continuous(
             leave=False,
         ):
             cache.set_threshold(alpha)
-            minppi = estimate_minppi(
-                X_tr,
-                X_val,
-                y_tr,
-                y_val,
-                alpha=alpha,
-                method="random_mc",
-                K=budget["K"],
-                seed=seed,
-                verbose=False,
-            )
+            if n_classes > 2:
+                minppi = estimate_minppi_random_mc(
+                    X_tr, X_val, y_tr, y_val,
+                    alpha=alpha, K=200, shared_coalitions=True,
+                    per_coalition=5, acc_cache=cache, seed=seed, verbose=False,
+                )
+            else:
+                minppi = estimate_minppi(
+                    X_tr, X_val, y_tr, y_val,
+                    alpha=alpha, method="random_mc",
+                    K=budget["K"], seed=seed, verbose=False,
+                )
             stats = minppi_stats(minppi)
             row: dict = {
                 "ablation": "binary_vs_continuous",
@@ -636,25 +650,30 @@ def run_ablation_beta_sweep(
         )
         budget = _budget_for(prefix)
         n_features = X.shape[1]
+        n_classes = len(np.unique(y_val))
         full_auc = make_acc_full_cache(X_tr, X_val, y_tr, y_val, seed=seed).acc_full
 
         # Pre-compute MinPPI (shared across β values)
-        sg_scores, sg_neighbors = build_guidance_from_data(
-            X_tr, y_tr, depth=1, m=5, seed=seed
-        )
-        minppi = estimate_minppi(
-            X_tr,
-            X_val,
-            y_tr,
-            y_val,
-            alpha=alpha,
-            method="shapg_guided",
-            K_adv=budget["K_adv"],
-            shapg_neighbors=sg_neighbors,
-            shapg_scores=sg_scores,
-            seed=seed,
-            verbose=False,
-        )
+        # Multiclass uses shared-coalition Algorithm A to avoid per-train
+        # overhead of 26-class XGBoost in ShapG + Algorithm B searches.
+        if n_classes > 2:
+            minppi = estimate_minppi_random_mc(
+                X_tr, X_val, y_tr, y_val,
+                alpha=alpha, K=200, shared_coalitions=True,
+                per_coalition=5, seed=seed, verbose=False,
+            )
+        else:
+            sg_scores, sg_neighbors = build_guidance_from_data(
+                X_tr, y_tr, depth=1, m=5, seed=seed,
+            )
+            minppi = estimate_minppi(
+                X_tr, X_val, y_tr, y_val,
+                alpha=alpha, method="shapg_guided",
+                K_adv=budget["K_adv"],
+                shapg_neighbors=sg_neighbors,
+                shapg_scores=sg_scores,
+                seed=seed, verbose=False,
+            )
 
         for beta in tqdm(
             [0, 1, 2, 5], desc=f"  β values ({prefix})", unit="β", file=sys.stdout, leave=False
@@ -760,6 +779,14 @@ def run_ablation_shapg_vs_shap(
     for prefix, target, is_mc in tqdm(
         DATASETS, desc="ShapG vs SHAP", unit="dataset", file=sys.stdout
     ):
+        # Skip multiclass: ShapG vs SHAP neighbor comparison requires
+        # Algorithm B which is O(p·K_adv·2) per signal source with 26-class
+        # XGBoost; shared-coalition Algorithm A does not use neighbors.
+        if is_mc:
+            print(f"\n  Skipping {prefix} (multiclass — ShapG vs SHAP neighbor "
+                  "comparison requires Algorithm B, too slow)", flush=True)
+            continue
+
         print(f"\n{'=' * 60}\n  ShapG vs SHAP — {prefix}\n{'=' * 60}", flush=True)
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
