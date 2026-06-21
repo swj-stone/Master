@@ -124,14 +124,25 @@ def estimate_minppi_random_mc(
     *,
     alpha: float = 0.95,
     K: int = 200,
+    shared_coalitions: bool = False,
+    per_coalition: int = 5,
     acc_cache: Optional[AccFullCache] = None,
     seed: int = 42,
     verbose: bool = False,
 ) -> dict[str, int]:
     """Estimate MinPPI via random coalition sampling (Algorithm A).
 
+    Two modes:
+
+    **Per-feature mode** (``shared_coalitions=False``, default):
     For each feature *i*, samples *K* random coalitions S ⊆ N \\ {i} and
     computes  min_k [v_alpha(S_k ∪ {i}) - v_alpha(S_k)].
+
+    **Shared-coalition mode** (``shared_coalitions=True``):
+    Draws *K* coalitions once.  For each coalition S, up to *per_coalition*
+    absent features are evaluated (same strategy as Banzhaf/MinShap).
+    Total XGBoost evaluations: O(K · per_coalition) instead of O(p·K).
+    Suitable for alpha sweeps and multiclass datasets.
 
     **Upward bias** (Lemma 3):  sample_min ≥ population_min almost surely.
 
@@ -145,7 +156,10 @@ def estimate_minppi_random_mc(
         y_train: Training target.
         y_val: Validation target.
         alpha: Quota parameter.
-        K: Number of random coalitions to sample per feature.
+        K: Number of random coalitions (per-feature or shared).
+        shared_coalitions: If True, use shared-coalition sampling.
+        per_coalition: Max absent features to evaluate per coalition
+            (shared-coalition mode only).
         acc_cache: Optional pre-built accuracy cache.
         seed: Random seed.
         verbose: Print progress.
@@ -163,6 +177,66 @@ def estimate_minppi_random_mc(
     all_features = set(features)
     minppi: dict[str, int] = {}
 
+    if shared_coalitions:
+        # ── shared‑coalition mode (Banzhaf-style) ──
+        # Draw K coalitions once.  For each S, evaluate v(S) and at most
+        # *per_coalition* randomly chosen absent features.  Total evals:
+        # K × (1 + per_coalition).
+        if verbose:
+            print(
+                f"  Algorithm A (shared): K={K}, per_cc={per_coalition}, {n} features",
+                flush=True,
+            )
+
+        minppi = {f: 1 for f in features}
+        hits = {f: 0 for f in features}
+        n_eval = 0
+
+        for _ in range(K):
+            s_size = rng.integers(0, n + 1)
+            S_list = rng.choice(features, size=s_size, replace=False).tolist()
+            S = set(S_list)
+            vS = 1 if acc_cache.is_winning(S) else 0
+            n_eval += 1
+
+            absent = [f for f in features if f not in S]
+            rng.shuffle(absent)
+            for feat in absent[:per_coalition]:
+                if minppi[feat] <= -0.99:
+                    continue
+                vSi = 1 if acc_cache.is_winning(S | {feat}) else 0
+                n_eval += 1
+                marg = vSi - vS
+                if marg < minppi[feat]:
+                    minppi[feat] = marg
+                hits[feat] += 1
+
+        # Second pass: any feature with < 2 evaluations?  Run a few
+        # dedicated coalitions to get a baseline (coupon-collector edge).
+        needs_more = [f for f in features if hits[f] < 2]
+        for feat in needs_more:
+            others = list(all_features - {feat})
+            for _ in range(max(0, 5 - hits[feat])):
+                s_size = rng.integers(0, len(others) + 1)
+                S = set(rng.choice(others, size=s_size, replace=False).tolist())
+                marg = acc_cache.eval_marginal(S, feat)
+                n_eval += 1
+                if marg < minppi[feat]:
+                    minppi[feat] = marg
+                hits[feat] += 1
+                if marg == -1:
+                    break
+
+        minppi = {f: minppi[f] if hits[f] > 0 else 0 for f in features}
+        if verbose:
+            n_neg = sum(1 for v in minppi.values() if v == -1)
+            print(
+                f"  Algorithm A (shared): {n_eval} evals, harmful={n_neg}/{n}",
+                flush=True,
+            )
+        return minppi
+
+    # ── per-feature mode ──
     if verbose:
         print(f"  Algorithm A (random MC): K={K}, {n} features", flush=True)
 
@@ -344,6 +418,7 @@ def estimate_minppi_hybrid(
     alpha: float = 0.95,
     K: int = 200,
     K_adv: int = 30,
+    shared_coalitions: bool = False,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
     acc_cache: Optional[AccFullCache] = None,
@@ -366,6 +441,7 @@ def estimate_minppi_hybrid(
         alpha: Quota parameter.
         K: Random MC budget (Algorithm A).
         K_adv: Adversarial search budget (Algorithm B).
+        shared_coalitions: Forwarded to Algorithm A.
         shapg_neighbors: ShapG neighbor dict for Algorithm B.
         shapg_scores: ShapG scores for seed construction.
         acc_cache: Optional pre-built accuracy cache.
@@ -410,6 +486,7 @@ def estimate_minppi_hybrid(
                 y_val,
                 alpha=alpha,
                 K=K,
+                shared_coalitions=shared_coalitions,
                 acc_cache=acc_cache,
                 seed=seed,
                 verbose=verbose,
@@ -439,6 +516,7 @@ def estimate_minppi_hybrid(
         y_val,
         alpha=alpha,
         K=K,
+        shared_coalitions=shared_coalitions,
         acc_cache=acc_cache,
         seed=seed,
         verbose=False,
@@ -488,6 +566,7 @@ def estimate_minppi(
     method: str = "hybrid",
     K: int = 200,
     K_adv: int = 30,
+    shared_coalitions: bool = False,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
     seed: int = 42,
@@ -512,6 +591,7 @@ def estimate_minppi(
             - ``"hybrid"`` — auto-select based on *n* (§4.3.3, default)
         K: Number of random samples per feature (Algorithm A).
         K_adv: Adversarial search budget per feature (Algorithm B).
+        shared_coalitions: Forwarded to Algorithm A (shared-coalition mode).
         shapg_neighbors: ShapG neighbour dict for Algorithm B.
         shapg_scores: ShapG scores for seed coalition construction.
         seed: Random seed.
@@ -557,7 +637,7 @@ def estimate_minppi(
     if method == "exact":
         return fn(**common)  # type: ignore[call-arg]
     elif method == "random_mc":
-        return fn(K=K, **common)  # type: ignore[call-arg]
+        return fn(K=K, shared_coalitions=shared_coalitions, **common)  # type: ignore[call-arg]
     elif method == "shapg_guided":
         return fn(
             K_adv=K_adv,
@@ -569,6 +649,7 @@ def estimate_minppi(
         return fn(
             K=K,
             K_adv=K_adv,
+            shared_coalitions=shared_coalitions,
             shapg_neighbors=shapg_neighbors,
             shapg_scores=shapg_scores,
             **common,

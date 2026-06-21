@@ -54,7 +54,11 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
-from minppi_mofs.min_ppi import estimate_minppi_shapg_guided, minppi_stats
+from minppi_mofs.min_ppi import (
+    estimate_minppi_random_mc,
+    estimate_minppi_shapg_guided,
+    minppi_stats,
+)
 from minppi_mofs.shapg_integration import build_guidance_from_data
 from minppi_mofs.voting_game import make_acc_full_cache
 
@@ -274,7 +278,7 @@ def main() -> None:
         # params: 26-class XGBoost is ~7× slower per estimator than binary.
         if n_classes > 2:
             model_params_ab = {
-                "n_estimators": 20, "max_depth": 3, "learning_rate": 0.2,
+                "n_estimators": 25, "max_depth": 2, "learning_rate": 0.3,
             }
         else:
             model_params_ab = {
@@ -287,10 +291,16 @@ def main() -> None:
         acc_full = cache.acc_full
         print(f"  Full-feature AUC: {acc_full:.4f}, n_features: {n_features}")
 
-        # ShapG guidance (shared across α)
-        sg_scores, sg_neighbors = build_guidance_from_data(
-            X_tr, y_tr, depth=1, m=5, seed=42
-        )
+        # ShapG guidance — only needed for binary datasets (Algorithm B).
+        # Multiclass uses Algorithm A (random MC), which does not depend on
+        # the correlation graph; this avoids ~6400 extra XGBoost evals on
+        # 26-class isolet.
+        sg_scores: dict[str, float] = {}
+        sg_neighbors: dict[str, list[str]] | None = None
+        if n_classes == 2:
+            sg_scores, sg_neighbors = build_guidance_from_data(
+                X_tr, y_tr, depth=1, m=5, seed=42,
+            )
 
         # Storage for stability analysis
         minppi_per_alpha: dict[float, dict[str, int]] = {}
@@ -309,22 +319,29 @@ def main() -> None:
                 flush=True,
             )
 
-            # --- MinPPI estimation (reuse shared AccFullCache across α) ---
+            # --- MinPPI estimation (shared AccFullCache across α) ---
+            # Multiclass: Algorithm A (shared-coalition random MC, K=150).
+            # Binary:     Algorithm B (ShapG-guided adversarial search).
+            # Rationale: alpha sweep only needs the sign of MinPPI, not
+            # precise identification of sparse harmful features.
+            # Algorithm A on isolet (100 feats): 300 eval × 0.12s ≈ 36s.
+            # Algorithm B on isolet: 600 eval + ShapG 6400 eval ≈ 15+ min.
             cache.set_threshold(alpha)
             t0 = time.perf_counter()
-            minppi = estimate_minppi_shapg_guided(
-                X_tr,
-                X_val,
-                y_tr,
-                y_val,
-                alpha=alpha,
-                K_adv=budget["K_adv"],
-                shapg_neighbors=sg_neighbors,
-                shapg_scores=sg_scores,
-                acc_cache=cache,
-                seed=42,
-                verbose=False,
-            )
+            if n_classes > 2:
+                minppi = estimate_minppi_random_mc(
+                    X_tr, X_val, y_tr, y_val,
+                    alpha=alpha, K=200, shared_coalitions=True,
+                    per_coalition=5, acc_cache=cache, seed=42, verbose=False,
+                )
+            else:
+                minppi = estimate_minppi_shapg_guided(
+                    X_tr, X_val, y_tr, y_val,
+                    alpha=alpha, K_adv=budget["K_adv"],
+                    shapg_neighbors=sg_neighbors,
+                    shapg_scores=sg_scores,
+                    acc_cache=cache, seed=42, verbose=False,
+                )
             t_minppi = time.perf_counter() - t0
             stats = minppi_stats(minppi)
             minppi_per_alpha[alpha] = minppi
@@ -355,18 +372,24 @@ def main() -> None:
             )
 
             # MinPPI-based ranking: decisive (+1) top, harmful (-1) bottom,
-            # neutral (0) middle sorted by ShapG score (harmonic proxy)
+            # neutral (0) middle sorted by importance proxy.
+            # Binary datasets use ShapG; multiclass uses per-feature variance.
             ranking_mpp: list[str] = []
             decisive_f = [f for f in features if minppi.get(f, 0) == +1]
+
+            def _score(feat: str) -> float:
+                """Proxy score for feature ordering."""
+                if sg_scores:
+                    return float(sg_scores.get(feat, 0.0))
+                return float(X_tr[feat].var())
+
             neutral_f = sorted(
                 [f for f in features if minppi.get(f, 0) == 0],
-                key=lambda f: sg_scores.get(f, 0),
-                reverse=True,
+                key=_score, reverse=True,
             )
             harmful_f = sorted(
                 [f for f in features if minppi.get(f, 0) == -1],
-                key=lambda f: sg_scores.get(f, 0),
-                reverse=True,
+                key=_score, reverse=True,
             )
             ranking_mpp = decisive_f + neutral_f + harmful_f
             ranking_per_alpha[alpha] = ranking_mpp
