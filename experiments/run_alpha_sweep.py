@@ -79,7 +79,7 @@ TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50)
 DATASET_BUDGET: dict[str, dict] = {
     "spambase":    {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
     "madelon":     {"K": 100, "K_adv": 20, "pop": 20, "gen": 15},
-    "isolet":      {"K": 80,  "K_adv": 8, "pop": 20, "gen": 10},
+    "isolet":      {"K": 80,  "K_adv": 3, "pop": 20, "gen": 10},
     "gisette":     {"K": 50,  "K_adv": 10, "pop": 15, "gen": 8},
     "credit_card_fraud": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
 }
@@ -274,7 +274,7 @@ def main() -> None:
         # params: 26-class XGBoost is ~7× slower per estimator than binary.
         if n_classes > 2:
             model_params_ab = {
-                "n_estimators": 25, "max_depth": 3, "learning_rate": 0.2,
+                "n_estimators": 20, "max_depth": 3, "learning_rate": 0.2,
             }
         else:
             model_params_ab = {
