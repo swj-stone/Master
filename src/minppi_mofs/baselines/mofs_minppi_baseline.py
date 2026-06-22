@@ -44,7 +44,7 @@ from sklearn.metrics import roc_auc_score, accuracy_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
-from minppi_mofs.min_ppi import estimate_minppi
+from minppi_mofs.min_ppi import estimate_minppi, estimate_minppi_random_mc
 from minppi_mofs.mofs_minppi import (
     mofs_minppi_search,
 )
@@ -174,29 +174,35 @@ def compute_mofs_minppi_importance(
     X_tr, X_val, y_tr, y_val = train_test_split(
         X, y, test_size=val_size, random_state=seed, stratify=y
     )
+    n_classes = len(np.unique(y_val))
 
     if verbose:
         print(f"  MOFS-MinPPI: {X.shape[1]} features", flush=True)
 
-    # ---- ShapG guidance ----
-    sg_scores, sg_neighbors = build_guidance_from_data(
-        X_tr, y_tr, depth=1, m=5, seed=seed
-    )
+    # ---- ShapG guidance (binary only; multiclass uses Algorithm A) ----
+    sg_scores: dict[str, float] = {}
+    sg_neighbors = None
+    if n_classes == 2:
+        sg_scores, sg_neighbors = build_guidance_from_data(
+            X_tr, y_tr, depth=1, m=5, seed=seed,
+        )
 
     # ---- MinPPI estimation ----
-    minppi = estimate_minppi(
-        X_tr,
-        X_val,
-        y_tr,
-        y_val,
-        alpha=alpha,
-        method="hybrid",
-        K_adv=K_adv,
-        shapg_neighbors=sg_neighbors,
-        shapg_scores=sg_scores,
-        seed=seed,
-        verbose=verbose,
-    )
+    # Multiclass (e.g. 26-class isolet): shared-coalition Algorithm A
+    # for tractable wall time. Binary: hybrid dispatcher (Algorithm B).
+    if n_classes > 2:
+        minppi = estimate_minppi_random_mc(
+            X_tr, X_val, y_tr, y_val,
+            alpha=alpha, K=200, shared_coalitions=True,
+            per_coalition=5, seed=seed, verbose=verbose,
+        )
+    else:
+        minppi = estimate_minppi(
+            X_tr, X_val, y_tr, y_val,
+            alpha=alpha, method="hybrid", K_adv=K_adv,
+            shapg_neighbors=sg_neighbors, shapg_scores=sg_scores,
+            seed=seed, verbose=verbose,
+        )
 
     # ---- MOFS-MinPPI search (fast weak model) ----
     result = mofs_minppi_search(
