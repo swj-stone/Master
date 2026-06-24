@@ -681,6 +681,16 @@ def main() -> None:
                             seed=seed,
                         )
 
+                    # Save Pareto front (refit fitness) for post-hoc
+                    # IGD/IGD+/Spacing via compute_pareto_metrics.py
+                    np.savetxt(
+                        method_dir / f"{prefix}_s{seed}_pareto.csv",
+                        pf_fitness,
+                        delimiter=",",
+                        header="n_features,one_minus_quality,time_s",
+                        comments="",
+                    )
+
                     # HV
                     ref = np.array([
                         max(float(n_total), float(pf_fitness[:, 0].max())) * 1.1,
