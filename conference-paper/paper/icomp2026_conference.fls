@@ -1,8 +1,8 @@
-PWD c:/work/学校/A.SPBU/paper/Zhao CHI/Paper/Master/conference-paper/paper
+PWD c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper
 INPUT c:/work/Latex/texlive/2026/texmf.cnf
 INPUT c:/work/Latex/texlive/2026/texmf-dist/web2c/texmf.cnf
 INPUT c:/work/Latex/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT c:/work/学校/A.SPBU/paper/Zhao CHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex
+INPUT c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex
 OUTPUT icomp2026_conference.log
 INPUT c:/work/Latex/texlive/2026/texmf-dist/tex/latex/base/article.cls
 INPUT c:/work/Latex/texlive/2026/texmf-dist/tex/latex/base/article.cls
@@ -202,23 +202,18 @@ INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmri8r.tfm
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmrc7t.tfm
+INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/vf/adobe/times/ptmrc7t.vf
+INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT c:/work/Latex/texlive/2026/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 INPUT c:/work/Latex/texlive/2026/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 INPUT c:/work/Latex/texlive/2026/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmr8c.tfm
-INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/vf/adobe/times/ptmrc7t.vf
-INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/vf/adobe/times/ptmr8c.vf
 INPUT ../figures/figure_1_minppi_trichotomy.pdf
 INPUT ../figures/figure_1_minppi_trichotomy.pdf
 INPUT ../figures/figure_1_minppi_trichotomy.pdf
 INPUT ../figures/figure_1_minppi_trichotomy.pdf
 INPUT ../figures/figure_1_minppi_trichotomy.pdf
-INPUT ../figures/figure_2_prop1_detection.pdf
-INPUT ../figures/figure_2_prop1_detection.pdf
-INPUT ../figures/figure_2_prop1_detection.pdf
-INPUT ../figures/figure_2_prop1_detection.pdf
-INPUT ../figures/figure_2_prop1_detection.pdf
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm
 INPUT ../figures/figure_3_algorithm_b_vs_a.pdf
@@ -262,6 +257,11 @@ INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/vf/adobe/times/ptmri7t.vf
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmri8r.tfm
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
 INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
+INPUT ../figures/figure_2_prop1_detection.pdf
+INPUT ../figures/figure_2_prop1_detection.pdf
+INPUT ../figures/figure_2_prop1_detection.pdf
+INPUT ../figures/figure_2_prop1_detection.pdf
+INPUT ../figures/figure_2_prop1_detection.pdf
 INPUT icomp2026_conference.aux
 INPUT ./icomp2026_conference.out
 INPUT ./icomp2026_conference.out

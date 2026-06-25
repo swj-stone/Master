@@ -152,10 +152,10 @@ def select_top_features(
 ) -> tuple[pd.DataFrame, list[str]]:
     """Select top features by mutual information with the target.
 
-    Rule:
-      - p <= 100  → keep all
+    Rule (aligned with PLAN.md MI protocol):
+      - p <= 100       → keep all
       - 100 < p <= 1000 → keep top 100
-      - all p > 100 → keep top 100
+      - p > 1000       → keep top 200
 
     Args:
         X: Feature DataFrame.
@@ -169,14 +169,20 @@ def select_top_features(
     if p <= 100:
         return X, list(X.columns)
 
-    k = 100
+    if p <= 1000:
+        k = 100
+        rule_label = "top100"
+    else:
+        k = 200
+        rule_label = "top200"
+
     mi = mutual_info_classif(X, y, random_state=seed)
     scores = pd.Series(mi, index=X.columns)
     top_cols = scores.abs().sort_values(ascending=False).head(k).index.tolist()
 
     print(
         f"  Feature selection (mutual info): {p} -> {len(top_cols)} "
-        f"(rule: top100)",
+        f"(rule: {rule_label})",
     )
     return X[top_cols], top_cols
 
