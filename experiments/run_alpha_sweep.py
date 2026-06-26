@@ -50,9 +50,10 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import yaml
-from sklearn.metrics import roc_auc_score
+from sklearn.feature_selection import mutual_info_regression
+from sklearn.metrics import r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 
 from minppi_mofs.min_ppi import (
     estimate_minppi_random_mc,
@@ -69,12 +70,14 @@ from minppi_mofs.voting_game import make_acc_full_cache
 
 ALPHA_VALUES: list[float] = [0.80, 0.85, 0.90, 0.95, 0.99]
 
-DATASETS: list[tuple[str, str, bool]] = [
-    ("spambase", "is_spam", False),
-    ("madelon", "label", False),
-    ("isolet", "letter", True),
-    ("gisette", "label", False),
-    ("credit_card_fraud", "Class", False),
+DATASETS: list[tuple[str, str, str]] = [
+    ("spambase", "is_spam", "binary"),
+    ("madelon", "label", "binary"),
+    ("isolet", "letter", "multiclass"),
+    ("gisette", "label", "binary"),
+    ("credit_card_fraud", "Class", "binary"),
+    ("crimedata", "nonViolPerPop", "regression"),
+    ("abalone", "Rings", "regression"),
 ]
 
 TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50)
@@ -86,6 +89,8 @@ DATASET_BUDGET: dict[str, dict] = {
     "isolet":      {"K": 80,  "K_adv": 3, "pop": 20, "gen": 10},
     "gisette":     {"K": 50,  "K_adv": 10, "pop": 15, "gen": 8},
     "credit_card_fraud": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
+    "crimedata": {"K": 50, "K_adv": 10, "pop": 15, "gen": 8},
+    "abalone": {"K": 50, "K_adv": 10, "pop": 30, "gen": 20},
 }
 
 
@@ -151,9 +156,11 @@ def evaluate_topk(
     y: np.ndarray,
     ranking: list[str],
     *,
+    task: str = "binary",
     ks: tuple[int, ...] = TOP_K_KPIS,
     seed: int = 42,
 ) -> pd.DataFrame:
+    """Measure XGBoost AUC (or R² for regression) using only top-k ranked features."""
     rows: list[dict] = []
     n_classes = len(np.unique(y))
     for k in ks:
@@ -163,8 +170,22 @@ def evaluate_topk(
             y,
             test_size=0.2,
             random_state=seed,
-            stratify=y,
+            stratify=y if task != "regression" else None,
         )
+        if task == "regression":
+            model = XGBRegressor(
+                n_estimators=100, max_depth=4, learning_rate=0.1,
+                verbosity=0, random_state=seed,
+            )
+            model.fit(X_tr, y_tr)
+            y_pred = model.predict(X_te)
+            val = float(r2_score(y_te, y_pred))
+            if val < 0.0:
+                val = 0.0
+            rows.append(
+                {"k": k, "n_features": len(feats), "metric": "R²", "value": val}
+            )
+            continue
         model = XGBClassifier(
             n_estimators=100,
             max_depth=4,
@@ -243,7 +264,7 @@ def main() -> None:
         "seed": 42,
         "alpha_values": ALPHA_VALUES,
         "datasets": [
-            {"prefix": d[0], "target": d[1], "multiclass": d[2]} for d in DATASETS
+            {"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS
         ],
         "evaluation": {
             "topk_kpis": list(TOP_K_KPIS),
@@ -259,14 +280,15 @@ def main() -> None:
     all_metrics: list[dict] = []
     all_distributions: list[dict] = []
 
-    for prefix, target, is_mc in tqdm(
+    for prefix, target, task in tqdm(
         DATASETS, desc="α sweep", unit="dataset", file=sys.stdout
     ):
         _header(f"Alpha sweep — {prefix}")
 
         X, y = load_data(prefix, target, processed_dir)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
+            X, y, test_size=0.2, random_state=42,
+            stratify=y if task != "regression" else None,
         )
         budget = _budget_for(prefix)
         n_features = X.shape[1]
@@ -276,6 +298,7 @@ def main() -> None:
         # Acc_full (independent of α) — use stronger model for meaningful
         # binary threshold separation. Multiclass datasets keep lighter
         # params: 26-class XGBoost is ~7× slower per estimator than binary.
+        # Regression uses R² via task= parameter.
         if n_classes > 2:
             model_params_ab = {
                 "n_estimators": 25, "max_depth": 2, "learning_rate": 0.3,
@@ -286,21 +309,27 @@ def main() -> None:
             }
         cache = make_acc_full_cache(
             X_tr, X_val, y_tr, y_val, seed=42,
-            model_params=model_params_ab,
+            model_params=model_params_ab, task=task,
         )
         acc_full = cache.acc_full
-        print(f"  Full-feature AUC: {acc_full:.4f}, n_features: {n_features}")
+        metric_label = "R²" if task == "regression" else "AUC"
+        print(f"  Full-feature {metric_label}: {acc_full:.4f}, n_features: {n_features}")
 
         # ShapG guidance — only needed for binary datasets (Algorithm B).
         # Multiclass uses Algorithm A (random MC), which does not depend on
         # the correlation graph; this avoids ~6400 extra XGBoost evals on
-        # 26-class isolet.
+        # 26-class isolet. Regression has no ShapG graph.
         sg_scores: dict[str, float] = {}
         sg_neighbors: dict[str, list[str]] | None = None
-        if n_classes == 2:
+        if n_classes == 2 and task != "regression":
             sg_scores, sg_neighbors = build_guidance_from_data(
                 X_tr, y_tr, depth=1, m=5, seed=42,
             )
+        # For regression: pre-compute mutual information scores for ranking proxy
+        mi_scores: dict[str, float] = {}
+        if task == "regression":
+            mi_arr = mutual_info_regression(X_tr, y_tr, random_state=42)
+            mi_scores = dict(zip(X_tr.columns, mi_arr))
 
         # Storage for stability analysis
         minppi_per_alpha: dict[float, dict[str, int]] = {}
@@ -320,7 +349,7 @@ def main() -> None:
             )
 
             # --- MinPPI estimation (shared AccFullCache across α) ---
-            # Multiclass: Algorithm A (shared-coalition random MC, K=150).
+            # Multiclass / Regression: Algorithm A (shared-coalition random MC).
             # Binary:     Algorithm B (ShapG-guided adversarial search).
             # Rationale: alpha sweep only needs the sign of MinPPI, not
             # precise identification of sparse harmful features.
@@ -328,11 +357,12 @@ def main() -> None:
             # Algorithm B on isolet: 600 eval + ShapG 6400 eval ≈ 15+ min.
             cache.set_threshold(alpha)
             t0 = time.perf_counter()
-            if n_classes > 2:
+            if n_classes > 2 or task == "regression":
                 minppi = estimate_minppi_random_mc(
                     X_tr, X_val, y_tr, y_val,
                     alpha=alpha, K=200, shared_coalitions=True,
                     per_coalition=5, acc_cache=cache, seed=42, verbose=False,
+                    task=task,
                 )
             else:
                 minppi = estimate_minppi_shapg_guided(
@@ -341,6 +371,7 @@ def main() -> None:
                     shapg_neighbors=sg_neighbors,
                     shapg_scores=sg_scores,
                     acc_cache=cache, seed=42, verbose=False,
+                    task=task,
                 )
             t_minppi = time.perf_counter() - t0
             stats = minppi_stats(minppi)
@@ -373,7 +404,8 @@ def main() -> None:
 
             # MinPPI-based ranking: decisive (+1) top, harmful (-1) bottom,
             # neutral (0) middle sorted by importance proxy.
-            # Binary datasets use ShapG; multiclass uses per-feature variance.
+            # Binary datasets use ShapG; multiclass uses per-feature variance;
+            # regression uses mutual information.
             ranking_mpp: list[str] = []
             decisive_f = [f for f in features if minppi.get(f, 0) == +1]
 
@@ -381,6 +413,8 @@ def main() -> None:
                 """Proxy score for feature ordering."""
                 if sg_scores:
                     return float(sg_scores.get(feat, 0.0))
+                if mi_scores:
+                    return float(mi_scores.get(feat, 0.0))
                 return float(X_tr[feat].var())
 
             neutral_f = sorted(
@@ -394,8 +428,8 @@ def main() -> None:
             ranking_mpp = decisive_f + neutral_f + harmful_f
             ranking_per_alpha[alpha] = ranking_mpp
 
-            # ---- Top-k AUC from MinPPI-based ranking (all α, nearly free) ----
-            kpi_mpp = evaluate_topk(X, y, ranking_mpp, seed=42)
+            # ---- Top-k AUC/R² from MinPPI-based ranking (all α, nearly free) ----
+            kpi_mpp = evaluate_topk(X, y, ranking_mpp, seed=42, task=task)
             metric_name = kpi_mpp["metric"].iloc[0]
 
             row: dict = {
@@ -488,16 +522,17 @@ def main() -> None:
     harmful_pivot.to_csv(run_dir / "table_harmful_pct_vs_alpha.csv")
     print("table_harmful_pct_vs_alpha.csv", flush=True)
 
-    # Top-k AUC from MinPPI ranking vs α (all α have this)
+    # Top-k AUC / R² from MinPPI ranking vs α (all α have this)
     for k in [1, 5, 10, 20, 50]:
-        auc_col = f"AUC@{k}"
-        if auc_col in metrics_df.columns:
-            pivot = metrics_df.pivot_table(
-                index="dataset", columns="alpha", values=auc_col, aggfunc="first",
-            )
-            pivot = pivot.round(4)
-            pivot.to_csv(run_dir / f"table_AUC@{k}_vs_alpha.csv")
-            print(f"table_AUC@{k}_vs_alpha.csv", flush=True)
+        for prefix in ["AUC", "R²"]:
+            metric_col = f"{prefix}@{k}"
+            if metric_col in metrics_df.columns:
+                pivot = metrics_df.pivot_table(
+                    index="dataset", columns="alpha", values=metric_col, aggfunc="first",
+                )
+                pivot = pivot.round(4)
+                pivot.to_csv(run_dir / f"table_{prefix}@{k}_vs_alpha.csv")
+                print(f"table_{prefix}@{k}_vs_alpha.csv", flush=True)
 
     # ---- Per-dataset alpha recommendation (three criteria) ----
     _header("Alpha recommendation")
@@ -522,9 +557,10 @@ def main() -> None:
         # Prefer lower α among ties (avoid over-selective extremes)
         usable = usable.sort_values("alpha")
 
-        # Criterion 2: best AUC@10 among usable
-        idx_best_auc = usable["AUC@10"].idxmax() if "AUC@10" in usable.columns else usable.index[0]
-        best_row = usable.loc[idx_best_auc]
+        # Criterion 2: best score@10 among usable (AUC or R²)
+        kpi_col = "AUC@10" if "AUC@10" in usable.columns else "R²@10"
+        idx_best_kpi = usable[kpi_col].idxmax() if kpi_col in usable.columns else usable.index[0]
+        best_row = usable.loc[idx_best_kpi]
 
         # Criterion 3: Jaccard stability to adjacent alphas
         stab_df = pd.read_csv(run_dir / f"{prefix}_stability.csv")
@@ -543,7 +579,7 @@ def main() -> None:
             mean_jac = {a: 0.0 for a in ALPHA_VALUES}
 
         # Build comparison for this dataset
-        lines: list[str] = [f"\n  {prefix}:"]
+        lines: list[str] = [f"\n  {prefix}: ({kpi_col})"]
         parts: list[str] = []
         for _, r in ds_rows.iterrows():
             a_val = float(r["alpha"])
@@ -552,10 +588,10 @@ def main() -> None:
         parts = []
         for _, r in ds_rows.iterrows():
             a_val = float(r["alpha"])
-            auc_v = r.get("AUC@10")
-            if not pd.isna(auc_v):
-                parts.append(f"α={a_val:.2f}:{auc_v:.3f}")
-        lines.append("    AUC@10:  " + "  ".join(parts))
+            kpi_v = r.get(kpi_col)
+            if not pd.isna(kpi_v):
+                parts.append(f"α={a_val:.2f}:{kpi_v:.3f}")
+        lines.append(f"    {kpi_col}:  " + "  ".join(parts))
         parts = [f"α={a:.2f}:{mean_jac[a]:.2f}" for a in alphas_sorted]
         lines.append("    J(neighbor): " + "  ".join(parts))
         print("\n".join(lines), flush=True)
@@ -565,11 +601,12 @@ def main() -> None:
             "recommended_alpha": float(best_row["alpha"]),
             "n_harmful_at_best": int(best_row["n_harmful"]),
             "pct_harmful_at_best": float(best_row["pct_harmful"]),
-            "AUC@10_at_best": float(best_row.get("AUC@10", float("nan"))),
+            "best_kpi_at_10": float(best_row.get(kpi_col, float("nan"))),
+            "best_kpi_name": kpi_col,
             "J_neighbor_harmful_at_best": round(mean_jac.get(float(best_row["alpha"]), 0.0), 3),
-            "n_harmful_α085": int(ds_rows[ds_rows["alpha"] == 0.85]["n_harmful"].values[0]),
-            "n_harmful_α095": int(ds_rows[ds_rows["alpha"] == 0.95]["n_harmful"].values[0]),
-            "n_harmful_α099": int(ds_rows[ds_rows["alpha"] == 0.99]["n_harmful"].values[0]),
+            "n_harmful_α085": int(ds_rows[ds_rows["alpha"] == 0.85]["n_harmful"].values[0]) if 0.85 in ds_rows["alpha"].values else 0,
+            "n_harmful_α095": int(ds_rows[ds_rows["alpha"] == 0.95]["n_harmful"].values[0]) if 0.95 in ds_rows["alpha"].values else 0,
+            "n_harmful_α099": int(ds_rows[ds_rows["alpha"] == 0.99]["n_harmful"].values[0]) if 0.99 in ds_rows["alpha"].values else 0,
         })
 
     # Global recommendation table

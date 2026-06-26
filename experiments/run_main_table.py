@@ -1,5 +1,5 @@
 """
-Main-table experiment: MOFS-MinPPI + 7 baselines × 5 datasets × 5 seeds.
+Main-table experiment: MOFS-MinPPI + 7 baselines × 7 datasets × 5 seeds.
 
 Methods
 -------
@@ -44,9 +44,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 
 from minppi_mofs.baselines.banzhaf_fs import (
     compute_banzhaf_importance,
@@ -153,16 +153,20 @@ BASELINES: dict[str, dict] = {
     },
 }
 
-DATASETS: list[tuple[str, str, bool]] = [
-    ("spambase", "is_spam", False),
-    ("madelon", "label", False),
-    ("isolet", "letter", True),
-    ("gisette", "label", False),
-    ("credit_card_fraud", "Class", False),
+DATASETS: list[tuple[str, str, str]] = [
+    ("spambase", "is_spam", "binary"),
+    ("madelon", "label", "binary"),
+    ("isolet", "letter", "multiclass"),
+    ("gisette", "label", "binary"),
+    ("credit_card_fraud", "Class", "binary"),
+    ("crimedata", "nonViolPerPop", "regression"),
+    ("abalone", "Rings", "regression"),
 ]
 
 DATASET_BANZHAF_BUDGET: dict[str, dict] = {
     "gisette": {"per_coalition": 50},
+    "crimedata": {"per_coalition": 10},
+    "abalone": {"per_coalition": 10},
 }
 
 DATASET_MINSHAP_BUDGET: dict[str, dict] = {
@@ -171,6 +175,8 @@ DATASET_MINSHAP_BUDGET: dict[str, dict] = {
     "isolet": {"n_coalitions": 100, "per_coalition": 10},
     "gisette": {"n_coalitions": 100, "per_coalition": 15},
     "credit_card_fraud": {"n_coalitions": 100, "per_coalition": 5},
+    "crimedata": {"n_coalitions": 100, "per_coalition": 10},
+    "abalone": {"n_coalitions": 100, "per_coalition": 5},
 }
 
 DATASET_MOFSPPI_BUDGET: dict[str, dict] = {
@@ -179,6 +185,8 @@ DATASET_MOFSPPI_BUDGET: dict[str, dict] = {
     "isolet":      {"K_adv": 8, "pop_size": 20, "generations": 10},
     "gisette":     {"K_adv": 10, "pop_size": 15, "generations": 8},
     "credit_card_fraud": {"K_adv": 30, "pop_size": 30, "generations": 20},
+    "crimedata": {"K_adv": 8, "pop_size": 15, "generations": 8},
+    "abalone": {"K_adv": 8, "pop_size": 30, "generations": 20},
 }
 
 # NSGA2-uniform shares MOFS-MinPPI's pop/gen per dataset for fair HV comparison
@@ -188,6 +196,8 @@ DATASET_NSGA2U_BUDGET: dict[str, dict] = {
     "isolet":      {"pop_size": 20, "generations": 10},
     "gisette":     {"pop_size": 15, "generations": 8},
     "credit_card_fraud": {"pop_size": 30, "generations": 20},
+    "crimedata": {"pop_size": 15, "generations": 8},
+    "abalone": {"pop_size": 30, "generations": 20},
 }
 
 # MOFS-SHAP n_samples scaled per dataset
@@ -197,6 +207,8 @@ DATASET_MOFSSHAP_BUDGET: dict[str, dict] = {
     "isolet":      {"n_samples": 80},
     "gisette":     {"n_samples": 60},
     "credit_card_fraud": {"n_samples": 100},
+    "crimedata": {"n_samples": 60},
+    "abalone": {"n_samples": 80},
 }
 
 TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50, 100)
@@ -265,6 +277,7 @@ def evaluate_topk(
     *,
     ks: tuple[int, ...] = TOP_K_KPIS,
     seed: int = 42,
+    task: str = "binary",
 ) -> pd.DataFrame:
     rows: list[dict] = []
     n_classes = len(np.unique(y))
@@ -279,24 +292,33 @@ def evaluate_topk(
             y,
             test_size=0.2,
             random_state=seed,
-            stratify=y,
+            stratify=y if task != "regression" else None,
         )
-        model = XGBClassifier(
-            n_estimators=100,
-            max_depth=4,
-            learning_rate=0.1,
-            verbosity=0,
-            random_state=seed,
-        )
-        model.fit(X_tr, y_tr)
-        y_prob = model.predict_proba(X_te)
-        if n_classes == 2:
-            val = float(roc_auc_score(y_te, y_prob[:, 1]))
+        if task == "regression":
+            model = XGBRegressor(n_estimators=100, max_depth=4, learning_rate=0.1, verbosity=0, random_state=seed)
+            model.fit(X_tr, y_tr)
+            y_pred = model.predict(X_te)
+            val = float(r2_score(y_te, y_pred))
+            if val < 0.0:
+                val = 0.0
+            rows.append({"k": k, "n_features": len(feats), "metric": "R²", "value": val})
         else:
-            val = float(roc_auc_score(y_te, y_prob, multi_class="ovr"))
-        rows.append(
-            {"k": k, "n_features": len(feats), "metric": "AUC", "value": val}
-        )
+            model = XGBClassifier(
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
+            )
+            model.fit(X_tr, y_tr)
+            y_prob = model.predict_proba(X_te)
+            if n_classes == 2:
+                val = float(roc_auc_score(y_te, y_prob[:, 1]))
+            else:
+                val = float(roc_auc_score(y_te, y_prob, multi_class="ovr"))
+            rows.append(
+                {"k": k, "n_features": len(feats), "metric": "AUC", "value": val}
+            )
     return pd.DataFrame(rows)
 
 
@@ -308,6 +330,7 @@ def refit_pareto_front(
     *,
     n_classes: int = 2,
     seed: int = 42,
+    task: str = "binary",
 ) -> np.ndarray:
     """Re-evaluate Pareto masks with strong XGBoost (100 estimators, depth 4).
 
@@ -328,22 +351,32 @@ def refit_pareto_front(
             fitness[i] = (0.0, 1.0, 0.0)
             continue
         X_tr, X_te, y_tr, y_te = train_test_split(
-            X_s[cols], y, test_size=0.2, random_state=seed, stratify=y,
+            X_s[cols], y, test_size=0.2, random_state=seed, stratify=y if task != "regression" else None,
         )
         t0 = _time.perf_counter()
-        model = XGBClassifier(
-            n_estimators=100, max_depth=4, learning_rate=0.1,
-            verbosity=0, random_state=seed,
-        )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            model.fit(X_tr, y_tr)
-        y_prob = model.predict_proba(X_te)
-        perf = float(
-            roc_auc_score(y_te, y_prob[:, 1])
-            if n_classes == 2
-            else accuracy_score(y_te, model.predict(X_te))
-        )
+        if task == "regression":
+            model = XGBRegressor(n_estimators=100, max_depth=4, learning_rate=0.1, verbosity=0, random_state=seed)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model.fit(X_tr, y_tr)
+            y_pred = model.predict(X_te)
+            perf = float(r2_score(y_te, y_pred))
+            if perf < 0.0:
+                perf = 0.0
+        else:
+            model = XGBClassifier(
+                n_estimators=100, max_depth=4, learning_rate=0.1,
+                verbosity=0, random_state=seed,
+            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model.fit(X_tr, y_tr)
+            y_prob = model.predict_proba(X_te)
+            perf = float(
+                roc_auc_score(y_te, y_prob[:, 1])
+                if n_classes == 2
+                else accuracy_score(y_te, model.predict(X_te))
+            )
         elapsed = _time.perf_counter() - t0
         fitness[i] = (float(len(cols)), 1.0 - perf, float(elapsed))
     return fitness
@@ -514,11 +547,11 @@ def main() -> None:
 
     # ---- config.yaml ----
     run_config: dict = {
-        "description": "Main table — MOFS-MinPPI + 7 baselines × 5 datasets × 5 seeds",
+        "description": "Main table — MOFS-MinPPI + 7 baselines × 7 datasets × 5 seeds",
         "baselines": {},
         "seeds": SEEDS,
         "datasets": [
-            {"prefix": d[0], "target": d[1], "multiclass": d[2]} for d in DATASETS
+            {"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS
         ],
         "topk_kpis": list(TOP_K_KPIS),
         "nsga2_metrics": ["hv", "cr_1pct", "cr_3pct", "cr_5pct"],
@@ -569,7 +602,7 @@ def main() -> None:
         is_nsga2 = cfg.get("nsga2", False)
         method_metrics: list[dict] = []
 
-        for prefix, target, is_mc in DATASETS:
+        for prefix, target, task in DATASETS:
             if prefix in cfg.get("skip_datasets", set()):
                 print(f"\n  Skipping {prefix} (excluded for {method})", flush=True)
                 continue
@@ -594,6 +627,11 @@ def main() -> None:
                     call_kwargs.update(DATASET_NSGA2U_BUDGET[prefix])
                 if method == "mofs_shap" and prefix in DATASET_MOFSSHAP_BUDGET:
                     call_kwargs.update(DATASET_MOFSSHAP_BUDGET[prefix])
+
+                call_kwargs["task"] = task
+
+                if method == "mofs_minppi" and task == "regression":
+                    call_kwargs["shapg_guided"] = False
 
                 # ---- NSGA-II methods: capture Pareto front via side-channel ----
                 result_box: list = []
@@ -642,7 +680,7 @@ def main() -> None:
                     imp_path, index=False
                 )
 
-                kpi_df = evaluate_topk(X, y, [f for f, _ in ranking], seed=seed)
+                kpi_df = evaluate_topk(X, y, [f for f, _ in ranking], seed=seed, task=task)
                 kpi_path = method_dir / f"{prefix}_s{seed}_topk_kpi.csv"
                 kpi_df.to_csv(kpi_path, index=False)
                 for _, kpi_row in kpi_df.iterrows():
@@ -679,6 +717,7 @@ def main() -> None:
                             features=list(X.columns),
                             n_classes=n_classes,
                             seed=seed,
+                            task=task,
                         )
 
                     # Save Pareto front (refit fitness) for post-hoc
@@ -704,19 +743,30 @@ def main() -> None:
                     safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
                     X_safe = X.rename(columns=safe_cols)
                     X_tr, X_te, y_tr, y_te = train_test_split(
-                        X_safe, y, test_size=0.2, random_state=seed, stratify=y,
+                        X_safe, y, test_size=0.2, random_state=seed, stratify=y if task != "regression" else None,
                     )
-                    full_model = XGBClassifier(
-                        n_estimators=100, max_depth=4, learning_rate=0.1,
-                        verbosity=0, random_state=seed,
-                    )
-                    full_model.fit(X_tr, y_tr)
-                    full_prob = full_model.predict_proba(X_te)
-                    full_metric = float(
-                        roc_auc_score(y_te, full_prob[:, 1])
-                        if n_classes == 2
-                        else accuracy_score(y_te, full_model.predict(X_te))
-                    )
+                    if task == "regression":
+                        full_model = XGBRegressor(
+                            n_estimators=100, max_depth=4, learning_rate=0.1,
+                            verbosity=0, random_state=seed,
+                        )
+                        full_model.fit(X_tr, y_tr)
+                        y_pred = full_model.predict(X_te)
+                        full_metric = float(r2_score(y_te, y_pred))
+                        if full_metric < 0.0:
+                            full_metric = 0.0
+                    else:
+                        full_model = XGBClassifier(
+                            n_estimators=100, max_depth=4, learning_rate=0.1,
+                            verbosity=0, random_state=seed,
+                        )
+                        full_model.fit(X_tr, y_tr)
+                        full_prob = full_model.predict_proba(X_te)
+                        full_metric = float(
+                            roc_auc_score(y_te, full_prob[:, 1])
+                            if n_classes == 2
+                            else accuracy_score(y_te, full_model.predict(X_te))
+                        )
                     for loss in AUC_LOSS_THRESHOLDS:
                         cr = compression_rate_from_fitness(
                             full_metric, pf_fitness, loss, n_total,

@@ -3,19 +3,25 @@ Weighted Voting Game formulation for feature selection (§4.1).
 
 Defines the binary winning function  v_alpha: 2^{N_1} → {0, 1}:
 
-    v_alpha(S) = 𝟙[Acc(ℳ_S) ≥ α · Acc_full]
+    v_alpha(S) = 𝟙[U(ℳ_S) ≥ α · U_full]
 
 where:
 - S ⊆ N_1 is a feature subset (coalition)
 - ℳ_S is a base learner (XGBoost default) trained on features S
-- α ∈ (0, 1] is the accuracy quota
-- Acc_full = Acc(ℳ_{N_1}) is the full-feature accuracy
+- α ∈ (0, 1] is the utility quota
+- U is the task utility: **AUC** for classification, **R²** for regression
+- U_full = U(ℳ_{N_1}) is the full-feature utility
 
 Key properties (distinguishing from WVG-FS):
 - **No additivity assumption**: v_alpha is evaluated by actual model training
-- **Non-monotonic**: adding features can decrease accuracy (noise/redundancy),
+- **Non-monotonic**: adding features can decrease utility (noise/redundancy),
   i.e. ∃S ⊂ T: v_alpha(S)=1, v_alpha(T)=0 — the basis for MinPPI's
   three-way classification in Theorem 1.
+
+Tasks:
+- ``"binary"`` — binary classification → AUC, XGBClassifier
+- ``"multiclass"`` — multiclass classification → AUC (ovr) / accuracy fallback
+- ``"regression"`` — regression → R², XGBRegressor
 
 Usage::
 
@@ -33,8 +39,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, roc_auc_score
-from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
+from xgboost import XGBClassifier, XGBRegressor
 
 
 # ---------------------------------------------------------------------------
@@ -43,14 +49,16 @@ from xgboost import XGBClassifier
 
 
 class AccFullCache:
-    """Cache for full-feature accuracy and per-subset evaluations.
+    """Cache for full-feature utility and per-subset evaluations.
 
     Avoids re-evaluating the same coalition across multiple calls — critical
     because each evaluation requires training an XGBoost model.
 
+    Supports classification (binary/multiclass) and regression via the
+    ``task`` parameter.
+
     Attributes:
-        acc_full: AUC of the model trained on all features.
-        alpha: The quota parameter.
+        acc_full: Utility (AUC or R²) of the model on all features.
         threshold: ``alpha * acc_full`` — the winning threshold.
     """
 
@@ -61,38 +69,44 @@ class AccFullCache:
         y_train: np.ndarray,
         y_val: np.ndarray,
         *,
+        task: str = "binary",
         seed: int = 42,
         model_params: Optional[dict] = None,
     ) -> None:
-        """Compute Acc_full and initialise the subset cache.
+        """Compute U_full and initialise the subset cache.
 
         Args:
             X_train: Training feature matrix.
             X_val: Validation feature matrix.
             y_train: Training target.
             y_val: Validation target.
+            task: One of ``"binary"``, ``"multiclass"``, ``"regression"``.
             seed: Random seed for XGBoost.
             model_params: Override for XGBoost params, e.g.
                 ``{"n_estimators": 50, "max_depth": 3}``.
                 Defaults to the fast (15, 2) used during NSGA-II search;
-                use stronger params when finer AUC separation is needed.
+                use stronger params when finer utility separation is needed.
         """
         self._X_train = X_train
         self._X_val = X_val
         self._y_train = y_train
         self._y_val = y_val
+        self._task = task
         self._seed = seed
         self._cache: dict[tuple[str, ...], float] = {}
         self._model_params = model_params or {
             "n_estimators": 15, "max_depth": 2, "learning_rate": 0.3,
         }
 
-        # Compute Acc_full
+        # Compute U_full
         self.acc_full = self._evaluate_subset(set(X_train.columns), _seed_base=seed)
         self.threshold: Optional[float] = None  # set later when alpha is chosen
 
     def _evaluate_subset(self, S: set[str], *, _seed_base: int = 42) -> float:
-        """Train XGBoost on S and return AUC on validation set.
+        """Train XGBoost on S and return utility on validation set.
+
+        - Classification: AUC (binary) or accuracy (multiclass).
+        - Regression: R² (clamped to ≥ 0 to keep U ≥ 0).
 
         Results are cached by sorted-tuple key for reuse across calls with
         different α values.
@@ -103,7 +117,24 @@ class AccFullCache:
 
         cols = list(S)
         if len(cols) == 0:
-            val = 0.5
+            val = 0.5 if self._task != "regression" else 0.0
+        elif self._task == "regression":
+            X_tr_sub = self._X_train[cols].values
+            X_val_sub = self._X_val[cols].values
+            model = XGBRegressor(
+                n_estimators=self._model_params.get("n_estimators", 15),
+                max_depth=self._model_params.get("max_depth", 2),
+                learning_rate=self._model_params.get("learning_rate", 0.3),
+                verbosity=0,
+                random_state=_seed_base,
+            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model.fit(X_tr_sub, self._y_train)
+            y_pred = model.predict(X_val_sub)
+            val = float(r2_score(self._y_val, y_pred))
+            if val < 0.0:
+                val = 0.0  # clamp: "no better than mean" satisfies U ≥ 0
         else:
             X_tr_sub = self._X_train[cols].values
             X_val_sub = self._X_val[cols].values
@@ -136,13 +167,13 @@ class AccFullCache:
         return val
 
     def evaluate(self, S: set[str]) -> float:
-        """Return AUC(ℳ_S) for coalition *S*.
+        """Return U(ℳ_S) for coalition *S*.
 
         Args:
             S: Feature subset.
 
         Returns:
-            AUC value in [0, 1].
+            Utility value (AUC in [0, 1] or R² in [0, 1]).
         """
         return self._evaluate_subset(S)
 
@@ -161,7 +192,7 @@ class AccFullCache:
             S: Feature subset.
 
         Returns:
-            True iff AUC(ℳ_S) >= alpha * Acc_full.
+            True iff U(ℳ_S) >= alpha * U_full.
 
         Raises:
             RuntimeError: If ``set_threshold`` has not been called.
@@ -191,16 +222,18 @@ def make_acc_full_cache(
     y_train: np.ndarray,
     y_val: np.ndarray,
     *,
+    task: str = "binary",
     seed: int = 42,
     model_params: Optional[dict] = None,
 ) -> AccFullCache:
-    """Create an :class:`AccFullCache` with Acc_full pre-computed.
+    """Create an :class:`AccFullCache` with U_full pre-computed.
 
     Args:
         X_train: Training feature matrix.
         X_val: Validation feature matrix.
         y_train: Training target.
         y_val: Validation target.
+        task: One of ``"binary"``, ``"multiclass"``, ``"regression"``.
         seed: Random seed.
         model_params: Optional XGBoost param overrides (see AccFullCache).
 
@@ -208,7 +241,8 @@ def make_acc_full_cache(
         Initialised cache with ``acc_full`` available.
     """
     return AccFullCache(
-        X_train, X_val, y_train, y_val, seed=seed, model_params=model_params,
+        X_train, X_val, y_train, y_val, task=task, seed=seed,
+        model_params=model_params,
     )
 
 
@@ -225,6 +259,7 @@ def compute_v_alpha(
     y_val: np.ndarray,
     *,
     alpha: float = 0.95,
+    task: str = "binary",
     acc_cache: Optional[AccFullCache] = None,
     seed: int = 42,
 ) -> int:
@@ -237,14 +272,17 @@ def compute_v_alpha(
         y_train: Training target.
         y_val: Validation target.
         alpha: Quota parameter in (0, 1].
+        task: One of ``"binary"``, ``"multiclass"``, ``"regression"``.
         acc_cache: Optional pre-built cache. Created on first call if None.
         seed: Random seed for XGBoost (ignored if *acc_cache* is provided).
 
     Returns:
-        1 if AUC(ℳ_S) >= α · Acc_full, else 0.
+        1 if U(ℳ_S) >= α · U_full, else 0.
     """
     if acc_cache is None:
-        acc_cache = make_acc_full_cache(X_train, X_val, y_train, y_val, seed=seed)
+        acc_cache = make_acc_full_cache(
+            X_train, X_val, y_train, y_val, task=task, seed=seed,
+        )
     acc_cache.set_threshold(alpha)
     return 1 if acc_cache.is_winning(S) else 0
 

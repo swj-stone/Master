@@ -36,9 +36,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 
 from minppi_mofs.baselines.banzhaf_fs import (
     compute_banzhaf_importance,
@@ -98,12 +98,14 @@ BASELINES: dict[str, dict] = {
     },
 }
 
-DATASETS: list[tuple[str, str, bool]] = [
-    ("spambase", "is_spam", False),
-    ("madelon", "label", False),
-    ("isolet", "letter", True),
-    ("gisette", "label", False),
-    ("credit_card_fraud", "Class", False),
+DATASETS: list[tuple[str, str, str]] = [
+    ("spambase", "is_spam", "binary"),
+    ("madelon", "label", "binary"),
+    ("isolet", "letter", "multiclass"),
+    ("gisette", "label", "binary"),
+    ("credit_card_fraud", "Class", "binary"),
+    ("crimedata", "nonViolPerPop", "regression"),
+    ("abalone", "Rings", "regression"),
 ]
 
 # Per-dataset Banzhaf sampling budget.
@@ -113,6 +115,8 @@ DATASET_BANZHAF_BUDGET: dict[str, dict] = {
     "gisette": {"per_coalition": 50},
     # spambase(56), madelon(100), isolet(100), credit_card(29) —
     # all <=100 feats after reduction; default per_coalition=10 is fine
+    "crimedata": {"per_coalition": 10},
+    "abalone": {"per_coalition": 10},
 }
 
 # Per-dataset MinShap sampling budget.
@@ -129,6 +133,8 @@ DATASET_MINSHAP_BUDGET: dict[str, dict] = {
     "isolet": {"n_coalitions": 100, "per_coalition": 10},
     "gisette": {"n_coalitions": 100, "per_coalition": 15},
     "credit_card_fraud": {"n_coalitions": 100, "per_coalition": 5},
+    "crimedata": {"n_coalitions": 100, "per_coalition": 10},
+    "abalone": {"n_coalitions": 100, "per_coalition": 5},
 }
 
 TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50)
@@ -194,6 +200,7 @@ def evaluate_topk(
     y: np.ndarray,
     ranking: list[str],
     *,
+    task: str,
     ks: tuple[int, ...] = TOP_K_KPIS,
     seed: int = 42,
 ) -> pd.DataFrame:
@@ -208,23 +215,47 @@ def evaluate_topk(
             y,
             test_size=0.2,
             random_state=seed,
-            stratify=y,
+            stratify=y if task != "regression" else None,
         )
-        model = XGBClassifier(
-            n_estimators=100,
-            max_depth=4,
-            learning_rate=0.1,
-            verbosity=0,
-            random_state=seed,
-        )
-        model.fit(X_tr, y_tr)
-        y_prob = model.predict_proba(X_te)
-        if n_classes == 2:
+        if task == "regression":
+            model = XGBRegressor(
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
+            )
+            model.fit(X_tr, y_tr)
+            y_pred = model.predict(X_te)
+            val = float(r2_score(y_te, y_pred))
+            if val < 0.0:
+                val = 0.0
+            rows.append(
+                {"k": k, "n_features": len(feats), "metric": "R²", "value": val}
+            )
+        elif n_classes == 2:
+            model = XGBClassifier(
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
+            )
+            model.fit(X_tr, y_tr)
+            y_prob = model.predict_proba(X_te)
             val = float(roc_auc_score(y_te, y_prob[:, 1]))
             rows.append(
                 {"k": k, "n_features": len(feats), "metric": "AUC", "value": val}
             )
         else:
+            model = XGBClassifier(
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
+            )
+            model.fit(X_tr, y_tr)
             y_pred = model.predict(X_te)
             val = float(accuracy_score(y_te, y_pred))
             rows.append(
@@ -286,9 +317,7 @@ def main() -> None:
     run_config: dict = {
         "description": "Baseline comparison run",
         "baselines": {},
-        "datasets": [
-            {"prefix": d[0], "target": d[1], "multiclass": d[2]} for d in DATASETS
-        ],
+        "datasets": [{"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS],
         "topk_kpis": list(TOP_K_KPIS),
         "seed": 42,
     }
@@ -333,7 +362,7 @@ def main() -> None:
 
         method_metrics: list[dict] = []
 
-        for prefix, target, is_mc in DATASETS:
+        for prefix, target, task in DATASETS:
             if prefix in cfg.get("skip_datasets", set()):
                 print(f"\n  Skipping {prefix} (excluded for {method})", flush=True)
                 continue
@@ -358,7 +387,7 @@ def main() -> None:
 
             t0 = time.perf_counter()
             try:
-                scores = compute_fn(X, y, **call_kwargs)
+                scores = compute_fn(X, y, task=task, **call_kwargs)
             except Exception:
                 import traceback
 
@@ -378,6 +407,7 @@ def main() -> None:
                 for k in TOP_K_KPIS:
                     failed_row[f"AUC@{k}"] = None
                     failed_row[f"Accuracy@{k}"] = None
+                    failed_row[f"R²@{k}"] = None
                 method_metrics.append(failed_row)
                 all_rows.append(method_metrics[-1])
                 print()
@@ -403,7 +433,7 @@ def main() -> None:
             print(f"  Saved: {imp_path}")
 
             # top-k KPI CSV
-            kpi_df = evaluate_topk(X, y, [f for f, _ in ranking], seed=42)
+            kpi_df = evaluate_topk(X, y, [f for f, _ in ranking], task=task, seed=42)
             kpi_path = method_dir / f"{prefix}_topk_kpi.csv"
             kpi_df.to_csv(kpi_path, index=False)
             for _, kpi_row in kpi_df.iterrows():

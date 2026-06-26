@@ -40,9 +40,9 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 
 from minppi_mofs.min_ppi import estimate_minppi, estimate_minppi_random_mc
 from minppi_mofs.mofs_minppi import (
@@ -61,6 +61,8 @@ DATASET_BUDGET: dict[str, dict] = {
     "isolet": {"K_adv": 8, "pop": 20, "gen": 10},
     "gisette": {"K_adv": 10, "pop": 15, "gen": 8},
     "credit_card_fraud": {"K_adv": 30, "pop": 30, "gen": 20},
+    "crimedata": {"K_adv": 8, "pop": 15, "gen": 8},
+    "abalone": {"K_adv": 8, "pop": 30, "gen": 20},
 }
 
 
@@ -79,6 +81,7 @@ def _refit_pareto(
     *,
     n_classes: int = 2,
     seed: int = 42,
+    task: str = "binary",
 ) -> np.ndarray:
     """Re-evaluate Pareto-front masks with the same strong XGBoost as
     ``evaluate_topk`` (n_estimators=100, max_depth=4).
@@ -106,7 +109,21 @@ def _refit_pareto(
             warnings.simplefilter("ignore")
             model.fit(X_tr_sub, y_train)
         y_prob = model.predict_proba(X_val_sub)
-        if n_classes == 2:
+        if task == "regression":
+            model = XGBRegressor(
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
+            )
+            model.fit(X_tr_sub, y_train)
+            y_pred = model.predict(X_val_sub)
+            quality = float(r2_score(y_val, y_pred))
+            if quality < 0.0:
+                quality = 0.0
+            auc = quality
+        elif n_classes == 2:
             auc = float(roc_auc_score(y_val, y_prob[:, 1]))
         else:
             auc = float(accuracy_score(y_val, model.predict(X_val_sub)))
@@ -148,6 +165,7 @@ def compute_mofs_minppi_importance(
     val_size: float = 0.25,
     seed: int = 42,
     verbose: bool = False,
+    task: str = "binary",
     _result_box: Optional[list] = None,
 ) -> dict[str, float]:
     """Compute MOFS-MinPPI feature importance.
@@ -163,6 +181,9 @@ def compute_mofs_minppi_importance(
         val_size: Fraction of *X* held out for MinPPI estimation.
         seed: Random seed.
         verbose: Print progress.
+        task: ``"binary"`` (default) uses XGBClassifier + AUC;
+            ``"regression"`` uses XGBRegressor + (1−R²).  When
+            ``"regression"``, ShapG guidance is skipped.
         _result_box: If a ``list``, the :class:`MOFSMinPPIResult` is
             appended so the caller can extract HV / compression without
             re-running the search.
@@ -179,10 +200,10 @@ def compute_mofs_minppi_importance(
     if verbose:
         print(f"  MOFS-MinPPI: {X.shape[1]} features", flush=True)
 
-    # ---- ShapG guidance (binary only; multiclass uses Algorithm A) ----
+    # ---- ShapG guidance (binary only; multiclass/regression use Algorithm A) ----
     sg_scores: dict[str, float] = {}
     sg_neighbors = None
-    if n_classes == 2:
+    if n_classes == 2 and task != "regression":
         sg_scores, sg_neighbors = build_guidance_from_data(
             X_tr, y_tr, depth=1, m=5, seed=seed,
         )
@@ -230,6 +251,7 @@ def compute_mofs_minppi_importance(
         result.features,
         n_classes=n_classes,
         seed=seed,
+        task=task,
     )
 
     # ---- Side-channel: store refit fitness for HV / compression ----

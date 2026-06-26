@@ -28,11 +28,21 @@ import pandas as pd
 from powershap import PowerShap
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
+try:
+    from catboost import CatBoostClassifier, CatBoostRegressor
+
+    _HAS_CATBOOST = True
+except ImportError:  # pragma: no cover
+    CatBoostClassifier = None  # type: ignore[assignment,misc]
+    CatBoostRegressor = None  # type: ignore[assignment,misc]
+    _HAS_CATBOOST = False
+
 
 def compute_powershap_importance(
     X: pd.DataFrame,
     y: np.ndarray,
     *,
+    task: str = "binary",
     power_iterations: int = 20,
     alpha: float = 0.01,
     seed: int = 42,
@@ -42,7 +52,9 @@ def compute_powershap_importance(
 
     Args:
         X: Feature DataFrame.
-        y: Target array.
+        y: Target array (binary, multiclass, or continuous).
+        task: ``"binary"`` (default) for classification or ``"regression"``
+            for continuous targets.
         power_iterations: Number of shadow-feature shuffles.
         alpha: Significance threshold for the statistical test.
         seed: Random seed (passed to CatBoost internally via
@@ -54,14 +66,25 @@ def compute_powershap_importance(
         The score is the mean absolute SHAP value (``impact`` column from
         the internal ``_processed_shaps_df``).
     """
-    ps = PowerShap(
-        power_iterations=power_iterations,
-        power_alpha=alpha,
-        include_all=True,
-        automatic=False,
-        show_progress=verbose,
-        verbose=verbose,
-    )
+    if task == "regression":
+        ps = PowerShap(
+            model=CatBoostRegressor(verbose=0, random_seed=seed),
+            power_iterations=power_iterations,
+            power_alpha=alpha,
+            include_all=True,
+            automatic=False,
+            show_progress=verbose,
+            verbose=verbose,
+        )
+    else:
+        ps = PowerShap(
+            power_iterations=power_iterations,
+            power_alpha=alpha,
+            include_all=True,
+            automatic=False,
+            show_progress=verbose,
+            verbose=verbose,
+        )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", ConvergenceWarning)
         ps.fit(X, y)

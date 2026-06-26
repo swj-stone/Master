@@ -66,9 +66,9 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import yaml
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 
 from minppi_mofs.min_ppi import (
     estimate_minppi,
@@ -90,12 +90,14 @@ from minppi_mofs.voting_game import make_acc_full_cache
 # Registry
 # ---------------------------------------------------------------------------
 
-DATASETS: list[tuple[str, str, bool]] = [
-    ("spambase", "is_spam", False),
-    ("madelon", "label", False),
-    ("isolet", "letter", True),
-    ("gisette", "label", False),
-    ("credit_card_fraud", "Class", False),
+DATASETS: list[tuple[str, str, str]] = [
+    ("spambase", "is_spam", "binary"),
+    ("madelon", "label", "binary"),
+    ("isolet", "letter", "multiclass"),
+    ("gisette", "label", "binary"),
+    ("credit_card_fraud", "Class", "binary"),
+    ("crimedata", "nonViolPerPop", "regression"),
+    ("abalone", "Rings", "regression"),
 ]
 
 # Primary datasets for expensive sweeps (NSGA-II × many configs):
@@ -118,6 +120,8 @@ DATASET_BUDGET: dict[str, dict] = {
     "isolet":      {"K": 80,  "K_adv": 8, "pop": 20, "gen": 10},
     "gisette":     {"K": 50,  "K_adv": 10, "pop": 15, "gen": 8},
     "credit_card_fraud": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
+    "crimedata": {"K_adv": 8, "pop": 15, "gen": 8},
+    "abalone": {"K_adv": 8, "pop": 30, "gen": 20},
 }
 
 # ---------------------------------------------------------------------------
@@ -217,10 +221,11 @@ def evaluate_topk(
     y: np.ndarray,
     ranking: list[str],
     *,
+    task: str = "binary",
     ks: tuple[int, ...] = TOP_K_KPIS,
     seed: int = 42,
 ) -> pd.DataFrame:
-    """Measure XGBoost AUC using only top-k ranked features."""
+    """Measure XGBoost AUC (or R² for regression) using only top-k ranked features."""
     rows: list[dict] = []
     n_classes = len(np.unique(y))
     for k in ks:
@@ -230,8 +235,22 @@ def evaluate_topk(
             y,
             test_size=0.2,
             random_state=seed,
-            stratify=y,
+            stratify=y if task != "regression" else None,
         )
+        if task == "regression":
+            model = XGBRegressor(
+                n_estimators=100, max_depth=4, learning_rate=0.1,
+                verbosity=0, random_state=seed,
+            )
+            model.fit(X_tr, y_tr)
+            y_pred = model.predict(X_te)
+            val = float(r2_score(y_te, y_pred))
+            if val < 0.0:
+                val = 0.0
+            rows.append(
+                {"k": k, "n_features": len(feats), "metric": "R²", "value": val}
+            )
+            continue
         model = XGBClassifier(
             n_estimators=100,
             max_depth=4,
@@ -315,7 +334,7 @@ def run_ablation_min_vs_mean(
     ablation_dir.mkdir(parents=True, exist_ok=True)
     rows: list[dict] = []
 
-    for prefix, target, is_mc in tqdm(
+    for prefix, target, task in tqdm(
         DATASETS, desc="min vs mean", unit="dataset", file=sys.stdout
     ):
         print(f"\n{'=' * 60}\n  min vs mean — {prefix}\n{'=' * 60}", flush=True)
@@ -323,7 +342,8 @@ def run_ablation_min_vs_mean(
         X, y = load_data(prefix, target, processed_dir, seed=seed)
         budget = _budget_for(prefix)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=seed, stratify=y
+            X, y, test_size=0.2, random_state=seed,
+            stratify=y if task != "regression" else None,
         )
         n_features = X.shape[1]
         n_classes = len(np.unique(y_val))
@@ -331,9 +351,10 @@ def run_ablation_min_vs_mean(
         # ShapG guidance — only for binary datasets.
         # Multiclass uses shared-coalition Algorithm A (same rationale as
         # run_alpha_sweep.py: 26-class XGBoost is ~15× slower per eval).
+        # Regression has no ShapG graph.
         sg_scores: dict[str, float] = {}
         sg_neighbors = None
-        if n_classes == 2:
+        if n_classes == 2 and task != "regression":
             sg_scores, sg_neighbors = build_guidance_from_data(
                 X_tr, y_tr, depth=1, m=5, seed=seed,
             )
@@ -343,11 +364,12 @@ def run_ablation_min_vs_mean(
             f"  Computing MinPPI (K_adv={budget['K_adv']})...", flush=True
         )
         t0 = time.perf_counter()
-        if n_classes > 2:
+        if n_classes > 2 or task == "regression":
             minppi = estimate_minppi_random_mc(
                 X_tr, X_val, y_tr, y_val,
                 alpha=alpha, K=200, shared_coalitions=True,
                 per_coalition=5, seed=seed, verbose=False,
+                task=task,
             )
         else:
             minppi = estimate_minppi(
@@ -357,6 +379,7 @@ def run_ablation_min_vs_mean(
                 shapg_neighbors=sg_neighbors,
                 shapg_scores=sg_scores,
                 seed=seed, verbose=False,
+                task=task,
             )
         t_minppi = time.perf_counter() - t0
 
@@ -419,13 +442,15 @@ def run_ablation_min_vs_mean(
         ]
 
         # --- Evaluate both ---
-        full_auc = make_acc_full_cache(X_tr, X_val, y_tr, y_val, seed=seed).acc_full
+        full_auc = make_acc_full_cache(
+            X_tr, X_val, y_tr, y_val, seed=seed, task=task,
+        ).acc_full
 
         for tag, result, ranking, t_guide in [
             ("minppi", result_minppi, ranking_minppi, t_minppi),
             ("mean_shap", result_shap, ranking_shap, t_shap),
         ]:
-            kpi_df = evaluate_topk(X, y, ranking, seed=seed)
+            kpi_df = evaluate_topk(X, y, ranking, seed=seed, task=task)
             metric_name = kpi_df["metric"].iloc[0]
 
             row: dict = {
@@ -506,7 +531,7 @@ def run_ablation_binary_vs_continuous(
     ablation_dir.mkdir(parents=True, exist_ok=True)
     rows: list[dict] = []
 
-    for prefix, target, is_mc in tqdm(
+    for prefix, target, task in tqdm(
         DATASETS, desc="binary vs continuous", unit="dataset", file=sys.stdout
     ):
         print(
@@ -516,12 +541,15 @@ def run_ablation_binary_vs_continuous(
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=seed, stratify=y
+            X, y, test_size=0.2, random_state=seed,
+            stratify=y if task != "regression" else None,
         )
         n_features = X.shape[1]
         budget = _budget_for(prefix)
         n_classes = len(np.unique(y_val))
-        cache = make_acc_full_cache(X_tr, X_val, y_tr, y_val, seed=seed)
+        cache = make_acc_full_cache(
+            X_tr, X_val, y_tr, y_val, seed=seed, task=task,
+        )
 
         # --- Binary v_alpha at multiple alpha ---
         for alpha in tqdm(
@@ -532,17 +560,19 @@ def run_ablation_binary_vs_continuous(
             leave=False,
         ):
             cache.set_threshold(alpha)
-            if n_classes > 2:
+            if n_classes > 2 or task == "regression":
                 minppi = estimate_minppi_random_mc(
                     X_tr, X_val, y_tr, y_val,
                     alpha=alpha, K=200, shared_coalitions=True,
                     per_coalition=5, acc_cache=cache, seed=seed, verbose=False,
+                    task=task,
                 )
             else:
                 minppi = estimate_minppi(
                     X_tr, X_val, y_tr, y_val,
                     alpha=alpha, method="random_mc",
                     K=budget["K"], seed=seed, verbose=False,
+                    task=task,
                 )
             stats = minppi_stats(minppi)
             row: dict = {
@@ -575,11 +605,12 @@ def run_ablation_binary_vs_continuous(
                 index=False,
             )
 
-        # --- Continuous v(S) (MinShap) ---
+        # --- Continuous v(S) (MinShap / R²) ---
         from minppi_mofs.baselines.min_shap import compute_minshap_importance
 
         minshap_scores = compute_minshap_importance(
-            X_tr, y_tr, n_coalitions=100, per_coalition=5, seed=seed
+            X_tr, y_tr, n_coalitions=100, per_coalition=5, seed=seed,
+            task=task,
         )
         neg = sum(1 for v in minshap_scores.values() if v < 0)
         pos = sum(1 for v in minshap_scores.values() if v > 0)
@@ -639,28 +670,33 @@ def run_ablation_beta_sweep(
     ablation_dir.mkdir(parents=True, exist_ok=True)
     rows: list[dict] = []
 
-    for prefix, target, is_mc in tqdm(
+    for prefix, target, task in tqdm(
         DATASETS, desc="β sweep", unit="dataset", file=sys.stdout
     ):
         print(f"\n{'=' * 60}\n  β sweep — {prefix}\n{'=' * 60}", flush=True)
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=seed, stratify=y
+            X, y, test_size=0.2, random_state=seed,
+            stratify=y if task != "regression" else None,
         )
         budget = _budget_for(prefix)
         n_features = X.shape[1]
         n_classes = len(np.unique(y_val))
-        full_auc = make_acc_full_cache(X_tr, X_val, y_tr, y_val, seed=seed).acc_full
+        full_auc = make_acc_full_cache(
+            X_tr, X_val, y_tr, y_val, seed=seed, task=task,
+        ).acc_full
 
         # Pre-compute MinPPI (shared across β values)
         # Multiclass uses shared-coalition Algorithm A to avoid per-train
         # overhead of 26-class XGBoost in ShapG + Algorithm B searches.
-        if n_classes > 2:
+        # Regression also uses Algorithm A (no ShapG).
+        if n_classes > 2 or task == "regression":
             minppi = estimate_minppi_random_mc(
                 X_tr, X_val, y_tr, y_val,
                 alpha=alpha, K=200, shared_coalitions=True,
                 per_coalition=5, seed=seed, verbose=False,
+                task=task,
             )
         else:
             sg_scores, sg_neighbors = build_guidance_from_data(
@@ -673,6 +709,7 @@ def run_ablation_beta_sweep(
                 shapg_neighbors=sg_neighbors,
                 shapg_scores=sg_scores,
                 seed=seed, verbose=False,
+                task=task,
             )
 
         for beta in tqdm(
@@ -776,22 +813,24 @@ def run_ablation_shapg_vs_shap(
     ablation_dir.mkdir(parents=True, exist_ok=True)
     rows: list[dict] = []
 
-    for prefix, target, is_mc in tqdm(
+    for prefix, target, task in tqdm(
         DATASETS, desc="ShapG vs SHAP", unit="dataset", file=sys.stdout
     ):
         # Skip multiclass: ShapG vs SHAP neighbor comparison requires
         # Algorithm B which is O(p·K_adv·2) per signal source with 26-class
         # XGBoost; shared-coalition Algorithm A does not use neighbors.
-        if is_mc:
-            print(f"\n  Skipping {prefix} (multiclass — ShapG vs SHAP neighbor "
-                  "comparison requires Algorithm B, too slow)", flush=True)
+        # Regression datasets have no ShapG graph.
+        if task == "multiclass" or task == "regression":
+            print(f"\n  Skipping {prefix} ({task} — ShapG vs SHAP neighbor "
+                  "comparison requires Algorithm B, not applicable)", flush=True)
             continue
 
         print(f"\n{'=' * 60}\n  ShapG vs SHAP — {prefix}\n{'=' * 60}", flush=True)
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=seed, stratify=y
+            X, y, test_size=0.2, random_state=seed,
+            stratify=y if task != "regression" else None,
         )
         budget = _budget_for(prefix)
 
@@ -837,6 +876,7 @@ def run_ablation_shapg_vs_shap(
                 shapg_scores=scrs,
                 seed=seed,
                 verbose=False,
+                task=task,
             )
             t_elapsed = time.perf_counter() - t0
             stats = minppi_stats(minppi)
@@ -967,7 +1007,7 @@ def main() -> None:
         "description": "Ablation experiments — 4 dimensions × 5 datasets",
         "seed": 42,
         "datasets": [
-            {"prefix": d[0], "target": d[1], "multiclass": d[2]} for d in DATASETS
+            {"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS
         ],
         "ablations": [
             {

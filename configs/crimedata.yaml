@@ -1,0 +1,33 @@
+# Preprocessing configuration for Communities & Crime (regression).
+# Raw: ~119 features, 2215 rows.  Target = nonViolPerPop (continuous R²).
+# Source: shapG repo mirror.
+
+dataset:
+  name: "Communities & Crime"
+  source: "url"
+  url: "https://raw.githubusercontent.com/vectorsss/shapG/master/datasets/crimedata_processing.csv"
+  n_features: 121
+  n_samples: 2215
+  target_name: "nonViolPerPop"
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  raw_filename: "crimedata.csv"
+  file_prefix: "crimedata"
+
+feature_engineering:
+  drop_duplicates: true
+  variance_threshold: 0.01
+  max_features: 100000
+
+preprocessing:
+  standardize: true
+  shuffle: true
+
+split:
+  feature_seed: 42
+  seeds: [42, 123, 456, 789, 1024]
+  test_size: 0.2
+  val_size: 0.25
+  # Continuous target – no stratification for regression.

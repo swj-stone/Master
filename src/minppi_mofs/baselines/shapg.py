@@ -34,9 +34,9 @@ from typing import Optional
 import networkx as nx
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 
 
 # ---------------------------------------------------------------------------
@@ -260,12 +260,14 @@ class _CachedAUCCharacteristic:
         seed: int = 42,
         test_size: float = 0.2,
         max_samples: int = 5000,
+        task: str = "binary",
     ) -> None:
         self._X = X
         self._y = y
         self._seed = seed
         self._test_size = test_size
         self._max_samples = max_samples
+        self._task = task
         self._cache: dict[tuple[str, ...], float] = {}
 
     def __call__(self, S: set[str]) -> float:
@@ -275,7 +277,7 @@ class _CachedAUCCharacteristic:
 
         cols = list(S)
         if len(cols) == 0:
-            val = 0.5
+            val = 0.0 if self._task == "regression" else 0.5
         else:
             X_sub = self._X[cols].values
             # Sub-sample large datasets for performance
@@ -293,7 +295,7 @@ class _CachedAUCCharacteristic:
                     y_sub,
                     test_size=self._test_size,
                     random_state=self._seed,
-                    stratify=y_sub,
+                    stratify=y_sub if self._task != "regression" else None,
                 )
             except ValueError:
                 X_tr, X_te, y_tr, y_te = train_test_split(
@@ -302,24 +304,38 @@ class _CachedAUCCharacteristic:
                     test_size=self._test_size,
                     random_state=self._seed,
                 )
-            model = XGBClassifier(
-                n_estimators=15,
-                max_depth=1,
-                learning_rate=0.3,
-                verbosity=0,
-                random_state=self._seed,
-            )
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
+            if self._task == "regression":
+                model = XGBRegressor(
+                    n_estimators=15,
+                    max_depth=1,
+                    learning_rate=0.3,
+                    verbosity=0,
+                    random_state=self._seed,
+                )
                 model.fit(X_tr, y_tr)
-            y_prob = model.predict_proba(X_te)
-            y_test_classes = np.unique(y_te)
-            if len(y_test_classes) < 2:
-                val = 0.5
-            elif y_prob.shape[1] == 2:
-                val = float(roc_auc_score(y_te, y_prob[:, 1]))
+                y_pred = model.predict(X_te)
+                val = float(r2_score(y_te, y_pred))
+                if val < 0.0:
+                    val = 0.0
             else:
-                val = float(roc_auc_score(y_te, y_prob, multi_class="ovr"))
+                model = XGBClassifier(
+                    n_estimators=15,
+                    max_depth=1,
+                    learning_rate=0.3,
+                    verbosity=0,
+                    random_state=self._seed,
+                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    model.fit(X_tr, y_tr)
+                y_prob = model.predict_proba(X_te)
+                y_test_classes = np.unique(y_te)
+                if len(y_test_classes) < 2:
+                    val = 0.5
+                elif y_prob.shape[1] == 2:
+                    val = float(roc_auc_score(y_te, y_prob[:, 1]))
+                else:
+                    val = float(roc_auc_score(y_te, y_prob, multi_class="ovr"))
         self._cache[key] = val
         return val
 
@@ -330,6 +346,7 @@ def make_xgb_auc_characteristic(
     *,
     seed: int = 42,
     test_size: float = 0.2,
+    task: str = "binary",
 ) -> _CachedAUCCharacteristic:
     """Return a cached characteristic function  v(S) = XGBoost AUC.
 
@@ -338,11 +355,12 @@ def make_xgb_auc_characteristic(
         y: Binary target array.
         seed: Random seed.
         test_size: Held-out fraction for AUC eval.
+        task: ``"binary"`` (classification) or ``"regression"``.
 
     Returns:
         Callable ``set[str] -> float`` with internal LRU cache.
     """
-    return _CachedAUCCharacteristic(X, y, seed=seed, test_size=test_size)
+    return _CachedAUCCharacteristic(X, y, seed=seed, test_size=test_size, task=task)
 
 
 # ---------------------------------------------------------------------------
@@ -358,6 +376,7 @@ def compute_shapg_importance(
     m: int = 5,
     seed: int = 42,
     verbose: bool = False,
+    task: str = "binary",
 ) -> dict[str, float]:
     """Compute ShapG feature importance for a tabular dataset.
 
@@ -371,6 +390,7 @@ def compute_shapg_importance(
         m: Sampling budget per node (max reachable nodes to draw).
         seed: Random seed controlling XGBoost, split, and sampling.
         verbose: If True, show progress bar and diagnostic messages.
+        task: ``"binary"`` for classification (AUC), ``"regression"`` for R^2.
 
     Returns:
         Dict ``{feature_name: shapley_value}`` sorted descending by value.
@@ -380,7 +400,7 @@ def compute_shapg_importance(
         >>> list(scores.items())[:5]  # top-5 features
     """
     G = build_feature_graph(X, seed=seed)
-    v = make_xgb_auc_characteristic(X, y, seed=seed)
+    v = make_xgb_auc_characteristic(X, y, seed=seed, task=task)
     shapley = shapg(
         G,
         v,

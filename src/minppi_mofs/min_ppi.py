@@ -47,6 +47,7 @@ def estimate_minppi_exact(
     y_val: np.ndarray,
     *,
     alpha: float = 0.95,
+    task: str = "binary",
     acc_cache: Optional[AccFullCache] = None,
     seed: int = 42,
     verbose: bool = False,
@@ -61,7 +62,8 @@ def estimate_minppi_exact(
         y_train: Training target.
         y_val: Validation target.
         alpha: Quota parameter.
-        acc_cache: Optional pre-built accuracy cache.
+        task: One of ``"binary"``, ``"multiclass"``, ``"regression"``.
+        acc_cache: Optional pre-built cache.
         seed: Random seed.
         verbose: Print progress.
 
@@ -69,7 +71,9 @@ def estimate_minppi_exact(
         Dict ``{feature_name: minppi}`` where values are in {-1, 0, +1}.
     """
     if acc_cache is None:
-        acc_cache = make_acc_full_cache(X_train, X_val, y_train, y_val, seed=seed)
+        acc_cache = make_acc_full_cache(
+            X_train, X_val, y_train, y_val, task=task, seed=seed,
+        )
     acc_cache.set_threshold(alpha)
 
     features = list(X_train.columns)
@@ -123,6 +127,7 @@ def estimate_minppi_random_mc(
     y_val: np.ndarray,
     *,
     alpha: float = 0.95,
+    task: str = "binary",
     K: int = 200,
     shared_coalitions: bool = False,
     per_coalition: int = 5,
@@ -169,7 +174,9 @@ def estimate_minppi_random_mc(
     """
     rng = np.random.default_rng(seed)
     if acc_cache is None:
-        acc_cache = make_acc_full_cache(X_train, X_val, y_train, y_val, seed=seed)
+        acc_cache = make_acc_full_cache(
+        X_train, X_val, y_train, y_val, task=task, seed=seed,
+    )
     acc_cache.set_threshold(alpha)
 
     features = list(X_train.columns)
@@ -280,6 +287,7 @@ def estimate_minppi_shapg_guided(
     y_val: np.ndarray,
     *,
     alpha: float = 0.95,
+    task: str = "binary",
     K_adv: int = 30,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
@@ -322,7 +330,9 @@ def estimate_minppi_shapg_guided(
     """
     rng = np.random.default_rng(seed)
     if acc_cache is None:
-        acc_cache = make_acc_full_cache(X_train, X_val, y_train, y_val, seed=seed)
+        acc_cache = make_acc_full_cache(
+        X_train, X_val, y_train, y_val, task=task, seed=seed,
+    )
     acc_cache.set_threshold(alpha)
 
     features = list(X_train.columns)
@@ -416,6 +426,7 @@ def estimate_minppi_hybrid(
     y_val: np.ndarray,
     *,
     alpha: float = 0.95,
+    task: str = "binary",
     K: int = 200,
     K_adv: int = 30,
     shared_coalitions: bool = False,
@@ -563,6 +574,7 @@ def estimate_minppi(
     y_val: np.ndarray,
     *,
     alpha: float = 0.95,
+    task: str = "binary",
     method: str = "hybrid",
     K: int = 200,
     K_adv: int = 30,
@@ -620,7 +632,9 @@ def estimate_minppi(
         )
 
     # Build acc_cache once and reuse
-    acc_cache = make_acc_full_cache(X_train, X_val, y_train, y_val, seed=seed)
+    acc_cache = make_acc_full_cache(
+        X_train, X_val, y_train, y_val, task=task, seed=seed,
+    )
 
     fn = methods[method]
     common: dict = {
@@ -629,6 +643,7 @@ def estimate_minppi(
         "y_train": y_train,
         "y_val": y_val,
         "alpha": alpha,
+        "task": task,
         "acc_cache": acc_cache,
         "seed": seed,
         "verbose": verbose,

@@ -33,8 +33,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, roc_auc_score
-from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
+from xgboost import XGBClassifier, XGBRegressor
 
 
 # ---------------------------------------------------------------------------
@@ -277,12 +277,14 @@ def _evaluate_mask(
     y_val: np.ndarray,
     features: list[str],
     *,
+    task: str = "binary",
     seed: int = 42,
 ) -> tuple[float, float, float]:
     """Evaluate a single mask on the three objectives.
 
     Returns:
-        ``(n_features, 1 − AUC, training_time_seconds)``.
+        ``(n_features, 1 − U, training_time_seconds)`` where U is AUC
+        (classification) or R² (regression).
     """
     cols = [features[j] for j in range(len(features)) if mask[j]]
     if len(cols) == 0:
@@ -290,29 +292,46 @@ def _evaluate_mask(
 
     X_tr_sub = X_train[cols].values
     X_val_sub = X_val[cols].values
-    n_classes = len(np.unique(y_val))
 
     t0 = time.perf_counter()
-    model = XGBClassifier(
-        n_estimators=10,
-        max_depth=2,
-        learning_rate=0.3,
-        verbosity=0,
-        random_state=seed,
-    )
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        model.fit(X_tr_sub, y_train)
 
-    y_prob = model.predict_proba(X_val_sub)
-    if n_classes == 2:
-        auc = float(roc_auc_score(y_val, y_prob[:, 1]))
-    else:
+    if task == "regression":
+        model = XGBRegressor(
+            n_estimators=10,
+            max_depth=2,
+            learning_rate=0.3,
+            verbosity=0,
+            random_state=seed,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            model.fit(X_tr_sub, y_train)
         y_pred = model.predict(X_val_sub)
-        auc = float(accuracy_score(y_val, y_pred))
+        quality = float(r2_score(y_val, y_pred))
+        if quality < 0.0:
+            quality = 0.0
+    else:
+        n_classes = len(np.unique(y_val))
+        model = XGBClassifier(
+            n_estimators=10,
+            max_depth=2,
+            learning_rate=0.3,
+            verbosity=0,
+            random_state=seed,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            model.fit(X_tr_sub, y_train)
+
+        y_prob = model.predict_proba(X_val_sub)
+        if n_classes == 2:
+            quality = float(roc_auc_score(y_val, y_prob[:, 1]))
+        else:
+            y_pred = model.predict(X_val_sub)
+            quality = float(accuracy_score(y_val, y_pred))
 
     elapsed = time.perf_counter() - t0
-    return (float(len(cols)), 1.0 - auc, float(elapsed))
+    return (float(len(cols)), 1.0 - quality, float(elapsed))
 
 
 # ---------------------------------------------------------------------------
@@ -412,6 +431,7 @@ def mofs_minppi_search(
     *,
     minppi: dict[str, int],
     alpha: float = 0.95,
+    task: str = "binary",
     beta: float = 1.0,
     pop_size: int = 50,
     generations: int = 30,
@@ -422,7 +442,8 @@ def mofs_minppi_search(
 ) -> MOFSMinPPIResult:
     """Run the full MOFS-MinPPI evolutionary search (§4.4.3).
 
-    Multi-objective formulation: minimise (|F|, 1−AUC, T_train).
+    Multi-objective formulation: minimise (|F|, 1−U, T_train) where U is
+    AUC (classification) or R² (regression).
 
     Pipeline:
     1. Initialise random population of binary masks.
@@ -441,6 +462,7 @@ def mofs_minppi_search(
         y_val: Validation target.
         minppi: Pre-computed MinPPI dict ``{feature_name: value ∈ {-1,0,+1}}``.
         alpha: Quota parameter (for metadata).
+        task: One of ``"binary"``, ``"multiclass"``, ``"regression"``.
         beta: Guidance strength (β ≥ 0). β = 0 → uniform baseline.
         pop_size: Population size (must be even).
         generations: Maximum number of generations.
@@ -487,7 +509,8 @@ def mofs_minppi_search(
         if np.sum(pop[i]) == 0:
             pop[i, rng.integers(0, n_features)] = 1
         fitness[i] = _evaluate_mask(
-            pop[i], X_train, X_val, y_train, y_val, features, seed=seed
+            pop[i], X_train, X_val, y_train, y_val, features,
+            task=task, seed=seed,
         )
 
     # Auto reference point if not given: worst observed × 1.1 in each dimension
@@ -536,6 +559,7 @@ def mofs_minppi_search(
                 y_train,
                 y_val,
                 features,
+                task=task,
                 seed=seed,
             )
 

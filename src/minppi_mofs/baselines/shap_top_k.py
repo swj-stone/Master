@@ -21,13 +21,14 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 
 
 def compute_shap_topk_importance(
     X: pd.DataFrame,
     y: np.ndarray,
     *,
+    task: str = "binary",
     seed: int = 42,
     verbose: bool = False,
 ) -> dict[str, float]:
@@ -38,7 +39,9 @@ def compute_shap_topk_importance(
 
     Args:
         X: Feature DataFrame.
-        y: Target array (binary or multiclass).
+        y: Target array (binary, multiclass, or continuous).
+        task: ``"binary"`` (default) for classification or ``"regression"``
+            for continuous targets.
         seed: Random seed for XGBoost training.
         verbose: Print progress.
 
@@ -49,20 +52,33 @@ def compute_shap_topk_importance(
     safe_map = {c: f"f{i}" for i, c in enumerate(X.columns)}
     X_safe = X.rename(columns=safe_map)
 
-    model = XGBClassifier(
-        n_estimators=100,
-        max_depth=4,
-        learning_rate=0.1,
-        verbosity=0,
-        random_state=seed,
-    )
+    if task == "regression":
+        model = XGBRegressor(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
+        )
+    else:
+        model = XGBClassifier(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
+        )
     model.fit(X_safe, y)
 
     import shap
 
     explainer = shap.TreeExplainer(model)
     shap_vals = explainer.shap_values(X_safe)
-    if isinstance(shap_vals, list):
+
+    if task == "regression":
+        # XGBRegressor returns a single 2D (n_samples, n_features) array
+        vals = np.abs(shap_vals).mean(axis=0)
+    elif isinstance(shap_vals, list):
         per_class = []
         for s in shap_vals:
             s_abs = np.abs(s)

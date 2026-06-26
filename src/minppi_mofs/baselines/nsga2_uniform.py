@@ -42,9 +42,9 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +144,7 @@ def compute_nsga2_uniform_importance(
     mutation_rate: float = 0.1,
     seed: int = 42,
     verbose: bool = False,
+    task: str = "binary",
     _result_box: Optional[list] = None,
 ) -> dict[str, float]:
     """Compute NSGA-II-uniform feature importance.
@@ -158,6 +159,8 @@ def compute_nsga2_uniform_importance(
         mutation_rate: Per-bit mutation probability.
         seed: Random seed.
         verbose: Print progress.
+        task: ``"binary"`` (default) uses XGBClassifier + AUC;
+            ``"regression"`` uses XGBRegressor + (1−R²).
 
     Returns:
         Dict ``{feature_name: score}`` sorted descending.  The score is
@@ -215,7 +218,21 @@ def compute_nsga2_uniform_importance(
             warnings.simplefilter("ignore")
             model.fit(X_tr, y_tr)
         y_prob = model.predict_proba(X_te)
-        if n_classes == 2:
+        if task == "regression":
+            model = XGBRegressor(
+                n_estimators=10,
+                max_depth=2,
+                learning_rate=0.3,
+                verbosity=0,
+                random_state=seed,
+            )
+            model.fit(X_tr, y_tr)
+            y_pred = model.predict(X_te)
+            quality = float(r2_score(y_te, y_pred))
+            if quality < 0.0:
+                quality = 0.0
+            perf = 1.0 - quality
+        elif n_classes == 2:
             perf = 1.0 - float(roc_auc_score(y_te, y_prob[:, 1]))
         else:
             perf = 1.0 - float(accuracy_score(y_te, model.predict(X_te)))
@@ -290,7 +307,21 @@ def compute_nsga2_uniform_importance(
                 warnings.simplefilter("ignore")
                 model.fit(X_tr, y_tr)
             y_prob = model.predict_proba(X_te)
-            if n_classes == 2:
+            if task == "regression":
+                model = XGBRegressor(
+                    n_estimators=10,
+                    max_depth=2,
+                    learning_rate=0.3,
+                    verbosity=0,
+                    random_state=seed,
+                )
+                model.fit(X_tr, y_tr)
+                y_pred = model.predict(X_te)
+                quality = float(r2_score(y_te, y_pred))
+                if quality < 0.0:
+                    quality = 0.0
+                perf = 1.0 - quality
+            elif n_classes == 2:
                 perf = 1.0 - float(roc_auc_score(y_te, y_prob[:, 1]))
             else:
                 perf = 1.0 - float(accuracy_score(y_te, model.predict(X_te)))
