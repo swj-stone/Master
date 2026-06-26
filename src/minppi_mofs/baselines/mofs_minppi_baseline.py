@@ -98,17 +98,7 @@ def _refit_pareto(
         X_tr_sub = X_train[cols].values
         X_val_sub = X_val[cols].values
         t0 = __import__("time").perf_counter()
-        model = XGBClassifier(
-            n_estimators=100,
-            max_depth=4,
-            learning_rate=0.1,
-            verbosity=0,
-            random_state=seed,
-        )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            model.fit(X_tr_sub, y_train)
-        y_prob = model.predict_proba(X_val_sub)
+
         if task == "regression":
             model = XGBRegressor(
                 n_estimators=100,
@@ -117,16 +107,30 @@ def _refit_pareto(
                 verbosity=0,
                 random_state=seed,
             )
-            model.fit(X_tr_sub, y_train)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model.fit(X_tr_sub, y_train)
             y_pred = model.predict(X_val_sub)
             quality = float(r2_score(y_val, y_pred))
             if quality < 0.0:
                 quality = 0.0
             auc = quality
-        elif n_classes == 2:
-            auc = float(roc_auc_score(y_val, y_prob[:, 1]))
         else:
-            auc = float(accuracy_score(y_val, model.predict(X_val_sub)))
+            model = XGBClassifier(
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
+            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model.fit(X_tr_sub, y_train)
+            y_prob = model.predict_proba(X_val_sub)
+            if n_classes == 2:
+                auc = float(roc_auc_score(y_val, y_prob[:, 1]))
+            else:
+                auc = float(accuracy_score(y_val, model.predict(X_val_sub)))
         elapsed = __import__("time").perf_counter() - t0
         fitness[i] = (float(len(cols)), 1.0 - auc, float(elapsed))
     return fitness

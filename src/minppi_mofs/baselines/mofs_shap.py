@@ -155,7 +155,7 @@ def compute_mofs_shap_importance(
                 y,
                 test_size=0.2,
                 random_state=seed,
-                stratify=y,
+                stratify=y if task != "regression" else None,
             )
         except ValueError:
             X_tr, X_te, y_tr, y_te = train_test_split(
@@ -164,17 +164,7 @@ def compute_mofs_shap_importance(
                 test_size=0.2,
                 random_state=seed,
             )
-        m = XGBClassifier(
-            n_estimators=10,
-            max_depth=2,
-            learning_rate=0.3,
-            verbosity=0,
-            random_state=seed,
-        )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            m.fit(X_tr, y_tr)
-        y_prob = m.predict_proba(X_te)
+
         if task == "regression":
             m = XGBRegressor(
                 n_estimators=10,
@@ -183,16 +173,30 @@ def compute_mofs_shap_importance(
                 verbosity=0,
                 random_state=seed,
             )
-            m.fit(X_tr, y_tr)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                m.fit(X_tr, y_tr)
             y_pred = m.predict(X_te)
             quality = float(r2_score(y_te, y_pred))
             if quality < 0.0:
                 quality = 0.0
             perf = 1.0 - quality
-        elif n_classes == 2:
-            perf = 1.0 - float(roc_auc_score(y_te, y_prob[:, 1]))
         else:
-            perf = 1.0 - float(accuracy_score(y_te, m.predict(X_te)))
+            m = XGBClassifier(
+                n_estimators=10,
+                max_depth=2,
+                learning_rate=0.3,
+                verbosity=0,
+                random_state=seed,
+            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                m.fit(X_tr, y_tr)
+            y_prob = m.predict_proba(X_te)
+            if n_classes == 2:
+                perf = 1.0 - float(roc_auc_score(y_te, y_prob[:, 1]))
+            else:
+                perf = 1.0 - float(accuracy_score(y_te, m.predict(X_te)))
         fitness[i] = [float(len(cols)), float(perf)]
 
         if verbose and (i + 1) % 50 == 0:

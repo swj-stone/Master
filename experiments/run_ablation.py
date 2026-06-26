@@ -390,6 +390,7 @@ def run_ablation_min_vs_mean(
             y_val,
             minppi=minppi,
             alpha=alpha,
+            task=task,
             beta=1.0,
             pop_size=budget["pop"],
             generations=budget["gen"],
@@ -406,7 +407,7 @@ def run_ablation_min_vs_mean(
         t0 = time.perf_counter()
         from minppi_mofs.baselines.mofs_shap import compute_mofs_shap_importance
 
-        shap_scores = compute_mofs_shap_importance(X_tr, y_tr, n_samples=50, seed=seed)
+        shap_scores = compute_mofs_shap_importance(X_tr, y_tr, n_samples=50, seed=seed, task=task)
         t_shap = time.perf_counter() - t0
 
         # Map SHAP scores to a pseudo-MinPPI: top 20% = "decisive",
@@ -430,6 +431,7 @@ def run_ablation_min_vs_mean(
             y_val,
             minppi=shap_minppi,
             alpha=alpha,
+            task=task,
             beta=1.0,
             pop_size=budget["pop"],
             generations=budget["gen"],
@@ -722,6 +724,7 @@ def run_ablation_beta_sweep(
                 y_val,
                 minppi=minppi,
                 alpha=alpha,
+                task=task,
                 beta=float(beta),
                 pop_size=budget["pop"],
                 generations=budget["gen"],

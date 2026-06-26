@@ -198,7 +198,7 @@ def compute_nsga2_uniform_importance(
                 y,
                 test_size=0.2,
                 random_state=seed,
-                stratify=y,
+                stratify=y if task != "regression" else None,
             )
         except ValueError:
             X_tr, X_te, y_tr, y_te = train_test_split(
@@ -207,35 +207,39 @@ def compute_nsga2_uniform_importance(
                 test_size=0.2,
                 random_state=seed,
             )
-        model = XGBClassifier(
-            n_estimators=10,
-            max_depth=2,
-            learning_rate=0.3,
-            verbosity=0,
-            random_state=seed,
-        )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            model.fit(X_tr, y_tr)
-        y_prob = model.predict_proba(X_te)
+
         if task == "regression":
-            model = XGBRegressor(
+            model_r = XGBRegressor(
                 n_estimators=10,
                 max_depth=2,
                 learning_rate=0.3,
                 verbosity=0,
                 random_state=seed,
             )
-            model.fit(X_tr, y_tr)
-            y_pred = model.predict(X_te)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model_r.fit(X_tr, y_tr)
+            y_pred = model_r.predict(X_te)
             quality = float(r2_score(y_te, y_pred))
             if quality < 0.0:
                 quality = 0.0
             perf = 1.0 - quality
-        elif n_classes == 2:
-            perf = 1.0 - float(roc_auc_score(y_te, y_prob[:, 1]))
         else:
-            perf = 1.0 - float(accuracy_score(y_te, model.predict(X_te)))
+            model = XGBClassifier(
+                n_estimators=10,
+                max_depth=2,
+                learning_rate=0.3,
+                verbosity=0,
+                random_state=seed,
+            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model.fit(X_tr, y_tr)
+            y_prob = model.predict_proba(X_te)
+            if n_classes == 2:
+                perf = 1.0 - float(roc_auc_score(y_te, y_prob[:, 1]))
+            else:
+                perf = 1.0 - float(accuracy_score(y_te, model.predict(X_te)))
         elapsed = time.perf_counter() - t0
         fitness[i] = [float(len(sel)), float(perf), float(elapsed)]
 
@@ -287,7 +291,7 @@ def compute_nsga2_uniform_importance(
                     y,
                     test_size=0.2,
                     random_state=seed,
-                    stratify=y,
+                    stratify=y if task != "regression" else None,
                 )
             except ValueError:
                 X_tr, X_te, y_tr, y_te = train_test_split(
@@ -296,35 +300,39 @@ def compute_nsga2_uniform_importance(
                     test_size=0.2,
                     random_state=seed,
                 )
-            model = XGBClassifier(
-                n_estimators=10,
-                max_depth=2,
-                learning_rate=0.3,
-                verbosity=0,
-                random_state=seed,
-            )
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                model.fit(X_tr, y_tr)
-            y_prob = model.predict_proba(X_te)
+
             if task == "regression":
-                model = XGBRegressor(
+                model_r = XGBRegressor(
                     n_estimators=10,
                     max_depth=2,
                     learning_rate=0.3,
                     verbosity=0,
                     random_state=seed,
                 )
-                model.fit(X_tr, y_tr)
-                y_pred = model.predict(X_te)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    model_r.fit(X_tr, y_tr)
+                y_pred = model_r.predict(X_te)
                 quality = float(r2_score(y_te, y_pred))
                 if quality < 0.0:
                     quality = 0.0
                 perf = 1.0 - quality
-            elif n_classes == 2:
-                perf = 1.0 - float(roc_auc_score(y_te, y_prob[:, 1]))
             else:
-                perf = 1.0 - float(accuracy_score(y_te, model.predict(X_te)))
+                model = XGBClassifier(
+                    n_estimators=10,
+                    max_depth=2,
+                    learning_rate=0.3,
+                    verbosity=0,
+                    random_state=seed,
+                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                model.fit(X_tr, y_tr)
+                y_prob = model.predict_proba(X_te)
+                if n_classes == 2:
+                    perf = 1.0 - float(roc_auc_score(y_te, y_prob[:, 1]))
+                else:
+                    perf = 1.0 - float(accuracy_score(y_te, model.predict(X_te)))
             off_fitness[i] = [float(len(sel)), float(perf), time.perf_counter() - t0]
 
         # Merge and select

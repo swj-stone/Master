@@ -144,12 +144,7 @@ def select_top_features(
     *,
     seed: int = 42,
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Select top features by mutual information (regression) with the target.
-
-    Rule (aligned with PLAN.md MI protocol):
-      - p <= 100       → keep all
-      - 100 < p <= 1000 → keep top 100
-      - p > 1000       → keep top 200
+    """Select top-100 features by mutual information (regression) with the target.
 
     Args:
         X: Feature DataFrame.
@@ -160,15 +155,7 @@ def select_top_features(
         Tuple of (DataFrame with selected features, list of selected columns).
     """
     p = X.shape[1]
-    if p <= 100:
-        return X, list(X.columns)
-
-    if p <= 1000:
-        k = 100
-        rule_label = "top100"
-    else:
-        k = 200
-        rule_label = "top200"
+    k = 100
 
     mi = mutual_info_regression(X, y, random_state=seed)
     scores = pd.Series(mi, index=X.columns)
@@ -176,7 +163,7 @@ def select_top_features(
 
     print(
         f"  Feature selection (mutual info regression): {p} -> {len(top_cols)} "
-        f"(rule: {rule_label})",
+        f"(rule: top{k})",
     )
     return X[top_cols], top_cols
 
