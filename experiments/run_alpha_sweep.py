@@ -554,12 +554,24 @@ def main() -> None:
             usable = ds_rows[ds_rows["pct_harmful"] >= threshold_weak].copy()
         if len(usable) == 0:
             usable = ds_rows[ds_rows["pct_harmful"] > 0].copy()
+        # If still empty (e.g. regression datasets where MinPPI finds no
+        # harmful features at any α), fall back to all α values.
+        if len(usable) == 0:
+            usable = ds_rows.copy()
         # Prefer lower α among ties (avoid over-selective extremes)
         usable = usable.sort_values("alpha")
 
-        # Criterion 2: best score@10 among usable (AUC or R²)
-        kpi_col = "AUC@10" if "AUC@10" in usable.columns else "R²@10"
-        idx_best_kpi = usable[kpi_col].idxmax() if kpi_col in usable.columns else usable.index[0]
+        # Criterion 2: best score@10 among usable (AUC or R²).
+        # Check for non-NaN values, not just column existence —
+        # merged DataFrames carry both AUC@k and R²@k columns with
+        # NaNs in the rows belonging to the other task type.
+        if "AUC@10" in usable.columns and usable["AUC@10"].notna().any():
+            kpi_col = "AUC@10"
+        elif "R²@10" in usable.columns and usable["R²@10"].notna().any():
+            kpi_col = "R²@10"
+        else:
+            kpi_col = usable.columns[0]  # fallback — shouldn't happen
+        idx_best_kpi = usable[kpi_col].idxmax()
         best_row = usable.loc[idx_best_kpi]
 
         # Criterion 3: Jaccard stability to adjacent alphas
