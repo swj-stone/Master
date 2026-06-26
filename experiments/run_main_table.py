@@ -803,17 +803,27 @@ def main() -> None:
         if kpi in raw_df.columns:
             res = friedman_nemenyi(raw_df, kpi)
             fn_results.append({"kpi": kpi, **res})
-            sig = "***" if res.get("p_value", 1) < 0.001 else (
-                "**" if res.get("p_value", 1) < 0.01 else (
-                    "*" if res.get("p_value", 1) < 0.05 else "n.s."
+            p_val = res.get("p_value")
+            if p_val is None:
+                sig = "—"
+                print(
+                    f"  Friedman {kpi}: skipped (insufficient data — "
+                    f"{res.get('n_methods', 0)} methods, "
+                    f"{res.get('n_datasets', 0)} datasets)",
+                    flush=True,
                 )
-            )
-            print(
-                f"  Friedman {kpi}: χ²={res['friedman_stat']:.2f}, "
-                f"p={res['p_value']:.4f} {sig} "
-                f"({res['n_methods']} methods, {res['n_datasets']} datasets)",
-                flush=True,
-            )
+            else:
+                sig = "***" if p_val < 0.001 else (
+                    "**" if p_val < 0.01 else (
+                        "*" if p_val < 0.05 else "n.s."
+                    )
+                )
+                print(
+                    f"  Friedman {kpi}: χ²={res['friedman_stat']:.2f}, "
+                    f"p={p_val:.4f} {sig} "
+                    f"({res['n_methods']} methods, {res['n_datasets']} datasets)",
+                    flush=True,
+                )
     if fn_results:
         pd.DataFrame(fn_results).to_csv(tables_dir / "friedman_tests.csv", index=False)
         print("  friedman_tests.csv saved", flush=True)
