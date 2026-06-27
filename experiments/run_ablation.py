@@ -206,7 +206,10 @@ def load_data(
     """Load preprocessed train split."""
     path = processed_dir / f"{prefix}_s{seed}_train.csv"
     df = pd.read_csv(path)
-    y = df[target].values.astype(int)
+    y = df[target].values
+    # Keep float for regression, coerce whole-number floats (labels) to int
+    if y.dtype == np.float64 and np.array_equal(y, y.astype(int)):
+        y = y.astype(int)
     return df.drop(columns=[target]), y
 
 

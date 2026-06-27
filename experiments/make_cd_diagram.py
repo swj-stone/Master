@@ -115,7 +115,11 @@ def main() -> None:
     if args.metric not in df.columns:
         raise SystemExit(f"column '{args.metric}' not in {args.csv} ({list(df.columns)})")
     agg = df.groupby(["method", "dataset"])[args.metric].mean().reset_index()
-    pivot = agg.pivot(index="dataset", columns="method", values=args.metric).dropna(axis=1)
+    pivot = (
+        agg.pivot(index="dataset", columns="method", values=args.metric)
+        .dropna(axis=1, how="all")      # drop fully-NaN methods (e.g. non-NSGA-II for HV)
+        .dropna(axis=0)                  # drop datasets missing any method (regression sets for IGD+)
+    )
     k, n = pivot.shape[1], pivot.shape[0]
     if k < 2 or n < 3:
         raise SystemExit(f"need >=2 methods and >=3 datasets; got k={k}, N={n}")

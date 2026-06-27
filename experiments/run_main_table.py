@@ -263,10 +263,18 @@ def load_data(
     *,
     seed: int = 42,
 ) -> tuple[pd.DataFrame, np.ndarray]:
-    """Load a preprocessed train split for a given seed."""
+    """Load a preprocessed train split for a given seed.
+
+    Target dtype is preserved from the CSV — ``int`` for classification,
+    ``float`` for regression.
+    """
     path = processed_dir / f"{prefix}_s{seed}_train.csv"
     df = pd.read_csv(path)
-    y = df[target].values.astype(int)
+    y = df[target].values
+    # Integer labels required by XGBClassifier and for stratify; regression
+    # targets are already saved as float in the preprocessed CSVs.
+    if y.dtype == np.float64 and np.array_equal(y, y.astype(int)):
+        y = y.astype(int)
     return df.drop(columns=[target]), y
 
 
@@ -413,7 +421,7 @@ def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
     kpi_cols = [
         c
         for c in raw_df.columns
-        if "@" in c and c.split("@")[0] == "AUC"
+        if "@" in c and c.split("@")[0] in ("AUC", "R²")
     ]
     hv_cr_cols = [
         c for c in raw_df.columns if c.startswith("hv") or c.startswith("cr_")
@@ -631,7 +639,7 @@ def main() -> None:
                 call_kwargs["task"] = task
 
                 if method == "mofs_minppi" and task == "regression":
-                    call_kwargs["shapg_guided"] = False
+                    call_kwargs["verbose"] = False  # suppress verbose for regression run
 
                 # ---- NSGA-II methods: capture Pareto front via side-channel ----
                 result_box: list = []
@@ -655,9 +663,9 @@ def main() -> None:
                         "top1": "FAILED",
                         "top1_score": 0.0,
                     }
+                    _metric = "R²" if task == "regression" else "AUC"
                     for k in TOP_K_KPIS:
-                        failed[f"AUC@{k}"] = None
-                        failed[f"Accuracy@{k}"] = None
+                        failed[f"{_metric}@{k}"] = None
                     if is_nsga2:
                         failed["hv"] = None
                         for loss in AUC_LOSS_THRESHOLDS:
@@ -797,33 +805,38 @@ def main() -> None:
     _build_tables(raw_df, tables_dir)
 
     # ---- Statistical tests ----
+    # Run Friedman+Nemenyi on every available top-10 and top-20 KPI column.
+    # Classification produces AUC@k; regression produces R^2@k.  Each test
+    # runs only on the datasets that have data for that metric (dropna(axis=0)
+    # inside friedman_nemenyi removes datasets missing that metric).
     _header("Statistical tests")
     fn_results: list[dict] = []
-    for kpi in ["AUC@10", "AUC@20"]:
-        if kpi in raw_df.columns:
-            res = friedman_nemenyi(raw_df, kpi)
-            fn_results.append({"kpi": kpi, **res})
-            p_val = res.get("p_value")
-            if p_val is None:
-                sig = "—"
-                print(
-                    f"  Friedman {kpi}: skipped (insufficient data — "
-                    f"{res.get('n_methods', 0)} methods, "
-                    f"{res.get('n_datasets', 0)} datasets)",
-                    flush=True,
+    _kpi_candidates = sorted({c for c in raw_df.columns if "@" in c})
+    for kpi in _kpi_candidates:
+        if not kpi.endswith(("@10", "@20")):
+            continue
+        res = friedman_nemenyi(raw_df, kpi)
+        fn_results.append({"kpi": kpi, **res})
+        p_val = res.get("p_value")
+        if p_val is None:
+            print(
+                f"  Friedman {kpi}: skipped (insufficient data — "
+                f"{res.get('n_methods', 0)} methods, "
+                f"{res.get('n_datasets', 0)} datasets)",
+                flush=True,
+            )
+        else:
+            sig = "***" if p_val < 0.001 else (
+                "**" if p_val < 0.01 else (
+                    "*" if p_val < 0.05 else "n.s."
                 )
-            else:
-                sig = "***" if p_val < 0.001 else (
-                    "**" if p_val < 0.01 else (
-                        "*" if p_val < 0.05 else "n.s."
-                    )
-                )
-                print(
-                    f"  Friedman {kpi}: χ²={res['friedman_stat']:.2f}, "
-                    f"p={p_val:.4f} {sig} "
-                    f"({res['n_methods']} methods, {res['n_datasets']} datasets)",
-                    flush=True,
-                )
+            )
+            print(
+                f"  Friedman {kpi}: χ²={res['friedman_stat']:.2f}, "
+                f"p={p_val:.4f} {sig} "
+                f"({res['n_methods']} methods, {res['n_datasets']} datasets)",
+                flush=True,
+            )
     if fn_results:
         pd.DataFrame(fn_results).to_csv(tables_dir / "friedman_tests.csv", index=False)
         print("  friedman_tests.csv saved", flush=True)

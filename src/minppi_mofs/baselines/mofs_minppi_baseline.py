@@ -197,7 +197,8 @@ def compute_mofs_minppi_importance(
     """
     # ---- Split for MinPPI estimation ----
     X_tr, X_val, y_tr, y_val = train_test_split(
-        X, y, test_size=val_size, random_state=seed, stratify=y
+        X, y, test_size=val_size, random_state=seed,
+        stratify=y if task != "regression" else None
     )
     n_classes = len(np.unique(y_val))
 
@@ -215,11 +216,12 @@ def compute_mofs_minppi_importance(
     # ---- MinPPI estimation ----
     # Multiclass (e.g. 26-class isolet): shared-coalition Algorithm A
     # for tractable wall time. Binary: hybrid dispatcher (Algorithm B).
-    if n_classes > 2:
+    if n_classes > 2 or task == "regression":
         minppi = estimate_minppi_random_mc(
             X_tr, X_val, y_tr, y_val,
             alpha=alpha, K=200, shared_coalitions=True,
             per_coalition=5, seed=seed, verbose=verbose,
+            task=task,
         )
     else:
         minppi = estimate_minppi(
@@ -227,6 +229,7 @@ def compute_mofs_minppi_importance(
             alpha=alpha, method="hybrid", K_adv=K_adv,
             shapg_neighbors=sg_neighbors, shapg_scores=sg_scores,
             seed=seed, verbose=verbose,
+            task=task,
         )
 
     # ---- MOFS-MinPPI search (fast weak model) ----
@@ -237,6 +240,7 @@ def compute_mofs_minppi_importance(
         y_val,
         minppi=minppi,
         alpha=alpha,
+        task=task,
         beta=beta,
         pop_size=pop_size,
         generations=generations,

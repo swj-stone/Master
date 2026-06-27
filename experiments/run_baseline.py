@@ -191,7 +191,9 @@ def load_data(
     """Load the seed-42 train split."""
     path = processed_dir / f"{prefix}_s42_train.csv"
     df = pd.read_csv(path)
-    y = df[target].values.astype(int)
+    y = df[target].values
+    if y.dtype == np.float64 and np.array_equal(y, y.astype(int)):
+        y = y.astype(int)
     return df.drop(columns=[target]), y
 
 
