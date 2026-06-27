@@ -480,7 +480,7 @@ def friedman_nemenyi(
     # Aggregate: mean over seeds per (method, dataset)
     agg = df.groupby([method_col, dataset_col])[value_col].mean().reset_index()
     pivot = agg.pivot(index=dataset_col, columns=method_col, values=value_col)
-    pivot = pivot.dropna(axis=1)
+    pivot = pivot.dropna(axis=0)
 
     if pivot.shape[1] < 2 or pivot.shape[0] < 3:
         return {"friedman_stat": None, "p_value": None, "n_methods": 0}
