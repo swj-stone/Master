@@ -141,7 +141,7 @@ ABLATION_MIN_VS_MEAN = {
 ABLATION_BINARY_VS_CONTINUOUS = {
     "name": "binary_vs_continuous",
     "description": "Binary v_alpha voting game vs continuous AUC characteristic function",
-    "alpha_values": [0.80, 0.85, 0.90, 0.95, 0.99],
+    "alpha_values": [0.85, 0.90, 0.95, 0.99],
 }
 
 # 3. beta sweep

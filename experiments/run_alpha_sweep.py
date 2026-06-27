@@ -1,5 +1,5 @@
 """
-Alpha sensitivity experiment — quota parameter α ∈ {0.80, 0.85, 0.90, 0.95, 0.99}.
+Alpha sensitivity experiment — quota parameter α ∈ {0.85, 0.90, 0.95, 0.99}.
 
 The quota α governs the voting-game threshold:
 
@@ -70,7 +70,7 @@ from minppi_mofs.voting_game import make_acc_full_cache
 # Constants
 # ---------------------------------------------------------------------------
 
-ALPHA_VALUES: list[float] = [0.80, 0.85, 0.90, 0.95, 0.99]
+ALPHA_VALUES: list[float] = [0.85, 0.90, 0.95, 0.99]
 
 DATASETS: list[tuple[str, str, str]] = [
     ("spambase", "is_spam", "binary"),
@@ -320,7 +320,7 @@ def main() -> None:
 
     # config.yaml snapshot
     run_config: dict = {
-        "description": "Alpha sensitivity sweep — quota parameter α ∈ {0.80, 0.85, 0.90, 0.95, 0.99}",
+        "description": "Alpha sensitivity sweep — quota parameter α ∈ {0.85, 0.90, 0.95, 0.99}",
         "seed": 42,
         "alpha_values": ALPHA_VALUES,
         "datasets": [
