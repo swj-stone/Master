@@ -84,6 +84,8 @@ from minppi_mofs.shapg_integration import (
     compute_shapg_guidance_signal,
     get_correlated_neighbors,
 )
+from scipy.stats import friedmanchisquare, wilcoxon
+
 from minppi_mofs.voting_game import make_acc_full_cache
 
 # ---------------------------------------------------------------------------
@@ -928,35 +930,73 @@ def run_ablation_shapg_vs_shap(
 # ---------------------------------------------------------------------------
 
 
-def friedman_nemenyi(
+def _stat_test(
     df: pd.DataFrame,
     value_col: str,
     method_col: str = "method",
     dataset_col: str = "dataset",
 ) -> dict:
-    """Friedman + Nemenyi post-hoc test.
+    """Friedman (≥3 groups) or Wilcoxon (2 groups) with automatic dispatch.
 
-    Args:
-        df: DataFrame with method × dataset rows.
-        value_col: Column with performance values.
-        method_col: Column identifying the method.
-        dataset_col: Column identifying the dataset.
+    The test is chosen based on the number of methods/groups present in the
+    data after dropping rows/columns with NaN:
+
+    - k ≥ 3 → Friedman chi-squared (omnibus test across all groups)
+    - k = 2 → Wilcoxon signed-rank (paired comparison across datasets)
+    - k < 2 or N < 3 → skipped
 
     Returns:
-        Dict with friedman_stat, p_value, and pairs where Nemenyi rejects H0.
+        Dict with keys ``test``, ``statistic``, ``p_value``, ``n_groups``,
+        ``n_datasets``, and ``significant`` (bool).
     """
-    from scipy.stats import friedmanchisquare
-
     pivot = df.pivot_table(
         index=dataset_col, columns=method_col, values=value_col, aggfunc="mean"
     )
-    pivot = pivot.dropna()
+    # Drop rows (datasets) and columns (methods) that are entirely NaN.
+    # This handles mixed-task DataFrames where e.g. AUC@k is NaN for
+    # regression datasets and R²@k is NaN for classification datasets.
+    pivot = pivot.dropna(axis=0, how="all").dropna(axis=1, how="all")
+    # Now drop any remaining partial-NaN rows
+    pivot = pivot.dropna(axis=0)
 
-    if pivot.shape[1] < 2 or pivot.shape[0] < 3:
-        return {"friedman_stat": None, "p_value": None, "significant_pairs": []}
+    k = pivot.shape[1]  # number of groups
+    n = pivot.shape[0]  # number of datasets
 
-    stat, p = friedmanchisquare(*[pivot[c] for c in pivot.columns])
-    return {"friedman_stat": float(stat), "p_value": float(p), "significant_pairs": []}
+    if k < 2 or n < 3:
+        return {
+            "test": "skipped",
+            "statistic": None,
+            "p_value": None,
+            "n_groups": k,
+            "n_datasets": n,
+            "significant": False,
+        }
+
+    if k == 2:
+        # Wilcoxon signed-rank (paired by dataset)
+        cols = list(pivot.columns)
+        stat, p = wilcoxon(
+            pivot[cols[0]].values, pivot[cols[1]].values, method="approx"
+        )
+        return {
+            "test": "wilcoxon",
+            "statistic": float(stat),
+            "p_value": float(p),
+            "n_groups": k,
+            "n_datasets": n,
+            "significant": bool(p < 0.05),
+        }
+
+    # k ≥ 3 → Friedman
+    stat, p = friedmanchisquare(*[pivot[c].values for c in pivot.columns])
+    return {
+        "test": "friedman",
+        "statistic": float(stat),
+        "p_value": float(p),
+        "n_groups": k,
+        "n_datasets": n,
+        "significant": bool(p < 0.05),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1097,23 +1137,53 @@ def main() -> None:
     full_df.to_csv(run_dir / "metrics.csv", index=False)
     print(f"\n  Global metrics.csv saved ({len(all_rows)} rows)", flush=True)
 
-    # Statistical tests where applicable
+    # ---- Statistical tests ----
+    # Each ablation is tested on its primary value column, with the test
+    # automatically dispatched: Friedman for ≥3 groups, Wilcoxon for 2.
     _header("Statistical tests")
-    for ablation_name in ["min_vs_mean", "beta_sweep"]:
-        subset = full_df[full_df.get("ablation", "") == ablation_name]
-        if len(subset) < 6:
+
+    _test_specs: list[tuple[str, str, str]] = [
+        # (ablation_name, value_column, method_column)
+        ("min_vs_mean", "hv", "guidance"),
+        ("beta_sweep", "hv", "beta"),
+        ("shapg_vs_shap", "pct_harmful", "signal_source"),
+        ("binary_vs_continuous", "pct_harmful", "alpha"),
+    ]
+
+    for abl_name, val_col, meth_col in _test_specs:
+        subset = full_df[full_df.get("ablation", "") == abl_name]
+        # binary_vs_continuous: only test binary rows (continuous has alpha=None)
+        if abl_name == "binary_vs_continuous" and "alpha" in subset.columns:
+            subset = subset[subset["alpha"].notna()]
+        if val_col not in subset.columns or meth_col not in subset.columns:
+            print(f"  {abl_name}: skipped — column missing", flush=True)
             continue
+        if len(subset) < 4:
+            print(f"  {abl_name}: skipped — {len(subset)} rows (need ≥4)", flush=True)
+            continue
+
         try:
-            val_col = "hv" if "hv" in subset.columns else "pct_harmful"
-            method_col = "guidance" if "guidance" in subset.columns else "beta"
-            res = friedman_nemenyi(subset, val_col, method_col=method_col)
-            print(
-                f"  {ablation_name}: Friedman stat={res['friedman_stat']}, "
-                f"p={res['p_value']}",
-                flush=True,
-            )
+            res = _stat_test(subset, val_col, method_col=meth_col)
+            if res["test"] == "skipped":
+                print(
+                    f"  {abl_name}: skipped — k={res['n_groups']}, "
+                    f"N={res['n_datasets']}",
+                    flush=True,
+                )
+            else:
+                sig_mark = " *" if res["significant"] else ""
+                print(
+                    f"  {abl_name}: {res['test']} "
+                    f"stat={res['statistic']:.4f}, "
+                    f"p={res['p_value']:.4f}{sig_mark} "
+                    f"(k={res['n_groups']}, N={res['n_datasets']})",
+                    flush=True,
+                )
         except Exception:
-            pass
+            import traceback
+
+            print(f"  {abl_name}: ERROR —", flush=True)
+            traceback.print_exc()
 
     _header("Done")
     print(f"Run directory: {run_dir}", flush=True)

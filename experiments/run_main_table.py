@@ -80,6 +80,8 @@ from minppi_mofs.baselines.shapg import (
     compute_shapg_importance,
     rank_features as rank_shapg,
 )
+from scipy.stats import friedmanchisquare, wilcoxon
+
 from minppi_mofs.mofs_minppi import compute_hypervolume
 
 
@@ -476,29 +478,70 @@ def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
             print(f"  table_{short}.csv", flush=True)
 
 
-def friedman_nemenyi(
+def _stat_test(
     df: pd.DataFrame,
     value_col: str,
     method_col: str = "method",
     dataset_col: str = "dataset",
 ) -> dict:
-    """Friedman test + Nemenyi post-hoc on *df* aggregated by seed."""
-    from scipy.stats import friedmanchisquare
+    """Friedman (≥3 groups) or Wilcoxon (2 groups) with automatic dispatch.
 
+    Mixed-task DataFrames may have NaN values in *value_col* for datasets
+    where the metric is not applicable (e.g. AUC@k is NaN for regression
+    datasets).  The function drops rows and columns that are entirely NaN
+    before testing.
+
+    Returns:
+        Dict with ``test``, ``statistic``, ``p_value``, ``n_groups``,
+        ``n_datasets``, ``significant``.
+    """
     # Aggregate: mean over seeds per (method, dataset)
     agg = df.groupby([method_col, dataset_col])[value_col].mean().reset_index()
     pivot = agg.pivot(index=dataset_col, columns=method_col, values=value_col)
+    # Drop datasets that have no data for this metric at all
+    pivot = pivot.dropna(axis=0, how="all")
+    # Drop methods that have no data for any dataset
+    pivot = pivot.dropna(axis=1, how="all")
+    # Now drop any rows with partial NaN (some methods missing)
     pivot = pivot.dropna(axis=0)
 
-    if pivot.shape[1] < 2 or pivot.shape[0] < 3:
-        return {"friedman_stat": None, "p_value": None, "n_methods": 0}
+    k = pivot.shape[1]  # number of groups (methods)
+    n = pivot.shape[0]  # number of datasets
 
-    stat, p = friedmanchisquare(*[pivot[c] for c in pivot.columns])
+    if k < 2 or n < 3:
+        return {
+            "test": "skipped",
+            "statistic": None,
+            "p_value": None,
+            "n_groups": k,
+            "n_datasets": n,
+            "significant": False,
+        }
+
+    if k == 2:
+        # Wilcoxon signed-rank (paired by dataset)
+        cols = list(pivot.columns)
+        stat, p = wilcoxon(
+            pivot[cols[0]].values, pivot[cols[1]].values, method="approx"
+        )
+        return {
+            "test": "wilcoxon",
+            "statistic": float(stat),
+            "p_value": float(p),
+            "n_groups": k,
+            "n_datasets": n,
+            "significant": bool(p < 0.05),
+        }
+
+    # k ≥ 3 → Friedman
+    stat, p = friedmanchisquare(*[pivot[c].values for c in pivot.columns])
     return {
-        "friedman_stat": float(stat),
+        "test": "friedman",
+        "statistic": float(stat),
         "p_value": float(p),
-        "n_methods": pivot.shape[1],
-        "n_datasets": pivot.shape[0],
+        "n_groups": k,
+        "n_datasets": n,
+        "significant": bool(p < 0.05),
     }
 
 
@@ -805,36 +848,36 @@ def main() -> None:
     _build_tables(raw_df, tables_dir)
 
     # ---- Statistical tests ----
-    # Run Friedman+Nemenyi on every available top-10 and top-20 KPI column.
-    # Classification produces AUC@k; regression produces R^2@k.  Each test
-    # runs only on the datasets that have data for that metric (dropna(axis=0)
-    # inside friedman_nemenyi removes datasets missing that metric).
+    # Run Friedman (≥3 methods) or Wilcoxon (2 methods) on every available
+    # top-10 and top-20 KPI column.  Classification datasets contribute
+    # AUC@k; regression datasets contribute R²@k.  Mixed-task columns are
+    # handled by dropna(how='all') inside _stat_test.
     _header("Statistical tests")
     fn_results: list[dict] = []
     _kpi_candidates = sorted({c for c in raw_df.columns if "@" in c})
     for kpi in _kpi_candidates:
         if not kpi.endswith(("@10", "@20")):
             continue
-        res = friedman_nemenyi(raw_df, kpi)
+        res = _stat_test(raw_df, kpi)
         fn_results.append({"kpi": kpi, **res})
-        p_val = res.get("p_value")
-        if p_val is None:
+        if res["test"] == "skipped":
             print(
-                f"  Friedman {kpi}: skipped (insufficient data — "
-                f"{res.get('n_methods', 0)} methods, "
-                f"{res.get('n_datasets', 0)} datasets)",
+                f"  {kpi}: skipped — k={res['n_groups']}, N={res['n_datasets']}",
                 flush=True,
             )
         else:
+            p_val = res["p_value"]
             sig = "***" if p_val < 0.001 else (
                 "**" if p_val < 0.01 else (
                     "*" if p_val < 0.05 else "n.s."
                 )
             )
+            sig_mark = f" {sig}" if res["significant"] else ""
             print(
-                f"  Friedman {kpi}: χ²={res['friedman_stat']:.2f}, "
-                f"p={p_val:.4f} {sig} "
-                f"({res['n_methods']} methods, {res['n_datasets']} datasets)",
+                f"  {kpi}: {res['test']} "
+                f"stat={res['statistic']:.4f}, "
+                f"p={p_val:.4f}{sig_mark} "
+                f"(k={res['n_groups']}, N={res['n_datasets']})",
                 flush=True,
             )
     if fn_results:

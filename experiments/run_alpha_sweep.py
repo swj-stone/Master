@@ -61,6 +61,8 @@ from minppi_mofs.min_ppi import (
     minppi_stats,
 )
 from minppi_mofs.shapg_integration import build_guidance_from_data
+from scipy.stats import friedmanchisquare, wilcoxon
+
 from minppi_mofs.voting_game import make_acc_full_cache
 
 
@@ -217,6 +219,62 @@ def jaccard_similarity(set_a: set[str], set_b: set[str]) -> float:
 # ---------------------------------------------------------------------------
 # Main α sweep
 # ---------------------------------------------------------------------------
+
+
+def _stat_test_alpha(
+    df: pd.DataFrame,
+    value_col: str,
+    alpha_col: str = "alpha",
+    dataset_col: str = "dataset",
+) -> dict:
+    """Friedman (≥3 alpha levels) or Wilcoxon (2 levels) across datasets.
+
+    Returns:
+        Dict with ``test``, ``statistic``, ``p_value``, ``n_groups``,
+        ``n_datasets``, ``significant``.
+    """
+    pivot = df.pivot_table(
+        index=dataset_col, columns=alpha_col, values=value_col, aggfunc="mean"
+    )
+    pivot = pivot.dropna(axis=0, how="all").dropna(axis=1, how="all")
+    pivot = pivot.dropna(axis=0)
+
+    k = pivot.shape[1]
+    n = pivot.shape[0]
+
+    if k < 2 or n < 3:
+        return {
+            "test": "skipped",
+            "statistic": None,
+            "p_value": None,
+            "n_groups": k,
+            "n_datasets": n,
+            "significant": False,
+        }
+
+    if k == 2:
+        cols = list(pivot.columns)
+        stat, p = wilcoxon(
+            pivot[cols[0]].values, pivot[cols[1]].values, method="approx"
+        )
+        return {
+            "test": "wilcoxon",
+            "statistic": float(stat),
+            "p_value": float(p),
+            "n_groups": k,
+            "n_datasets": n,
+            "significant": bool(p < 0.05),
+        }
+
+    stat, p = friedmanchisquare(*[pivot[c].values for c in pivot.columns])
+    return {
+        "test": "friedman",
+        "statistic": float(stat),
+        "p_value": float(p),
+        "n_groups": k,
+        "n_datasets": n,
+        "significant": bool(p < 0.05),
+    }
 
 
 def main() -> None:
@@ -637,6 +695,90 @@ def main() -> None:
         "  alpha=0.95 is the recommended primary value; Appendix reports 0.90, 0.99 for context.",
         flush=True,
     )
+
+    # ---- Statistical tests ----
+    # Does α level significantly affect MinPPI output (harmful %) and
+    # downstream ranking quality (top-k AUC / R²)?
+    _header("Statistical tests")
+
+    # 1. Friedman across all α levels for harmful %
+    res_harm = _stat_test_alpha(metrics_df, "pct_harmful")
+    if res_harm["test"] == "skipped":
+        print(
+            f"  pct_harmful vs α: skipped (k={res_harm['n_groups']}, "
+            f"N={res_harm['n_datasets']})",
+            flush=True,
+        )
+    else:
+        sig_mark = " *" if res_harm["significant"] else ""
+        print(
+            f"  harmful% vs α: {res_harm['test']} "
+            f"stat={res_harm['statistic']:.4f}, "
+            f"p={res_harm['p_value']:.4f}{sig_mark} "
+            f"(k={res_harm['n_groups']}, N={res_harm['n_datasets']})",
+            flush=True,
+        )
+
+    # 2. Friedman / Wilcoxon for top-k KPI columns vs α
+    _kpi_candidates = sorted(
+        {c for c in metrics_df.columns if "@" in c and not c.startswith("metric_")}
+    )
+    for kpi in _kpi_candidates:
+        if not kpi.endswith(("@10", "@20")):
+            continue
+        res_kpi = _stat_test_alpha(metrics_df, kpi)
+        if res_kpi["test"] == "skipped":
+            print(
+                f"  {kpi} vs α: skipped (k={res_kpi['n_groups']}, "
+                f"N={res_kpi['n_datasets']})",
+                flush=True,
+            )
+        else:
+            sig_mark = " *" if res_kpi["significant"] else ""
+            print(
+                f"  {kpi} vs α: {res_kpi['test']} "
+                f"stat={res_kpi['statistic']:.4f}, "
+                f"p={res_kpi['p_value']:.4f}{sig_mark} "
+                f"(k={res_kpi['n_groups']}, N={res_kpi['n_datasets']})",
+                flush=True,
+            )
+
+    # 3. Pairwise Wilcoxon: recommended α=0.95 vs each other α for harmful%
+    alpha_list = sorted(ALPHA_VALUES)
+    if 0.95 in alpha_list:
+        print("\n  Pairwise Wilcoxon: α=0.95 vs each other α (harmful%):", flush=True)
+        base = metrics_df[metrics_df["alpha"] == 0.95]
+        for a in alpha_list:
+            if a == 0.95:
+                continue
+            comp = metrics_df[metrics_df["alpha"] == a]
+            merged = pd.merge(
+                base[["dataset", "pct_harmful"]],
+                comp[["dataset", "pct_harmful"]],
+                on="dataset",
+                suffixes=("_095", f"_{int(a*100):02d}"),
+            ).dropna()
+            if len(merged) < 4:
+                print(
+                    f"    α=0.95 vs {a:.2f}: skipped (N={len(merged)})",
+                    flush=True,
+                )
+                continue
+            try:
+                stat_w, p_w = wilcoxon(
+                    merged["pct_harmful_095"].values,
+                    merged[f"pct_harmful_{int(a*100):02d}"].values,
+                    method="approx",
+                )
+                sig_w = " *" if p_w < 0.05 else ""
+                print(
+                    f"    α=0.95 vs {a:.2f}: W={stat_w:.1f}, p={p_w:.4f}{sig_w}",
+                    flush=True,
+                )
+            except Exception:
+                import traceback
+                print(f"    α=0.95 vs {a:.2f}: ERROR", flush=True)
+                traceback.print_exc()
 
     _header("Done")
     print(f"Run directory: {run_dir}", flush=True)
