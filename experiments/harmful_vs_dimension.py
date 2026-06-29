@@ -56,12 +56,7 @@ from sklearn.feature_selection import mutual_info_classif
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from minppi_mofs.min_ppi import (
-    estimate_minppi_random_mc,
-    estimate_minppi_shapg_guided,
-    minppi_stats,
-)
-from minppi_mofs.shapg_integration import build_guidance_from_data
+from minppi_mofs.min_ppi import estimate_minppi_random_mc, minppi_stats
 from minppi_mofs.voting_game import make_acc_full_cache
 
 
@@ -251,16 +246,6 @@ def main() -> None:
             y_tr_vals = y_tr.values if isinstance(y_tr, pd.DataFrame) else y_tr
             y_val_vals = y_val.values if isinstance(y_val, pd.DataFrame) else y_val
 
-            # ShapG for binary (cached per seed)
-            sg_scores = {}
-            sg_neighbors = None
-            if task == "binary":
-                sg_scores, sg_neighbors = build_guidance_from_data(
-                    pd.DataFrame(X_tr_full, columns=raw_X.columns),
-                    y_tr_vals,
-                    depth=1, m=5, seed=seed,
-                )
-
             for k in valid_cutoffs:
                 # MI-select top-k
                 X_tr_k, X_val_k, _ = _mi_select(
@@ -271,31 +256,23 @@ def main() -> None:
                 )
                 n_actual = X_tr_k.shape[1]
 
-                # AccFullCache (shared across α levels for this k/seed)
+                # Use Algorithm A (shared-coalition random MC) for all datasets.
+                # O(K · per_coalition) instead of O(p · K_adv) per alpha.
+                # The dimension scan only needs the sign of MinPPI, not
+                # precise identification of sparse harmful features.
                 cache = make_acc_full_cache(
                     X_tr_k, X_val_k, y_tr_vals, y_val_vals, seed=seed, task=task,
                 )
-
                 for alpha in ALPHA_VALUES:
                     cache.set_threshold(alpha)
                     t0 = time.perf_counter()
 
-                    if task == "multiclass":
-                        minppi = estimate_minppi_random_mc(
-                            X_tr_k, X_val_k, y_tr_vals, y_val_vals,
-                            alpha=alpha, K=200, shared_coalitions=True,
-                            per_coalition=5, acc_cache=cache, seed=seed,
-                            verbose=False, task=task,
-                        )
-                    else:
-                        minppi = estimate_minppi_shapg_guided(
-                            X_tr_k, X_val_k, y_tr_vals, y_val_vals,
-                            alpha=alpha, K_adv=30,
-                            shapg_neighbors=sg_neighbors,
-                            shapg_scores=sg_scores if sg_neighbors else None,
-                            acc_cache=cache, seed=seed, verbose=False,
-                            task=task,
-                        )
+                    minppi = estimate_minppi_random_mc(
+                        X_tr_k, X_val_k, y_tr_vals, y_val_vals,
+                        alpha=alpha, K=300, shared_coalitions=True,
+                        per_coalition=5, acc_cache=cache, seed=seed,
+                        verbose=False, task=task,
+                    )
 
                     t_elapsed = time.perf_counter() - t0
                     stats = minppi_stats(minppi)

@@ -237,15 +237,15 @@ def run_c1_removal(
     cls_rows: list[dict] = []
     reg_rows: list[dict] = []
 
-    all_configs: list[tuple[str, str, str, bool]] = []
+    all_configs: list[tuple[str, str, str, bool, int]] = []
     for prefix, target, task in C1_CLS_DATASETS:
         for seed in SEEDS:
-            all_configs.append((prefix, target, task, True))
+            all_configs.append((prefix, target, task, True, seed))
     for prefix, target, task in C1_REG_DATASETS:
         for seed in SEEDS:
-            all_configs.append((prefix, target, task, False))
+            all_configs.append((prefix, target, task, False, seed))
 
-    for prefix, target, task, is_cls in tqdm(
+    for prefix, target, task, is_cls, seed in tqdm(
         all_configs, desc="c1 removal", unit="config", file=sys.stdout
     ):
         try:
