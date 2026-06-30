@@ -1,16 +1,18 @@
 # Fdb version 4
-["bibtex icomp2026_conference"] 1782287830.19886 "icomp2026_conference.aux" "icomp2026_conference.bbl" "icomp2026_conference" 1782462960.15041 0
+["bibtex icomp2026_conference"] 1782826923.67796 "icomp2026_conference.aux" "icomp2026_conference.bbl" "icomp2026_conference" 1782826925.74927 0
   "./icomp2026_conference.bib" 1781427140 10631 10ac48fd9d6b8855d9e4312ce389d914 ""
   "./icomp2026_conference.bst" 1779366397 26974 b1fa9868993c83455e3347c51621e256 ""
-  "icomp2026_conference.aux" 1782462959 17683 be7e8539d0fe14f08342cc39901cd862 "pdflatex"
+  "icomp2026_conference.aux" 1782826925 28726 867eb624ce634cd046ad831122e94f1e "pdflatex"
   (generated)
   "icomp2026_conference.bbl"
   "icomp2026_conference.blg"
   (rewritten before read)
-["pdflatex"] 1782462957.86272 "c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" "icomp2026_conference.pdf" "icomp2026_conference" 1782462960.15092 0
+["pdflatex"] 1782826924.04706 "c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" "icomp2026_conference.pdf" "icomp2026_conference" 1782826925.75005 0
+  "../figures/cd_diagram_AUC@10.pdf" 1782648972 15287 b95a01859ba1c2295a2d052d4db9273e ""
   "../figures/figure_1_minppi_trichotomy.pdf" 1781345690 36664 09a5b79e7896f625f366e02720aa8904 ""
   "../figures/figure_2_prop1_detection.pdf" 1781345690 29499 ac3d2221f00c11d95ffb9a2d7a403000 ""
   "../figures/figure_3_algorithm_b_vs_a.pdf" 1781345690 35932 6d1d1e03f6f3f2e9734f6b9643061a3a ""
+  "../figures/harmful_vs_dimension.pdf" 1782722572 21698 2df442bfced217e0b49b10bc3cb630d1 ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/enc/dvips/base/8r.enc" 1780216845 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/map/fontname/texfonts.map" 1780217017 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/helvetic/phvb.tfm" 1780217150 2300 14616918391efa49ac8b481a75fbdc1a ""
@@ -62,12 +64,16 @@
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb" 1780216365 36299 5f9df58c2139e7edcf37c8fca4bd384d ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb" 1780216365 37912 07513ec114ac737ab54cea0152f4424b ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb" 1780216365 36281 c355509802a035cadc5f15869451dcee ""
+  "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb" 1780216365 36094 798f80770b3b148ceedd006d487db67c ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1780216365 35752 024fb6c41858982481f6968b5fc26508 ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb" 1780216365 31809 8670ca339bf94e56da1fc21c80635e2a ""
+  "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb" 1780216365 32734 69e00a6b65cedb993666e42eedb3d48f ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb" 1780216365 32762 7fee39e011c23b3589931effd97b9702 ""
+  "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb" 1780216365 33993 9b89b85fd2d9df0482bd47194d1d3bf3 ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb" 1780216365 32569 5e5ddc8df908dea60932f3c484a54c0d ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pfb" 1780216365 32915 7bf7720c61a5b3a7ff25b0964421c9b6 ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb" 1780216365 32716 08e384dc442464e7285e891af9f45947 ""
+  "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb" 1780216365 32442 c975af247b6702f7ca0c299af3616b80 ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb" 1780216365 34694 870c211f62cb72718a00e353f14f254d ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/public/bbold-type1/bbold10.pfb" 1780216458 25452 d4e98a3bf6b13d4b7dcffd6302990a65 ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/type1/urw/times/utmb8a.pfb" 1780218462 44729 fea0975e20ec51c992338362f05f1146 ""
@@ -140,13 +146,13 @@
   "c:/work/Latex/texlive/2026/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1780218776 5587506 bfccaadafa15c64d804aaff7756ac6dd ""
   "c:/work/Latex/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt" 1780218923 3636846 0291aa99435d085f5a777e36ddca91dc ""
   "c:/work/Latex/texlive/2026/texmf.cnf" 1780218758 713 e69b156964470283e0530f5060668171 ""
-  "c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" 1782462957 51219 72a60570abd0126f22e30638c21ccfdb ""
+  "c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" 1782826919 73007 7e7aa6de4f106ae57e9ec6e06e00fc97 ""
   "fancyhdr.sty" 1779366397 20521 e5d13d98d57bd53d4fed3aa61bd29c86 ""
-  "icomp2026_conference.aux" 1782462959 17683 be7e8539d0fe14f08342cc39901cd862 "pdflatex"
-  "icomp2026_conference.bbl" 1782416535 8772 81efc3408f2a05441749d26d68159386 "bibtex icomp2026_conference"
-  "icomp2026_conference.out" 1782462959 5928 34d43721a44686a21fb99e75dd0e0c55 "pdflatex"
+  "icomp2026_conference.aux" 1782826925 28726 867eb624ce634cd046ad831122e94f1e "pdflatex"
+  "icomp2026_conference.bbl" 1782826924 8772 81efc3408f2a05441749d26d68159386 "bibtex icomp2026_conference"
+  "icomp2026_conference.out" 1782826925 8405 ef612e4dbe1ca4cc45ad22b94e3b10c9 "pdflatex"
   "icomp2026_conference.sty" 1779366397 9181 1ef73fa0f4a021d75fda9f06f666bb3f ""
-  "icomp2026_conference.tex" 1782462957 51219 72a60570abd0126f22e30638c21ccfdb ""
+  "icomp2026_conference.tex" 1782826919 73007 7e7aa6de4f106ae57e9ec6e06e00fc97 ""
   "math_commands.tex" 1779366397 12284 a71653715108dc62b66e3a0bde0307d8 ""
   "natbib.sty" 1779366397 45154 40088ce024445d7ee2bca59e704cdd01 ""
   (generated)

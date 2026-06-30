@@ -100,5 +100,5 @@ SHAP-Top-k · ShapG · MinShap · Banzhaf-FS · Powershap · MOFS-SHAP · NSGA2-
 - [ ] P1.5：回归集预处理 + 跑 + 全表。
 - [ ] 重写 §6 正文（Table M1 + CD 图 + 两段）+ 灌附录。
 - [ ] §4 Method surgery + 全文 9 页定稿（移 Table 1/Table 3 等到附录）。
-- [ ] 维度口径对齐（摘要/§6 与上方 MI 规则，Gisette 200）。
+- [ ] 维度口径对齐（摘要/§6 与上方 MI 规则，Gisette 100）。
 - [ ] 软化 robustness 措辞；Thm1(a) decisive 死代码处理。
