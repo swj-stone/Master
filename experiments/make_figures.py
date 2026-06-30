@@ -489,7 +489,7 @@ def _make_figure_1(ex1: dict, ex2: dict, save_path: Path) -> None:
     )
 
     plt.suptitle(
-        "Figure 3: MinPPI Trichotomy — Lemma 1 & Theorem 1",
+        "MinPPI Trichotomy — Lemma 1 & Theorem 1",
         fontsize=11, y=1.02,
     )
     plt.tight_layout()
@@ -526,7 +526,7 @@ def _make_figure_2(prop1: dict, save_path: Path) -> None:
     ax.set_xlim(0, 105)
     ax.legend(loc="lower right", framealpha=0.9)
     ax.set_title(
-        f"Figure 4: Proposition 1 — "
+        f"Proposition 1 — "
         f"$p_- = {p_neg:.4f}$, $r = {r_val:.4f}$",
         fontsize=10,
     )
@@ -592,7 +592,7 @@ def _make_figure_3(alg_data: dict, save_path: Path) -> None:
 
 
     plt.suptitle(
-        "Figure 5: Algorithm B vs Algorithm A — §4.3.2",
+        "Algorithm B vs Algorithm A",
         fontsize=11, y=1.02,
     )
     plt.tight_layout()
