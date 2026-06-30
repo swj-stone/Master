@@ -453,6 +453,15 @@ Abalone   & 8 & 8 & 4,177 & R & $R^2$ \\
 
 \subsection{Pareto Quality (NSGA-II Methods)}
 
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.85\linewidth]{../figures/cd_diagram_hv.pdf} \\
+\includegraphics[width=0.85\linewidth]{../figures/cd_diagram_igd_plus.pdf}
+\end{center}
+\caption{CD diagrams for HV (higher better, top) and IGD$^+$ (lower better, bottom) across the three NSGA-II methods on all seven datasets.  Friedman $\chi^2 = 0.29$, $p = 0.87$ (HV) and $\chi^2 = 1.14$, $p = 0.56$ (IGD$^+$), both n.s.\ at $k=3, N=7$.  The large Nemenyi CD ($\approx 1.6$ ranks) subsumes all pairwise differences.}
+\label{fig:cd_pareto}
+\end{figure}
+
 \begin{table}[h]
 \caption{Spacing and runtime (means over 5 seeds).  Best per row \textbf{bold}.}
 \label{tab:pareto_sp_runtime}
@@ -477,6 +486,9 @@ Abalone     & 0.122 & \textbf{0.099} & 0.152 & 25.9 & \textbf{0.4} & 3.3 \\
 
 \subsection{Single-Point AUC@$k$ (All Methods)}
 
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{2.5pt}
 \begin{longtable}{l rrrrrrrr}
 \caption{AUC@1, AUC@5, AUC@20, AUC@50. } 
 \label{tab:all_auc} \\
@@ -526,6 +538,7 @@ ISOLET      & 0.990 & 0.992 & \textbf{0.992} & 0.991 & 0.990 & 0.991 & 0.946 & 0
 Gisette     & 0.986 & 0.989 & 0.989 & 0.986 & 0.984 & 0.986 & 0.972 & 0.989 \\
 Credit-Card & 0.980 & \textbf{0.982} & 0.979 & 0.974 & 0.982 & 0.980 & 0.980 & 0.979 \\
 \end{longtable}
+\endgroup
 
 \subsection{Compression Rate (NSGA-II Methods)}
 
@@ -745,6 +758,14 @@ AUC@20 & 14.47 & 0.043 & 0.36 & 4.83 & 8 \\
 \end{table}
 
 Both Friedman tests are significant, confirming that method differences on AUC rankings are not due to chance.  The large Nemenyi CD ($\approx 4.8$ ranks) means that, with $N=5$ datasets, pairwise post-hoc separation is difficult---methods within $\approx 5$ ranks of each other cannot be declared significantly different.  This is a known limitation of the Demsar procedure at small $N$ and is why we emphasize the CD diagram (Figure~\ref{fig:cd_auc10}) and the harmful-utility experiment (Section~\ref{sec:harmful_utility}) as the primary empirical evidence, with Friedman significance as supporting context.
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.85\linewidth]{../figures/cd_diagram_AUC@20.pdf}
+\end{center}
+\caption{CD diagram for AUC@20 (8 methods, 5 classification datasets).  Friedman $\chi^2 = 14.47$, $p = 0.043$ (Kendall's $W = 0.36$). }
+\label{fig:cd_auc20}
+\end{figure}
 
 % ---------------------------------------------------------------------------
 \section{Method Design-Space}
