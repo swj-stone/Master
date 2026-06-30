@@ -1,14 +1,9 @@
-\begin{thebibliography}{28}
+\begin{thebibliography}{25}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
   \providecommand{\doi}[1]{doi: #1}\else
   \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
-
-\bibitem[Aas et~al.(2021)Aas, Jullum, and L{\o}land]{aas2021explaining}
-Kjersti Aas, Martin Jullum, and Anders L{\o}land.
-\newblock Explaining individual predictions when features are dependent: More accurate approximations to {Shapley} values.
-\newblock In \emph{International Conference on Artificial Intelligence and Statistics (AISTATS)}, 2021.
 
 \bibitem[Banzhaf(1965)]{banzhaf1965weighted}
 John~F. Banzhaf.
@@ -34,11 +29,6 @@ Shay Cohen, Gideon Dror, and Eytan Ruppin.
 Kalyanmoy Deb, Amrit Pratap, Sameer Agarwal, and T.~Meyarivan.
 \newblock A fast and elitist multiobjective genetic algorithm: {NSGA-II}.
 \newblock \emph{IEEE Transactions on Evolutionary Computation}, 6\penalty0 (2):\penalty0 182--197, 2002.
-
-\bibitem[Frye et~al.(2020)Frye, Rowat, and Feige]{frye2020shapley}
-Christopher Frye, Colin Rowat, and Ilya Feige.
-\newblock Shapley explainability on the data manifold.
-\newblock In \emph{International Conference on Learning Representations (ICLR)}, 2020.
 
 \bibitem[Grabisch \& Roubens(1999)Grabisch and Roubens]{grabisch1999axiomatic}
 Michel Grabisch and Marc Roubens.
@@ -114,11 +104,6 @@ Xianfang Song, Yong Zhang, Wanqiu Zhang, Chunlin He, Ying Hu, Jian Wang, and Dun
 Philip~D. Straffin.
 \newblock The {Shapley-Shubik} and {Banzhaf} power indices as probabilities.
 \newblock In Alvin~E. Roth (ed.), \emph{The Shapley Value: Essays in Honor of {Lloyd S. Shapley}}, pp.\  71--81. Cambridge University Press, 1977.
-
-\bibitem[Sundararajan \& Najmi(2020)Sundararajan and Najmi]{sundararajan2020many}
-Mukund Sundararajan and Amir Najmi.
-\newblock The many {Shapley} values for model explanation.
-\newblock In \emph{International Conference on Machine Learning (ICML)}, 2020.
 
 \bibitem[Tsai et~al.(2023)Tsai, Yeh, and Ravikumar]{tsai2023faithshap}
 Che-Ping Tsai, Chih-Kuan Yeh, and Pradeep Ravikumar.
