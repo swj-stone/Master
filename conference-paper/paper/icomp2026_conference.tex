@@ -4,9 +4,11 @@
 \usepackage{amssymb}
 \usepackage{amsfonts}
 \usepackage{graphicx}
+\usepackage{longtable}
 \usepackage{booktabs}
 \usepackage{bbold}
 \usepackage{amsthm}
+\usepackage{float}
 % Optional math command from https://github.com/goodfeli/dlbook_notation.
 \input{math_commands.tex}
 
@@ -252,7 +254,7 @@ Features with $\text{MinPPI}=+1$ adjacent in $G_{\text{corr}}$ (edge weight $> \
 \section{Theoretical Analysis}
 \label{sec:theory}
 
-We establish formal guarantees (proofs in Appendix~\ref{app:proofs}; summary in Appendix~\ref{app:guarantees}).
+We establish formal guarantees (proofs and summary in Appendix~\ref{app:proofs}).
 
 \subsection{Sample Complexity of Algorithm~A}
 
@@ -308,7 +310,7 @@ Table~\ref{tab:main_pareto} reports Pareto-front quality. MOFS-SHAP leads on HV 
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=0.85\linewidth]{../figures/cd_diagram_AUC@10.pdf}
+\includegraphics[width=0.95\linewidth]{../figures/cd_diagram_AUC@10.pdf}
 \end{center}
 \caption{Critical-difference diagram for AUC@10 across all eight methods on five classification datasets.  Friedman $\chi^2 = 14.13$, $p = 0.049$ (Kendall's $W = 0.35$).  Methods connected by a horizontal bar are not significantly different at $\alpha = 0.05$ (Nemenyi post-hoc).}
 \label{fig:cd_auc10}
@@ -321,7 +323,7 @@ On single-point AUC rankings (Figure~\ref{fig:cd_auc10}, Appendix~\ref{app:full_
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=0.78\linewidth]{../figures/harmful_vs_dimension.pdf}
+\includegraphics[width=0.95\linewidth]{../figures/harmful_vs_dimension.pdf}
 \end{center}
 \caption{Harmful-feature fraction versus number of MI-selected features at three $\alpha$ levels (mean over 3 seeds).  Harmful\% \emph{decreases} as more features are included, countering the concern that MinPPI's harmful detection degrades with dimensionality.}
 \label{fig:harmful_vs_dim}
@@ -421,7 +423,7 @@ With $\beta<\infty$ the per-bit flip probability lies in $(0,1)$, so from any st
 \section{Datasets and Protocol}
 \label{app:datasets}
 
-\begin{table}[h]
+\begin{table}[H]
 \caption{Dataset summary.  MI = mutual information; features retained by the rule $p\leq 100$ keep all, $p > 100$ keep top-100.  Task: C = binary/multi-class, R = regression.}
 \label{tab:datasets}
 \begin{center}
@@ -475,15 +477,22 @@ Abalone     & 0.122 & \textbf{0.099} & 0.152 & 25.9 & \textbf{0.4} & 3.3 \\
 
 \subsection{Single-Point AUC@$k$ (All Methods)}
 
-\begin{table}[h]
-\caption{AUC@1, AUC@5, AUC@20, AUC@50 (means over 5 seeds).  Best per row \textbf{bold}.}
-\label{tab:all_auc}
-\begin{center}
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{l rrrrrrrr}
+\begin{longtable}{l rrrrrrrr}
+\caption{AUC@1, AUC@5, AUC@20, AUC@50. } 
+\label{tab:all_auc} \\
 \toprule
 \textbf{Dataset} & \textbf{MinPPI} & \textbf{SHAP-k} & \textbf{MOFS-S} & \textbf{NSGA2-u} & \textbf{Banzhaf} & \textbf{MinShap} & \textbf{ShapG} & \textbf{PShap} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Dataset} & \textbf{MinPPI} & \textbf{SHAP-k} & \textbf{MOFS-S} & \textbf{NSGA2-u} & \textbf{Banzhaf} & \textbf{MinShap} & \textbf{ShapG} & \textbf{PShap} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{9}{r}{\textit{continued on next page}} \\
+\endfoot
+\bottomrule
+\endlastfoot
 \midrule
 \multicolumn{9}{c}{\textit{AUC@1}} \\
 \midrule
@@ -516,15 +525,12 @@ Madelon     & 0.792 & 0.808 & 0.783 & 0.802 & 0.801 & 0.763 & 0.804 & 0.778 \\
 ISOLET      & 0.990 & 0.992 & \textbf{0.992} & 0.991 & 0.990 & 0.991 & 0.946 & 0.991 \\
 Gisette     & 0.986 & 0.989 & 0.989 & 0.986 & 0.984 & 0.986 & 0.972 & 0.989 \\
 Credit-Card & 0.980 & \textbf{0.982} & 0.979 & 0.974 & 0.982 & 0.980 & 0.980 & 0.979 \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
+\end{longtable}
 
 \subsection{Compression Rate (NSGA-II Methods)}
 
 \begin{table}[h]
-\caption{CR$_{1\%}$, CR$_{5\%}$ (means over 5 seeds).  Best \textbf{bold}.}
+\caption{CR$_{1\%}$, CR$_{5\%}$. }
 \label{tab:cr_1_5}
 \begin{center}
 \footnotesize
@@ -550,7 +556,7 @@ Abalone     & 0.300 & 0.300 & \textbf{0.400} & \textbf{0.725} & 0.725 & \textbf{
 \label{app:regression}
 
 \begin{table}[h]
-\caption{Regression results on Crimedata and Abalone ($R^2$@$k$, means over 5 seeds).  Best \textbf{bold}.}
+\caption{Regression results on Crimedata and Abalone ($R^2$@$k$). }
 \label{tab:regression}
 \begin{center}
 \footnotesize
@@ -579,8 +585,8 @@ MOFS-MinPPI achieves the best $R^2$@10 on Crimedata (0.660) and competitive $R^2
 \section{Alpha Sensitivity}
 \label{app:alpha}
 
-\begin{table}[h]
-\caption{Harmful feature \% vs.\ quota $\alpha$ (single seed 42).  ``---'' = zero harmful.}
+\begin{table}[H]
+\caption{Harmful feature \% vs.\ quota $\alpha$ (single seed 42).  ``---'' means zero harmful.}
 \label{tab:alpha_sweep}
 \begin{center}
 \footnotesize
@@ -606,7 +612,7 @@ Harmful counts increase monotonically with $\alpha$ (higher quota $\Rightarrow$ 
 \section{MinShap Comparison and Madelon Ground Truth}
 \label{app:minshap}
 
-\begin{table}[h]
+\begin{table}[H]
 \caption{Madelon ground-truth probe recovery (100 features, 97 probes, 5 seeds).}
 \label{tab:madelon_ground_truth}
 \begin{center}
@@ -623,7 +629,7 @@ SHAP    & $0.971 \pm 0.031$ & $0.214 \pm 0.140$ & $0.336 \pm 0.165$ \\
 \end{center}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[H]
 \caption{MinShap vs.\ MinPPI harmful-set agreement (Jaccard index, means over 5 seeds).}
 \label{tab:minshap_vs_minppi}
 \begin{center}
@@ -646,7 +652,7 @@ The low Jaccard (0.03--0.20) confirms that binary $v_\alpha$ and continuous $v(S
 \section{Ablation Full Tables}
 \label{app:ablation}
 
-\begin{table}[h]
+\begin{table}[H]
 \caption{Min vs.\ mean operator: HV and AUC@10 (means over datasets).}
 \label{tab:abl_min_vs_mean}
 \begin{center}
@@ -662,7 +668,7 @@ Mean-SHAP & 0.034 & 0.913 \\
 \end{center}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[H]
 \caption{Binary $v_\alpha$ vs.\ continuous $v(S)$: harmful\% distribution (mean over 7 datasets).  Continuous flags 46--66\%; binary gives $\alpha$-controlled rates.}
 \label{tab:abl_binary_vs_cont}
 \begin{center}
@@ -678,7 +684,7 @@ Continuous & --- & --- & --- & --- & 50--66\% \\
 \end{center}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[H]
 \caption{Guidance strength $\beta$: HV (mean over 7 datasets).  Friedman $\chi^2 = 0.83$, $p = 0.84$ (n.s.).}
 \label{tab:abl_beta}
 \begin{center}
@@ -699,7 +705,7 @@ HV & 0.031 & 0.036 & 0.026 & 0.036 \\
 
 \subsection{Nemenyi Pairwise Significance Matrices}
 
-\begin{table}[h]
+\begin{table}[H]
 \caption{Nemenyi post-hoc: ``sig'' = significantly different at $\alpha=0.05$.  AUC@10: CD = 4.83 ranks ($k=8$, $N=5$).}
 \label{tab:nemenyi_auc10}
 \begin{center}
@@ -722,7 +728,7 @@ ShapG    & ns & ns & ns & ns & ns & ns & ns & --- \\
 \end{center}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[H]
 \caption{Friedman test summary.  Kendall's $W$ (effect size) and Nemenyi CD.}
 \label{tab:friedman_summary}
 \begin{center}
@@ -741,10 +747,12 @@ AUC@20 & 14.47 & 0.043 & 0.36 & 4.83 & 8 \\
 Both Friedman tests are significant, confirming that method differences on AUC rankings are not due to chance.  The large Nemenyi CD ($\approx 4.8$ ranks) means that, with $N=5$ datasets, pairwise post-hoc separation is difficult---methods within $\approx 5$ ranks of each other cannot be declared significantly different.  This is a known limitation of the Demsar procedure at small $N$ and is why we emphasize the CD diagram (Figure~\ref{fig:cd_auc10}) and the harmful-utility experiment (Section~\ref{sec:harmful_utility}) as the primary empirical evidence, with Friedman significance as supporting context.
 
 % ---------------------------------------------------------------------------
-\section{Design-Space Classification and Theoretical Guarantees}
+\section{Method Design-Space}
 \label{app:op_table}
 
-\begin{table}[h]
+Table~\ref{tab:operator-comparison} classifies prior work and our contribution along two axes: the aggregation operator (mean vs.\ min) and the value-function type (binary vs.\ continuous).  MinPPI occupies the unoccupied cell---min operator $\times$ binary---yielding the discrete $\{-1,0,+1\}$ output that enables the three-way classification of Section~\ref{sec:minppi}.
+
+\begin{table}[H]
 \caption{Game-theoretic feature importance methods by aggregation operator and value function.}
 \label{tab:operator-comparison}
 \begin{center}
@@ -763,35 +771,17 @@ MinShap        & min  & continuous & $\subseteq [-1,1]$ \\
 \end{center}
 \end{table}
 
-\begin{table}[h]
-\caption{Theoretical guarantees summary.}
-\label{tab:guarantees}
-\begin{center}
-\footnotesize
-\begin{tabular}{lp{7.2cm}}
-\toprule
-\textbf{Result} & \textbf{Practical consequence} \\
-\midrule
-Property~1 & MinPPI $\in\{-1,0,+1\}$; no threshold tuning. \\
-Property~2 & Clean semantics: decisive / harmful / neutral. \\
-Property~3 & MinSS = MinBz; use the cheaper MinBz. \\
-Prop.~1 / Thm.~1 & Alg.~A needs $K=\Omega(1/p_{\min})$. \\
-Thm.~2 & Alg.~B far more sample-efficient when witness is in ShapG neighborhood. \\
-Prop.~2a/b & MinPPI errors affect only convergence speed; returned front is internally non-dominated. \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-\label{app:guarantees}
-
 % ---------------------------------------------------------------------------
 \section{Empirical Verification of the Estimators}
 \label{app:verify}
 
-The toy-game verifications supporting Properties~1--3, Proposition~1, and the Algorithm~A/B comparison are collected here.
+This appendix collects the constructed toy-game experiments that numerically verify the formal claims of Sections~\ref{sec:minppi}--\ref{sec:estimation}.  All examples use $n=5$ features and $v_\alpha \in \{0,1\}$ as defined in~\eqref{eq:valpha}.
 
-\begin{figure}[h]
+\subsection{MinPPI Trichotomy (Properties~1--3)}
+
+Figure~\ref{fig:minppi_trichotomy} illustrates two engineered voting games that exercise all three MinSS values.  Example~1 ($v_\alpha(S)=\mathbb{1}[0\in S]$) produces a dictator-like feature: $f_0$ is decisive ($+1$), the remaining features are neutral ($0$).  Example~2 uses 13 hand-crafted winning coalitions on $N=\{0,\dots,4\}$ in which $f_1$ is harmful ($-1$) through witness $S=\{f_0,f_2\}$ where $v_\alpha(\{f_0,f_2\})=1$ but $v_\alpha(\{f_0,f_1,f_2\})=0$.  Table~\ref{tab:minss_demo} reports the numeric MinSS and mean Shapley-Shubik values, confirming that all MinSS values lie in $\{-1,0,+1\}$ (Property~1) and that the min operator detects signals invisible to the mean: $f_0$ appears in every winning coalition yet $\text{MinSS}(f_0)=0$ (the caveat of Property~2a).
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=0.95\linewidth]{../figures/figure_1_minppi_trichotomy.pdf}
 \end{center}
@@ -799,7 +789,7 @@ The toy-game verifications supporting Properties~1--3, Proposition~1, and the Al
 \label{fig:minppi_trichotomy}
 \end{figure}
 
-\begin{table}[h]
+\begin{table}[H]
 \caption{MinSS and mean Shapley-Shubik values for the games of Figure~\ref{fig:minppi_trichotomy}.}
 \label{tab:minss_demo}
 \begin{center}
@@ -817,24 +807,30 @@ $f_2$--$f_4$ & $\;\,0$ & $\;\,0.0000$ & neutral  & $f_2$--$f_4$ & $\;\,0$ & $+0.
 \end{center}
 \end{table}
 
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=0.95\linewidth]{../figures/figure_3_algorithm_b_vs_a.pdf}
-\end{center}
-\caption{Algorithm~B vs.\ Algorithm~A ($p_-^i=0.033$, 500 trials). (a)~Alg.~B detects deterministically at $K=1$; Alg.~A needs $K\!\approx\!90$. (b)~Sensitivity to $\mathcal{N}(0,\sigma^2)$ noise on the correlation matrix: Alg.~B retains $>50\%$ detection at $\sigma=0.50$, well above Alg.~A, but the gain shrinks as noise increases.}
-\label{fig:alg_b_vs_a}
-\end{figure}
+\subsection{Algorithm~A vs.\ Algorithm~B}
 
-\begin{figure}[h]
+We reuse Example~2 ($p_-^i = 0.033$, the probability that a random coalition reveals $f_1$ as harmful).  Figure~\ref{fig:prop1} verifies Proposition~1: the observed miss rate matches $(1-p_-)^K$ to within sampling error (Pearson $r=0.9993$, 500 trials per $K$).  For 95\% confidence, $K \approx 90$ random coalitions are needed.
+
+Figure~\ref{fig:alg_b_vs_a} and Table~\ref{tab:alg_ab_comparison} compare Algorithm~B (ShapG-guided) against Algorithm~A on the same game, using a hard-coded correlation matrix $W$ that assigns maximal weights to the witness features $\{f_0,f_2\}$ (the ShapG structural condition of Theorem~2).  Algorithm~B hits the witness at $K_{\text{adv}}=1$ in every trial.  When independent Gaussian noise $\mathcal{N}(0,\sigma^2)$ is added to $W$, detection degrades but remains above uniform sampling even at $\sigma=0.50$, consistent with Theorem~2's graceful degradation bound.
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=0.55\linewidth]{../figures/figure_2_prop1_detection.pdf}
 \end{center}
-\caption{Empirical verification of Proposition~1 on an engineered voting game with $p_-^i = 0.0333$ (500 trials per $K$). Theory (solid line) and empirical rates (open circles) agree closely ($r = 0.9993$). For sparse harmful contexts ($p_- \ll 1$), Algorithm~A requires $K \approx 90$ to reach 95\% detection.}
+\caption{Empirical verification of Proposition~1 on Example~2 ($p_-^i = 0.0333$, 500 trials per $K$). Theory (solid line) and empirical rates (circles) agree closely ($r = 0.9993$).}
 \label{fig:prop1}
 \end{figure}
 
-\begin{table}[h]
-\caption{Quantitative comparison of Algorithm~A and Algorithm~B (500 trials per setting).}
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.95\linewidth]{../figures/figure_3_algorithm_b_vs_a.pdf}
+\end{center}
+\caption{Algorithm~B vs.\ Algorithm~A on Example~2 (500 trials). (a)~Alg.~B detects the harmful feature at $K=1$ in every trial; Alg.~A needs $K \approx 90$. (b)~Sensitivity to $\mathcal{N}(0,\sigma^2)$ noise on the correlation matrix $W$: Alg.~B retains $>50\%$ detection at $\sigma=0.50$ vs.\ Alg.~A's $\approx 15\%$.}
+\label{fig:alg_b_vs_a}
+\end{figure}
+
+\begin{table}[H]
+\caption{Quantitative comparison of Algorithm~A and Algorithm~B on Example~2 (500 trials per setting).}
 \label{tab:alg_ab_comparison}
 \begin{center}
 \begin{minipage}[t]{0.52\linewidth}

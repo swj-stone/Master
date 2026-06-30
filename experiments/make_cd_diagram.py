@@ -49,8 +49,9 @@ def draw_cd_diagram(avg_rank: pd.Series, cd: float, out_pdf: Path, title: str) -
     methods = list(avg_rank.index)
     ranks = avg_rank.values
     k = len(methods)
+    half = (k + 1) // 3  # labels on the deeper side
     lo, hi = 1, k
-    fig_h = 1.2 + 0.32 * k
+    fig_h = 1.2 + 0.32 * half
     fig, ax = plt.subplots(figsize=(7.2, fig_h))
     ax.set_xlim(lo - 0.5, hi + 0.5)
     ax.set_ylim(0, fig_h)
@@ -66,7 +67,6 @@ def draw_cd_diagram(avg_rank: pd.Series, cd: float, out_pdf: Path, title: str) -
             ha="center", va="bottom", fontsize=10)
 
     # method labels: best ranks (left) on the left side, worst on the right
-    half = (k + 1) // 2
     level = top - 0.35
     step = 0.32
     for i, (name, r) in enumerate(zip(methods, ranks)):
