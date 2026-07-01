@@ -67,6 +67,8 @@ C1_CLS_DATASETS: list[tuple[str, str, str]] = [
     ("spambase", "is_spam", "binary"),
     ("madelon", "label", "binary"),
     ("isolet", "letter", "multiclass"),
+    ("gisette", "label", "binary"),
+    ("credit_card_fraud", "Class", "binary"),
 ]
 
 # c1 regression datasets

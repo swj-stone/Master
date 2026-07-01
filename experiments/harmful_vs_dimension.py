@@ -64,7 +64,7 @@ from minppi_mofs.voting_game import make_acc_full_cache
 # Constants
 # ---------------------------------------------------------------------------
 
-DIM_CUTOFFS: list[int] = [20, 50, 100, 150, 200]
+DIM_CUTOFFS: list[int] = [20, 50, 100]
 ALPHA_VALUES: list[float] = [0.90, 0.95, 0.99]
 SEEDS: list[int] = [42, 123, 456]
 

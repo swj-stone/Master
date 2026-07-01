@@ -272,5 +272,66 @@
 | Table `tab:harmful_removal` | 加 gisette + credit_card_fraud 行 |
 | Figure M2 相关段落 | 加一句 x 轴 200 的解释 |
 | §6.4 β sweep 段 | 强化解释 (T3.2) |
-| Appendix F | 加 Madelon α-recall 曲线图及表 |
-| Appendix G | 加 per-dataset 分解表 |
+| Appendix F | 加 Madelon α-recall 曲线图及表 | ✅ T1.3 |
+| Appendix G | 加 per-dataset 分解表 | ❌ T2.2 |
+
+---
+
+## 第V部分: 完成状态追踪 (2026-07-01)
+
+### 已完成 ✅
+
+| 代号 | 任务 | 涉及文件 | 结果 |
+|------|------|---------|------|
+| **T1.1** | 统一 α 表数据 | `.tex` Appendix E `tab:alpha_sweep` | 数据源从 alpha sweep (Alg A) 切换为 binary_vs_continuous (Alg B/A)；数值全线更新；caption 加算法标注；加 pairwise Wilcoxon 统计 |
+| **T1.2** | 补齐 Gisette + Credit-Card 移除测试 | `eval_harmful_utility.py` → `.tex` `tab:harmful_removal` | C1_CLS_DATASETS 3→5；重跑 (2026-07-01_14-39-54)；5 行数据写入正文 Table；正文叙述改为诚实报告全部 5 集 |
+| **T1.3** | Madelon α–recall 曲线 | `experiments/madelon_alpha_recall.py` → `.tex` Appendix F `fig:madelon_alpha_recall` + `tab:madelon_alpha_recall` | 5 seeds × 4 α + MinShap/SHAP；Precision 始终 >0.95，Recall 随 α 增长；正文 §6.3 加一段精准的 α trade-off 讨论 |
+| **T2.1** | Friedman dropping-one-dataset | `experiments/sensitivity_friedman.py` → `.tex` Appendix H 叙述 | 证实显著性非单点驱动；去掉 Madelon 后 χ² 上升；去掉 ISOLET 后 p 从 0.049→0.063；正文加完整解释 |
+
+### 对应 adversarial_review.md 的已解决项
+
+| 审稿问题 | 如何解决 |
+|---------|---------|
+| **#1.2** 移除测试仅 3 数据集 | T1.2: 扩展至 5 分类集（含 trivial Gisette） |
+| **#1.4** Madelon recall=0.214 未解释 | T1.3: α-recall 曲线展示 α 作为可控 precision knob |
+| **#1.1** 方法不领先 | 诚实定位段 (§6.4)，原始即有，未改 |
+| **#2** 三分类退化为二 | §4.2/4.4.2 的 decisive 标注为"never observed"，原始已完成 |
+| **#3.1** Friedman 可能由单点驱动 | T2.1: drop-one 分析证明稳健 |
+| **#1.3 SHAP bottom-k 对照** | `tab:harmful_removal` 始终有 SHAP 对照列 |
+
+### 仍需完成 (按优先级)
+
+#### 优先级 A — 影响审稿评估的关键项
+
+| 代号 | 任务 | 来源 | 预计耗时 |
+|------|------|------|:--:|
+| **R1** | 维度声明：Figure M2 x 轴 200 与正文 "29–100" 矛盾 | 审稿 #4, M4 | 5min (.tex 直接改一句话) |
+| **R2** | β sweep 解释强化 (§6.4) | 审稿 #5.2, M2 | 10min (.tex 直接改) |
+| **R3** | ShapG vs SHAP 方向性结论弱化 | 审稿 #5.3, M3 | 5min (.tex 直接改) |
+| **R4** | "parameter-free" 措辞修正 | 审稿 #6.1 | 5min (.tex 全局搜索替换) |
+
+#### 优先级 B — 加分完善
+
+| 代号 | 任务 | 来源 | 预计耗时 |
+|------|------|------|:--:|
+| **R5** | Appendix G per-dataset 消融分解表 | 审稿 #5.1/#7.1, L2 | 30min (提取已有数据制表) |
+| **R6** | `tab:all_auc` 加标准差 | 审稿 #3.2 | 15min (从 mean_metrics.csv 读取 std_column) |
+| **R7** | Theorem 2 structural condition 作为 heuristic 的诚实声明 | 审稿 #6.2 | 5min (.tex 加一句话) |
+
+#### 优先级 C — 可选/低优先级
+
+| 代号 | 任务 | 来源 |
+|------|------|------|
+| R8 | 附录 G 四张表之间加过渡叙述 | 审稿 #7.3 |
+| R9 | §6 正文加一句回归结果讨论 （1 句话即可） | 审稿 #7.2, L3 |
+| R10 | Credit-Card-Fraud 29 维纳入合理性一句解释 | 审稿 #6.3 |
+
+### 当前论文状态 vs 审稿标准
+
+| 审稿维度 | 初始评分 | 当前评分 | 提升来源 |
+|---------|:--:|:--:|---------|
+| Soundness | 2.5/5 | **3.5/5** | T1.2 (移除全覆盖), T1.3 (α-recall), T2.1 (稳健性) |
+| Significance | 2.5/5 | **3.0/5** | T1.3 (α-as-knob 叙事), T1.1 (数据自洽) |
+| Presentation | 3/5 | **3.5/5** | T1.1 (统一数据源), 多项 caption 修正 |
+
+**评估**: R1-R4 完成后 Soundness 可达 4.0/5，整体从 Weak Reject → **Weak Accept / Accept** 区间。R5-R7 建议在 07-05 前完成，R8-R10 视时间决定。

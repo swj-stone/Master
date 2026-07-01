@@ -1,13 +1,13 @@
 # Fdb version 4
-["bibtex icomp2026_conference"] 1782849815.74232 "icomp2026_conference.aux" "icomp2026_conference.bbl" "icomp2026_conference" 1782850183.08574 0
+["bibtex icomp2026_conference"] 1782939691.72639 "icomp2026_conference.aux" "icomp2026_conference.bbl" "icomp2026_conference" 1782939694.91793 0
   "./icomp2026_conference.bib" 1781427140 10631 10ac48fd9d6b8855d9e4312ce389d914 ""
   "./icomp2026_conference.bst" 1779366397 26974 b1fa9868993c83455e3347c51621e256 ""
-  "icomp2026_conference.aux" 1782850181 27822 3aa87d178cf14a03069d864d6583e684 "pdflatex"
+  "icomp2026_conference.aux" 1782939692 29589 008e9adf3ac9de2a84bb3c2070104343 "pdflatex"
   (generated)
   "icomp2026_conference.bbl"
   "icomp2026_conference.blg"
   (rewritten before read)
-["pdflatex"] 1782850180.61143 "c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" "icomp2026_conference.pdf" "icomp2026_conference" 1782850183.08622 0
+["pdflatex"] 1782939692.09773 "c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" "icomp2026_conference.pdf" "icomp2026_conference" 1782939694.91868 0
   "../figures/cd_diagram_AUC@10.pdf" 1782838159 15302 7dfa4949883b54ebbd40a180524a9768 ""
   "../figures/cd_diagram_AUC@20.pdf" 1782848911 15339 5243ea1205b2c008a6e70f7e5f00b19d ""
   "../figures/cd_diagram_hv.pdf" 1782848911 11950 c6970beaf202f66e609c044a6a8ccc7f ""
@@ -15,7 +15,8 @@
   "../figures/figure_1_minppi_trichotomy.pdf" 1782850164 36619 132479f8ad0dd91e6f21a6be1198c7ee ""
   "../figures/figure_2_prop1_detection.pdf" 1782850164 27138 4b41d3c7473056bd7e91d1d7856e66e0 ""
   "../figures/figure_3_algorithm_b_vs_a.pdf" 1782850164 34190 694d4b6557db70e274c864ff1e63fc7e ""
-  "../figures/harmful_vs_dimension.pdf" 1782722572 21698 2df442bfced217e0b49b10bc3cb630d1 ""
+  "../figures/harmful_vs_dimension.pdf" 1782939273 22321 5e86dd04c8213e1320d61420163e00c0 ""
+  "../figures/madelon_alpha_recall.pdf" 1782914379 19568 6e18ebbd2cdd7caeb5d529cf3882770e ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/enc/dvips/base/8r.enc" 1780216845 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/map/fontname/texfonts.map" 1780217017 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/helvetic/phvb.tfm" 1780217150 2300 14616918391efa49ac8b481a75fbdc1a ""
@@ -155,13 +156,13 @@
   "c:/work/Latex/texlive/2026/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1780218776 5587506 bfccaadafa15c64d804aaff7756ac6dd ""
   "c:/work/Latex/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt" 1780218923 3636846 0291aa99435d085f5a777e36ddca91dc ""
   "c:/work/Latex/texlive/2026/texmf.cnf" 1780218758 713 e69b156964470283e0530f5060668171 ""
-  "c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" 1782849812 66553 9ac8c9b393e228ca696a2e1ac0563beb ""
+  "c:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex" 1782939688 71499 3c7172d51b154d696569a47034c34311 ""
   "fancyhdr.sty" 1779366397 20521 e5d13d98d57bd53d4fed3aa61bd29c86 ""
-  "icomp2026_conference.aux" 1782850181 27822 3aa87d178cf14a03069d864d6583e684 "pdflatex"
-  "icomp2026_conference.bbl" 1782849816 7908 b4307124e076f76a8f1670fe97957daf "bibtex icomp2026_conference"
-  "icomp2026_conference.out" 1782850181 8630 ba4197abc94d41e0a6e4d9264707cf1f "pdflatex"
+  "icomp2026_conference.aux" 1782939692 29589 008e9adf3ac9de2a84bb3c2070104343 "pdflatex"
+  "icomp2026_conference.bbl" 1782939692 7908 b4307124e076f76a8f1670fe97957daf "bibtex icomp2026_conference"
+  "icomp2026_conference.out" 1782939693 8630 ba4197abc94d41e0a6e4d9264707cf1f "pdflatex"
   "icomp2026_conference.sty" 1779366397 9181 1ef73fa0f4a021d75fda9f06f666bb3f ""
-  "icomp2026_conference.tex" 1782849812 66553 9ac8c9b393e228ca696a2e1ac0563beb ""
+  "icomp2026_conference.tex" 1782939688 71499 3c7172d51b154d696569a47034c34311 ""
   "math_commands.tex" 1779366397 12284 a71653715108dc62b66e3a0bde0307d8 ""
   "natbib.sty" 1779366397 45154 40088ce024445d7ee2bca59e704cdd01 ""
   (generated)
