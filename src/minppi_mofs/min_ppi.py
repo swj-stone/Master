@@ -441,8 +441,8 @@ def estimate_minppi_hybrid(
     Dispatches based on feature count *n*:
 
     - n ≤ 20: exact enumeration
-    - 20 < n ≤ 200: Algorithm B (ShapG-guided), fallback to Algorithm A
-    - n > 200: Algorithm A + Algorithm B, take the min of both estimates
+    - 20 < n ≤ 75: Algorithm B (ShapG-guided), fallback to Algorithm A
+    - n > 75: Algorithm A + Algorithm B, take the min of both estimates
 
     Args:
         X_train: Training feature matrix.
@@ -481,9 +481,9 @@ def estimate_minppi_hybrid(
             verbose=verbose,
         )
 
-    if n <= 200:
+    if n <= 75:
         if verbose:
-            print(f"  Hybrid: 20 < n={n} ≤ 200 → Algorithm B", flush=True)
+            print(f"  Hybrid: 20 < n={n} ≤ 75 → Algorithm B", flush=True)
         if shapg_neighbors is None:
             if verbose:
                 print(
@@ -516,9 +516,9 @@ def estimate_minppi_hybrid(
             verbose=verbose,
         )
 
-    # n > 200: run both and take element-wise min
+    # n > 75: run both and take element-wise min
     if verbose:
-        print(f"  Hybrid: n={n} > 200 → Algorithm A + B combined", flush=True)
+        print(f"  Hybrid: n={n} > 75 → Algorithm A + B combined", flush=True)
 
     minppi_a = estimate_minppi_random_mc(
         X_train,
