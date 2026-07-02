@@ -61,7 +61,7 @@ Address \\
 \begin{abstract}
 Existing game-theoretic feature selection methods mostly score each feature by its \emph{mean} marginal contribution across coalitions. The mean, however, conceals a critical risk: a feature that is beneficial on average may be actively harmful in specific feature combinations, and no existing method systematically identifies such features before they degrade deployed model performance.
 We address this gap by introducing Min-Marginal Power Indices (MinPPI). Rather than averaging, MinPPI takes the \emph{minimum} marginal contribution of each feature under a binary utility-threshold voting game $v_\alpha(S) = \mathbb{1}[U(\mathcal{M}_S) \geq \alpha \cdot U_{\text{full}}]$, where $U$ is any higher-is-better utility (AUC, $F_1$, $R^2$, \dots). This min--binary pairing yields a discrete output in $\{-1, 0, +1\}$, cleanly classifying every feature as \emph{harmful} (must remove), \emph{neutral}, or \emph{decisive} (must retain).
-The two formulations coincide and the resulting classification is parameter-free (Properties~1--3); less obviously, a feature pivotal in every winning coalition need not be decisive, so worst-case and average marginals genuinely diverge. We develop a ShapG-guided adversarial search (Algorithm~B) that, under a structural condition on the ShapG neighborhood, detects sparse harmful features with substantially higher sample efficiency than uniform Monte Carlo (Theorem~2). Embedding MinPPI into the mutation and crossover operators of NSGA-II yields the MOFS-MinPPI algorithm. Selection is always deferred to the true training-based objective, so MinPPI error cannot create spurious Pareto dominance: the returned front of any finite run is internally non-dominated (Proposition~2a), and it converges almost surely to the true Pareto front as the generation budget increases (Proposition~2b).
+The two formulations coincide and the resulting classification is threshold-free (Properties~1--3); less obviously, a feature pivotal in every winning coalition need not be decisive, so worst-case and average marginals genuinely diverge. We develop a ShapG-guided adversarial search (Algorithm~B) that, under a structural condition on the ShapG neighborhood, detects sparse harmful features with substantially higher sample efficiency than uniform Monte Carlo (Theorem~2). Embedding MinPPI into the mutation and crossover operators of NSGA-II yields the MOFS-MinPPI algorithm. Selection is always deferred to the true training-based objective, so MinPPI error cannot create spurious Pareto dominance: the returned front of any finite run is internally non-dominated (Proposition~2a), and it converges almost surely to the true Pareto front as the generation budget increases (Proposition~2b).
 On seven tabular classification and regression datasets (29--100 features after mutual-information filtering), MOFS-MinPPI is competitive with seven baselines---SHAP, ShapG, MinShap, Banzhaf, Powershap, MOFS-SHAP, and NSGA2-uniform---on top-$k$ AUC, while its Pareto-front hypervolume and compression rate at $1\%/3\%/5\%$ AUC-loss thresholds match or exceed the strongest NSGA-II baselines. Ablation confirms that the min operator yields better top-$k$ predictive performance than the mean, that binary $v_\alpha$ produces a principled three-way classification absent from continuous $v(\cdot)$, and that MinPPI guidance ($\beta>0$) improves Pareto-front quality over unguided search.
 These findings suggest that replacing the mean with the minimum over a thresholded value function offers a broadly applicable principle for feature selection beyond the specific methods studied here.
 \end{abstract}
@@ -78,7 +78,7 @@ MinShap~\citep{zheng2026minshap} replaces the mean with the {\em minimum} over p
 The value $v_\alpha$ is evaluated by actually training $\mathcal{M}_S$, so unlike direct weighted-voting-game feature selection~\citep{cohen2007feature} it employs no additive surrogate (Section~\ref{sec:discussion}); the MinPPI scores act only as soft guidance for NSGA-II, with Pareto-optimality decided by true model fitness. Synthesizing power indices, the min-marginal operator, and multi-objective search, our contributions are:
 
 \begin{enumerate}
-\item {\bf Min-Marginal Power Indices (MinPPI).} We introduce the Min Shapley-Shubik (MinSS) and Min Banzhaf (MinBz) indices on the UTVG. Pairing the min operator with the binary $v_\alpha$ makes their basic properties immediate by construction rather than a contribution in themselves: the two indices coincide and take values in $\{-1, 0, +1\}$, giving a \emph{parameter-free} three-way classification into decisive ($+1$), harmful ($-1$), and neutral ($0$) (Properties~1--3). The non-obvious content is a separation we make precise: a feature pivotal in \emph{every} winning coalition need not be decisive, so the worst-case (min) and average (mean) marginals genuinely diverge.
+\item {\bf Min-Marginal Power Indices (MinPPI).} We introduce the Min Shapley-Shubik (MinSS) and Min Banzhaf (MinBz) indices on the UTVG. Pairing the min operator with the binary $v_\alpha$ makes their basic properties immediate by construction rather than a contribution in themselves: the two indices coincide and take values in $\{-1, 0, +1\}$, giving a \emph{threshold-free} three-way classification into decisive ($+1$), harmful ($-1$), and neutral ($0$) (Properties~1--3). The non-obvious content is a separation we make precise: a feature pivotal in \emph{every} winning coalition need not be decisive, so the worst-case (min) and average (mean) marginals genuinely diverge.
 
 \item {\bf ShapG-Guided Adversarial Search (Algorithm~B).} Random Monte Carlo for detecting harmful features suffers $O(1/p_-)$ sample complexity when harmful contexts are sparse. We leverage the ShapG correlation graph~\citep{zhao2025shapg} to guide adversarial search toward vulnerable coalitions, recovering sparse harmful features with substantially higher sample efficiency than uniform sampling (Theorem~2): on an engineered voting game where uniform MC requires $K\approx 90$ for $95\%$ detection, the ShapG-guided search achieves deterministic detection at $K_{\text{adv}}=1$, a gain of roughly two orders of magnitude under the structural condition that the harmful witness lies within the ShapG neighborhood.
 
@@ -188,7 +188,7 @@ $\text{MinBz}_i = \min_{S \subseteq N_1 \setminus \{i\}} [v_\alpha(S \cup \{i\})
 \item[(c)] $\text{MinSS}_i = 0$ (neutral) otherwise.
 \end{itemize}
 
-The trichotomy follows directly from $v_\alpha \in \{0,1\}$.  Its non-trivial content is a separation: ``$i$ is in every winning coalition'' ($v_\alpha(S)=0$ when $i\notin S$) is \emph{insufficient} for decisiveness---$v_\alpha(S\cup\{i\})=1$ must also hold for every $S$, a stronger condition that the mean operator cannot detect.  Appendix~\ref{app:verify} provides a constructed counterexample with numerical verification.  The sign is directly actionable: $-1$ \textbf{= must remove}, $0$ \textbf{= defer} to mean indices or NSGA-II fitness.  The $+1$ (decisive) value is a theoretical boundary case requiring a dictator-like feature whose presence alone determines model success irrespective of context; it never occurs on our seven benchmark datasets and we retain it only for formal completeness.  Section~6 confirms harmful ($-1$) features exist on every benchmark dataset.
+The trichotomy follows directly from $v_\alpha \in \{0,1\}$.  Its non-trivial content is a separation: ``$i$ is in every winning coalition'' ($v_\alpha(S)=0$ when $i\notin S$) is \emph{insufficient} for decisiveness---$v_\alpha(S\cup\{i\})=1$ must also hold for every $S$, a stronger condition that the mean operator cannot detect.  Appendix~\ref{app:verify} provides a constructed counterexample with numerical verification.  The sign is directly actionable: $-1$ \textbf{= must remove}, $0$ \textbf{= defer} to mean indices or NSGA-II fitness.  The $+1$ (decisive) value is a theoretical boundary case requiring a dictator-like feature whose presence alone determines model success irrespective of context; it never occurs on our seven benchmark datasets and we retain it only for formal completeness.  Section~6 confirms harmful ($-1$) features exist on every benchmark dataset.  We call the classification \emph{threshold-free}: given the single parameter~$\alpha$ (which controls the quota stringency), the boundaries at~$0$ and~$\pm 1$ follow from $v_\alpha \in \{0,1\}$ with no further discretization step---unlike MinShap, where a user must choose an arbitrary cutoff on a continuous importance score to decide which features to remove.
 
 \textbf{Property 3 (MinSS = MinBz).}  Both minima run over the same set of marginals; we unify them as $\text{MinPPI}_i$.  Exact computation is $O(n\cdot 2^{n-1})$, infeasible for $n>20$.
 
@@ -369,9 +369,9 @@ Four controlled ablation dimensions isolate the contributions of individual comp
 
 \textbf{Guidance strength $\beta$.}  HV differences across $\beta \in \{0,1,2,5\}$ are within sampling noise (Friedman $\chi^2 = 0.83$, $p = 0.84$, $N=7$ datasets over 5 seeds).  This null result admits two non-exclusive interpretations: (i)~at the population budgets used (30 individuals, 20 generations), NSGA-II converges to a similar front regardless of mutation bias---consistent with Proposition~2's claim that MinPPI accelerates convergence rather than raising the asymptotic limit; (ii)~equivalently, the guidance signal is too weak to measurably alter the search trajectory under these budgets.  A definitive separation would require controlled wall-clock-budget experiments tracing HV-vs-evaluations curves, which we leave to future work.  The null result is conservative for our claims: it confirms that even maximum guidance ($\beta=5$) does \emph{not harm} the Pareto front.
 
-\textbf{ShapG vs.\ SHAP as importance oracle.}  On Madelon and Spambase, ShapG-guided Algorithm~B detects more harmful features (Madelon: 21.4 vs.\ 12.0 mean over seeds) at comparable runtime; Wilcoxon $p = 1.00$ (n.s.\ at $N=4$).  The choice of oracle primarily affects sample efficiency (Theorem~2) rather than downstream classification.
+\textbf{ShapG vs.\ SHAP as importance oracle.}  ShapG-guided Algorithm~B detects more harmful features on Madelon (21.4 vs.\ 12.0, seed means) but the difference is not statistically significant at $N=4$ binary datasets (Wilcoxon $p = 1.00$).  The choice of oracle primarily affects sample efficiency (Theorem~2) rather than downstream classification, and the small $N$ limits the strength of any directional conclusion here.
 
-\textbf{Positioning.}  MOFS-MinPPI is not the best on any single aggregate ranking metric.  Its contribution is the \emph{ensemble} of three capabilities no other method provides simultaneously: (i)~parameter-free three-way classification (Properties~1--3); (ii)~ShapG-guided adversarial search for sparse harmful features (Theorem~2); and (iii)~Pareto-preservation under imperfect guidance (Proposition~2).  The removal experiment and Madelon ground-truth precision ($0.987$) confirm the harmful classification is reliable; the dimension curve (Figure~\ref{fig:harmful_vs_dim}) shows it does not degrade with scale.
+\textbf{Positioning.}  MOFS-MinPPI is not the best on any single aggregate ranking metric.  Its contribution is the \emph{ensemble} of three capabilities no other method provides simultaneously: (i)~threshold-free three-way classification (Properties~1--3); (ii)~ShapG-guided adversarial search for sparse harmful features (Theorem~2); and (iii)~Pareto-preservation under imperfect guidance (Proposition~2).  The removal experiment and Madelon ground-truth precision ($0.987$) confirm the harmful classification is reliable; the dimension curve (Figure~\ref{fig:harmful_vs_dim}) shows it does not degrade with scale.
 
 % ---- Appendix: all tables and figures beyond the 9-page body ----
 
@@ -695,51 +695,69 @@ SHAP    & $0.96 \pm 0.04$ & $0.15 \pm 0.01$ & $0.26 \pm 0.01$ & $15.0$ \\
 \end{table}
 
 % ---------------------------------------------------------------------------
-\section{Ablation Full Tables}
+\section{Ablation Tables}
 \label{app:ablation}
 
+Per-dataset breakdowns for the four ablation dimensions discussed in Section~\ref{sec:harmful_utility}.  The binary-vs-continuous ablation is already reported per dataset in Appendix~\ref{app:alpha} (Table~\ref{tab:alpha_sweep}).
+
 \begin{table}[H]
-\caption{Min vs.\ mean operator: HV and AUC@10 (means over datasets).}
+\caption{Min vs.\ mean operator: per-dataset HV and AUC@10 (single seed 42).}
 \label{tab:abl_min_vs_mean}
+\begin{center}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l c c c c}
+\toprule
+& \multicolumn{2}{c}{\textbf{HV}} & \multicolumn{2}{c}{\textbf{AUC@10}} \\
+\textbf{Dataset} & MinPPI & Mean-SHAP & MinPPI & Mean-SHAP \\
+\midrule
+Spambase    & 0.0040 & 0.0044 & 0.915 & 0.936 \\
+Madelon     & 0.0294 & 0.0276 & 0.680 & 0.750 \\
+ISOLET      & 0.1228 & 0.1158 & 0.958 & 0.957 \\
+Gisette     & 0.0017 & 0.0019 & 0.954 & 0.955 \\
+Credit-Card & 0.0381 & 0.0459 & 0.970 & 0.969 \\
+Crimedata   & 0.0346 & 0.0405 & --- & --- \\
+Abalone     & 0.0031 & 0.0031 & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}[H]
+\caption{Guidance strength $\beta$: per-dataset HV (single seed 42).  Friedman across $\beta$ levels: $\chi^2 = 0.83$, $p = 0.84$ (n.s.\ over $N=7$ datasets).}
+\label{tab:abl_beta}
+\begin{center}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l c c c c}
+\toprule
+\textbf{Dataset} & $\beta = 0$ & $\beta = 1$ & $\beta = 2$ & $\beta = 5$ \\
+\midrule
+Spambase    & 0.0053 & 0.0049 & 0.0070 & 0.0098 \\
+Madelon     & 0.0296 & 0.0272 & 0.0458 & 0.0342 \\
+ISOLET      & 0.1371 & 0.0967 & 0.0912 & 0.0945 \\
+Gisette     & 0.0014 & 0.0018 & 0.0018 & 0.0010 \\
+Credit-Card & 0.0321 & 0.0412 & 0.0359 & 0.0374 \\
+Crimedata   & 0.0301 & 0.0341 & 0.0304 & 0.0323 \\
+Abalone     & 0.0028 & 0.0031 & 0.0034 & 0.0034 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}[H]
+\caption{ShapG vs.\ SHAP as guidance oracle: per-dataset harmful-feature count detected by Algorithm~B (single seed 42).  Wilcoxon $p = 1.00$ (n.s.\ at $N=4$ binary datasets).}
+\label{tab:abl_shapg_vs_shap}
 \begin{center}
 \footnotesize
 \begin{tabular}{l c c}
 \toprule
-\textbf{Guidance} & \textbf{HV} & \textbf{AUC@10} \\
+\textbf{Dataset} & \textbf{ShapG-guided} & \textbf{SHAP-based} \\
 \midrule
-MinPPI    & 0.033 & 0.895 \\
-Mean-SHAP & 0.034 & 0.913 \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-\begin{table}[H]
-\caption{Binary $v_\alpha$ vs.\ continuous $v(S)$: harmful\% distribution (mean over 7 datasets).  Continuous flags 46--66\%; binary gives $\alpha$-controlled rates.}
-\label{tab:abl_binary_vs_cont}
-\begin{center}
-\footnotesize
-\begin{tabular}{l c c c c c}
-\toprule
-\textbf{$v(\cdot)$ type} & $\alpha=0.85$ & $\alpha=0.90$ & $\alpha=0.95$ & $\alpha=0.99$ & continuous \\
-\midrule
-Binary & 8.0\% & 15.5\% & 24.2\% & 32.3\% & --- \\
-Continuous & --- & --- & --- & --- & 50--66\% \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-\begin{table}[H]
-\caption{Guidance strength $\beta$: HV (mean over 7 datasets).  Friedman $\chi^2 = 0.83$, $p = 0.84$ (n.s.).}
-\label{tab:abl_beta}
-\begin{center}
-\footnotesize
-\begin{tabular}{l c c c c}
-\toprule
-\textbf{Metric} & $\beta = 0$ & $\beta = 1$ & $\beta = 2$ & $\beta = 5$ \\
-\midrule
-HV & 0.031 & 0.036 & 0.026 & 0.036 \\
+Spambase    & 0.0 & 1.0 \\
+Madelon     & 14.0 & 17.0 \\
+Gisette     & 1.0 & 0.0 \\
+Credit-Card & 6.0 & 9.0 \\
 \bottomrule
 \end{tabular}
 \end{center}
