@@ -5,7 +5,7 @@ A Voting-Game Approach that synthesises:
 
 - **WVG framework** (Weighted Voting Game): binary  v_alpha(S) ∈ {0, 1}
 - **Min operator** (inspired by MinShap): min over coalitions instead of mean
-- **MOFS-MinPPI NSGA-II**: multi-objective evolutionary search with MinPPI-guided
+- **MinPPI NSGA-II**: multi-objective evolutionary search with MinPPI-guided
   mutation and crossover operators
 - **ShapG integration**: correlation-graph importance signal used for
   adversarial search guidance (Algorithm B)

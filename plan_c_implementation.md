@@ -533,3 +533,129 @@ src/minppi_mofs/baselines/min_shap.py
 src/minppi_mofs/baselines/banzhaf_fs.py
 src/minppi_mofs/baselines/powershap.py
 ```
+
+---
+
+## 附录：从零开始的完整执行列表
+
+以下假设 `C:\work\学校\A.SPBU\paper\ZhaoCHI\Paper\Master` 为工作目录，Python 为 `..\venv\Scripts\python`。
+
+### 阶段 0：环境验证（1 min）
+
+```powershell
+cd C:\work\学校\A.SPBU\paper\ZhaoCHI\Paper\Master
+..\venv\Scripts\python -c "
+from minppi_mofs import compute_v_alpha, estimate_minppi
+from minppi_mofs.baselines.shap_top_k import compute_shap_topk_importance
+from minppi_mofs.baselines.shapg import compute_shapg_importance
+from minppi_mofs.baselines.min_shap import compute_minshap_importance
+from minppi_mofs.baselines.banzhaf_fs import compute_banzhaf_importance
+from minppi_mofs.baselines.powershap import compute_powershap_importance
+print('All imports OK')
+"
+```
+
+### 阶段 0.5：检查数据完整性（<1 min）
+
+```powershell
+..\venv\Scripts\python -c "
+from pathlib import Path
+ds = ['spambase','madelon','isolet','gisette','credit_card_fraud','crimedata','abalone']
+for d in ds:
+    for s in [42,123,456,789,1024]:
+        p = Path(f'data/processed/{d}_s{s}_train.csv')
+        if not p.exists(): print(f'MISSING: {p}')
+print('Data check complete')
+"
+```
+
+### 阶段 1：耗时实验（按顺序运行）
+
+| 序号 | 命令 | 说明 | 预计时间 | 产出目录 |
+|:--:|------|------|:--:|------|
+| **1** | `$VENV -u experiments/run_main_table.py` | **5 baselines 单点排名**：SHAP-Top-k/ShapG/MinShap/Banzhaf/Powershap × 7 datasets × 5 seeds → AUC@k | 4-5h | `results/tables/<R0>/` |
+| **2** | `$VENV -u experiments/run_pareto_eval.py` | **α-Pareto 前沿主表**：7 datasets × 5 seeds × 4 α → 压缩率 + AUC保留率 | 4-5h | `results/tables/<R1>/` |
+| **3** | `$VENV -u experiments/eval_harmful_utility.py` | **c1 移除测试 + c2 Madelon GT + c8 MinShap 对比**：5+2 datasets × 5 seeds | 3-4h | `results/logs/<R2>/` |
+| **4** | `$VENV -u experiments/minppi_filter_eval.py` | **MinPPI filter 管道**：MinPPI 过滤 → 5 baseline 在过滤后数据上排名 | 2h | `results/tables/<R3>/` |
+| **5** | `$VENV experiments/eval_pipeline_comparison.py` | **管道对比**：MinPPI vs MinShap vs Random 预处理 → SHAP-top-k | 30min | `results/tables/<R4>/` |
+
+> **并行提示**：步骤 1、2、3 完全独立，可三者同时启动以节省 6-8h。
+
+### 阶段 2：已有实验（已跑过，跳过）
+
+| 原始运行 | 内容 | 目录 |
+|----------|------|------|
+| `run_ablation.py` | binary_vs_continuous 消融 | `results/logs/2026-06-27_19-51-48/` |
+| `madelon_alpha_recall.py` | Madelon α-recall 曲线 | `results/tables/2026-07-01_10-58-30/` |
+| `harmful_vs_dimension.py` | harmful% vs 维度 | `results/logs/2026-06-29_07-08-39/` |
+
+### 阶段 3：图表与统计（秒级，等阶段 1 全部跑完）
+
+各产出目录标识符：
+- **R0** = `run_main_table.py` 产出（baseline 排名）
+- **R1** = `run_pareto_eval.py` 产出（α-Pareto 前沿）
+- **R4** = `eval_pipeline_comparison.py` 产出（管道对比）
+
+```powershell
+# 取最新各产出目录
+$R0 = (Get-ChildItem -Directory "results/tables" | Where-Object { $_.Name -like "2026-07-0*" -and (Test-Path "$_\main_metrics.csv") } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name
+$R1 = (Get-ChildItem -Directory "results/tables" | Where-Object { $_.Name -like "2026-07-0*" -and (Test-Path "$_\pareto_front_agg.csv") } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name
+
+# CD 图 — 基于 baseline 排名数据（R0）和 α-Pareto 数据（R1）
+$VENV experiments/make_cd_diagram.py results/tables/$R0/mean_metrics.csv --metric AUC@10 --higher
+$VENV experiments/make_cd_diagram.py results/tables/$R0/mean_metrics.csv --metric AUC@20 --higher
+
+# Friedman leave-one-out
+$VENV experiments/sensitivity_friedman.py
+
+# Demo figures (Figure 1-3)
+$VENV experiments/make_figures.py
+```
+
+### 阶段 4：复制 PDF 产物到 `conference-paper/figures/`
+
+```powershell
+# 设各 run_id
+$R0 = (Get-ChildItem -Directory "results/tables" | Where-Object { $_.Name -like "2026-07-0*" -and (Test-Path "$_\main_metrics.csv") } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name
+$R1 = (Get-ChildItem -Directory "results/tables" | Where-Object { $_.Name -like "2026-07-0*" -and (Test-Path "$_\pareto_front_agg.csv") } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name
+$R4 = (Get-ChildItem -Directory "results/tables" | Where-Object { $_.Name -like "2026-07-0*" -and (Test-Path "$_\pipeline_comparison.pdf") } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name
+
+# 新产出的图
+Copy-Item results/tables/$R1/pareto_front.pdf                conference-paper/figures/   # α-Pareto 前沿
+Copy-Item results/tables/$R0/cd_diagram_AUC@10.pdf            conference-paper/figures/   # CD 图 (baseline 数据)
+Copy-Item results/tables/$R0/cd_diagram_AUC@20.pdf            conference-paper/figures/
+Copy-Item results/tables/$R4/pipeline_comparison.pdf          conference-paper/figures/   # 管道对比
+
+# 已有产出的图（从旧运行直接复制，不用重跑）
+Copy-Item results/logs/2026-06-29_07-08-39/harmful_vs_dimension.pdf     conference-paper/figures/
+Copy-Item results/tables/2026-07-01_10-58-30/madelon_alpha_recall.pdf   conference-paper/figures/
+Copy-Item results/figures/figure_1_minppi_trichotomy.pdf                conference-paper/figures/
+Copy-Item results/figures/figure_2_prop1_detection.pdf                  conference-paper/figures/
+Copy-Item results/figures/figure_3_algorithm_b_vs_a.pdf                 conference-paper/figures/
+```
+
+### 阶段 5：编译论文
+
+```powershell
+cd conference-paper/paper
+pdflatex -interaction=nonstopmode icomp2026_conference.tex
+bibtex icomp2026_conference
+pdflatex -interaction=nonstopmode icomp2026_conference.tex
+pdflatex -interaction=nonstopmode icomp2026_conference.tex
+```
+
+### 成本汇总
+
+| 阶段 | 必须重跑 | 时间 | 可并行 |
+|------|:--:|:--:|:--:|
+| 0. 环境 + 数据检查 | 是 | 1min | — |
+| 1.1 run_main_table (baseline 排名) | **是** | 4-5h | 与 1.2/1.3 并行 |
+| 1.2 α-Pareto 前沿 | **是** | 4-5h | 与 1.1/1.3 并行 |
+| 1.3 Removal test | **是** | 3-4h | 与 1.1/1.2 并行 |
+| 1.4 Filter 管道 | **是** | 2h | 等 1.3 |
+| 1.5 管道对比 | **是** | 30min | 等 1.4 |
+| 2. 已有实验 (消融/α-recall/维度) | 否 | 0 | — |
+| 3. 图表 + 统计 | 是(快) | <10min | 等 1.1+1.2 |
+| 4. 复制 PDF | 是 | <1min | — |
+| 5. 编译 | 是 | <1min | — |
+| **总计（新跑）** | | **~5-6h**（三步并行后） | |

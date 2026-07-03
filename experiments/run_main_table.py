@@ -580,12 +580,7 @@ def main() -> None:
             entry["dataset_budget"] = DATASET_BANZHAF_BUDGET
         if name == "minshap":
             entry["dataset_budget"] = DATASET_MINSHAP_BUDGET
-        if name == "mofs_minppi":
-            entry["dataset_budget"] = DATASET_MOFSPPI_BUDGET
-        if name == "nsga2_uniform":
-            entry["dataset_budget"] = DATASET_NSGA2U_BUDGET
-        if name == "mofs_shap":
-            entry["dataset_budget"] = DATASET_MOFSSHAP_BUDGET
+        # Plan C: mofs_minppi / nsga2_uniform / mofs_shap removed
         run_config["baselines"][name] = entry
     with (run_dir / "config.yaml").open("w", encoding="utf-8") as f:
         yaml.safe_dump(run_config, f, sort_keys=False, allow_unicode=True)
