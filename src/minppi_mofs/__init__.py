@@ -12,7 +12,7 @@ A Voting-Game Approach that synthesises:
 
 Public API
 ----------
-``from minppi_mofs import compute_v_alpha, estimate_minppi, mofs_minppi_search``
+``from minppi_mofs import compute_v_alpha, estimate_minppi``
 """
 
 from __future__ import annotations
@@ -24,14 +24,6 @@ from minppi_mofs.min_ppi import (
     estimate_minppi_hybrid,
     estimate_minppi_random_mc,
     estimate_minppi_shapg_guided,
-)
-from minppi_mofs.mofs_minppi import (
-    crowding_distance,
-    minppi_crossover,
-    minppi_mutation,
-    mofs_minppi_search,
-    non_dominated_sort,
-    tournament_select,
 )
 from minppi_mofs.shapg_integration import (
     compute_shapg_guidance_signal,
@@ -49,13 +41,6 @@ __all__ = [
     "estimate_minppi_random_mc",
     "estimate_minppi_shapg_guided",
     "estimate_minppi_hybrid",
-    # nsga2
-    "non_dominated_sort",
-    "crowding_distance",
-    "tournament_select",
-    "minppi_mutation",
-    "minppi_crossover",
-    "mofs_minppi_search",
     # shapg_integration
     "compute_shapg_guidance_signal",
     "get_correlated_neighbors",

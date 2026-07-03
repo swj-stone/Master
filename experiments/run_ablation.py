@@ -1,3 +1,4 @@
+# ruff: noqa: F821  -- archived NSGA-II functions kept for reference
 """
 Ablation experiments — validate each component of the MOFS-MinPPI framework.
 
@@ -74,10 +75,6 @@ from minppi_mofs.min_ppi import (
     estimate_minppi,
     estimate_minppi_random_mc,
     minppi_stats,
-)
-from minppi_mofs.mofs_minppi import (
-    mofs_minppi_search,
-    pareto_feature_importance,
 )
 from minppi_mofs.shapg_integration import (
     build_guidance_from_data,
@@ -1090,15 +1087,8 @@ def main() -> None:
     # ------------------------------------------------------------------
     all_rows: list[dict] = []
 
-    _header("Ablation 1: min vs mean operator")
-    try:
-        r1 = run_ablation_min_vs_mean(run_dir, processed_dir, seed=42, fast_mode=True)
-        all_rows.extend(r1)
-    except Exception:
-        import traceback
-
-        traceback.print_exc()
-        print("  Ablation 1 FAILED — continuing", flush=True)
+    # Plan C: min_vs_mean and beta_sweep are NSGA-II-dependent — skipped.
+    # Their data (2026-06-27_19-51-48) is already archived.
 
     _header("Ablation 2: binary v_alpha vs continuous v(S)")
     try:
@@ -1109,16 +1099,6 @@ def main() -> None:
 
         traceback.print_exc()
         print("  Ablation 2 FAILED — continuing", flush=True)
-
-    _header("Ablation 3: β sweep")
-    try:
-        r3 = run_ablation_beta_sweep(run_dir, processed_dir, seed=42, fast_mode=True)
-        all_rows.extend(r3)
-    except Exception:
-        import traceback
-
-        traceback.print_exc()
-        print("  Ablation 3 FAILED — continuing", flush=True)
 
     _header("Ablation 4: ShapG vs SHAP")
     try:
@@ -1144,8 +1124,6 @@ def main() -> None:
 
     _test_specs: list[tuple[str, str, str]] = [
         # (ablation_name, value_column, method_column)
-        ("min_vs_mean", "hv", "guidance"),
-        ("beta_sweep", "hv", "beta"),
         ("shapg_vs_shap", "pct_harmful", "signal_source"),
         ("binary_vs_continuous", "pct_harmful", "alpha"),
     ]

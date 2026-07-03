@@ -56,18 +56,6 @@ from minppi_mofs.baselines.min_shap import (
     compute_minshap_importance,
     rank_features as rank_minshap,
 )
-from minppi_mofs.baselines.mofs_minppi_baseline import (
-    compute_mofs_minppi_importance,
-    rank_features as rank_mofs_minppi,
-)
-from minppi_mofs.baselines.mofs_shap import (
-    compute_mofs_shap_importance,
-    rank_features as rank_mofs_shap,
-)
-from minppi_mofs.baselines.nsga2_uniform import (
-    compute_nsga2_uniform_importance,
-    rank_features as rank_nsga2u,
-)
 from minppi_mofs.baselines.powershap import (
     compute_powershap_importance,
     rank_features as rank_powershap,
@@ -82,42 +70,17 @@ from minppi_mofs.baselines.shapg import (
 )
 from scipy.stats import friedmanchisquare, wilcoxon
 
-from minppi_mofs.mofs_minppi import compute_hypervolume
-
 
 # ---------------------------------------------------------------------------
-# Registry — 8 methods (MOFS-MinPPI + 7 baselines)
+# Registry — 5 baselines (Plan C: no NSGA-II methods)
 # ---------------------------------------------------------------------------
-
-NSGA2_METHODS: set[str] = {"mofs_minppi", "mofs_shap", "nsga2_uniform"}
 
 BASELINES: dict[str, dict] = {
-    "mofs_minppi": {
-        "compute": compute_mofs_minppi_importance,
-        "rank": rank_mofs_minppi,
-        "kwargs": {"alpha": 0.95, "beta": 1.0, "verbose": True},
-        "score_col": "mofs_minppi_freq",
-        "nsga2": True,
-    },
     "shaptopk": {
         "compute": compute_shap_topk_importance,
         "rank": rank_shaptopk,
         "kwargs": {"seed": 42, "verbose": True},
         "score_col": "shap_value",
-    },
-    "mofs_shap": {
-        "compute": compute_mofs_shap_importance,
-        "rank": rank_mofs_shap,
-        "kwargs": {"n_samples": 100, "seed": 42, "verbose": True},
-        "score_col": "mofs_shap_value",
-        "nsga2": True,
-    },
-    "nsga2_uniform": {
-        "compute": compute_nsga2_uniform_importance,
-        "rank": rank_nsga2u,
-        "kwargs": {"pop_size": 30, "generations": 15, "seed": 42, "verbose": True},
-        "score_col": "nsga2u_freq",
-        "nsga2": True,
     },
     "banzhaf": {
         "compute": compute_banzhaf_importance,
@@ -584,7 +547,7 @@ def main() -> None:
         "seeds": SEEDS,
         "datasets": [d[0] for d in DATASETS],
         "methods": list(BASELINES.keys()),
-        "nsga2_methods": sorted(NSGA2_METHODS),
+        "nsga2_methods": [],
         "topk_kpis": list(TOP_K_KPIS),
     }
     (run_dir / "metadata.json").write_text(
@@ -781,14 +744,7 @@ def main() -> None:
                         comments="",
                     )
 
-                    # HV
-                    ref = np.array([
-                        max(float(n_total), float(pf_fitness[:, 0].max())) * 1.1,
-                        1.1,
-                        max(1.0, float(pf_fitness[:, 2].max()) * 1.1),
-                    ])
-                    hv_val = compute_hypervolume(pf_fitness, ref)
-                    row["hv"] = round(float(hv_val), 4)
+                    # HV — not computed (Plan C: no NSGA-II methods)
 
                     # Compression rate — full-model baseline
                     safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
@@ -824,8 +780,7 @@ def main() -> None:
                         )
                         row[f"cr_{int(loss * 100):d}pct"] = round(cr, 4)
                     print(
-                        f"  HV={hv_val:.4f}  "
-                        + "  ".join(
+                        "  "  + "  ".join(
                             f"CR@{int(loss * 100)}%={row[f'cr_{int(loss * 100):d}pct']:.3f}"
                             for loss in AUC_LOSS_THRESHOLDS
                         ),
