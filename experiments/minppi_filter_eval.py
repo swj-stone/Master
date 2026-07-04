@@ -28,6 +28,7 @@ Run::
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -168,6 +169,9 @@ def main():
     run_id = _now_stamp()
     out_dir = project_root / "results" / "tables" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Redirect CatBoost logs into this run's own output directory
+    os.environ["CATBOOST_TRAIN_DIR"] = str(out_dir)
 
     commit = _git_commit(project_root.parent)
     (out_dir / "metadata.json").write_text(json.dumps(

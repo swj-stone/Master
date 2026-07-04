@@ -27,6 +27,7 @@ Run::
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -36,6 +37,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 from sklearn.metrics import r2_score, roc_auc_score
@@ -170,6 +172,7 @@ def main() -> None:
     tables_dir = project_root / "results" / "tables" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     tables_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["CATBOOST_TRAIN_DIR"] = str(tables_dir)
 
     tee = _Tee(run_dir / "output.log")
     sys.stdout = tee  # type: ignore[assignment]
@@ -294,49 +297,79 @@ def main() -> None:
     # ---- Plot ----
     _header("Plotting")
     ds_names = sorted(df["dataset"].unique())
-    cols = 3
-    rows = (len(ds_names) + cols - 1) // cols
-    fig, axes = plt.subplots(rows, cols, figsize=(5.0 * cols, 3.5 * rows),
-                             squeeze=False)
     alpha_colors = {0.85: "#d62728", 0.90: "#ff7f0e",
                     0.95: "#2ca02c", 0.99: "#1f77b4"}
+    alpha_markers = {0.85: "s", 0.90: "D", 0.95: "o", 0.99: "^"}
 
-    for ax_i, ds in enumerate(ds_names):
-        r, c = ax_i // cols, ax_i % cols
-        ax = axes[r, c]
-        sub = df[df["dataset"] == ds].groupby("alpha")[
-            ["compression", "filtered_util"]].mean()
-        metric_ds = df[df["dataset"] == ds]["metric"].iloc[0]
+    # Split classification / regression for shared Y scales
+    cls_ds = [d for d in ds_names if df[df["dataset"] == d]["metric"].iloc[0] == "AUC"]
+    reg_ds = [d for d in ds_names if df[df["dataset"] == d]["metric"].iloc[0] == "R2"]
+
+    for group_name, group_ds, y_lo, y_hi in [
+        ("classification", cls_ds, 0.968, 1.025),
+        ("regression",     reg_ds, 0.960, 1.025),
+    ]:
+        if not group_ds:
+            continue
+
+        n_ds = len(group_ds)
+        n_cols = min(3, n_ds)
+        n_rows = (n_ds + n_cols - 1) // n_cols
+        fig, axes = plt.subplots(n_rows, n_cols,
+                                  figsize=(3.5 * n_cols, 3.0 * n_rows),
+                                  squeeze=False)
+        fig.suptitle(f"α-Pareto Front — {group_name} datasets\n"
+                     f"X = compression (% features removed), Y = AUC preservation",
+                     fontsize=11, y=1.02)
+
+        for ax_i, ds in enumerate(group_ds):
+            r, c = ax_i // n_cols, ax_i % n_cols
+            ax = axes[r, c]
+            sub = df[df["dataset"] == ds].groupby("alpha")[
+                ["compression", "preservation", "n_harmful"]].mean()
+            n_full = int(df[df["dataset"] == ds]["n_full"].iloc[0])
+
+            for a in ALPHA_VALUES:
+                if a not in sub.index:
+                    continue
+                x_val = sub.loc[a, "compression"] * 100
+                y_val = sub.loc[a, "preservation"]
+                n_h = int(sub.loc[a, "n_harmful"])
+                ax.scatter(x_val, y_val,
+                           color=alpha_colors[a], marker=alpha_markers[a],
+                           s=80, zorder=5, edgecolors="black", linewidth=0.3)
+                ax.annotate(f"a={a:.2f}\n{n_h}/{n_full}",
+                            (x_val, y_val),
+                            textcoords="offset points", xytext=(6, -10),
+                            fontsize=6, color=alpha_colors[a])
+
+            ax.axhline(y=1.0, color="gray", linewidth=0.5, linestyle="--")
+            ax.set_xlabel("Compression %")
+            if c == 0:
+                ax.set_ylabel("Preservation ratio")
+            ax.set_ylim(y_lo, y_hi)
+            ax.set_title(f"{ds}  (n={n_full})", fontsize=10)
+            ax.grid(True, alpha=0.3)
+
+        # Hide unused subplots
+        for ax_i in range(len(group_ds), n_rows * n_cols):
+            r, c = ax_i // n_cols, ax_i % n_cols
+            axes[r, c].set_visible(False)
+
+        handles = []
         for a in ALPHA_VALUES:
-            if a in sub.index:
-                ax.scatter(sub.loc[a, "compression"] * 100,
-                           sub.loc[a, "filtered_util"],
-                           color=alpha_colors[a], s=60, zorder=5,
-                           label=f"a={a:.2f}")
-        pts = [(sub.loc[a, "compression"] * 100, sub.loc[a, "filtered_util"])
-               for a in ALPHA_VALUES if a in sub.index]
-        if len(pts) >= 2:
-            xs, ys = zip(*pts)
-            ax.plot(xs, ys, "-", color="gray", lw=0.8, alpha=0.5)
-        ax.set_title(ds, fontsize=10)
-        ax.set_xlabel("Compression %")
-        if c == 0:
-            ax.set_ylabel(metric_ds)
-        ax.grid(True, alpha=0.3)
-        if ax_i == 0:
-            ax.legend(fontsize=7, loc="best")
+            handles.append(Line2D([], [], color=alpha_colors[a],
+                                   marker=alpha_markers[a], linestyle="",
+                                   markersize=7, label=f"α={a:.2f}"))
+        fig.legend(handles=handles, loc="lower center", ncol=4,
+                   fontsize=8, framealpha=0.9)
 
-    for ax_i in range(len(ds_names), rows * cols):
-        r, c = ax_i // cols, ax_i % cols
-        axes[r, c].set_visible(False)
-
-    fig.suptitle("alpha-Pareto Front: Compression vs. filtered AUC / R2",
-                 fontsize=12, y=1.01)
-    fig.tight_layout()
-    plot_path = tables_dir / "pareto_front.pdf"
-    fig.savefig(plot_path, format="pdf", bbox_inches="tight")
-    plt.close(fig)
-    print(f"  Saved: {plot_path.name}")
+        fig.tight_layout(rect=[0, 0.04, 1, 0.96])
+        suffix = "cls" if group_name == "classification" else "reg"
+        plot_path = tables_dir / f"pareto_front_{suffix}.pdf"
+        fig.savefig(plot_path, format="pdf", bbox_inches="tight")
+        plt.close(fig)
+        print(f"  Saved: {plot_path.name}")
 
     # ---- Per-dataset recommendation ----
     _header("Dataset-level alpha recommendation")

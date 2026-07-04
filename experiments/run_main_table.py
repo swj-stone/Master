@@ -554,6 +554,7 @@ def main() -> None:
         json.dumps(metadata, indent=2), encoding="utf-8"
     )
     tables_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["CATBOOST_TRAIN_DIR"] = str(tables_dir)
     (tables_dir / "metadata.json").write_text(
         json.dumps(metadata, indent=2), encoding="utf-8"
     )
