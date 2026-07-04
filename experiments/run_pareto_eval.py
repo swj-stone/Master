@@ -301,33 +301,49 @@ def main() -> None:
                     0.95: "#2ca02c", 0.99: "#1f77b4"}
     alpha_markers = {0.85: "s", 0.90: "D", 0.95: "o", 0.99: "^"}
 
-    # Split classification / regression for shared Y scales
+    # Classification: 5 datasets (4 AUC + 1 multiclass/Accuracy)
     cls_ds = [d for d in ds_names if df[df["dataset"] == d]["metric"].iloc[0] == "AUC"]
     reg_ds = [d for d in ds_names if df[df["dataset"] == d]["metric"].iloc[0] == "R2"]
 
-    for group_name, group_ds, y_lo, y_hi in [
-        ("classification", cls_ds, 0.968, 1.025),
-        ("regression",     reg_ds, 0.960, 1.025),
-    ]:
-        if not group_ds:
-            continue
-
-        n_ds = len(group_ds)
-        n_cols = min(3, n_ds)
-        n_rows = (n_ds + n_cols - 1) // n_cols
+    # --- Classification panel ---
+    if cls_ds:
+        isolet_ds = [d for d in cls_ds if d == "isolet"]
+        auc_ds = sorted(d for d in cls_ds if d != "isolet")
+        n_cols, n_rows = 3, 2
         fig, axes = plt.subplots(n_rows, n_cols,
-                                  figsize=(3.5 * n_cols, 3.0 * n_rows),
-                                  squeeze=False)
-        fig.suptitle(f"α-Pareto Front — {group_name} datasets\n"
-                     f"X = compression (% features removed), Y = AUC preservation",
-                     fontsize=11, y=1.02)
+                                  figsize=(10.5, 6.0), squeeze=False)
+        fig.suptitle(
+            "Alpha-Pareto Front -- Classification" + chr(10) +
+            "X = compression (% features removed),  "
+            "Y = preservation (1.0 = full-model baseline)",
+            fontsize=11, y=1.02)
 
-        for ax_i, ds in enumerate(group_ds):
-            r, c = ax_i // n_cols, ax_i % n_cols
-            ax = axes[r, c]
+        grid_map = {}
+        auc_positions = [(0, 0), (0, 1), (0, 2), (1, 0)]
+        for ds, (r, c) in zip(auc_ds, auc_positions):
+            grid_map[ds] = (r, c)
+        if isolet_ds:
+            grid_map[isolet_ds[0]] = (1, 2)
+
+        for rr in range(n_rows):
+            for cc in range(n_cols):
+                used = any((rr, cc) == pos for pos in grid_map.values())
+                if not used:
+                    axes[rr, cc].set_visible(False)
+
+        for ds, (rr, cc) in grid_map.items():
+            ax = axes[rr, cc]
             sub = df[df["dataset"] == ds].groupby("alpha")[
                 ["compression", "preservation", "n_harmful"]].mean()
             n_full = int(df[df["dataset"] == ds]["n_full"].iloc[0])
+            metric_label = df[df["dataset"] == ds]["metric"].iloc[0]
+            label_suffix = " (Accuracy)" if ds == "isolet" else f" ({metric_label})"
+
+            yv = sub["preservation"].values
+            span = max(float(yv.max()) - float(yv.min()), 0.001)
+            pad = max(span * 0.3, 0.003)
+            y_lo = round(min(float(yv.min()) - pad, 0.999), 4)
+            y_hi = round(max(float(yv.max()) + pad, 1.001), 4)
 
             for a in ALPHA_VALUES:
                 if a not in sub.index:
@@ -338,35 +354,92 @@ def main() -> None:
                 ax.scatter(x_val, y_val,
                            color=alpha_colors[a], marker=alpha_markers[a],
                            s=80, zorder=5, edgecolors="black", linewidth=0.3)
-                ax.annotate(f"a={a:.2f}\n{n_h}/{n_full}",
+                ax.annotate(f"Alpha={a:.2f}" + chr(10) + f"{n_h}/{n_full}",
                             (x_val, y_val),
                             textcoords="offset points", xytext=(6, -10),
                             fontsize=6, color=alpha_colors[a])
 
             ax.axhline(y=1.0, color="gray", linewidth=0.5, linestyle="--")
+            ax.set_ylim(y_lo, y_hi)
+            ax.set_xlabel("Compression %")
+            ax.set_title(f"{ds}{label_suffix}  (n={n_full})", fontsize=10)
+            ax.grid(True, alpha=0.3)
+
+        for rr in range(n_rows):
+            if axes[rr, 0].get_visible():
+                axes[rr, 0].set_ylabel("Preservation ratio")
+                break
+
+        handles = [Line2D([], [], color=alpha_colors[a], marker=alpha_markers[a],
+                           linestyle="", markersize=7, label=f"Alpha={a:.2f}")
+                   for a in ALPHA_VALUES]
+        fig.legend(handles=handles, loc="lower center", ncol=4,
+                   fontsize=8, framealpha=0.9)
+        fig.tight_layout(rect=[0, 0.05, 1, 0.96])
+        plot_path = tables_dir / "pareto_front_cls.pdf"
+        fig.savefig(plot_path, format="pdf", bbox_inches="tight")
+        plt.close(fig)
+        print(f"  Saved: {plot_path.name}")
+
+    # --- Regression panel ---
+    if reg_ds:
+        n_ds = len(reg_ds)
+        n_cols = min(2, n_ds)
+        n_rows = (n_ds + n_cols - 1) // n_cols
+        fig, axes = plt.subplots(n_rows, n_cols,
+                                  figsize=(3.5 * n_cols, 3.0 * n_rows),
+                                  squeeze=False)
+        fig.suptitle(
+            "Alpha-Pareto Front -- Regression" + chr(10) +
+            "X = compression (% features removed),  "
+            "Y = R2 preservation (1.0 = full-model baseline)",
+            fontsize=11, y=1.02)
+
+        for ax_i, ds in enumerate(reg_ds):
+            r, c = ax_i // n_cols, ax_i % n_cols
+            ax = axes[r, c]
+            sub = df[df["dataset"] == ds].groupby("alpha")[
+                ["compression", "preservation", "n_harmful"]].mean()
+            n_full = int(df[df["dataset"] == ds]["n_full"].iloc[0])
+
+            yv = sub["preservation"].values
+            span = max(float(yv.max()) - float(yv.min()), 0.001)
+            pad = max(span * 0.3, 0.003)
+            y_lo = round(min(float(yv.min()) - pad, 0.999), 4)
+            y_hi = round(max(float(yv.max()) + pad, 1.001), 4)
+
+            for a in ALPHA_VALUES:
+                if a not in sub.index:
+                    continue
+                x_val = sub.loc[a, "compression"] * 100
+                y_val = sub.loc[a, "preservation"]
+                n_h = int(sub.loc[a, "n_harmful"])
+                ax.scatter(x_val, y_val,
+                           color=alpha_colors[a], marker=alpha_markers[a],
+                           s=80, zorder=5, edgecolors="black", linewidth=0.3)
+                ax.annotate(f"Alpha={a:.2f}" + chr(10) + f"{n_h}/{n_full}",
+                            (x_val, y_val),
+                            textcoords="offset points", xytext=(6, -10),
+                            fontsize=6, color=alpha_colors[a])
+
+            ax.axhline(y=1.0, color="gray", linewidth=0.5, linestyle="--")
+            ax.set_ylim(y_lo, y_hi)
             ax.set_xlabel("Compression %")
             if c == 0:
                 ax.set_ylabel("Preservation ratio")
-            ax.set_ylim(y_lo, y_hi)
-            ax.set_title(f"{ds}  (n={n_full})", fontsize=10)
+            ax.set_title(f"{ds} (R2)  (n={n_full})", fontsize=10)
             ax.grid(True, alpha=0.3)
 
-        # Hide unused subplots
-        for ax_i in range(len(group_ds), n_rows * n_cols):
-            r, c = ax_i // n_cols, ax_i % n_cols
-            axes[r, c].set_visible(False)
+        for ax_i in range(len(reg_ds), n_rows * n_cols):
+            axes[ax_i // n_cols, ax_i % n_cols].set_visible(False)
 
-        handles = []
-        for a in ALPHA_VALUES:
-            handles.append(Line2D([], [], color=alpha_colors[a],
-                                   marker=alpha_markers[a], linestyle="",
-                                   markersize=7, label=f"α={a:.2f}"))
+        handles = [Line2D([], [], color=alpha_colors[a], marker=alpha_markers[a],
+                           linestyle="", markersize=7, label=f"Alpha={a:.2f}")
+                   for a in ALPHA_VALUES]
         fig.legend(handles=handles, loc="lower center", ncol=4,
                    fontsize=8, framealpha=0.9)
-
-        fig.tight_layout(rect=[0, 0.04, 1, 0.96])
-        suffix = "cls" if group_name == "classification" else "reg"
-        plot_path = tables_dir / f"pareto_front_{suffix}.pdf"
+        fig.tight_layout(rect=[0, 0.05, 1, 0.96])
+        plot_path = tables_dir / "pareto_front_reg.pdf"
         fig.savefig(plot_path, format="pdf", bbox_inches="tight")
         plt.close(fig)
         print(f"  Saved: {plot_path.name}")
