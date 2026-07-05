@@ -28,7 +28,6 @@ Run::
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 import time
@@ -191,9 +190,6 @@ def main():
     out_dir = project_root / "results" / "tables" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Redirect CatBoost logs into this run's own output directory
-    os.environ["CATBOOST_TRAIN_DIR"] = str(out_dir)
-
     commit = _git_commit(project_root.parent)
     (out_dir / "metadata.json").write_text(
         json.dumps(
@@ -291,7 +287,7 @@ def main():
                     rank = baseline_ranking(X_tr_f, y_tr, mname, task=task, seed=seed)
                 except Exception as e:
                     print(f"      {mname}: FAILED ({e})")
-                continue
+                    continue
                 kpi = evaluate_topk(X_te_f, y_te, rank, task=task, seed=seed)
                 for _, r in kpi.iterrows():
                     all_rows.append(

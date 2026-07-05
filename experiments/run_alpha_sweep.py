@@ -56,8 +56,8 @@ from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, XGBRegressor
 
 from minppi_mofs.min_ppi import (
+    estimate_minppi,
     estimate_minppi_random_mc,
-    estimate_minppi_shapg_guided,
     minppi_stats,
 )
 from minppi_mofs.shapg_integration import build_guidance_from_data
@@ -450,12 +450,13 @@ def main() -> None:
                     task=task,
                 )
             else:
-                minppi = estimate_minppi_shapg_guided(
+                minppi = estimate_minppi(
                     X_tr,
                     X_val,
                     y_tr,
                     y_val,
                     alpha=alpha,
+                    method="shapg_guided",
                     K_adv=budget["K_adv"],
                     shapg_neighbors=sg_neighbors,
                     shapg_scores=sg_scores,

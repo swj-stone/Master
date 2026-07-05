@@ -27,7 +27,6 @@ Run::
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 import time
@@ -197,7 +196,6 @@ def main() -> None:
     tables_dir = project_root / "results" / "tables" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     tables_dir.mkdir(parents=True, exist_ok=True)
-    os.environ["CATBOOST_TRAIN_DIR"] = str(tables_dir)
 
     tee = _Tee(run_dir / "output.log")
     sys.stdout = tee  # type: ignore[assignment]
@@ -456,7 +454,11 @@ def main() -> None:
             row_labels.append(ds_name)
             row_cells: list[str] = []
             for a in _alpha_cols:
-                nh = int(_harmful_pivot.loc[ds_name, a]) if ds_name in _harmful_pivot.index and a in _harmful_pivot.columns else 0
+                nh = (
+                    int(_harmful_pivot.loc[ds_name, a])
+                    if ds_name in _harmful_pivot.index and a in _harmful_pivot.columns
+                    else 0
+                )
                 row_cells.append(f"{nh}/{nf}")
             cell_text.append(row_cells)
         col_labels = [f"α={a:.2f}" for a in _alpha_cols]
@@ -474,7 +476,9 @@ def main() -> None:
             cell.set_linewidth(0.4)
             if key[0] == 0:
                 cell.set_fontsize(6.5)
-        table_ax.set_title("Harmful features removed  (n_harmful / n_full)", fontsize=8, pad=2)
+        table_ax.set_title(
+            "Harmful features removed  (n_harmful / n_full)", fontsize=8, pad=2
+        )
 
         for rr in range(n_rows):
             if axes[rr, 0].get_visible():

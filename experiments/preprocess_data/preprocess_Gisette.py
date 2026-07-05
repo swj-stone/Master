@@ -303,7 +303,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path(__file__).resolve().parent.parent / "configs" / "gisette.yaml",
+        default=Path(__file__).resolve().parent.parent.parent
+        / "configs"
+        / "gisette.yaml",
         help="Path to YAML configuration file",
     )
     return parser.parse_args()

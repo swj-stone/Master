@@ -57,6 +57,16 @@ CLS_DATASETS: list[tuple[str, str, str]] = [
     ("credit_card_fraud", "Class", "binary"),
 ]
 
+# Per-dataset Algorithm-B adversarial search budget (consistent with
+# run_pareto_eval.py and run_main_table.py).
+DATASET_BUDGET: dict[str, dict] = {
+    "spambase": {"K_adv": 30},
+    "madelon": {"K_adv": 20},
+    "isolet": {"K_adv": 8},
+    "gisette": {"K_adv": 10},
+    "credit_card_fraud": {"K_adv": 30},
+}
+
 
 def _now_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -152,6 +162,7 @@ def main():
             from minppi_mofs.min_ppi import estimate_minppi
 
             sg_s, sg_n = build_guidance_from_data(X_r, y_r, depth=1, m=5, seed=42)
+            budget = DATASET_BUDGET.get(prefix, {"K_adv": 20})
             minppi_d = estimate_minppi(
                 X_r,
                 Xv_r,
@@ -159,7 +170,7 @@ def main():
                 yv_r,
                 alpha=0.95,
                 method="shapg_guided",
-                K_adv=30,
+                K_adv=budget["K_adv"],
                 shapg_neighbors=sg_n,
                 shapg_scores=sg_s,
                 seed=42,

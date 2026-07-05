@@ -17,6 +17,10 @@ Public API
 
 from __future__ import annotations
 
+import logging
+
+import xgboost as xgb
+
 from minppi_mofs.voting_game import AccFullCache, compute_v_alpha, make_acc_full_cache
 from minppi_mofs.min_ppi import (
     estimate_minppi,
@@ -29,6 +33,11 @@ from minppi_mofs.shapg_integration import (
     compute_shapg_guidance_signal,
     get_correlated_neighbors,
 )
+
+# Suppress XGBoost training progress output globally (XGBoost ≥3.x
+# may emit [0]...validation_0-logloss:... even with per-model verbosity=0).
+xgb.set_config(verbosity=0)
+logging.getLogger("xgboost").setLevel(logging.ERROR)
 
 __all__ = [
     # voting_game

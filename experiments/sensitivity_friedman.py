@@ -23,7 +23,9 @@ Run::
 
 from __future__ import annotations
 
+import argparse
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,11 +33,6 @@ import pandas as pd
 from scipy.stats import friedmanchisquare
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-INPUT_CSV = "results/tables/2026-06-28_07-44-10/main_metrics.csv"
 METRICS = ["AUC@10", "AUC@20"]
 CLASSIFICATION_DATASETS = [
     "credit_card_fraud",
@@ -53,7 +50,41 @@ CLASSIFICATION_DATASETS = [
 
 def main() -> None:
     project_root = Path(__file__).resolve().parent.parent
-    df = pd.read_csv(project_root / INPUT_CSV)
+
+    parser = argparse.ArgumentParser(
+        description="Friedman leave-one-out sensitivity analysis"
+    )
+    parser.add_argument(
+        "input_csv",
+        nargs="?",
+        default=None,
+        help="Path to main_metrics.csv (e.g. results/tables/<run_id>/main_metrics.csv). "
+        "If omitted, the most recent main_metrics.csv under results/tables/ is used.",
+    )
+    args = parser.parse_args()
+
+    if args.input_csv is not None:
+        input_path = Path(args.input_csv)
+        if not input_path.is_absolute():
+            input_path = project_root / input_path
+    else:
+        candidates = sorted(
+            project_root.glob("results/tables/*/main_metrics.csv"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not candidates:
+            print(
+                "ERROR: No main_metrics.csv found under results/tables/. "
+                "Run run_main_table.py first, or pass an explicit path.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        input_path = candidates[0]
+        print(f"Auto-detected input: {input_path}")
+
+    input_csv_str = str(input_path.relative_to(project_root))
+    df = pd.read_csv(input_path)
     cls_df = df[df["dataset"].isin(CLASSIFICATION_DATASETS)]
 
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -65,7 +96,7 @@ def main() -> None:
         json.dumps(
             {
                 "script": "sensitivity_friedman.py",
-                "input": INPUT_CSV,
+                "input": input_csv_str,
                 "datasets": CLASSIFICATION_DATASETS,
                 "metrics": METRICS,
             },

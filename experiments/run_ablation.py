@@ -521,7 +521,7 @@ def run_ablation_min_vs_mean(
     # Save
     df = pd.DataFrame(rows)
     df.to_csv(ablation_dir / "metrics.csv", index=False)
-    with (ablation_dir / "metadata.json").open("w") as f:
+    with (ablation_dir / "metadata.json").open("w", encoding="utf-8") as f:
         json.dump(
             {
                 "ablation": "min_vs_mean",
@@ -693,7 +693,7 @@ def run_ablation_binary_vs_continuous(
 
     df = pd.DataFrame(rows)
     df.to_csv(ablation_dir / "metrics.csv", index=False)
-    with (ablation_dir / "metadata.json").open("w") as f:
+    with (ablation_dir / "metadata.json").open("w", encoding="utf-8") as f:
         json.dump(
             {"ablation": "binary_vs_continuous", "seed": seed},
             f,
@@ -858,7 +858,7 @@ def run_ablation_beta_sweep(
 
     df = pd.DataFrame(rows)
     df.to_csv(ablation_dir / "metrics.csv", index=False)
-    with (ablation_dir / "metadata.json").open("w") as f:
+    with (ablation_dir / "metadata.json").open("w", encoding="utf-8") as f:
         json.dump(
             {
                 "ablation": "beta_sweep",
@@ -997,7 +997,7 @@ def run_ablation_shapg_vs_shap(
 
     df = pd.DataFrame(rows)
     df.to_csv(ablation_dir / "metrics.csv", index=False)
-    with (ablation_dir / "metadata.json").open("w") as f:
+    with (ablation_dir / "metadata.json").open("w", encoding="utf-8") as f:
         json.dump(
             {"ablation": "shapg_vs_shap", "alpha": alpha, "seed": seed},
             f,
