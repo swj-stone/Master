@@ -366,6 +366,18 @@ def main() -> None:
     cls_ds = [d for d in ds_names if df[df["dataset"] == d]["metric"].iloc[0] == "AUC"]
     reg_ds = [d for d in ds_names if df[df["dataset"] == d]["metric"].iloc[0] == "R2"]
 
+    # Build compression-count summary table (all 7 datasets × 4 alpha)
+    # for embedding into the CLS figure at position (1,1).
+    _harmful_pivot = (
+        df.groupby(["dataset", "alpha"])["n_harmful"]
+        .mean()
+        .round(0)
+        .astype(int)
+        .unstack("alpha")
+    )
+    _n_full_per_ds = df.groupby("dataset")["n_full"].first().astype(int)
+    _alpha_cols = sorted(ALPHA_VALUES)
+
     # --- Classification panel ---
     if cls_ds:
         isolet_ds = [d for d in cls_ds if d == "isolet"]
@@ -388,17 +400,11 @@ def main() -> None:
         if isolet_ds:
             grid_map[isolet_ds[0]] = (1, 2)
 
-        for rr in range(n_rows):
-            for cc in range(n_cols):
-                used = any((rr, cc) == pos for pos in grid_map.values())
-                if not used:
-                    axes[rr, cc].set_visible(False)
-
         for ds, (rr, cc) in grid_map.items():
             ax = axes[rr, cc]
             sub = (
                 df[df["dataset"] == ds]
-                .groupby("alpha")[["compression", "preservation", "n_harmful"]]
+                .groupby("alpha")[["compression", "preservation"]]
                 .mean()
             )
             n_full = int(df[df["dataset"] == ds]["n_full"].iloc[0])
@@ -411,12 +417,16 @@ def main() -> None:
             y_lo = round(min(float(yv.min()) - pad, 0.999), 4)
             y_hi = round(max(float(yv.max()) + pad, 1.001), 4)
 
+            xv = sub["compression"].values * 100
+            x_span = max(float(xv.max()) - float(xv.min()), 0.01)
+            x_lo = max(float(xv.min()) - x_span * 0.4, -0.5)
+            x_hi = float(xv.max()) + x_span * 0.4
+
             for a in ALPHA_VALUES:
                 if a not in sub.index:
                     continue
                 x_val = sub.loc[a, "compression"] * 100
                 y_val = sub.loc[a, "preservation"]
-                n_h = int(sub.loc[a, "n_harmful"])
                 ax.scatter(
                     x_val,
                     y_val,
@@ -427,20 +437,44 @@ def main() -> None:
                     edgecolors="black",
                     linewidth=0.3,
                 )
-                ax.annotate(
-                    f"Alpha={a:.2f}" + chr(10) + f"{n_h}/{n_full}",
-                    (x_val, y_val),
-                    textcoords="offset points",
-                    xytext=(6, -10),
-                    fontsize=6,
-                    color=alpha_colors[a],
-                )
 
             ax.axhline(y=1.0, color="gray", linewidth=0.5, linestyle="--")
+            ax.set_xlim(x_lo, x_hi)
             ax.set_ylim(y_lo, y_hi)
             ax.set_xlabel("Compression %")
             ax.set_title(f"{ds}{label_suffix}  (n={n_full})", fontsize=10)
             ax.grid(True, alpha=0.3)
+
+        # --- Compression-count table at position (1,1) ---
+        table_ax = axes[1, 1]
+        table_ax.set_axis_off()
+        all_ds_ordered = [d[0] for d in DATASETS]
+        row_labels: list[str] = []
+        cell_text: list[list[str]] = []
+        for ds_name in all_ds_ordered:
+            nf = _n_full_per_ds.get(ds_name, 0)
+            row_labels.append(ds_name)
+            row_cells: list[str] = []
+            for a in _alpha_cols:
+                nh = int(_harmful_pivot.loc[ds_name, a]) if ds_name in _harmful_pivot.index and a in _harmful_pivot.columns else 0
+                row_cells.append(f"{nh}/{nf}")
+            cell_text.append(row_cells)
+        col_labels = [f"α={a:.2f}" for a in _alpha_cols]
+        tbl = table_ax.table(
+            cellText=cell_text,
+            rowLabels=row_labels,
+            colLabels=col_labels,
+            cellLoc="center",
+            loc="center",
+        )
+        tbl.auto_set_font_size(False)
+        tbl.set_fontsize(7)
+        tbl.scale(1.0, 1.25)
+        for key, cell in tbl.get_celld().items():
+            cell.set_linewidth(0.4)
+            if key[0] == 0:
+                cell.set_fontsize(6.5)
+        table_ax.set_title("Harmful features removed  (n_harmful / n_full)", fontsize=8, pad=2)
 
         for rr in range(n_rows):
             if axes[rr, 0].get_visible():
@@ -455,7 +489,7 @@ def main() -> None:
                 marker=alpha_markers[a],
                 linestyle="",
                 markersize=7,
-                label=f"Alpha={a:.2f}",
+                label=f"α={a:.2f}",
             )
             for a in ALPHA_VALUES
         ]
@@ -490,7 +524,7 @@ def main() -> None:
             ax = axes[r, c]
             sub = (
                 df[df["dataset"] == ds]
-                .groupby("alpha")[["compression", "preservation", "n_harmful"]]
+                .groupby("alpha")[["compression", "preservation"]]
                 .mean()
             )
             n_full = int(df[df["dataset"] == ds]["n_full"].iloc[0])
@@ -501,12 +535,16 @@ def main() -> None:
             y_lo = round(min(float(yv.min()) - pad, 0.999), 4)
             y_hi = round(max(float(yv.max()) + pad, 1.001), 4)
 
+            xv = sub["compression"].values * 100
+            x_span = max(float(xv.max()) - float(xv.min()), 0.01)
+            x_lo = max(float(xv.min()) - x_span * 0.4, -0.5)
+            x_hi = float(xv.max()) + x_span * 0.4
+
             for a in ALPHA_VALUES:
                 if a not in sub.index:
                     continue
                 x_val = sub.loc[a, "compression"] * 100
                 y_val = sub.loc[a, "preservation"]
-                n_h = int(sub.loc[a, "n_harmful"])
                 ax.scatter(
                     x_val,
                     y_val,
@@ -517,16 +555,9 @@ def main() -> None:
                     edgecolors="black",
                     linewidth=0.3,
                 )
-                ax.annotate(
-                    f"Alpha={a:.2f}" + chr(10) + f"{n_h}/{n_full}",
-                    (x_val, y_val),
-                    textcoords="offset points",
-                    xytext=(6, -10),
-                    fontsize=6,
-                    color=alpha_colors[a],
-                )
 
             ax.axhline(y=1.0, color="gray", linewidth=0.5, linestyle="--")
+            ax.set_xlim(x_lo, x_hi)
             ax.set_ylim(y_lo, y_hi)
             ax.set_xlabel("Compression %")
             if c == 0:
@@ -545,7 +576,7 @@ def main() -> None:
                 marker=alpha_markers[a],
                 linestyle="",
                 markersize=7,
-                label=f"Alpha={a:.2f}",
+                label=f"α={a:.2f}",
             )
             for a in ALPHA_VALUES
         ]
