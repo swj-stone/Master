@@ -18,8 +18,29 @@ Public API
 from __future__ import annotations
 
 import logging
+import os
 
+# ── pre-import XGBoost patches ──────────────────────────────────────────
+# XGBoost ≥3.x `fit()` has a `verbose` parameter whose default may print
+# per-iteration metrics even when the constructor's `verbosity=0` and
+# `xgb.set_config(verbosity=0)` are set.  Monkey-patch so every `fit()`
+# call in the whole project defaults to silent.
 import xgboost as xgb
+
+_fit_orig = xgb.XGBModel.fit
+
+
+def _fit_silent(self, *args, **kwargs):
+    kwargs.setdefault("verbose", False)
+    return _fit_orig(self, *args, **kwargs)
+
+
+xgb.XGBModel.fit = _fit_silent  # type: ignore[method-assign]
+
+xgb.set_config(verbosity=0)
+os.environ.setdefault("OMP_NUM_THREADS", "1")  # thread-pool hygiene
+logging.getLogger("xgboost").setLevel(logging.ERROR)
+# ─────────────────────────────────────────────────────────────────────────
 
 from minppi_mofs.voting_game import AccFullCache, compute_v_alpha, make_acc_full_cache
 from minppi_mofs.min_ppi import (
@@ -33,11 +54,6 @@ from minppi_mofs.shapg_integration import (
     compute_shapg_guidance_signal,
     get_correlated_neighbors,
 )
-
-# Suppress XGBoost training progress output globally (XGBoost ≥3.x
-# may emit [0]...validation_0-logloss:... even with per-model verbosity=0).
-xgb.set_config(verbosity=0)
-logging.getLogger("xgboost").setLevel(logging.ERROR)
 
 __all__ = [
     # voting_game
