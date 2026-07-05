@@ -27,15 +27,7 @@ import numpy as np
 import pandas as pd
 from powershap import PowerShap
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
-
-try:
-    from catboost import CatBoostClassifier, CatBoostRegressor
-
-    _HAS_CATBOOST = True
-except ImportError:  # pragma: no cover
-    CatBoostClassifier = None  # type: ignore[assignment,misc]
-    CatBoostRegressor = None  # type: ignore[assignment,misc]
-    _HAS_CATBOOST = False
+from xgboost import XGBClassifier, XGBRegressor
 
 
 def compute_powershap_importance(
@@ -50,6 +42,9 @@ def compute_powershap_importance(
 ) -> dict[str, float]:
     """Compute Powershap feature importance using the official PyPI package.
 
+    Uses XGBoost as the underlying model (CatBoost is unavailable on
+    Python 3.13 — see Powershap docs for model-agnostic usage).
+
     Args:
         X: Feature DataFrame.
         y: Target array (binary, multiclass, or continuous).
@@ -57,8 +52,7 @@ def compute_powershap_importance(
             for continuous targets.
         power_iterations: Number of shadow-feature shuffles.
         alpha: Significance threshold for the statistical test.
-        seed: Random seed (passed to CatBoost internally via
-            ``random_seed``-aware model re-creation in PowerShap).
+        seed: Random seed passed to XGBoost (``random_state``).
         verbose: If True, enable PowerShap console output.
 
     Returns:
@@ -67,24 +61,31 @@ def compute_powershap_importance(
         the internal ``_processed_shaps_df``).
     """
     if task == "regression":
-        ps = PowerShap(
-            model=CatBoostRegressor(verbose=0, random_seed=seed),
-            power_iterations=power_iterations,
-            power_alpha=alpha,
-            include_all=True,
-            automatic=False,
-            show_progress=verbose,
-            verbose=verbose,
+        model = XGBRegressor(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
         )
     else:
-        ps = PowerShap(
-            power_iterations=power_iterations,
-            power_alpha=alpha,
-            include_all=True,
-            automatic=False,
-            show_progress=verbose,
-            verbose=verbose,
+        model = XGBClassifier(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
         )
+
+    ps = PowerShap(
+        model=model,
+        power_iterations=power_iterations,
+        power_alpha=alpha,
+        include_all=True,
+        automatic=False,
+        show_progress=verbose,
+        verbose=verbose,
+    )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", ConvergenceWarning)
         ps.fit(X, y)

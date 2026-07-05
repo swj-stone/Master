@@ -11,6 +11,7 @@ Run:
     python experiments/make_cd_diagram.py <metrics.csv> --metric hv --higher
     python experiments/make_cd_diagram.py <pareto_metrics_mean.csv> --metric igd_plus --lower
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,8 +27,20 @@ from scipy.stats import friedmanchisquare  # noqa: E402
 
 # Nemenyi critical values q_{0.05} (studentized range / sqrt(2)) by #methods k
 _Q05 = {
-    2: 1.960, 3: 2.343, 4: 2.569, 5: 2.728, 6: 2.850, 7: 2.949, 8: 3.031,
-    9: 3.102, 10: 3.164, 11: 3.219, 12: 3.268, 13: 3.313, 14: 3.354, 15: 3.391,
+    2: 1.960,
+    3: 2.343,
+    4: 2.569,
+    5: 2.728,
+    6: 2.850,
+    7: 2.949,
+    8: 3.031,
+    9: 3.102,
+    10: 3.164,
+    11: 3.219,
+    12: 3.268,
+    13: 3.313,
+    14: 3.354,
+    15: 3.391,
 }
 
 
@@ -63,23 +76,33 @@ def draw_cd_diagram(avg_rank: pd.Series, cd: float, out_pdf: Path, title: str) -
     for r in range(lo, hi + 1):
         ax.plot([r, r], [top, top + 0.12], "k-", lw=1.0)
         ax.text(r, top + 0.22, str(r), ha="center", va="bottom", fontsize=9)
-    ax.text((lo + hi) / 2, top + 0.5, f"{title}  (CD = {cd:.2f})",
-            ha="center", va="bottom", fontsize=10)
+    ax.text(
+        (lo + hi) / 2,
+        top + 0.5,
+        f"{title}  (CD = {cd:.2f})",
+        ha="center",
+        va="bottom",
+        fontsize=10,
+    )
 
     # method labels: best ranks (left) on the left side, worst on the right
     level = top - 0.35
     step = 0.32
     for i, (name, r) in enumerate(zip(methods, ranks)):
-        if i < half:                       # left block
+        if i < half:  # left block
             y = level - i * step
             ax.plot([r, r], [top, y], "k-", lw=0.8)
             ax.plot([r, lo - 0.45], [y, y], "k-", lw=0.8)
-            ax.text(lo - 0.5, y, f"{name} ({r:.2f})", ha="right", va="center", fontsize=9)
-        else:                              # right block
+            ax.text(
+                lo - 0.5, y, f"{name} ({r:.2f})", ha="right", va="center", fontsize=9
+            )
+        else:  # right block
             y = level - (i - half) * step
             ax.plot([r, r], [top, y], "k-", lw=0.8)
             ax.plot([r, hi + 0.45], [y, y], "k-", lw=0.8)
-            ax.text(hi + 0.5, y, f"({r:.2f}) {name}", ha="left", va="center", fontsize=9)
+            ax.text(
+                hi + 0.5, y, f"({r:.2f}) {name}", ha="left", va="center", fontsize=9
+            )
 
     # cliques: groups of consecutive methods within CD of each other
     order = list(ranks)
@@ -105,27 +128,33 @@ def main() -> None:
     ap.add_argument("csv", type=Path)
     ap.add_argument("--metric", required=True)
     g = ap.add_mutually_exclusive_group(required=True)
-    g.add_argument("--higher", action="store_true", help="higher value is better (HV, AUC)")
-    g.add_argument("--lower", action="store_true", help="lower value is better (IGD+, spacing)")
+    g.add_argument(
+        "--higher", action="store_true", help="higher value is better (HV, AUC)"
+    )
+    g.add_argument(
+        "--lower", action="store_true", help="lower value is better (IGD+, spacing)"
+    )
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     higher = args.higher
 
     df = pd.read_csv(args.csv)
     if args.metric not in df.columns:
-        raise SystemExit(f"column '{args.metric}' not in {args.csv} ({list(df.columns)})")
+        raise SystemExit(
+            f"column '{args.metric}' not in {args.csv} ({list(df.columns)})"
+        )
     agg = df.groupby(["method", "dataset"])[args.metric].mean().reset_index()
     pivot = (
         agg.pivot(index="dataset", columns="method", values=args.metric)
-        .dropna(axis=1, how="all")      # drop fully-NaN methods (e.g. non-NSGA-II for HV)
-        .dropna(axis=0)                  # drop datasets missing any method (regression sets for IGD+)
+        .dropna(axis=1, how="all")  # drop fully-NaN methods (e.g. non-NSGA-II for HV)
+        .dropna(axis=0)  # drop datasets missing any method (regression sets for IGD+)
     )
     k, n = pivot.shape[1], pivot.shape[0]
     if k < 2 or n < 3:
         raise SystemExit(f"need >=2 methods and >=3 datasets; got k={k}, N={n}")
 
     stat, p = friedmanchisquare(*[pivot[c].values for c in pivot.columns])
-    kendall_w = float(stat / (n * (k - 1)))           # Friedman effect size
+    kendall_w = float(stat / (n * (k - 1)))  # Friedman effect size
     cd = critical_difference(k, n)
     avg_rank = average_ranks(pivot, higher)
 
@@ -139,8 +168,10 @@ def main() -> None:
     sig = pd.DataFrame("", index=methods, columns=methods)
     for a in methods:
         for b in methods:
-            sig.loc[a, b] = "" if a == b else (
-                "sig" if abs(avg_rank[a] - avg_rank[b]) > cd else "ns"
+            sig.loc[a, b] = (
+                ""
+                if a == b
+                else ("sig" if abs(avg_rank[a] - avg_rank[b]) > cd else "ns")
             )
     avg_rank.rename("avg_rank").to_csv(out_dir / f"avg_ranks_{args.metric}.csv")
     sig.to_csv(out_dir / f"nemenyi_pairs_{args.metric}.csv")
@@ -151,7 +182,9 @@ def main() -> None:
     print("Average ranks (1=best):")
     for m, r in avg_rank.items():
         print(f"  {m:16s} {r:.3f}")
-    print(f"\nSaved: {out_pdf.name}, avg_ranks_{args.metric}.csv, nemenyi_pairs_{args.metric}.csv")
+    print(
+        f"\nSaved: {out_pdf.name}, avg_ranks_{args.metric}.csv, nemenyi_pairs_{args.metric}.csv"
+    )
 
 
 if __name__ == "__main__":

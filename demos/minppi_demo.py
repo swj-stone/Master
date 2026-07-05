@@ -23,7 +23,6 @@ Run:
 
 from __future__ import annotations
 
-import math
 from itertools import combinations
 from math import factorial
 from typing import Callable, Iterable, Tuple
@@ -146,16 +145,20 @@ def example_2() -> None:
     print()
     print("Theorem 1 verification:")
     print(f"  f_1: MinSS = {results[1][0]:+d}  →  HARMFUL  ✓")
-    print(f"       Witness: v({{0,2}}) = {v_alpha({0,2})}, "
-          f"v({{0,1,2}}) = {v_alpha({0,1,2})}, marginal = -1")
+    print(
+        f"       Witness: v({{0,2}}) = {v_alpha({0, 2})}, "
+        f"v({{0,1,2}}) = {v_alpha({0, 1, 2})}, marginal = -1"
+    )
     print()
     print("Caveat (refuting naive equivalence):")
-    print(f"  f_0 IS in every winning coalition (sanity above) — but")
+    print("  f_0 IS in every winning coalition (sanity above) — but")
     print(f"  MinSS(f_0) = {results[0][0]} ≠ +1.")
-    print(f"  Why? At S = {{1,2}}: v({{1,2}}) = {v_alpha({1,2})}, "
-          f"v({{0,1,2}}) = {v_alpha({0,1,2})}, marginal = 0")
-    print(f"  ⟹ 'in every winning' is NECESSARY but NOT SUFFICIENT for MinSS = +1.")
-    print(f"  Decisiveness requires ALSO that every coalition with f_0 wins.")
+    print(
+        f"  Why? At S = {{1,2}}: v({{1,2}}) = {v_alpha({1, 2})}, "
+        f"v({{0,1,2}}) = {v_alpha({0, 1, 2})}, marginal = 0"
+    )
+    print("  ⟹ 'in every winning' is NECESSARY but NOT SUFFICIENT for MinSS = +1.")
+    print("  Decisiveness requires ALSO that every coalition with f_0 wins.")
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +229,9 @@ def example_3() -> None:
     print()
     print("Lemma 1: all MinSS values are in {-1, 0, +1} (verified across all α) ✓")
     print("Observation: real-data MinSS is α-dependent. Lower α → broader 'neutral'.")
-    print("             Higher α → tighter quota → more features look harmful or neutral.")
+    print(
+        "             Higher α → tighter quota → more features look harmful or neutral."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -276,19 +281,21 @@ def example_4_alg_a_bias() -> None:
             if marg == -1:
                 n_neg_per_size[k] += 1
     # Sampler probability = (1/(|other|+1)) * (n_neg_per_size[k] / n_per_size[k])
-    p_neg = sum(
-        n_neg_per_size[k] / n_per_size[k] for k in range(len(other) + 1)
-    ) / (len(other) + 1)
+    p_neg = sum(n_neg_per_size[k] / n_per_size[k] for k in range(len(other) + 1)) / (
+        len(other) + 1
+    )
 
     print(f"Target = f_{target}. True MinSS = -1.")
-    print(f"  Sampler used: uniform random size k ∈ [0, {len(other)}], then "
-          f"uniform subset of size k.")
+    print(
+        f"  Sampler used: uniform random size k ∈ [0, {len(other)}], then "
+        f"uniform subset of size k."
+    )
     print(f"  Per-draw harmful probability p_- = {p_neg:.4f}")
     print()
-    print(f"  Theoretical P(miss in K draws) = (1 - p_-)^K")
+    print("  Theoretical P(miss in K draws) = (1 - p_-)^K")
     print()
     print(f"  {'K':>5}  {'P(detect) theory':>18}  {'P(detect) empirical':>22}")
-    print(f"  {'-'*5}  {'-'*18}  {'-'*22}")
+    print(f"  {'-' * 5}  {'-' * 18}  {'-' * 22}")
 
     rng = np.random.default_rng(11)
     n_trials = 500

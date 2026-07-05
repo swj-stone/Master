@@ -38,13 +38,18 @@ from scipy.stats import friedmanchisquare
 INPUT_CSV = "results/tables/2026-06-28_07-44-10/main_metrics.csv"
 METRICS = ["AUC@10", "AUC@20"]
 CLASSIFICATION_DATASETS = [
-    "credit_card_fraud", "gisette", "isolet", "madelon", "spambase",
+    "credit_card_fraud",
+    "gisette",
+    "isolet",
+    "madelon",
+    "spambase",
 ]
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     project_root = Path(__file__).resolve().parent.parent
@@ -57,12 +62,15 @@ def main() -> None:
 
     # Metadata
     (out_dir / "metadata.json").write_text(
-        json.dumps({
-            "script": "sensitivity_friedman.py",
-            "input": INPUT_CSV,
-            "datasets": CLASSIFICATION_DATASETS,
-            "metrics": METRICS,
-        }, indent=2),
+        json.dumps(
+            {
+                "script": "sensitivity_friedman.py",
+                "input": INPUT_CSV,
+                "datasets": CLASSIFICATION_DATASETS,
+                "metrics": METRICS,
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
@@ -70,13 +78,10 @@ def main() -> None:
 
     for metric in METRICS:
         # Full
-        agg_full = (
-            cls_df.groupby(["method", "dataset"])[metric].mean().reset_index()
-        )
-        pivot_full = (
-            agg_full.pivot(index="dataset", columns="method", values=metric)
-            .dropna()
-        )
+        agg_full = cls_df.groupby(["method", "dataset"])[metric].mean().reset_index()
+        pivot_full = agg_full.pivot(
+            index="dataset", columns="method", values=metric
+        ).dropna()
         k_full, n_full = pivot_full.shape[1], pivot_full.shape[0]
         stat_f, p_f = friedmanchisquare(
             *[pivot_full[c].values for c in pivot_full.columns]
@@ -85,29 +90,33 @@ def main() -> None:
         print(f"\n{'=' * 60}")
         print(f"{metric}  (FULL: N={n_full}, k={k_full})")
         print(f"  chi2 = {stat_f:.3f},  p = {p_f:.4f}")
-        rows.append({
-            "metric": metric, "dropped": "(full)",
-            "n_datasets": n_full, "chi2": round(stat_f, 3),
-            "p_value": round(p_f, 5),
-        })
+        rows.append(
+            {
+                "metric": metric,
+                "dropped": "(full)",
+                "n_datasets": n_full,
+                "chi2": round(stat_f, 3),
+                "p_value": round(p_f, 5),
+            }
+        )
 
         # Leave-one-out
         for drop_ds in CLASSIFICATION_DATASETS:
             sub = cls_df[cls_df["dataset"] != drop_ds]
             agg = sub.groupby(["method", "dataset"])[metric].mean().reset_index()
             piv = agg.pivot(index="dataset", columns="method", values=metric).dropna()
-            stat, p = friedmanchisquare(
-                *[piv[c].values for c in piv.columns]
-            )
+            stat, p = friedmanchisquare(*[piv[c].values for c in piv.columns])
             sig_mark = " *" if p < 0.05 else ""
-            print(
-                f"  - {drop_ds:25s}: chi2 = {stat:.3f},  p = {p:.4f}{sig_mark}"
+            print(f"  - {drop_ds:25s}: chi2 = {stat:.3f},  p = {p:.4f}{sig_mark}")
+            rows.append(
+                {
+                    "metric": metric,
+                    "dropped": drop_ds,
+                    "n_datasets": piv.shape[0],
+                    "chi2": round(stat, 3),
+                    "p_value": round(p, 5),
+                }
             )
-            rows.append({
-                "metric": metric, "dropped": drop_ds,
-                "n_datasets": piv.shape[0],
-                "chi2": round(stat, 3), "p_value": round(p, 5),
-            })
 
     out_df = pd.DataFrame(rows)
     out_path = out_dir / "friedman_leave_one_out.csv"
@@ -117,13 +126,23 @@ def main() -> None:
     # Inverse question: if we drop madelon, does significance increase?
     print("\n=== Key finding ===")
     for metric in METRICS:
-        full_row = out_df[(out_df["metric"] == metric) & (out_df["dropped"] == "(full)")].iloc[0]
-        mad_row = out_df[(out_df["metric"] == metric) & (out_df["dropped"] == "madelon")].iloc[0]
-        iso_row = out_df[(out_df["metric"] == metric) & (out_df["dropped"] == "isolet")].iloc[0]
+        full_row = out_df[
+            (out_df["metric"] == metric) & (out_df["dropped"] == "(full)")
+        ].iloc[0]
+        mad_row = out_df[
+            (out_df["metric"] == metric) & (out_df["dropped"] == "madelon")
+        ].iloc[0]
+        iso_row = out_df[
+            (out_df["metric"] == metric) & (out_df["dropped"] == "isolet")
+        ].iloc[0]
         print(f"{metric}:")
         print(f"  Full chi2={full_row['chi2']:.1f} (p={full_row['p_value']:.4f})")
-        print(f"  Drop Madelon:  chi2={mad_row['chi2']:.1f} (p={mad_row['p_value']:.4f})  ← {'significance INCREASES' if mad_row['chi2'] > full_row['chi2'] else 'significance decreases'}")
-        print(f"  Drop ISOLET:   chi2={iso_row['chi2']:.1f} (p={iso_row['p_value']:.4f})  ← {'significance DECREASES (ShapG outlier?)' if iso_row['chi2'] < full_row['chi2'] else 'significance increases'}")
+        print(
+            f"  Drop Madelon:  chi2={mad_row['chi2']:.1f} (p={mad_row['p_value']:.4f})  ← {'significance INCREASES' if mad_row['chi2'] > full_row['chi2'] else 'significance decreases'}"
+        )
+        print(
+            f"  Drop ISOLET:   chi2={iso_row['chi2']:.1f} (p={iso_row['p_value']:.4f})  ← {'significance DECREASES (ShapG outlier?)' if iso_row['chi2'] < full_row['chi2'] else 'significance increases'}"
+        )
 
     print("\nDone.")
 

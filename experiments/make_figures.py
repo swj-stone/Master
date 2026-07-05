@@ -230,9 +230,9 @@ def _compute_prop1_data() -> dict[str, np.ndarray]:
             marg = v_alpha(S_set | {target}) - v_alpha(S_set)
             if marg == -1:
                 n_neg_per_size[k] += 1
-    p_neg = sum(
-        n_neg_per_size[k] / n_per_size[k] for k in range(len(other) + 1)
-    ) / (len(other) + 1)
+    p_neg = sum(n_neg_per_size[k] / n_per_size[k] for k in range(len(other) + 1)) / (
+        len(other) + 1
+    )
 
     K_values = np.array([1, 3, 5, 10, 20, 50, 100], dtype=int)
     n_trials = 500
@@ -297,9 +297,7 @@ def _compute_alg_b_data() -> dict:
     )
 
     # --- Algorithm A ---
-    def _algorithm_a(
-        tgt: int, K: int, rng: np.random.Generator
-    ) -> Tuple[int, int]:
+    def _algorithm_a(tgt: int, K: int, rng: np.random.Generator) -> Tuple[int, int]:
         other_a = [f for f in range(n) if f != tgt]
         min_marg = 1
         for r in range(K):
@@ -317,7 +315,10 @@ def _compute_alg_b_data() -> dict:
 
     # --- Algorithm B ---
     def _algorithm_b(
-        tgt: int, W: np.ndarray, K: int, rng: np.random.Generator,
+        tgt: int,
+        W: np.ndarray,
+        K: int,
+        rng: np.random.Generator,
         k_seed: int = 2,
     ) -> Tuple[int, int]:
         other_c = [(j, W[tgt, j]) for j in range(n) if j != tgt]
@@ -386,9 +387,7 @@ def _compute_alg_b_data() -> dict:
             W_noisy = np.clip(W_demo + noise, 0, 1)
             W_noisy = (W_noisy + W_noisy.T) / 2
             np.fill_diagonal(W_noisy, 0)
-            inner_rng = np.random.default_rng(
-                int(rng_master.integers(1, int(1e9)))
-            )
+            inner_rng = np.random.default_rng(int(rng_master.integers(1, int(1e9))))
             mb, _ = _algorithm_b(target, W_noisy, K_robust, inner_rng)
             d_b_rob += int(mb == -1)
             ma, _ = _algorithm_a(target, K_robust, inner_rng)
@@ -426,8 +425,7 @@ def _make_figure_1(ex1: dict, ex2: dict, save_path: Path) -> None:
     colors_ex2 = ["#d62728" if v == -1 else "#7f7f7f" for v in ex2["MinSS"]]
 
     # Left: Example 1 — DECISIVE
-    ax1.bar(x, ex1["MinSS"], width, color=colors_ex1,
-            edgecolor="black", linewidth=0.4)
+    ax1.bar(x, ex1["MinSS"], width, color=colors_ex1, edgecolor="black", linewidth=0.4)
     ax1.set_xticks(x)
     ax1.set_xticklabels(ex1["feature"])
     ax1.set_ylabel("MinSS")
@@ -446,8 +444,7 @@ def _make_figure_1(ex1: dict, ex2: dict, save_path: Path) -> None:
     )
 
     # Right: Example 2 — HARMFUL
-    ax2.bar(x, ex2["MinSS"], width, color=colors_ex2,
-            edgecolor="black", linewidth=0.4)
+    ax2.bar(x, ex2["MinSS"], width, color=colors_ex2, edgecolor="black", linewidth=0.4)
     ax2.set_xticks(x)
     ax2.set_xticklabels(ex2["feature"])
     ax2.set_ylabel("MinSS")
@@ -490,7 +487,8 @@ def _make_figure_1(ex1: dict, ex2: dict, save_path: Path) -> None:
 
     plt.suptitle(
         "MinPPI Trichotomy — Lemma 1 & Theorem 1",
-        fontsize=11, y=1.02,
+        fontsize=11,
+        y=1.02,
     )
     plt.tight_layout()
     plt.savefig(save_path, format="pdf")
@@ -513,11 +511,14 @@ def _make_figure_2(prop1: dict, save_path: Path) -> None:
     p_neg = prop1["p_neg"]
     r_val = prop1["r_value"]
 
-    ax.plot(K_vals, theory, "b-", linewidth=1.5,
-            label="Theory: $1 - (1-p_-)^K$")
+    ax.plot(K_vals, theory, "b-", linewidth=1.5, label="Theory: $1 - (1-p_-)^K$")
     ax.plot(
-        K_vals, empirical, "ro", markersize=5,
-        markerfacecolor="none", markeredgewidth=1.2,
+        K_vals,
+        empirical,
+        "ro",
+        markersize=5,
+        markerfacecolor="none",
+        markeredgewidth=1.2,
         label="Empirical (500 trials)",
     )
     ax.set_xlabel("$K$ (number of random coalition samples)")
@@ -526,8 +527,7 @@ def _make_figure_2(prop1: dict, save_path: Path) -> None:
     ax.set_xlim(0, 105)
     ax.legend(loc="lower right", framealpha=0.9)
     ax.set_title(
-        f"Proposition 1 — "
-        f"$p_- = {p_neg:.4f}$, $r = {r_val:.4f}$",
+        f"Proposition 1 — $p_- = {p_neg:.4f}$, $r = {r_val:.4f}$",
         fontsize=10,
     )
     ax.grid(True, alpha=0.3)
@@ -552,10 +552,24 @@ def _make_figure_3(alg_data: dict, save_path: Path) -> None:
     det_b = alg_data["det_b"]
 
     # --- (a) Detection rate comparison ---
-    ax1.plot(K_vals, det_b, "s-", color="#2ca02c", linewidth=1.5,
-             markersize=5, label="Algorithm B (ShapG-guided)")
-    ax1.plot(K_vals, det_a, "o-", color="#d62728", linewidth=1.5,
-             markersize=5, label="Algorithm A (random MC)")
+    ax1.plot(
+        K_vals,
+        det_b,
+        "s-",
+        color="#2ca02c",
+        linewidth=1.5,
+        markersize=5,
+        label="Algorithm B (ShapG-guided)",
+    )
+    ax1.plot(
+        K_vals,
+        det_a,
+        "o-",
+        color="#d62728",
+        linewidth=1.5,
+        markersize=5,
+        label="Algorithm A (random MC)",
+    )
     ax1.set_xlabel("$K$ (search budget)")
     ax1.set_ylabel("Detection rate of MinSS = $-1$")
     ax1.set_ylim(-0.05, 1.10)
@@ -579,10 +593,24 @@ def _make_figure_3(alg_data: dict, save_path: Path) -> None:
     rob_a = alg_data["robustness_a"]
     K_r = alg_data["K_robust"]
 
-    ax2.plot(sigma_vals, rob_b, "s-", color="#2ca02c", linewidth=1.5,
-             markersize=6, label=f"Algorithm B ($K{{=}}{K_r}$)")
-    ax2.plot(sigma_vals, rob_a, "o--", color="#d62728", linewidth=1.5,
-             markersize=6, label=f"Algorithm A ($K{{=}}{K_r}$)")
+    ax2.plot(
+        sigma_vals,
+        rob_b,
+        "s-",
+        color="#2ca02c",
+        linewidth=1.5,
+        markersize=6,
+        label=f"Algorithm B ($K{{=}}{K_r}$)",
+    )
+    ax2.plot(
+        sigma_vals,
+        rob_a,
+        "o--",
+        color="#d62728",
+        linewidth=1.5,
+        markersize=6,
+        label=f"Algorithm A ($K{{=}}{K_r}$)",
+    )
     ax2.set_xlabel(r"$\sigma$ (correlation matrix noise)")
     ax2.set_ylabel("Detection rate")
     ax2.set_ylim(-0.05, 1.10)
@@ -590,10 +618,10 @@ def _make_figure_3(alg_data: dict, save_path: Path) -> None:
     ax2.set_title("(b) Robustness to ShapG $W$ noise", fontsize=10)
     ax2.grid(True, alpha=0.3)
 
-
     plt.suptitle(
         "Algorithm B vs Algorithm A",
-        fontsize=11, y=1.02,
+        fontsize=11,
+        y=1.02,
     )
     plt.tight_layout()
     plt.savefig(save_path, format="pdf")
@@ -613,21 +641,29 @@ def _make_table_1(ex1: dict, ex2: dict, save_path: Path) -> None:
 
     n = len(ex1["feature"])
     col_labels = [
-        "Feature", "MinSS", "Mean SS", "Class",
-        "Feature", "MinSS", "Mean SS", "Class",
+        "Feature",
+        "MinSS",
+        "Mean SS",
+        "Class",
+        "Feature",
+        "MinSS",
+        "Mean SS",
+        "Class",
     ]
     rows = []
     for i in range(n):
-        rows.append([
-            ex1["feature"][i],
-            f"{ex1['MinSS'][i]:+d}",
-            f"{ex1['MeanSS'][i]:+.4f}",
-            ex1["class"][i],
-            ex2["feature"][i],
-            f"{ex2['MinSS'][i]:+d}",
-            f"{ex2['MeanSS'][i]:+.4f}",
-            ex2["class"][i],
-        ])
+        rows.append(
+            [
+                ex1["feature"][i],
+                f"{ex1['MinSS'][i]:+d}",
+                f"{ex1['MeanSS'][i]:+.4f}",
+                ex1["class"][i],
+                ex2["feature"][i],
+                f"{ex2['MinSS'][i]:+d}",
+                f"{ex2['MeanSS'][i]:+.4f}",
+                ex2["class"][i],
+            ]
+        )
 
     table = ax.table(
         cellText=rows,
@@ -683,18 +719,23 @@ def _make_table_2(alg_data: dict, save_path: Path) -> None:
 
     # --- Left: Detection rate comparison ---
     col_labels_main = [
-        "$K$", "Alg A detect", "Alg B detect",
-        r"Alg A $\bar{s}$", r"Alg B $\bar{s}$",
+        "$K$",
+        "Alg A detect",
+        "Alg B detect",
+        r"Alg A $\bar{s}$",
+        r"Alg B $\bar{s}$",
     ]
     rows_main = []
     for idx in range(len(K_vals)):
-        rows_main.append([
-            f"{K_vals[idx]}",
-            f"{det_a[idx]:.3f}",
-            f"{det_b[idx]:.3f}",
-            f"{samples_a[idx]:.1f}",
-            f"{samples_b[idx]:.1f}",
-        ])
+        rows_main.append(
+            [
+                f"{K_vals[idx]}",
+                f"{det_a[idx]:.3f}",
+                f"{det_b[idx]:.3f}",
+                f"{samples_a[idx]:.1f}",
+                f"{samples_b[idx]:.1f}",
+            ]
+        )
 
     table_main = ax1.table(
         cellText=rows_main,
@@ -723,11 +764,13 @@ def _make_table_2(alg_data: dict, save_path: Path) -> None:
     col_labels_rob = [r"$\sigma$", "Alg B ($K{=}5$)", "Alg A ($K{=}5$)"]
     rows_rob = []
     for idx in range(len(sigma_vals)):
-        rows_rob.append([
-            f"{sigma_vals[idx]:.2f}",
-            f"{rob_b[idx]:.3f}",
-            f"{rob_a[idx]:.3f}",
-        ])
+        rows_rob.append(
+            [
+                f"{sigma_vals[idx]:.2f}",
+                f"{rob_b[idx]:.3f}",
+                f"{rob_a[idx]:.3f}",
+            ]
+        )
 
     table_rob = ax2.table(
         cellText=rows_rob,
@@ -791,25 +834,15 @@ def main() -> None:
     print("  Example 1 (decisive v_alpha) ...")
     ex1 = _compute_example_1_data()
     assert ex1["MinSS"][0] == 1, "Ex1: f_0 must be decisive"
-    assert all(
-        v in {-1, 0, 1} for v in ex1["MinSS"]
-    ), "Ex1: Lemma 1 violation"
-    print(
-        f"    f_0: MinSS={ex1['MinSS'][0]:+d} "
-        f"({ex1['class'][0]}) ✓"
-    )
+    assert all(v in {-1, 0, 1} for v in ex1["MinSS"]), "Ex1: Lemma 1 violation"
+    print(f"    f_0: MinSS={ex1['MinSS'][0]:+d} ({ex1['class'][0]}) ✓")
 
     print("  Example 2 (harmful v_alpha + caveat) ...")
     ex2 = _compute_example_2_data()
     assert ex2["MinSS"][1] == -1, "Ex2: f_1 must be harmful"
-    assert ex2["f0_in_all_winning"], \
-        "Ex2: f_0 must be in every winning coalition"
-    assert ex2["MinSS"][0] == 0, \
-        "Ex2: f_0 must be neutral (caveat holds)"
-    print(
-        f"    f_1: MinSS={ex2['MinSS'][1]:+d} "
-        f"({ex2['class'][1]}) ✓"
-    )
+    assert ex2["f0_in_all_winning"], "Ex2: f_0 must be in every winning coalition"
+    assert ex2["MinSS"][0] == 0, "Ex2: f_0 must be neutral (caveat holds)"
+    print(f"    f_1: MinSS={ex2['MinSS'][1]:+d} ({ex2['class'][1]}) ✓")
     print(
         f"    f_0: in all winning but MinSS={ex2['MinSS'][0]:+d} "
         f"({ex2['class'][0]}) — caveat verified ✓"
@@ -818,20 +851,16 @@ def main() -> None:
     print("  Proposition 1 (Algorithm A detection probability) ...")
     prop1 = _compute_prop1_data()
     print(
-        f"    p_- = {prop1['p_neg']:.4f},  "
-        f"r(theory, empir) = {prop1['r_value']:.4f} ✓"
+        f"    p_- = {prop1['p_neg']:.4f},  r(theory, empir) = {prop1['r_value']:.4f} ✓"
     )
 
     print("  Algorithm B vs A + robustness ...")
     alg_data = _compute_alg_b_data()
-    assert abs(alg_data["det_b"][0] - 1.0) < 0.001, \
+    assert abs(alg_data["det_b"][0] - 1.0) < 0.001, (
         "Alg B must detect at K=1 (noiseless case)"
-    print(
-        f"    Alg B @ K=1: {alg_data['det_b'][0]:.3f} detect rate ✓"
     )
-    print(
-        f"    Alg A @ K=1: {alg_data['det_a'][0]:.3f} detect rate (baseline)"
-    )
+    print(f"    Alg B @ K=1: {alg_data['det_b'][0]:.3f} detect rate ✓")
+    print(f"    Alg A @ K=1: {alg_data['det_a'][0]:.3f} detect rate (baseline)")
     print(
         f"    Robustness σ={alg_data['sigma_values'][-1]}: "
         f"B={alg_data['robustness_b'][-1]:.3f} vs "
@@ -862,20 +891,10 @@ def main() -> None:
     print("  Figure 1: Lemma 1 holds — all MinSS in {-1, 0, +1}.")
     print("             Theorem 1: f_0 DECISIVE (Ex1), f_1 HARMFUL (Ex2).")
     print("             Caveat: f_0 in every winning but MinSS(f_0)=0.")
-    print(
-        f"  Figure 2: Proposition 1 verified — "
-        f"r = {prop1['r_value']:.4f}."
-    )
-    print(
-        f"             p_- = {prop1['p_neg']:.4f} "
-        f"-> K~100 for 95% detection."
-    )
-    print(
-        "  Figure 3: Algorithm B achieves ~100% detection at K=1."
-    )
-    print(
-        "             Robustness: detection >50% even at sigma=0.50."
-    )
+    print(f"  Figure 2: Proposition 1 verified — r = {prop1['r_value']:.4f}.")
+    print(f"             p_- = {prop1['p_neg']:.4f} -> K~100 for 95% detection.")
+    print("  Figure 3: Algorithm B achieves ~100% detection at K=1.")
+    print("             Robustness: detection >50% even at sigma=0.50.")
     print("  All figures/tables saved as PDF (README hard rule #6).")
 
 

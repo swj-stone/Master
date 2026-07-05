@@ -19,7 +19,7 @@ Run:
 
 from __future__ import annotations
 
-from typing import Callable, Iterable, Tuple
+from typing import Iterable, Tuple
 
 import numpy as np
 
@@ -62,13 +62,15 @@ def v_alpha(S: Iterable[int]) -> int:
 # f_1 is harmful exactly when paired with f_0 AND f_2 (the witness S = {0, 2}).
 # A correct ShapG output should therefore show f_1 most strongly correlated
 # with f_0 and f_2.
-W_DEMO = np.array([
-    [0.00, 0.40, 0.50, 0.10, 0.10],
-    [0.40, 0.00, 0.70, 0.20, 0.20],  # f_1: strongest tie to f_2, then f_0
-    [0.50, 0.70, 0.00, 0.20, 0.20],
-    [0.10, 0.20, 0.20, 0.00, 0.10],
-    [0.10, 0.20, 0.20, 0.10, 0.00],
-])
+W_DEMO = np.array(
+    [
+        [0.00, 0.40, 0.50, 0.10, 0.10],
+        [0.40, 0.00, 0.70, 0.20, 0.20],  # f_1: strongest tie to f_2, then f_0
+        [0.50, 0.70, 0.00, 0.20, 0.20],
+        [0.10, 0.20, 0.20, 0.00, 0.10],
+        [0.10, 0.20, 0.20, 0.10, 0.00],
+    ]
+)
 
 
 # ---------------------------------------------------------------------------
@@ -146,14 +148,14 @@ def banner(s: str) -> None:
 def main() -> None:
     banner("Algorithm B (ShapG-guided) vs Algorithm A (random MC)")
     print()
-    print(f"v_α: 13 winning coalitions on N = {{0,1,2,3,4}}")
+    print("v_α: 13 winning coalitions on N = {0,1,2,3,4}")
     print(f"Target: f_{TARGET}  (true MinSS = -1; harmful witness at S = {{0, 2}})")
     print()
 
     print("Correlation matrix W (ShapG proxy):")
     print("       " + "  ".join(f"f_{j:>3}" for j in range(N)))
     for i in range(N):
-        row = "  ".join(f"{W_DEMO[i,j]:>4.2f}" for j in range(N))
+        row = "  ".join(f"{W_DEMO[i, j]:>4.2f}" for j in range(N))
         print(f"f_{i}    {row}")
     print()
 
@@ -161,14 +163,18 @@ def main() -> None:
         [(j, W_DEMO[TARGET, j]) for j in range(N) if j != TARGET],
         key=lambda x: -x[1],
     )
-    print(f"Top neighbors of f_{TARGET}: " +
-          ", ".join(f"f_{j}({c:.2f})" for j, c in neighbors))
+    print(
+        f"Top neighbors of f_{TARGET}: "
+        + ", ".join(f"f_{j}({c:.2f})" for j, c in neighbors)
+    )
     print()
     seed = {j for j, _ in neighbors[:2]}
-    print(f"Algorithm B seed (top-2 neighbors): {{{', '.join(f'f_{j}' for j in seed)}}}")
-    print(f"Seed evaluation:")
-    print(f"   v({{0,1,2}}) - v({{0,2}}) = {v_alpha({0,1,2}) - v_alpha({0,2})}")
-    print(f"   ⟹ DETECTED at K=1 (deterministic, given correct ShapG W) ✓")
+    print(
+        f"Algorithm B seed (top-2 neighbors): {{{', '.join(f'f_{j}' for j in seed)}}}"
+    )
+    print("Seed evaluation:")
+    print(f"   v({{0,1,2}}) - v({{0,2}}) = {v_alpha({0, 1, 2}) - v_alpha({0, 2})}")
+    print("   ⟹ DETECTED at K=1 (deterministic, given correct ShapG W) ✓")
     print()
 
     # ----- main comparison: detection rate -----
@@ -177,9 +183,11 @@ def main() -> None:
 
     print(f"Detection rate of MinSS = -1, averaged over {n_trials} trials:")
     print()
-    print(f"  {'K':>3}  {'Alg A detect':>14}  {'Alg B detect':>14}  "
-          f"{'Alg A samples':>15}  {'Alg B samples':>15}")
-    print(f"  {'-'*3}  {'-'*14}  {'-'*14}  {'-'*15}  {'-'*15}")
+    print(
+        f"  {'K':>3}  {'Alg A detect':>14}  {'Alg B detect':>14}  "
+        f"{'Alg A samples':>15}  {'Alg B samples':>15}"
+    )
+    print(f"  {'-' * 3}  {'-' * 14}  {'-' * 14}  {'-' * 15}  {'-' * 15}")
 
     rng_a = np.random.default_rng(2025)
     rng_b = np.random.default_rng(2026)
@@ -190,29 +198,31 @@ def main() -> None:
         for _ in range(n_trials):
             ma, ka = algorithm_a(TARGET, K, rng_a)
             mb, kb = algorithm_b(TARGET, W_DEMO, K, rng_b)
-            det_a += (ma == -1)
-            det_b += (mb == -1)
+            det_a += ma == -1
+            det_b += mb == -1
             used_a.append(ka)
             used_b.append(kb)
-        print(f"  {K:>3}  {det_a/n_trials:>14.3f}  {det_b/n_trials:>14.3f}  "
-              f"{np.mean(used_a):>15.2f}  {np.mean(used_b):>15.2f}")
+        print(
+            f"  {K:>3}  {det_a / n_trials:>14.3f}  {det_b / n_trials:>14.3f}  "
+            f"{np.mean(used_a):>15.2f}  {np.mean(used_b):>15.2f}"
+        )
 
     print()
     print("Observations:")
-    print(f"  - Algorithm B at K=1 reaches ~100% detection (seed hits witness).")
-    print(f"  - Algorithm A at K=1 reaches ~3% (p_neg = 0.033, sparse harmful).")
-    print(f"  - For equal detection target (say 95%), Algorithm A needs ~K=100,")
-    print(f"    Algorithm B needs K=1. Sample efficiency: ~100×.")
+    print("  - Algorithm B at K=1 reaches ~100% detection (seed hits witness).")
+    print("  - Algorithm A at K=1 reaches ~3% (p_neg = 0.033, sparse harmful).")
+    print("  - For equal detection target (say 95%), Algorithm A needs ~K=100,")
+    print("    Algorithm B needs K=1. Sample efficiency: ~100×.")
     print()
 
     # ----- robustness: what if W is noisy / wrong? -----
     banner("Robustness check: what if ShapG correlation matrix W is noisy?")
     print()
     print("Replace W with W_noisy = W + Gaussian(0, σ²), clipped to [0,1]")
-    print(f"σ ∈ {{0.05, 0.15, 0.30, 0.50}}, K = 5, 500 trials per σ")
+    print("σ ∈ {0.05, 0.15, 0.30, 0.50}, K = 5, 500 trials per σ")
     print()
     print(f"  {'σ noise':>10}  {'Alg B detection':>18}  {'(Alg A baseline)':>20}")
-    print(f"  {'-'*10}  {'-'*18}  {'-'*20}")
+    print(f"  {'-' * 10}  {'-' * 18}  {'-' * 20}")
 
     K_robust = 5
     rng_master = np.random.default_rng(42)
@@ -225,16 +235,23 @@ def main() -> None:
             # Make symmetric and zero diagonal
             W_noisy = (W_noisy + W_noisy.T) / 2
             np.fill_diagonal(W_noisy, 0)
-            mb, _ = algorithm_b(TARGET, W_noisy, K_robust,
-                                np.random.default_rng(int(rng_master.integers(1e9))))
-            det += (mb == -1)
+            mb, _ = algorithm_b(
+                TARGET,
+                W_noisy,
+                K_robust,
+                np.random.default_rng(int(rng_master.integers(1e9))),
+            )
+            det += mb == -1
         # Algorithm A at same K for reference
         det_a = 0
         for _ in range(n_trials):
-            ma, _ = algorithm_a(TARGET, K_robust,
-                                np.random.default_rng(int(rng_master.integers(1e9))))
-            det_a += (ma == -1)
-        print(f"  σ = {sigma:>5.2f}  {det/n_trials:>18.3f}  {det_a/n_trials:>20.3f}")
+            ma, _ = algorithm_a(
+                TARGET, K_robust, np.random.default_rng(int(rng_master.integers(1e9)))
+            )
+            det_a += ma == -1
+        print(
+            f"  σ = {sigma:>5.2f}  {det / n_trials:>18.3f}  {det_a / n_trials:>20.3f}"
+        )
 
     print()
     print("Even at σ = 0.50 (heavy noise), Algorithm B beats random MC, because")

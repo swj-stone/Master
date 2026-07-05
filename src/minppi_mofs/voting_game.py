@@ -95,7 +95,9 @@ class AccFullCache:
         self._seed = seed
         self._cache: dict[tuple[str, ...], float] = {}
         self._model_params = model_params or {
-            "n_estimators": 15, "max_depth": 2, "learning_rate": 0.3,
+            "n_estimators": 15,
+            "max_depth": 2,
+            "learning_rate": 0.3,
         }
 
         # Compute U_full
@@ -241,7 +243,12 @@ def make_acc_full_cache(
         Initialised cache with ``acc_full`` available.
     """
     return AccFullCache(
-        X_train, X_val, y_train, y_val, task=task, seed=seed,
+        X_train,
+        X_val,
+        y_train,
+        y_val,
+        task=task,
+        seed=seed,
         model_params=model_params,
     )
 
@@ -281,7 +288,12 @@ def compute_v_alpha(
     """
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
-            X_train, X_val, y_train, y_val, task=task, seed=seed,
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            task=task,
+            seed=seed,
         )
     acc_cache.set_threshold(alpha)
     return 1 if acc_cache.is_winning(S) else 0

@@ -39,6 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -71,7 +72,8 @@ def _git_commit(repo_root: Path) -> str:
     try:
         return subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
-            cwd=str(repo_root), text=True,
+            cwd=str(repo_root),
+            text=True,
         ).strip()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
@@ -97,21 +99,40 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description="Madelon alpha–recall curve for MinPPI/MinShap/SHAP"
     )
-    ap.add_argument("--out", type=Path, default=None,
-                    help="Output directory (default: results/tables/<run_id>)")
-    ap.add_argument("--seeds", type=int, nargs="+", default=SEEDS,
-                    help="Seeds to use")
-    ap.add_argument("--alpha", type=float, nargs="+", default=ALPHA_VALUES,
-                    help="Alpha values to evaluate MinPPI at")
-    ap.add_argument("--skip-minppi", action="store_true",
-                    help="Skip fresh MinPPI computation (use only cached data)")
+    ap.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Output directory (default: results/tables/<run_id>)",
+    )
+    ap.add_argument("--seeds", type=int, nargs="+", default=SEEDS, help="Seeds to use")
+    ap.add_argument(
+        "--alpha",
+        type=float,
+        nargs="+",
+        default=ALPHA_VALUES,
+        help="Alpha values to evaluate MinPPI at",
+    )
+    ap.add_argument(
+        "--skip-minppi",
+        action="store_true",
+        help="Skip fresh MinPPI computation (use only cached data)",
+    )
     args = ap.parse_args()
 
     project_root = Path(__file__).resolve().parent.parent
     git_root = project_root.parent
     processed_dir = project_root / "data" / "processed"
-    bvc_dir = project_root / "results" / "logs" / "2026-06-27_19-51-48" / "binary_vs_continuous"
-    c2_dir = project_root / "results" / "logs" / "2026-06-28_15-28-58" / "c2_ground_truth"
+    bvc_dir = (
+        project_root
+        / "results"
+        / "logs"
+        / "2026-06-27_19-51-48"
+        / "binary_vs_continuous"
+    )
+    c2_dir = (
+        project_root / "results" / "logs" / "2026-06-28_15-28-58" / "c2_ground_truth"
+    )
 
     run_id = _now_stamp()
     out_dir = args.out or (project_root / "results" / "tables" / run_id)
@@ -142,14 +163,17 @@ def main() -> None:
         },
     }
     (out_dir / "metadata.json").write_text(
-        json.dumps(metadata, indent=2), encoding="utf-8",
+        json.dumps(metadata, indent=2),
+        encoding="utf-8",
     )
 
     # Ground truth labels for the MI-100 features
     train_s42 = pd.read_csv(processed_dir / "madelon_s42_train.csv")
     all_features = [c for c in train_s42.columns if c != "label"]
     gt_probes = set(all_features) & MADELON_PROBES
-    print(f"\n  Ground truth: {len(gt_probes)} probes in MI-100 ({len(all_features)} features)")
+    print(
+        f"\n  Ground truth: {len(gt_probes)} probes in MI-100 ({len(all_features)} features)"
+    )
     print(f"  Real features: {sorted(set(all_features) - gt_probes)}")
 
     # ==================================================================
@@ -180,7 +204,9 @@ def main() -> None:
 
     # The c2 CSV only stores n_predicted, precision, recall, f1 — not the actual
     # feature sets.  We recompute MinShap/SHAP once per seed (cheap, ~30s each).
-    print("  c2 CSV has aggregate stats only; recomputing MinShap/SHAP per seed (~2 min)")
+    print(
+        "  c2 CSV has aggregate stats only; recomputing MinShap/SHAP per seed (~2 min)"
+    )
 
     from minppi_mofs.baselines.min_shap import compute_minshap_importance
     from minppi_mofs.baselines.shap_top_k import compute_shap_topk_importance
@@ -191,7 +217,11 @@ def main() -> None:
         y_train = train_df["label"].values
 
         ms_scores = compute_minshap_importance(
-            X_train, y_train, n_coalitions=100, per_coalition=5, seed=seed,
+            X_train,
+            y_train,
+            n_coalitions=100,
+            per_coalition=5,
+            seed=seed,
             task="binary",
         )
         # MinShap: use all negative-scored features as harmful set
@@ -201,7 +231,9 @@ def main() -> None:
             k = max(1, len(minshap_per_seed.get(42, set())) // 5)
             minshap_per_seed[seed] = {f for f, _ in ranked[:k]}
 
-        sh_scores = compute_shap_topk_importance(X_train, y_train, seed=seed, task="binary")
+        sh_scores = compute_shap_topk_importance(
+            X_train, y_train, seed=seed, task="binary"
+        )
         # SHAP: use bottom-15 (≈MinPPI mean harmful count across α)
         ranked_sh = sorted(sh_scores.items(), key=lambda kv: kv[1])
         k_shap = max(1, 15)
@@ -209,8 +241,10 @@ def main() -> None:
 
         p_ms, r_ms, f1_ms = _prf(minshap_per_seed[seed], gt_probes)
         p_sh, r_sh, f1_sh = _prf(shap_per_seed[seed], gt_probes)
-        print(f"  s{seed}: MinShap={len(minshap_per_seed[seed]):3d} P={p_ms:.3f} R={r_ms:.3f}  "
-              f"SHAP={len(shap_per_seed[seed]):3d} P={p_sh:.3f} R={r_sh:.3f}")
+        print(
+            f"  s{seed}: MinShap={len(minshap_per_seed[seed]):3d} P={p_ms:.3f} R={r_ms:.3f}  "
+            f"SHAP={len(shap_per_seed[seed]):3d} P={p_sh:.3f} R={r_sh:.3f}"
+        )
 
     # ==================================================================
     # Step 2: MinPPI at each α per seed
@@ -230,7 +264,11 @@ def main() -> None:
 
         # ShapG neighbors (same for all α, computed once per seed)
         sg_scores, sg_neighbors = build_guidance_from_data(
-            X_train, y_train, depth=1, m=5, seed=seed,
+            X_train,
+            y_train,
+            depth=1,
+            m=5,
+            seed=seed,
         )
 
         for alpha in args.alpha:
@@ -238,7 +276,7 @@ def main() -> None:
 
             # Check if already cached from bvc (seed 42 at all α)
             if seed == 42:
-                bvc_file = bvc_dir / f"madelon_alpha{int(alpha*100):02d}_minppi.csv"
+                bvc_file = bvc_dir / f"madelon_alpha{int(alpha * 100):02d}_minppi.csv"
                 if bvc_file.exists():
                     bvc_minppi = pd.read_csv(bvc_file)
                     harmful_set = set(
@@ -246,8 +284,11 @@ def main() -> None:
                     )
                     minppi_per_seed_alpha[key] = harmful_set
                     p, r, f1 = _prf(harmful_set, gt_probes)
-                    print(f"    α={alpha:.2f} [bvc]: {len(harmful_set):3d} harmful  "
-                          f"P={p:.3f} R={r:.3f} F1={f1:.3f}", flush=True)
+                    print(
+                        f"    α={alpha:.2f} [bvc]: {len(harmful_set):3d} harmful  "
+                        f"P={p:.3f} R={r:.3f} F1={f1:.3f}",
+                        flush=True,
+                    )
                     continue
 
             if args.skip_minppi:
@@ -255,17 +296,28 @@ def main() -> None:
 
             t0 = time.perf_counter()
             minppi = estimate_minppi(
-                X_train, X_val, y_train, y_val,
-                alpha=alpha, method="shapg_guided", K_adv=20,
-                shapg_neighbors=sg_neighbors, shapg_scores=sg_scores,
-                seed=seed, verbose=False, task="binary",
+                X_train,
+                X_val,
+                y_train,
+                y_val,
+                alpha=alpha,
+                method="shapg_guided",
+                K_adv=20,
+                shapg_neighbors=sg_neighbors,
+                shapg_scores=sg_scores,
+                seed=seed,
+                verbose=False,
+                task="binary",
             )
             elapsed = time.perf_counter() - t0
             harmful_set = {f for f, v in minppi.items() if v == -1}
             minppi_per_seed_alpha[key] = harmful_set
             p, r, f1 = _prf(harmful_set, gt_probes)
-            print(f"    α={alpha:.2f}: {len(harmful_set):3d} harmful  "
-                  f"P={p:.3f} R={r:.3f} F1={f1:.3f}  ({elapsed:.0f}s)", flush=True)
+            print(
+                f"    α={alpha:.2f}: {len(harmful_set):3d} harmful  "
+                f"P={p:.3f} R={r:.3f} F1={f1:.3f}  ({elapsed:.0f}s)",
+                flush=True,
+            )
 
     # ==================================================================
     # Step 3: Aggregate and save
@@ -277,37 +329,60 @@ def main() -> None:
         # MinShap & SHAP (α-independent)
         if seed in minshap_per_seed:
             p, r, f1 = _prf(minshap_per_seed[seed], gt_probes)
-            rows.append({
-                "dataset": "madelon", "seed": seed, "alpha": None, "method": "minshap",
-                "n_predicted": len(minshap_per_seed[seed]),
-                "precision": p, "recall": r, "f1": f1,
-            })
+            rows.append(
+                {
+                    "dataset": "madelon",
+                    "seed": seed,
+                    "alpha": None,
+                    "method": "minshap",
+                    "n_predicted": len(minshap_per_seed[seed]),
+                    "precision": p,
+                    "recall": r,
+                    "f1": f1,
+                }
+            )
         if seed in shap_per_seed:
             p, r, f1 = _prf(shap_per_seed[seed], gt_probes)
-            rows.append({
-                "dataset": "madelon", "seed": seed, "alpha": None, "method": "shap",
-                "n_predicted": len(shap_per_seed[seed]),
-                "precision": p, "recall": r, "f1": f1,
-            })
+            rows.append(
+                {
+                    "dataset": "madelon",
+                    "seed": seed,
+                    "alpha": None,
+                    "method": "shap",
+                    "n_predicted": len(shap_per_seed[seed]),
+                    "precision": p,
+                    "recall": r,
+                    "f1": f1,
+                }
+            )
         # MinPPI per α
         for alpha in args.alpha:
             key = (seed, alpha)
             if key in minppi_per_seed_alpha:
                 p, r, f1 = _prf(minppi_per_seed_alpha[key], gt_probes)
-                rows.append({
-                    "dataset": "madelon", "seed": seed, "alpha": alpha, "method": "minppi",
-                    "n_predicted": len(minppi_per_seed_alpha[key]),
-                    "precision": p, "recall": r, "f1": f1,
-                })
+                rows.append(
+                    {
+                        "dataset": "madelon",
+                        "seed": seed,
+                        "alpha": alpha,
+                        "method": "minppi",
+                        "n_predicted": len(minppi_per_seed_alpha[key]),
+                        "precision": p,
+                        "recall": r,
+                        "f1": f1,
+                    }
+                )
 
     df = pd.DataFrame(rows)
     df.to_csv(out_dir / "madelon_alpha_recall.csv", index=False)
     print(f"\n  madelon_alpha_recall.csv saved ({len(df)} rows)", flush=True)
 
     # Aggregate over seeds
-    agg = df.groupby(["method", "alpha"])[
-        ["n_predicted", "precision", "recall", "f1"]
-    ].agg(["mean", "std"]).round(4)
+    agg = (
+        df.groupby(["method", "alpha"])[["n_predicted", "precision", "recall", "f1"]]
+        .agg(["mean", "std"])
+        .round(4)
+    )
     agg.to_csv(out_dir / "madelon_alpha_recall_agg.csv")
     print("  madelon_alpha_recall_agg.csv saved", flush=True)
     print(agg.to_string(), flush=True)
@@ -326,12 +401,28 @@ def main() -> None:
         mean_r = grp.mean()
         std_r = grp.std()
         alphas = mean_r.index.values
-        ax1.errorbar(alphas, mean_r["recall"], yerr=std_r["recall"],
-                     fmt="s-", color="#2ca02c", capsize=4, lw=1.5, ms=6,
-                     label="MinPPI recall")
-        ax1.errorbar(alphas, mean_r["precision"], yerr=std_r["precision"],
-                     fmt="o--", color="#1f77b4", capsize=4, lw=1.2, ms=5,
-                     label="MinPPI precision")
+        ax1.errorbar(
+            alphas,
+            mean_r["recall"],
+            yerr=std_r["recall"],
+            fmt="s-",
+            color="#2ca02c",
+            capsize=4,
+            lw=1.5,
+            ms=6,
+            label="MinPPI recall",
+        )
+        ax1.errorbar(
+            alphas,
+            mean_r["precision"],
+            yerr=std_r["precision"],
+            fmt="o--",
+            color="#1f77b4",
+            capsize=4,
+            lw=1.2,
+            ms=5,
+            label="MinPPI precision",
+        )
         ax1.set_xlabel(r"$\alpha$")
         ax1.set_ylabel("Score")
         ax1.set_ylim(-0.05, 1.15)
@@ -340,10 +431,13 @@ def main() -> None:
         ax1.grid(True, alpha=0.3)
 
     # Right: F₁ bar chart — MinPPI at each α + MinShap + SHAP
-    methods_order = [("minppi", a) for a in args.alpha] + \
-                    [("minshap", None), ("shap", None)]
-    labels = [f"PPI\n{a:.2f}" if m == "minppi" else m.capitalize()
-              for m, a in methods_order]
+    methods_order = [("minppi", a) for a in args.alpha] + [
+        ("minshap", None),
+        ("shap", None),
+    ]
+    labels = [
+        f"PPI\n{a:.2f}" if m == "minppi" else m.capitalize() for m, a in methods_order
+    ]
     f1_means = []
     f1_stds = []
     for method, alpha in methods_order:
@@ -354,9 +448,15 @@ def main() -> None:
         f1_stds.append(sub["f1"].std())
 
     x = np.arange(len(labels))
-    ax2.bar(x, f1_means, yerr=f1_stds, capsize=3,
-                   color=["#2ca02c"] * len(args.alpha) + ["#d62728", "#7f7f7f"],
-                   edgecolor="black", linewidth=0.4)
+    ax2.bar(
+        x,
+        f1_means,
+        yerr=f1_stds,
+        capsize=3,
+        color=["#2ca02c"] * len(args.alpha) + ["#d62728", "#7f7f7f"],
+        edgecolor="black",
+        linewidth=0.4,
+    )
     ax2.set_xticks(x)
     ax2.set_xticklabels(labels, fontsize=7)
     ax2.set_ylabel("F$_1$ score")
@@ -365,11 +465,15 @@ def main() -> None:
     ax2.grid(True, alpha=0.3, axis="y")
     # Highlight MinShap bar
     ms_idx = len(args.alpha)
-    ax2.annotate(f"F$_1$={f1_means[ms_idx]:.2f}",
-                 xy=(ms_idx, f1_means[ms_idx]),
-                 xytext=(ms_idx + 0.4, f1_means[ms_idx] + 0.08),
-                 fontsize=7, color="#d62728", fontweight="bold",
-                 arrowprops={"arrowstyle": "->", "color": "gray", "linewidth": 0.6})
+    ax2.annotate(
+        f"F$_1$={f1_means[ms_idx]:.2f}",
+        xy=(ms_idx, f1_means[ms_idx]),
+        xytext=(ms_idx + 0.4, f1_means[ms_idx] + 0.08),
+        fontsize=7,
+        color="#d62728",
+        fontweight="bold",
+        arrowprops={"arrowstyle": "->", "color": "gray", "linewidth": 0.6},
+    )
 
     fig.tight_layout()
     plot_path = out_dir / "madelon_alpha_recall.pdf"
@@ -385,10 +489,19 @@ def main() -> None:
     print("\nLaunch examples:", flush=True)
     print("  # Full run (all seeds, all alpha):", flush=True)
     print("  python -u experiments/madelon_alpha_recall.py", flush=True)
-    print("\n  # Quick test (seed 42 only, skip fresh MinPPI → use bvc cache):", flush=True)
-    print("  python experiments/madelon_alpha_recall.py --seeds 42 --skip-minppi", flush=True)
+    print(
+        "\n  # Quick test (seed 42 only, skip fresh MinPPI → use bvc cache):",
+        flush=True,
+    )
+    print(
+        "  python experiments/madelon_alpha_recall.py --seeds 42 --skip-minppi",
+        flush=True,
+    )
     print("\n  # Single alpha (seed 42):", flush=True)
-    print("  python experiments/madelon_alpha_recall.py --seeds 42 --alpha 0.90", flush=True)
+    print(
+        "  python experiments/madelon_alpha_recall.py --seeds 42 --alpha 0.90",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

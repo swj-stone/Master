@@ -186,8 +186,7 @@ def select_top_features(
     top_cols = scores.abs().sort_values(ascending=False).head(k).index.tolist()
 
     print(
-        f"  Feature selection (mutual info): {p} -> {len(top_cols)} "
-        f"(rule: top{k})",
+        f"  Feature selection (mutual info): {p} -> {len(top_cols)} (rule: top{k})",
     )
     return X[top_cols], top_cols
 

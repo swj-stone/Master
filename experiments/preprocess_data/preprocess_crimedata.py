@@ -294,7 +294,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path(__file__).resolve().parent.parent.parent / "configs" / "crimedata.yaml",
+        default=Path(__file__).resolve().parent.parent.parent
+        / "configs"
+        / "crimedata.yaml",
         help="Path to YAML configuration file",
     )
     return parser.parse_args()
@@ -326,8 +328,10 @@ def main() -> None:
         df.to_csv(raw_path, index=False)
     print(f"  Raw data saved to {raw_path}")
     print(f"  Shape: {df.shape}")
-    print(f"  Target stats: min={df[target_name].min():.4f}  "
-          f"mean={df[target_name].mean():.4f}  max={df[target_name].max():.4f}")
+    print(
+        f"  Target stats: min={df[target_name].min():.4f}  "
+        f"mean={df[target_name].mean():.4f}  max={df[target_name].max():.4f}"
+    )
 
     # Step 2: Feature engineering (seed-independent)
     banner("Step 2: Feature engineering (seed-independent)")

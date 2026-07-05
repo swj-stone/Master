@@ -145,10 +145,10 @@ DATASET_MINSHAP_BUDGET: dict[str, dict] = {
 }
 
 DATASET_MOFSPPI_BUDGET: dict[str, dict] = {
-    "spambase":    {"K_adv": 30, "pop_size": 30, "generations": 20},
-    "madelon":     {"K_adv": 20, "pop_size": 20, "generations": 15},
-    "isolet":      {"K_adv": 8, "pop_size": 20, "generations": 10},
-    "gisette":     {"K_adv": 10, "pop_size": 15, "generations": 8},
+    "spambase": {"K_adv": 30, "pop_size": 30, "generations": 20},
+    "madelon": {"K_adv": 20, "pop_size": 20, "generations": 15},
+    "isolet": {"K_adv": 8, "pop_size": 20, "generations": 10},
+    "gisette": {"K_adv": 10, "pop_size": 15, "generations": 8},
     "credit_card_fraud": {"K_adv": 30, "pop_size": 30, "generations": 20},
     "crimedata": {"K_adv": 8, "pop_size": 15, "generations": 8},
     "abalone": {"K_adv": 8, "pop_size": 30, "generations": 20},
@@ -156,10 +156,10 @@ DATASET_MOFSPPI_BUDGET: dict[str, dict] = {
 
 # NSGA2-uniform shares MOFS-MinPPI's pop/gen per dataset for fair HV comparison
 DATASET_NSGA2U_BUDGET: dict[str, dict] = {
-    "spambase":    {"pop_size": 30, "generations": 20},
-    "madelon":     {"pop_size": 20, "generations": 15},
-    "isolet":      {"pop_size": 20, "generations": 10},
-    "gisette":     {"pop_size": 15, "generations": 8},
+    "spambase": {"pop_size": 30, "generations": 20},
+    "madelon": {"pop_size": 20, "generations": 15},
+    "isolet": {"pop_size": 20, "generations": 10},
+    "gisette": {"pop_size": 15, "generations": 8},
     "credit_card_fraud": {"pop_size": 30, "generations": 20},
     "crimedata": {"pop_size": 15, "generations": 8},
     "abalone": {"pop_size": 30, "generations": 20},
@@ -167,10 +167,10 @@ DATASET_NSGA2U_BUDGET: dict[str, dict] = {
 
 # MOFS-SHAP n_samples scaled per dataset
 DATASET_MOFSSHAP_BUDGET: dict[str, dict] = {
-    "spambase":    {"n_samples": 100},
-    "madelon":     {"n_samples": 80},
-    "isolet":      {"n_samples": 80},
-    "gisette":     {"n_samples": 60},
+    "spambase": {"n_samples": 100},
+    "madelon": {"n_samples": 80},
+    "isolet": {"n_samples": 80},
+    "gisette": {"n_samples": 60},
     "credit_card_fraud": {"n_samples": 100},
     "crimedata": {"n_samples": 60},
     "abalone": {"n_samples": 80},
@@ -268,13 +268,21 @@ def evaluate_topk(
             stratify=y if task != "regression" else None,
         )
         if task == "regression":
-            model = XGBRegressor(n_estimators=100, max_depth=4, learning_rate=0.1, verbosity=0, random_state=seed)
+            model = XGBRegressor(
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
+            )
             model.fit(X_tr, y_tr)
             y_pred = model.predict(X_te)
             val = float(r2_score(y_te, y_pred))
             if val < 0.0:
                 val = 0.0
-            rows.append({"k": k, "n_features": len(feats), "metric": "R²", "value": val})
+            rows.append(
+                {"k": k, "n_features": len(feats), "metric": "R²", "value": val}
+            )
         else:
             model = XGBClassifier(
                 n_estimators=100,
@@ -324,11 +332,21 @@ def refit_pareto_front(
             fitness[i] = (0.0, 1.0, 0.0)
             continue
         X_tr, X_te, y_tr, y_te = train_test_split(
-            X_s[cols], y, test_size=0.2, random_state=seed, stratify=y if task != "regression" else None,
+            X_s[cols],
+            y,
+            test_size=0.2,
+            random_state=seed,
+            stratify=y if task != "regression" else None,
         )
         t0 = _time.perf_counter()
         if task == "regression":
-            model = XGBRegressor(n_estimators=100, max_depth=4, learning_rate=0.1, verbosity=0, random_state=seed)
+            model = XGBRegressor(
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
+            )
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 model.fit(X_tr, y_tr)
@@ -338,8 +356,11 @@ def refit_pareto_front(
                 perf = 0.0
         else:
             model = XGBClassifier(
-                n_estimators=100, max_depth=4, learning_rate=0.1,
-                verbosity=0, random_state=seed,
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
             )
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -384,9 +405,7 @@ def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
 
     # Separate top-k KPI columns from HV/compression columns
     kpi_cols = [
-        c
-        for c in raw_df.columns
-        if "@" in c and c.split("@")[0] in ("AUC", "R²")
+        c for c in raw_df.columns if "@" in c and c.split("@")[0] in ("AUC", "R²")
     ]
     hv_cr_cols = [
         c for c in raw_df.columns if c.startswith("hv") or c.startswith("cr_")
@@ -565,9 +584,7 @@ def main() -> None:
         "description": "Main table — MOFS-MinPPI + 7 baselines × 7 datasets × 5 seeds",
         "baselines": {},
         "seeds": SEEDS,
-        "datasets": [
-            {"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS
-        ],
+        "datasets": [{"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS],
         "topk_kpis": list(TOP_K_KPIS),
         "nsga2_metrics": ["hv", "cr_1pct", "cr_3pct", "cr_5pct"],
     }
@@ -641,7 +658,9 @@ def main() -> None:
                 call_kwargs["task"] = task
 
                 if method == "mofs_minppi" and task == "regression":
-                    call_kwargs["verbose"] = False  # suppress verbose for regression run
+                    call_kwargs["verbose"] = (
+                        False  # suppress verbose for regression run
+                    )
 
                 # ---- NSGA-II methods: capture Pareto front via side-channel ----
                 result_box: list = []
@@ -690,7 +709,9 @@ def main() -> None:
                     imp_path, index=False
                 )
 
-                kpi_df = evaluate_topk(X, y, [f for f, _ in ranking], seed=seed, task=task)
+                kpi_df = evaluate_topk(
+                    X, y, [f for f, _ in ranking], seed=seed, task=task
+                )
                 kpi_path = method_dir / f"{prefix}_s{seed}_topk_kpi.csv"
                 kpi_df.to_csv(kpi_path, index=False)
                 for _, kpi_row in kpi_df.iterrows():
@@ -723,7 +744,9 @@ def main() -> None:
                     # weak models during search — refit here for fair comparison.
                     if method != "mofs_minppi":
                         pf_fitness = refit_pareto_front(
-                            pf_data["masks"], X, y,
+                            pf_data["masks"],
+                            X,
+                            y,
                             features=list(X.columns),
                             n_classes=n_classes,
                             seed=seed,
@@ -746,12 +769,19 @@ def main() -> None:
                     safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
                     X_safe = X.rename(columns=safe_cols)
                     X_tr, X_te, y_tr, y_te = train_test_split(
-                        X_safe, y, test_size=0.2, random_state=seed, stratify=y if task != "regression" else None,
+                        X_safe,
+                        y,
+                        test_size=0.2,
+                        random_state=seed,
+                        stratify=y if task != "regression" else None,
                     )
                     if task == "regression":
                         full_model = XGBRegressor(
-                            n_estimators=100, max_depth=4, learning_rate=0.1,
-                            verbosity=0, random_state=seed,
+                            n_estimators=100,
+                            max_depth=4,
+                            learning_rate=0.1,
+                            verbosity=0,
+                            random_state=seed,
                         )
                         full_model.fit(X_tr, y_tr)
                         y_pred = full_model.predict(X_te)
@@ -760,8 +790,11 @@ def main() -> None:
                             full_metric = 0.0
                     else:
                         full_model = XGBClassifier(
-                            n_estimators=100, max_depth=4, learning_rate=0.1,
-                            verbosity=0, random_state=seed,
+                            n_estimators=100,
+                            max_depth=4,
+                            learning_rate=0.1,
+                            verbosity=0,
+                            random_state=seed,
                         )
                         full_model.fit(X_tr, y_tr)
                         full_prob = full_model.predict_proba(X_te)
@@ -772,11 +805,15 @@ def main() -> None:
                         )
                     for loss in AUC_LOSS_THRESHOLDS:
                         cr = compression_rate_from_fitness(
-                            full_metric, pf_fitness, loss, n_total,
+                            full_metric,
+                            pf_fitness,
+                            loss,
+                            n_total,
                         )
                         row[f"cr_{int(loss * 100):d}pct"] = round(cr, 4)
                     print(
-                        "  "  + "  ".join(
+                        "  "
+                        + "  ".join(
                             f"CR@{int(loss * 100)}%={row[f'cr_{int(loss * 100):d}pct']:.3f}"
                             for loss in AUC_LOSS_THRESHOLDS
                         ),
@@ -818,10 +855,10 @@ def main() -> None:
             )
         else:
             p_val = res["p_value"]
-            sig = "***" if p_val < 0.001 else (
-                "**" if p_val < 0.01 else (
-                    "*" if p_val < 0.05 else "n.s."
-                )
+            sig = (
+                "***"
+                if p_val < 0.001
+                else ("**" if p_val < 0.01 else ("*" if p_val < 0.05 else "n.s."))
             )
             sig_mark = f" {sig}" if res["significant"] else ""
             print(

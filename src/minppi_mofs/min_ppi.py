@@ -72,7 +72,12 @@ def estimate_minppi_exact(
     """
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
-            X_train, X_val, y_train, y_val, task=task, seed=seed,
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            task=task,
+            seed=seed,
         )
     acc_cache.set_threshold(alpha)
 
@@ -175,8 +180,13 @@ def estimate_minppi_random_mc(
     rng = np.random.default_rng(seed)
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
-        X_train, X_val, y_train, y_val, task=task, seed=seed,
-    )
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            task=task,
+            seed=seed,
+        )
     acc_cache.set_threshold(alpha)
 
     features = list(X_train.columns)
@@ -331,8 +341,13 @@ def estimate_minppi_shapg_guided(
     rng = np.random.default_rng(seed)
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
-        X_train, X_val, y_train, y_val, task=task, seed=seed,
-    )
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            task=task,
+            seed=seed,
+        )
     acc_cache.set_threshold(alpha)
 
     features = list(X_train.columns)
@@ -633,7 +648,12 @@ def estimate_minppi(
 
     # Build acc_cache once and reuse
     acc_cache = make_acc_full_cache(
-        X_train, X_val, y_train, y_val, task=task, seed=seed,
+        X_train,
+        X_val,
+        y_train,
+        y_val,
+        task=task,
+        seed=seed,
     )
 
     fn = methods[method]

@@ -435,8 +435,8 @@ class TestMOFSMinPPIResult:
         # b appears in sol  with AUC 0.8               → max 0.8
         # c appears in sol  with AUC 0.9               → max 0.9
         assert imp["a"] >= imp["c"]  # both tied at 0.9
-        assert imp["a"] > imp["b"]   # 0.9 > 0.8
-        assert imp["c"] > imp["b"]   # 0.9 > 0.8
+        assert imp["a"] > imp["b"]  # 0.9 > 0.8
+        assert imp["c"] > imp["b"]  # 0.9 > 0.8
 
 
 # ---------------------------------------------------------------------------

@@ -86,10 +86,10 @@ TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50)
 
 # Per-dataset budget — shrinks MinPPI + NSGA-II cost on high-dimensional datasets
 DATASET_BUDGET: dict[str, dict] = {
-    "spambase":    {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
-    "madelon":     {"K": 100, "K_adv": 20, "pop": 20, "gen": 15},
-    "isolet":      {"K": 80,  "K_adv": 3, "pop": 20, "gen": 10},
-    "gisette":     {"K": 50,  "K_adv": 10, "pop": 15, "gen": 8},
+    "spambase": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
+    "madelon": {"K": 100, "K_adv": 20, "pop": 20, "gen": 15},
+    "isolet": {"K": 80, "K_adv": 3, "pop": 20, "gen": 10},
+    "gisette": {"K": 50, "K_adv": 10, "pop": 15, "gen": 8},
     "credit_card_fraud": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
     "crimedata": {"K": 50, "K_adv": 10, "pop": 15, "gen": 8},
     "abalone": {"K": 50, "K_adv": 10, "pop": 30, "gen": 20},
@@ -178,8 +178,11 @@ def evaluate_topk(
         )
         if task == "regression":
             model = XGBRegressor(
-                n_estimators=100, max_depth=4, learning_rate=0.1,
-                verbosity=0, random_state=seed,
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
             )
             model.fit(X_tr, y_tr)
             y_pred = model.predict(X_te)
@@ -203,9 +206,7 @@ def evaluate_topk(
             val = float(roc_auc_score(y_te, y_prob[:, 1]))
         else:
             val = float(roc_auc_score(y_te, y_prob, multi_class="ovr"))
-        rows.append(
-            {"k": k, "n_features": len(feats), "metric": "AUC", "value": val}
-        )
+        rows.append({"k": k, "n_features": len(feats), "metric": "AUC", "value": val})
     return pd.DataFrame(rows)
 
 
@@ -323,9 +324,7 @@ def main() -> None:
         "description": "Alpha sensitivity sweep — quota parameter α ∈ {0.85, 0.90, 0.95, 0.99}",
         "seed": 42,
         "alpha_values": ALPHA_VALUES,
-        "datasets": [
-            {"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS
-        ],
+        "datasets": [{"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS],
         "evaluation": {
             "topk_kpis": list(TOP_K_KPIS),
         },
@@ -347,7 +346,10 @@ def main() -> None:
 
         X, y = load_data(prefix, target, processed_dir)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=42,
+            X,
+            y,
+            test_size=0.2,
+            random_state=42,
             stratify=y if task != "regression" else None,
         )
         budget = _budget_for(prefix)
@@ -361,19 +363,30 @@ def main() -> None:
         # Regression uses R² via task= parameter.
         if n_classes > 2:
             model_params_ab = {
-                "n_estimators": 25, "max_depth": 2, "learning_rate": 0.3,
+                "n_estimators": 25,
+                "max_depth": 2,
+                "learning_rate": 0.3,
             }
         else:
             model_params_ab = {
-                "n_estimators": 50, "max_depth": 3, "learning_rate": 0.1,
+                "n_estimators": 50,
+                "max_depth": 3,
+                "learning_rate": 0.1,
             }
         cache = make_acc_full_cache(
-            X_tr, X_val, y_tr, y_val, seed=42,
-            model_params=model_params_ab, task=task,
+            X_tr,
+            X_val,
+            y_tr,
+            y_val,
+            seed=42,
+            model_params=model_params_ab,
+            task=task,
         )
         acc_full = cache.acc_full
         metric_label = "R²" if task == "regression" else "AUC"
-        print(f"  Full-feature {metric_label}: {acc_full:.4f}, n_features: {n_features}")
+        print(
+            f"  Full-feature {metric_label}: {acc_full:.4f}, n_features: {n_features}"
+        )
 
         # ShapG guidance — only needed for binary datasets (Algorithm B).
         # Multiclass uses Algorithm A (random MC), which does not depend on
@@ -383,7 +396,11 @@ def main() -> None:
         sg_neighbors: dict[str, list[str]] | None = None
         if n_classes == 2 and task != "regression":
             sg_scores, sg_neighbors = build_guidance_from_data(
-                X_tr, y_tr, depth=1, m=5, seed=42,
+                X_tr,
+                y_tr,
+                depth=1,
+                m=5,
+                seed=42,
             )
         # For regression: pre-compute mutual information scores for ranking proxy
         mi_scores: dict[str, float] = {}
@@ -419,18 +436,32 @@ def main() -> None:
             t0 = time.perf_counter()
             if n_classes > 2 or task == "regression":
                 minppi = estimate_minppi_random_mc(
-                    X_tr, X_val, y_tr, y_val,
-                    alpha=alpha, K=200, shared_coalitions=True,
-                    per_coalition=5, acc_cache=cache, seed=42, verbose=False,
+                    X_tr,
+                    X_val,
+                    y_tr,
+                    y_val,
+                    alpha=alpha,
+                    K=200,
+                    shared_coalitions=True,
+                    per_coalition=5,
+                    acc_cache=cache,
+                    seed=42,
+                    verbose=False,
                     task=task,
                 )
             else:
                 minppi = estimate_minppi_shapg_guided(
-                    X_tr, X_val, y_tr, y_val,
-                    alpha=alpha, K_adv=budget["K_adv"],
+                    X_tr,
+                    X_val,
+                    y_tr,
+                    y_val,
+                    alpha=alpha,
+                    K_adv=budget["K_adv"],
                     shapg_neighbors=sg_neighbors,
                     shapg_scores=sg_scores,
-                    acc_cache=cache, seed=42, verbose=False,
+                    acc_cache=cache,
+                    seed=42,
+                    verbose=False,
                     task=task,
                 )
             t_minppi = time.perf_counter() - t0
@@ -479,11 +510,13 @@ def main() -> None:
 
             neutral_f = sorted(
                 [f for f in features if minppi.get(f, 0) == 0],
-                key=_score, reverse=True,
+                key=_score,
+                reverse=True,
             )
             harmful_f = sorted(
                 [f for f in features if minppi.get(f, 0) == -1],
-                key=_score, reverse=True,
+                key=_score,
+                reverse=True,
             )
             ranking_mpp = decisive_f + neutral_f + harmful_f
             ranking_per_alpha[alpha] = ranking_mpp
@@ -588,7 +621,10 @@ def main() -> None:
             metric_col = f"{prefix}@{k}"
             if metric_col in metrics_df.columns:
                 pivot = metrics_df.pivot_table(
-                    index="dataset", columns="alpha", values=metric_col, aggfunc="first",
+                    index="dataset",
+                    columns="alpha",
+                    values=metric_col,
+                    aggfunc="first",
                 )
                 pivot = pivot.round(4)
                 pivot.to_csv(run_dir / f"table_{prefix}@{k}_vs_alpha.csv")
@@ -646,7 +682,9 @@ def main() -> None:
                 if abs(a2 - a1) == 0.05:  # 1-step neighbor
                     neighbors_jac[a1].append(jh)
                     neighbors_jac[a2].append(jh)
-            mean_jac = {a: float(np.mean(v)) if v else 0.0 for a, v in neighbors_jac.items()}
+            mean_jac = {
+                a: float(np.mean(v)) if v else 0.0 for a, v in neighbors_jac.items()
+            }
         else:
             mean_jac = {a: 0.0 for a in ALPHA_VALUES}
 
@@ -668,18 +706,34 @@ def main() -> None:
         lines.append("    J(neighbor): " + "  ".join(parts))
         print("\n".join(lines), flush=True)
 
-        summary_rows.append({
-            "dataset": prefix,
-            "recommended_alpha": float(best_row["alpha"]),
-            "n_harmful_at_best": int(best_row["n_harmful"]),
-            "pct_harmful_at_best": float(best_row["pct_harmful"]),
-            "best_kpi_at_10": float(best_row.get(kpi_col, float("nan"))),
-            "best_kpi_name": kpi_col,
-            "J_neighbor_harmful_at_best": round(mean_jac.get(float(best_row["alpha"]), 0.0), 3),
-            "n_harmful_α085": int(ds_rows[ds_rows["alpha"] == 0.85]["n_harmful"].values[0]) if 0.85 in ds_rows["alpha"].values else 0,
-            "n_harmful_α095": int(ds_rows[ds_rows["alpha"] == 0.95]["n_harmful"].values[0]) if 0.95 in ds_rows["alpha"].values else 0,
-            "n_harmful_α099": int(ds_rows[ds_rows["alpha"] == 0.99]["n_harmful"].values[0]) if 0.99 in ds_rows["alpha"].values else 0,
-        })
+        summary_rows.append(
+            {
+                "dataset": prefix,
+                "recommended_alpha": float(best_row["alpha"]),
+                "n_harmful_at_best": int(best_row["n_harmful"]),
+                "pct_harmful_at_best": float(best_row["pct_harmful"]),
+                "best_kpi_at_10": float(best_row.get(kpi_col, float("nan"))),
+                "best_kpi_name": kpi_col,
+                "J_neighbor_harmful_at_best": round(
+                    mean_jac.get(float(best_row["alpha"]), 0.0), 3
+                ),
+                "n_harmful_α085": int(
+                    ds_rows[ds_rows["alpha"] == 0.85]["n_harmful"].values[0]
+                )
+                if 0.85 in ds_rows["alpha"].values
+                else 0,
+                "n_harmful_α095": int(
+                    ds_rows[ds_rows["alpha"] == 0.95]["n_harmful"].values[0]
+                )
+                if 0.95 in ds_rows["alpha"].values
+                else 0,
+                "n_harmful_α099": int(
+                    ds_rows[ds_rows["alpha"] == 0.99]["n_harmful"].values[0]
+                )
+                if 0.99 in ds_rows["alpha"].values
+                else 0,
+            }
+        )
 
     # Global recommendation table
     summary_df = pd.DataFrame(summary_rows)
@@ -756,7 +810,7 @@ def main() -> None:
                 base[["dataset", "pct_harmful"]],
                 comp[["dataset", "pct_harmful"]],
                 on="dataset",
-                suffixes=("_095", f"_{int(a*100):02d}"),
+                suffixes=("_095", f"_{int(a * 100):02d}"),
             ).dropna()
             if len(merged) < 4:
                 print(
@@ -767,7 +821,7 @@ def main() -> None:
             try:
                 stat_w, p_w = wilcoxon(
                     merged["pct_harmful_095"].values,
-                    merged[f"pct_harmful_{int(a*100):02d}"].values,
+                    merged[f"pct_harmful_{int(a * 100):02d}"].values,
                     method="approx",
                 )
                 sig_w = " *" if p_w < 0.05 else ""
@@ -777,6 +831,7 @@ def main() -> None:
                 )
             except Exception:
                 import traceback
+
                 print(f"    α=0.95 vs {a:.2f}: ERROR", flush=True)
                 traceback.print_exc()
 

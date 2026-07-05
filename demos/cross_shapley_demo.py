@@ -35,7 +35,6 @@ from itertools import combinations
 from typing import Tuple
 
 import numpy as np
-from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
@@ -63,6 +62,7 @@ y = (logits > np.median(logits)).astype(int)
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.3, random_state=42, stratify=y
 )
+
 
 # ---------------------------------------------------------------------------
 # 2. Three "architecture operations"
@@ -141,14 +141,18 @@ def all_subsets(n: int):
             yield combo
 
 
-print(f"Precomputing v(F, A) for all 2^{N_FEATURES} × 2^{N_OPS} = "
-      f"{2**N_FEATURES * 2**N_OPS} subsets ...")
+print(
+    f"Precomputing v(F, A) for all 2^{N_FEATURES} × 2^{N_OPS} = "
+    f"{2**N_FEATURES * 2**N_OPS} subsets ..."
+)
 v_table: dict[Tuple[Tuple[int, ...], Tuple[int, ...]], float] = {}
 for F in all_subsets(N_FEATURES):
     for A in all_subsets(N_OPS):
         v_table[(F, A)] = v(F, A)
-print(f"Done. v(∅,∅) = {v_table[((), ())]:.4f}, "
-      f"v(F=all, A=all) = {v_table[(tuple(range(N_FEATURES)), tuple(range(N_OPS)))]:.4f}\n")
+print(
+    f"Done. v(∅,∅) = {v_table[((), ())]:.4f}, "
+    f"v(F=all, A=all) = {v_table[(tuple(range(N_FEATURES)), tuple(range(N_OPS)))]:.4f}\n"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -231,14 +235,12 @@ def feature_shapley_marginalized(i: int) -> float:
             # Probability that a uniformly random ordering of ops produces T as
             # the prefix... we use uniform over the entire size distribution
             # for simplicity (mean over all 2^m subsets weighted equally).
-            w_T = 1.0 / (2 ** m)
+            w_T = 1.0 / (2**m)
             for s in range(n):
                 w_S = shapley_weight(s, n)
                 for S in combinations(other_F, s):
                     S_with_i = tuple(sorted(S + (i,)))
-                    total += w_T * w_S * (
-                        v_table[(S_with_i, T)] - v_table[(S, T)]
-                    )
+                    total += w_T * w_S * (v_table[(S_with_i, T)] - v_table[(S, T)])
     return total
 
 
@@ -248,14 +250,12 @@ def arch_shapley_marginalized(o: int) -> float:
     total = 0.0
     for s in range(n + 1):
         for S in combinations(range(n), s):
-            w_S = 1.0 / (2 ** n)
+            w_S = 1.0 / (2**n)
             for t in range(m):
                 w_T = shapley_weight(t, m)
                 for T in combinations(other_A, t):
                     T_with_o = tuple(sorted(T + (o,)))
-                    total += w_S * w_T * (
-                        v_table[(S, T_with_o)] - v_table[(S, T)]
-                    )
+                    total += w_S * w_T * (v_table[(S, T_with_o)] - v_table[(S, T)])
     return total
 
 

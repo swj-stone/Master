@@ -35,6 +35,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -55,25 +56,29 @@ ALPHA_VALUES: list[float] = [0.85, 0.90, 0.95, 0.99]
 SEEDS: list[int] = [42, 123, 456, 789, 1024]
 
 DATASETS: list[tuple[str, str, str]] = [
-    ("spambase",             "is_spam",        "binary"),
-    ("madelon",              "label",          "binary"),
-    ("isolet",               "letter",         "multiclass"),
-    ("gisette",              "label",          "binary"),
-    ("credit_card_fraud",    "Class",          "binary"),
-    ("crimedata",            "nonViolPerPop",  "regression"),
-    ("abalone",              "Rings",          "regression"),
+    ("spambase", "is_spam", "binary"),
+    ("madelon", "label", "binary"),
+    ("isolet", "letter", "multiclass"),
+    ("gisette", "label", "binary"),
+    ("credit_card_fraud", "Class", "binary"),
+    ("crimedata", "nonViolPerPop", "regression"),
+    ("abalone", "Rings", "regression"),
 ]
 
 DATASET_BUDGET: dict[str, dict] = {
-    "spambase": {"K_adv": 30}, "madelon": {"K_adv": 20},
-    "isolet": {"K_adv": 8}, "gisette": {"K_adv": 10},
+    "spambase": {"K_adv": 30},
+    "madelon": {"K_adv": 20},
+    "isolet": {"K_adv": 8},
+    "gisette": {"K_adv": 10},
     "credit_card_fraud": {"K_adv": 30},
-    "crimedata": {"K_adv": 10}, "abalone": {"K_adv": 10},
+    "crimedata": {"K_adv": 10},
+    "abalone": {"K_adv": 10},
 }
 
 # ============================================================
 # Helpers
 # ============================================================
+
 
 def _now_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -83,7 +88,8 @@ def _git_commit(repo_root: Path) -> str:
     try:
         return subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
-            cwd=str(repo_root), text=True,
+            cwd=str(repo_root),
+            text=True,
         ).strip()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
@@ -109,16 +115,24 @@ class _Tee:
 
 
 def load_split(
-    prefix: str, target: str, processed_dir: Path, *, seed: int,
-) -> tuple[pd.DataFrame, np.ndarray, pd.DataFrame, np.ndarray,
-           pd.DataFrame, np.ndarray]:
+    prefix: str,
+    target: str,
+    processed_dir: Path,
+    *,
+    seed: int,
+) -> tuple[
+    pd.DataFrame, np.ndarray, pd.DataFrame, np.ndarray, pd.DataFrame, np.ndarray
+]:
     train = pd.read_csv(processed_dir / f"{prefix}_s{seed}_train.csv")
-    val   = pd.read_csv(processed_dir / f"{prefix}_s{seed}_val.csv")
-    test  = pd.read_csv(processed_dir / f"{prefix}_s{seed}_test.csv")
+    val = pd.read_csv(processed_dir / f"{prefix}_s{seed}_val.csv")
+    test = pd.read_csv(processed_dir / f"{prefix}_s{seed}_test.csv")
     return (
-        train.drop(columns=[target]), train[target].values,
-        val.drop(columns=[target]),   val[target].values,
-        test.drop(columns=[target]),  test[target].values,
+        train.drop(columns=[target]),
+        train[target].values,
+        val.drop(columns=[target]),
+        val[target].values,
+        test.drop(columns=[target]),
+        test[target].values,
     )
 
 
@@ -127,17 +141,24 @@ def _budget_for(prefix: str) -> dict:
 
 
 def train_and_eval(
-    X_tr: pd.DataFrame, y_tr: np.ndarray,
-    X_te: pd.DataFrame, y_te: np.ndarray,
-    *, task: str = "binary", seed: int = 42,
+    X_tr: pd.DataFrame,
+    y_tr: np.ndarray,
+    X_te: pd.DataFrame,
+    y_te: np.ndarray,
+    *,
+    task: str = "binary",
+    seed: int = 42,
 ) -> tuple[float, float]:
     t0 = time.perf_counter()
     n_classes = len(np.unique(y_te))
 
     if task == "regression":
         model = XGBRegressor(
-            n_estimators=100, max_depth=4, learning_rate=0.1,
-            verbosity=0, random_state=seed,
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
         )
         model.fit(X_tr.values, y_tr)
         y_pred = model.predict(X_te.values)
@@ -146,8 +167,11 @@ def train_and_eval(
             val = 0.0
     else:
         model = XGBClassifier(
-            n_estimators=100, max_depth=4, learning_rate=0.1,
-            verbosity=0, random_state=seed,
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
         )
         model.fit(X_tr.values, y_tr)
         y_prob = model.predict_proba(X_te.values)
@@ -161,6 +185,7 @@ def train_and_eval(
 # ============================================================
 # Main
 # ============================================================
+
 
 def main() -> None:
     project_root = Path(__file__).resolve().parent.parent
@@ -189,9 +214,11 @@ def main() -> None:
     print(f"Commit: {commit}")
 
     metadata = {
-        "run_id": run_id, "git_commit": commit,
+        "run_id": run_id,
+        "git_commit": commit,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "alpha_values": ALPHA_VALUES, "seeds": SEEDS,
+        "alpha_values": ALPHA_VALUES,
+        "seeds": SEEDS,
         "datasets": [d[0] for d in DATASETS],
     }
     (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
@@ -199,13 +226,16 @@ def main() -> None:
 
     all_rows: list[dict] = []
 
-    for prefix, target, task in tqdm(DATASETS, desc="alpha-Pareto", unit="ds",
-                                      file=sys.stdout):
-        for seed in tqdm(SEEDS, desc=f"  seeds ({prefix})", unit="seed",
-                          file=sys.stdout, leave=False):
+    for prefix, target, task in tqdm(
+        DATASETS, desc="alpha-Pareto", unit="ds", file=sys.stdout
+    ):
+        for seed in tqdm(
+            SEEDS, desc=f"  seeds ({prefix})", unit="seed", file=sys.stdout, leave=False
+        ):
             try:
                 X_tr, y_tr, X_val, y_val, X_te, y_te = load_split(
-                    prefix, target, processed_dir, seed=seed)
+                    prefix, target, processed_dir, seed=seed
+                )
             except FileNotFoundError:
                 print(f"\n  SKIP {prefix} s{seed}: missing split")
                 continue
@@ -215,14 +245,16 @@ def main() -> None:
             metric_label = "R2" if task == "regression" else "AUC"
 
             base_util, base_time = train_and_eval(
-                X_tr, y_tr, X_te, y_te, task=task, seed=seed)
+                X_tr, y_tr, X_te, y_te, task=task, seed=seed
+            )
             print(f"\n  {prefix} s{seed}: base {metric_label}={base_util:.4f}")
 
             sg_scores: dict = {}
             sg_neighbors = None
             if n_classes == 2 and task != "regression":
                 sg_scores, sg_neighbors = build_guidance_from_data(
-                    X_tr, y_tr, depth=1, m=5, seed=seed)
+                    X_tr, y_tr, depth=1, m=5, seed=seed
+                )
 
             for alpha in ALPHA_VALUES:
                 t0 = time.perf_counter()
@@ -230,17 +262,33 @@ def main() -> None:
 
                 if n_classes > 2 or task == "regression":
                     minppi = estimate_minppi_random_mc(
-                        X_tr, X_val, y_tr, y_val,
-                        alpha=alpha, K=200, shared_coalitions=True,
-                        per_coalition=5, seed=seed, verbose=False, task=task)
+                        X_tr,
+                        X_val,
+                        y_tr,
+                        y_val,
+                        alpha=alpha,
+                        K=200,
+                        shared_coalitions=True,
+                        per_coalition=5,
+                        seed=seed,
+                        verbose=False,
+                        task=task,
+                    )
                 else:
                     minppi = estimate_minppi(
-                        X_tr, X_val, y_tr, y_val,
-                        alpha=alpha, method="shapg_guided",
+                        X_tr,
+                        X_val,
+                        y_tr,
+                        y_val,
+                        alpha=alpha,
+                        method="shapg_guided",
                         K_adv=budget["K_adv"],
                         shapg_neighbors=sg_neighbors,
                         shapg_scores=sg_scores,
-                        seed=seed, verbose=False, task=task)
+                        seed=seed,
+                        verbose=False,
+                        task=task,
+                    )
 
                 harmful = {f for f, v in minppi.items() if v == -1}
                 n_harmful = len(harmful)
@@ -250,55 +298,68 @@ def main() -> None:
                 if n_harmful > 0:
                     keep = [c for c in X_tr.columns if c not in harmful]
                     filt_util, _ = train_and_eval(
-                        X_tr[keep], y_tr, X_te[keep], y_te,
-                        task=task, seed=seed)
+                        X_tr[keep], y_tr, X_te[keep], y_te, task=task, seed=seed
+                    )
                 else:
                     filt_util, _ = base_util, base_time
 
                 preserv = filt_util / base_util if base_util > 0 else 1.0
 
                 row = {
-                    "dataset": prefix, "seed": seed, "alpha": alpha,
-                    "n_full": n_full, "n_harmful": n_harmful,
+                    "dataset": prefix,
+                    "seed": seed,
+                    "alpha": alpha,
+                    "n_full": n_full,
+                    "n_harmful": n_harmful,
                     "compression": round(cr, 4),
                     "base_util": round(base_util, 4),
                     "filtered_util": round(filt_util, 4),
-                    "AUC" if task != "regression" else "R2":
-                        round(filt_util, 4),
+                    "AUC" if task != "regression" else "R2": round(filt_util, 4),
                     "preservation": round(preserv, 4),
                     "time_minppi_s": round(t_minppi, 1),
                     "metric": metric_label,
                 }
                 all_rows.append(row)
                 print(
-                    f"    a={alpha:.2f}: harmful={n_harmful} ({cr*100:.1f}%), "
+                    f"    a={alpha:.2f}: harmful={n_harmful} ({cr * 100:.1f}%), "
                     f"{metric_label}={filt_util:.4f} (preserv={preserv:.4f}) "
-                    f"({t_minppi:.1f}s)", flush=True)
+                    f"({t_minppi:.1f}s)",
+                    flush=True,
+                )
 
     # ---- Save CSVs ----
     df = pd.DataFrame(all_rows)
     df.to_csv(tables_dir / "pareto_front.csv", index=False)
     print(f"\n  pareto_front.csv saved ({len(df)} rows)")
 
-    num_cols = [c for c in df.columns if c in (
-        "compression", "base_util", "filtered_util", "AUC", "R2",
-        "preservation", "time_minppi_s")]
-    agg = df.groupby(["dataset", "alpha"])[num_cols].agg(
-        ["mean", "std"]).round(4)
+    num_cols = [
+        c
+        for c in df.columns
+        if c
+        in (
+            "compression",
+            "base_util",
+            "filtered_util",
+            "AUC",
+            "R2",
+            "preservation",
+            "time_minppi_s",
+        )
+    ]
+    agg = df.groupby(["dataset", "alpha"])[num_cols].agg(["mean", "std"]).round(4)
     agg.to_csv(tables_dir / "pareto_front_agg.csv")
     print("  pareto_front_agg.csv saved")
 
     for col_key in ["compression", "preservation"]:
         pivot = df.pivot_table(
-            index="dataset", columns="alpha",
-            values=col_key, aggfunc="mean").round(4)
+            index="dataset", columns="alpha", values=col_key, aggfunc="mean"
+        ).round(4)
         pivot.to_csv(tables_dir / f"table_{col_key}_vs_alpha.csv")
 
     # ---- Plot ----
     _header("Plotting")
     ds_names = sorted(df["dataset"].unique())
-    alpha_colors = {0.85: "#d62728", 0.90: "#ff7f0e",
-                    0.95: "#2ca02c", 0.99: "#1f77b4"}
+    alpha_colors = {0.85: "#d62728", 0.90: "#ff7f0e", 0.95: "#2ca02c", 0.99: "#1f77b4"}
     alpha_markers = {0.85: "s", 0.90: "D", 0.95: "o", 0.99: "^"}
 
     # Classification: 5 datasets (4 AUC + 1 multiclass/Accuracy)
@@ -310,13 +371,15 @@ def main() -> None:
         isolet_ds = [d for d in cls_ds if d == "isolet"]
         auc_ds = sorted(d for d in cls_ds if d != "isolet")
         n_cols, n_rows = 3, 2
-        fig, axes = plt.subplots(n_rows, n_cols,
-                                  figsize=(10.5, 6.0), squeeze=False)
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(10.5, 6.0), squeeze=False)
         fig.suptitle(
-            "Alpha-Pareto Front -- Classification" + chr(10) +
-            "X = compression (% features removed),  "
+            "Alpha-Pareto Front -- Classification"
+            + chr(10)
+            + "X = compression (% features removed),  "
             "Y = preservation (1.0 = full-model baseline)",
-            fontsize=11, y=1.02)
+            fontsize=11,
+            y=1.02,
+        )
 
         grid_map = {}
         auc_positions = [(0, 0), (0, 1), (0, 2), (1, 0)]
@@ -333,8 +396,11 @@ def main() -> None:
 
         for ds, (rr, cc) in grid_map.items():
             ax = axes[rr, cc]
-            sub = df[df["dataset"] == ds].groupby("alpha")[
-                ["compression", "preservation", "n_harmful"]].mean()
+            sub = (
+                df[df["dataset"] == ds]
+                .groupby("alpha")[["compression", "preservation", "n_harmful"]]
+                .mean()
+            )
             n_full = int(df[df["dataset"] == ds]["n_full"].iloc[0])
             metric_label = df[df["dataset"] == ds]["metric"].iloc[0]
             label_suffix = " (Accuracy)" if ds == "isolet" else f" ({metric_label})"
@@ -351,13 +417,24 @@ def main() -> None:
                 x_val = sub.loc[a, "compression"] * 100
                 y_val = sub.loc[a, "preservation"]
                 n_h = int(sub.loc[a, "n_harmful"])
-                ax.scatter(x_val, y_val,
-                           color=alpha_colors[a], marker=alpha_markers[a],
-                           s=80, zorder=5, edgecolors="black", linewidth=0.3)
-                ax.annotate(f"Alpha={a:.2f}" + chr(10) + f"{n_h}/{n_full}",
-                            (x_val, y_val),
-                            textcoords="offset points", xytext=(6, -10),
-                            fontsize=6, color=alpha_colors[a])
+                ax.scatter(
+                    x_val,
+                    y_val,
+                    color=alpha_colors[a],
+                    marker=alpha_markers[a],
+                    s=80,
+                    zorder=5,
+                    edgecolors="black",
+                    linewidth=0.3,
+                )
+                ax.annotate(
+                    f"Alpha={a:.2f}" + chr(10) + f"{n_h}/{n_full}",
+                    (x_val, y_val),
+                    textcoords="offset points",
+                    xytext=(6, -10),
+                    fontsize=6,
+                    color=alpha_colors[a],
+                )
 
             ax.axhline(y=1.0, color="gray", linewidth=0.5, linestyle="--")
             ax.set_ylim(y_lo, y_hi)
@@ -370,11 +447,21 @@ def main() -> None:
                 axes[rr, 0].set_ylabel("Preservation ratio")
                 break
 
-        handles = [Line2D([], [], color=alpha_colors[a], marker=alpha_markers[a],
-                           linestyle="", markersize=7, label=f"Alpha={a:.2f}")
-                   for a in ALPHA_VALUES]
-        fig.legend(handles=handles, loc="lower center", ncol=4,
-                   fontsize=8, framealpha=0.9)
+        handles = [
+            Line2D(
+                [],
+                [],
+                color=alpha_colors[a],
+                marker=alpha_markers[a],
+                linestyle="",
+                markersize=7,
+                label=f"Alpha={a:.2f}",
+            )
+            for a in ALPHA_VALUES
+        ]
+        fig.legend(
+            handles=handles, loc="lower center", ncol=4, fontsize=8, framealpha=0.9
+        )
         fig.tight_layout(rect=[0, 0.05, 1, 0.96])
         plot_path = tables_dir / "pareto_front_cls.pdf"
         fig.savefig(plot_path, format="pdf", bbox_inches="tight")
@@ -386,20 +473,26 @@ def main() -> None:
         n_ds = len(reg_ds)
         n_cols = min(2, n_ds)
         n_rows = (n_ds + n_cols - 1) // n_cols
-        fig, axes = plt.subplots(n_rows, n_cols,
-                                  figsize=(3.5 * n_cols, 3.0 * n_rows),
-                                  squeeze=False)
+        fig, axes = plt.subplots(
+            n_rows, n_cols, figsize=(3.5 * n_cols, 3.0 * n_rows), squeeze=False
+        )
         fig.suptitle(
-            "Alpha-Pareto Front -- Regression" + chr(10) +
-            "X = compression (% features removed),  "
+            "Alpha-Pareto Front -- Regression"
+            + chr(10)
+            + "X = compression (% features removed),  "
             "Y = R2 preservation (1.0 = full-model baseline)",
-            fontsize=11, y=1.02)
+            fontsize=11,
+            y=1.02,
+        )
 
         for ax_i, ds in enumerate(reg_ds):
             r, c = ax_i // n_cols, ax_i % n_cols
             ax = axes[r, c]
-            sub = df[df["dataset"] == ds].groupby("alpha")[
-                ["compression", "preservation", "n_harmful"]].mean()
+            sub = (
+                df[df["dataset"] == ds]
+                .groupby("alpha")[["compression", "preservation", "n_harmful"]]
+                .mean()
+            )
             n_full = int(df[df["dataset"] == ds]["n_full"].iloc[0])
 
             yv = sub["preservation"].values
@@ -414,13 +507,24 @@ def main() -> None:
                 x_val = sub.loc[a, "compression"] * 100
                 y_val = sub.loc[a, "preservation"]
                 n_h = int(sub.loc[a, "n_harmful"])
-                ax.scatter(x_val, y_val,
-                           color=alpha_colors[a], marker=alpha_markers[a],
-                           s=80, zorder=5, edgecolors="black", linewidth=0.3)
-                ax.annotate(f"Alpha={a:.2f}" + chr(10) + f"{n_h}/{n_full}",
-                            (x_val, y_val),
-                            textcoords="offset points", xytext=(6, -10),
-                            fontsize=6, color=alpha_colors[a])
+                ax.scatter(
+                    x_val,
+                    y_val,
+                    color=alpha_colors[a],
+                    marker=alpha_markers[a],
+                    s=80,
+                    zorder=5,
+                    edgecolors="black",
+                    linewidth=0.3,
+                )
+                ax.annotate(
+                    f"Alpha={a:.2f}" + chr(10) + f"{n_h}/{n_full}",
+                    (x_val, y_val),
+                    textcoords="offset points",
+                    xytext=(6, -10),
+                    fontsize=6,
+                    color=alpha_colors[a],
+                )
 
             ax.axhline(y=1.0, color="gray", linewidth=0.5, linestyle="--")
             ax.set_ylim(y_lo, y_hi)
@@ -433,11 +537,21 @@ def main() -> None:
         for ax_i in range(len(reg_ds), n_rows * n_cols):
             axes[ax_i // n_cols, ax_i % n_cols].set_visible(False)
 
-        handles = [Line2D([], [], color=alpha_colors[a], marker=alpha_markers[a],
-                           linestyle="", markersize=7, label=f"Alpha={a:.2f}")
-                   for a in ALPHA_VALUES]
-        fig.legend(handles=handles, loc="lower center", ncol=4,
-                   fontsize=8, framealpha=0.9)
+        handles = [
+            Line2D(
+                [],
+                [],
+                color=alpha_colors[a],
+                marker=alpha_markers[a],
+                linestyle="",
+                markersize=7,
+                label=f"Alpha={a:.2f}",
+            )
+            for a in ALPHA_VALUES
+        ]
+        fig.legend(
+            handles=handles, loc="lower center", ncol=4, fontsize=8, framealpha=0.9
+        )
         fig.tight_layout(rect=[0, 0.05, 1, 0.96])
         plot_path = tables_dir / "pareto_front_reg.pdf"
         fig.savefig(plot_path, format="pdf", bbox_inches="tight")
@@ -447,15 +561,19 @@ def main() -> None:
     # ---- Per-dataset recommendation ----
     _header("Dataset-level alpha recommendation")
     for ds in ds_names:
-        sub = df[df["dataset"] == ds].groupby("alpha")[
-            ["compression", "preservation"]].mean()
+        sub = (
+            df[df["dataset"] == ds]
+            .groupby("alpha")[["compression", "preservation"]]
+            .mean()
+        )
         if len(sub) == 0:
             continue
         best_alpha = sub["compression"].idxmax()
         print(
             f"  {ds:20s}: best a={best_alpha:.2f} "
-            f"(cr={sub.loc[best_alpha,'compression']*100:.1f}%, "
-            f"preserv={sub.loc[best_alpha,'preservation']:.4f})")
+            f"(cr={sub.loc[best_alpha, 'compression'] * 100:.1f}%, "
+            f"preserv={sub.loc[best_alpha, 'preservation']:.4f})"
+        )
 
     _header("Done")
     print(f"Run directory: {run_dir}")

@@ -114,10 +114,10 @@ AUC_LOSS_THRESHOLDS: tuple[float, ...] = (0.01, 0.03, 0.05)
 # per-feature budget to keep total runtime manageable.
 # Key: dataset_prefix → {K, K_adv, nsga2_pop, nsga2_gen}
 DATASET_BUDGET: dict[str, dict] = {
-    "spambase":    {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
-    "madelon":     {"K": 100, "K_adv": 20, "pop": 20, "gen": 15},
-    "isolet":      {"K": 80,  "K_adv": 8, "pop": 20, "gen": 10},
-    "gisette":     {"K": 50,  "K_adv": 10, "pop": 15, "gen": 8},
+    "spambase": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
+    "madelon": {"K": 100, "K_adv": 20, "pop": 20, "gen": 15},
+    "isolet": {"K": 80, "K_adv": 8, "pop": 20, "gen": 10},
+    "gisette": {"K": 50, "K_adv": 10, "pop": 15, "gen": 8},
     "credit_card_fraud": {"K": 200, "K_adv": 30, "pop": 30, "gen": 20},
     "crimedata": {"K_adv": 8, "pop": 15, "gen": 8},
     "abalone": {"K_adv": 8, "pop": 30, "gen": 20},
@@ -241,8 +241,11 @@ def evaluate_topk(
         )
         if task == "regression":
             model = XGBRegressor(
-                n_estimators=100, max_depth=4, learning_rate=0.1,
-                verbosity=0, random_state=seed,
+                n_estimators=100,
+                max_depth=4,
+                learning_rate=0.1,
+                verbosity=0,
+                random_state=seed,
             )
             model.fit(X_tr, y_tr)
             y_pred = model.predict(X_te)
@@ -266,9 +269,7 @@ def evaluate_topk(
             val = float(roc_auc_score(y_te, y_prob[:, 1]))
         else:
             val = float(roc_auc_score(y_te, y_prob, multi_class="ovr"))
-        rows.append(
-            {"k": k, "n_features": len(feats), "metric": "AUC", "value": val}
-        )
+        rows.append({"k": k, "n_features": len(feats), "metric": "AUC", "value": val})
     return pd.DataFrame(rows)
 
 
@@ -344,7 +345,10 @@ def run_ablation_min_vs_mean(
         X, y = load_data(prefix, target, processed_dir, seed=seed)
         budget = _budget_for(prefix)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=seed,
+            X,
+            y,
+            test_size=0.2,
+            random_state=seed,
             stratify=y if task != "regression" else None,
         )
         n_features = X.shape[1]
@@ -358,29 +362,43 @@ def run_ablation_min_vs_mean(
         sg_neighbors = None
         if n_classes == 2 and task != "regression":
             sg_scores, sg_neighbors = build_guidance_from_data(
-                X_tr, y_tr, depth=1, m=5, seed=seed,
+                X_tr,
+                y_tr,
+                depth=1,
+                m=5,
+                seed=seed,
             )
 
         # --- MinPPI-guided (our method) ---
-        print(
-            f"  Computing MinPPI (K_adv={budget['K_adv']})...", flush=True
-        )
+        print(f"  Computing MinPPI (K_adv={budget['K_adv']})...", flush=True)
         t0 = time.perf_counter()
         if n_classes > 2 or task == "regression":
             minppi = estimate_minppi_random_mc(
-                X_tr, X_val, y_tr, y_val,
-                alpha=alpha, K=200, shared_coalitions=True,
-                per_coalition=5, seed=seed, verbose=False,
+                X_tr,
+                X_val,
+                y_tr,
+                y_val,
+                alpha=alpha,
+                K=200,
+                shared_coalitions=True,
+                per_coalition=5,
+                seed=seed,
+                verbose=False,
                 task=task,
             )
         else:
             minppi = estimate_minppi(
-                X_tr, X_val, y_tr, y_val,
-                alpha=alpha, method="shapg_guided",
+                X_tr,
+                X_val,
+                y_tr,
+                y_val,
+                alpha=alpha,
+                method="shapg_guided",
                 K_adv=budget["K_adv"],
                 shapg_neighbors=sg_neighbors,
                 shapg_scores=sg_scores,
-                seed=seed, verbose=False,
+                seed=seed,
+                verbose=False,
                 task=task,
             )
         t_minppi = time.perf_counter() - t0
@@ -409,7 +427,9 @@ def run_ablation_min_vs_mean(
         t0 = time.perf_counter()
         from minppi_mofs.baselines.mofs_shap import compute_mofs_shap_importance
 
-        shap_scores = compute_mofs_shap_importance(X_tr, y_tr, n_samples=50, seed=seed, task=task)
+        shap_scores = compute_mofs_shap_importance(
+            X_tr, y_tr, n_samples=50, seed=seed, task=task
+        )
         t_shap = time.perf_counter() - t0
 
         # Map SHAP scores to a pseudo-MinPPI: top 20% = "decisive",
@@ -447,7 +467,12 @@ def run_ablation_min_vs_mean(
 
         # --- Evaluate both ---
         full_auc = make_acc_full_cache(
-            X_tr, X_val, y_tr, y_val, seed=seed, task=task,
+            X_tr,
+            X_val,
+            y_tr,
+            y_val,
+            seed=seed,
+            task=task,
         ).acc_full
 
         for tag, result, ranking, t_guide in [
@@ -545,14 +570,22 @@ def run_ablation_binary_vs_continuous(
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=seed,
+            X,
+            y,
+            test_size=0.2,
+            random_state=seed,
             stratify=y if task != "regression" else None,
         )
         n_features = X.shape[1]
         budget = _budget_for(prefix)
         n_classes = len(np.unique(y_val))
         cache = make_acc_full_cache(
-            X_tr, X_val, y_tr, y_val, seed=seed, task=task,
+            X_tr,
+            X_val,
+            y_tr,
+            y_val,
+            seed=seed,
+            task=task,
         )
 
         # --- Binary v_alpha at multiple alpha ---
@@ -566,16 +599,30 @@ def run_ablation_binary_vs_continuous(
             cache.set_threshold(alpha)
             if n_classes > 2 or task == "regression":
                 minppi = estimate_minppi_random_mc(
-                    X_tr, X_val, y_tr, y_val,
-                    alpha=alpha, K=200, shared_coalitions=True,
-                    per_coalition=5, acc_cache=cache, seed=seed, verbose=False,
+                    X_tr,
+                    X_val,
+                    y_tr,
+                    y_val,
+                    alpha=alpha,
+                    K=200,
+                    shared_coalitions=True,
+                    per_coalition=5,
+                    acc_cache=cache,
+                    seed=seed,
+                    verbose=False,
                     task=task,
                 )
             else:
                 minppi = estimate_minppi(
-                    X_tr, X_val, y_tr, y_val,
-                    alpha=alpha, method="random_mc",
-                    K=budget["K"], seed=seed, verbose=False,
+                    X_tr,
+                    X_val,
+                    y_tr,
+                    y_val,
+                    alpha=alpha,
+                    method="random_mc",
+                    K=budget["K"],
+                    seed=seed,
+                    verbose=False,
                     task=task,
                 )
             stats = minppi_stats(minppi)
@@ -613,7 +660,11 @@ def run_ablation_binary_vs_continuous(
         from minppi_mofs.baselines.min_shap import compute_minshap_importance
 
         minshap_scores = compute_minshap_importance(
-            X_tr, y_tr, n_coalitions=100, per_coalition=5, seed=seed,
+            X_tr,
+            y_tr,
+            n_coalitions=100,
+            per_coalition=5,
+            seed=seed,
             task=task,
         )
         neg = sum(1 for v in minshap_scores.values() if v < 0)
@@ -681,14 +732,22 @@ def run_ablation_beta_sweep(
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=seed,
+            X,
+            y,
+            test_size=0.2,
+            random_state=seed,
             stratify=y if task != "regression" else None,
         )
         budget = _budget_for(prefix)
         n_features = X.shape[1]
         n_classes = len(np.unique(y_val))
         full_auc = make_acc_full_cache(
-            X_tr, X_val, y_tr, y_val, seed=seed, task=task,
+            X_tr,
+            X_val,
+            y_tr,
+            y_val,
+            seed=seed,
+            task=task,
         ).acc_full
 
         # Pre-compute MinPPI (shared across β values)
@@ -697,27 +756,47 @@ def run_ablation_beta_sweep(
         # Regression also uses Algorithm A (no ShapG).
         if n_classes > 2 or task == "regression":
             minppi = estimate_minppi_random_mc(
-                X_tr, X_val, y_tr, y_val,
-                alpha=alpha, K=200, shared_coalitions=True,
-                per_coalition=5, seed=seed, verbose=False,
+                X_tr,
+                X_val,
+                y_tr,
+                y_val,
+                alpha=alpha,
+                K=200,
+                shared_coalitions=True,
+                per_coalition=5,
+                seed=seed,
+                verbose=False,
                 task=task,
             )
         else:
             sg_scores, sg_neighbors = build_guidance_from_data(
-                X_tr, y_tr, depth=1, m=5, seed=seed,
+                X_tr,
+                y_tr,
+                depth=1,
+                m=5,
+                seed=seed,
             )
             minppi = estimate_minppi(
-                X_tr, X_val, y_tr, y_val,
-                alpha=alpha, method="shapg_guided",
+                X_tr,
+                X_val,
+                y_tr,
+                y_val,
+                alpha=alpha,
+                method="shapg_guided",
                 K_adv=budget["K_adv"],
                 shapg_neighbors=sg_neighbors,
                 shapg_scores=sg_scores,
-                seed=seed, verbose=False,
+                seed=seed,
+                verbose=False,
                 task=task,
             )
 
         for beta in tqdm(
-            [0, 1, 2, 5], desc=f"  β values ({prefix})", unit="β", file=sys.stdout, leave=False
+            [0, 1, 2, 5],
+            desc=f"  β values ({prefix})",
+            unit="β",
+            file=sys.stdout,
+            leave=False,
         ):
             result = mofs_minppi_search(
                 X_tr,
@@ -826,15 +905,21 @@ def run_ablation_shapg_vs_shap(
         # XGBoost; shared-coalition Algorithm A does not use neighbors.
         # Regression datasets have no ShapG graph.
         if task == "multiclass" or task == "regression":
-            print(f"\n  Skipping {prefix} ({task} — ShapG vs SHAP neighbor "
-                  "comparison requires Algorithm B, not applicable)", flush=True)
+            print(
+                f"\n  Skipping {prefix} ({task} — ShapG vs SHAP neighbor "
+                "comparison requires Algorithm B, not applicable)",
+                flush=True,
+            )
             continue
 
         print(f"\n{'=' * 60}\n  ShapG vs SHAP — {prefix}\n{'=' * 60}", flush=True)
 
         X, y = load_data(prefix, target, processed_dir, seed=seed)
         X_tr, X_val, y_tr, y_val = train_test_split(
-            X, y, test_size=0.2, random_state=seed,
+            X,
+            y,
+            test_size=0.2,
+            random_state=seed,
             stratify=y if task != "regression" else None,
         )
         budget = _budget_for(prefix)
@@ -1049,9 +1134,7 @@ def main() -> None:
     run_config: dict = {
         "description": "Ablation experiments — 4 dimensions × 5 datasets",
         "seed": 42,
-        "datasets": [
-            {"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS
-        ],
+        "datasets": [{"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS],
         "ablations": [
             {
                 "name": "min_vs_mean",

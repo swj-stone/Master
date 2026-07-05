@@ -47,6 +47,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -237,10 +238,15 @@ def main() -> None:
         print(f"  Valid cutoffs: {valid_cutoffs}", flush=True)
 
         # ShapG guidance (binary only — cached per seed)
-        for seed in tqdm(SEEDS, desc=f"  seeds ({prefix})", unit="seed", file=sys.stdout):
+        for seed in tqdm(
+            SEEDS, desc=f"  seeds ({prefix})", unit="seed", file=sys.stdout
+        ):
             # Split once per seed: fixed train/val for all cutoffs
             X_tr_full, X_val_full, y_tr, y_val = train_test_split(
-                raw_X, raw_y, test_size=0.2, random_state=seed,
+                raw_X,
+                raw_y,
+                test_size=0.2,
+                random_state=seed,
                 stratify=raw_y if task != "regression" else None,
             )
             y_tr_vals = y_tr.values if isinstance(y_tr, pd.DataFrame) else y_tr
@@ -252,7 +258,9 @@ def main() -> None:
                     pd.DataFrame(X_tr_full, columns=raw_X.columns),
                     y_tr_vals,
                     pd.DataFrame(X_val_full, columns=raw_X.columns),
-                    k, seed=42, task=task,
+                    k,
+                    seed=42,
+                    task=task,
                 )
                 n_actual = X_tr_k.shape[1]
 
@@ -261,34 +269,49 @@ def main() -> None:
                 # The dimension scan only needs the sign of MinPPI, not
                 # precise identification of sparse harmful features.
                 cache = make_acc_full_cache(
-                    X_tr_k, X_val_k, y_tr_vals, y_val_vals, seed=seed, task=task,
+                    X_tr_k,
+                    X_val_k,
+                    y_tr_vals,
+                    y_val_vals,
+                    seed=seed,
+                    task=task,
                 )
                 for alpha in ALPHA_VALUES:
                     cache.set_threshold(alpha)
                     t0 = time.perf_counter()
 
                     minppi = estimate_minppi_random_mc(
-                        X_tr_k, X_val_k, y_tr_vals, y_val_vals,
-                        alpha=alpha, K=300, shared_coalitions=True,
-                        per_coalition=5, acc_cache=cache, seed=seed,
-                        verbose=False, task=task,
+                        X_tr_k,
+                        X_val_k,
+                        y_tr_vals,
+                        y_val_vals,
+                        alpha=alpha,
+                        K=300,
+                        shared_coalitions=True,
+                        per_coalition=5,
+                        acc_cache=cache,
+                        seed=seed,
+                        verbose=False,
+                        task=task,
                     )
 
                     t_elapsed = time.perf_counter() - t0
                     stats = minppi_stats(minppi)
 
-                    all_rows.append({
-                        "dataset": prefix,
-                        "seed": seed,
-                        "alpha": alpha,
-                        "cutoff": k,
-                        "n_actual": n_actual,
-                        "n_harmful": stats["n_harmful"],
-                        "n_neutral": stats["n_neutral"],
-                        "n_decisive": stats["n_decisive"],
-                        "pct_harmful": round(stats["pct_harmful"], 1),
-                        "time_s": round(t_elapsed, 1),
-                    })
+                    all_rows.append(
+                        {
+                            "dataset": prefix,
+                            "seed": seed,
+                            "alpha": alpha,
+                            "cutoff": k,
+                            "n_actual": n_actual,
+                            "n_harmful": stats["n_harmful"],
+                            "n_neutral": stats["n_neutral"],
+                            "n_decisive": stats["n_decisive"],
+                            "pct_harmful": round(stats["pct_harmful"], 1),
+                            "time_s": round(t_elapsed, 1),
+                        }
+                    )
                     print(
                         f"    k={k:>3d} α={alpha:.2f}: "
                         f"harmful={stats['n_harmful']:>3d} "
@@ -312,9 +335,13 @@ def main() -> None:
     print(f"\n  harmful_vs_dimension.csv saved ({len(df)} rows)", flush=True)
 
     # Aggregate over seeds
-    agg = df.groupby(["dataset", "alpha", "cutoff", "n_actual"])[
-        ["n_harmful", "pct_harmful", "time_s"]
-    ].agg(["mean", "std"]).round(2)
+    agg = (
+        df.groupby(["dataset", "alpha", "cutoff", "n_actual"])[
+            ["n_harmful", "pct_harmful", "time_s"]
+        ]
+        .agg(["mean", "std"])
+        .round(2)
+    )
     agg.to_csv(run_dir / "harmful_vs_dimension_agg.csv")
     print("  harmful_vs_dimension_agg.csv saved", flush=True)
 
@@ -323,19 +350,18 @@ def main() -> None:
     # ------------------------------------------------------------------
     _header("Plotting")
     n_datasets = len(df["dataset"].unique())
-    fig, axes = plt.subplots(1, n_datasets, figsize=(5.5 * n_datasets, 4.2),
-                             squeeze=False)
+    fig, axes = plt.subplots(
+        1, n_datasets, figsize=(5.5 * n_datasets, 4.2), squeeze=False
+    )
 
-    for ax_i, (ds_name, ax) in enumerate(zip(sorted(df["dataset"].unique()),
-                                              axes[0])):
+    for ax_i, (ds_name, ax) in enumerate(zip(sorted(df["dataset"].unique()), axes[0])):
         for alpha in ALPHA_VALUES:
             sub = df[(df["dataset"] == ds_name) & (df["alpha"] == alpha)]
             if len(sub) == 0:
                 continue
             # Mean over seeds
             pts = sub.groupby("n_actual")["pct_harmful"].mean()
-            ax.plot(pts.index, pts.values, "o-", lw=1.5, ms=5,
-                    label=f"α={alpha:.2f}")
+            ax.plot(pts.index, pts.values, "o-", lw=1.5, ms=5, label=f"α={alpha:.2f}")
         ax.set_title(ds_name)
         ax.set_xlabel("Number of features (MI top-k)")
         ax.set_ylabel("Harmful %")

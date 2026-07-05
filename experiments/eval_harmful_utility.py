@@ -189,8 +189,11 @@ def train_and_eval(
 
     if task == "regression":
         model = XGBRegressor(
-            n_estimators=100, max_depth=4, learning_rate=0.1,
-            verbosity=0, random_state=seed,
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
         )
         model.fit(X_tr.values, y_tr)
         y_pred = model.predict(X_te.values)
@@ -199,8 +202,11 @@ def train_and_eval(
             val = 0.0
     else:
         model = XGBClassifier(
-            n_estimators=100, max_depth=4, learning_rate=0.1,
-            verbosity=0, random_state=seed,
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
         )
         model.fit(X_tr.values, y_tr)
         y_prob = model.predict_proba(X_te.values)
@@ -252,7 +258,10 @@ def run_c1_removal(
     ):
         try:
             X_tr, y_tr, X_val, y_val, X_te, y_te = load_split(
-                prefix, target, processed_dir, seed=seed,
+                prefix,
+                target,
+                processed_dir,
+                seed=seed,
             )
         except FileNotFoundError:
             print(f"\n  SKIP {prefix} s{seed}: missing split files", flush=True)
@@ -264,7 +273,12 @@ def run_c1_removal(
 
         # ---- baseline ----
         base_util, base_time = train_and_eval(
-            X_tr, y_tr.values, X_te, y_te.values, task=task, seed=seed,
+            X_tr,
+            y_tr.values,
+            X_te,
+            y_te.values,
+            task=task,
+            seed=seed,
         )
         print(
             f"\n  {prefix} s{seed}: base {metric_label}={base_util:.4f} "
@@ -276,21 +290,39 @@ def run_c1_removal(
         t0 = time.perf_counter()
         if task == "multiclass" or task == "regression":
             minppi = estimate_minppi_random_mc(
-                X_tr, X_val, y_tr.values, y_val.values,
-                alpha=alpha, K=200, shared_coalitions=True,
-                per_coalition=5, seed=seed, verbose=False, task=task,
+                X_tr,
+                X_val,
+                y_tr.values,
+                y_val.values,
+                alpha=alpha,
+                K=200,
+                shared_coalitions=True,
+                per_coalition=5,
+                seed=seed,
+                verbose=False,
+                task=task,
             )
         else:
             sg_scores, sg_neighbors = build_guidance_from_data(
-                X_tr, y_tr.values, depth=1, m=5, seed=seed,
+                X_tr,
+                y_tr.values,
+                depth=1,
+                m=5,
+                seed=seed,
             )
             minppi = estimate_minppi(
-                X_tr, X_val, y_tr.values, y_val.values,
-                alpha=alpha, method="shapg_guided",
+                X_tr,
+                X_val,
+                y_tr.values,
+                y_val.values,
+                alpha=alpha,
+                method="shapg_guided",
                 K_adv=budget["K_adv"],
                 shapg_neighbors=sg_neighbors,
                 shapg_scores=sg_scores,
-                seed=seed, verbose=False, task=task,
+                seed=seed,
+                verbose=False,
+                task=task,
             )
         t_minppi = time.perf_counter() - t0
         harmful = {f for f, v in minppi.items() if v == -1}
@@ -298,14 +330,23 @@ def run_c1_removal(
 
         # ---- mean-SHAP ranking ----
         from minppi_mofs.baselines.shap_top_k import compute_shap_topk_importance
-        shap_scores = compute_shap_topk_importance(X_tr, y_tr.values, seed=seed, task=task)
+
+        shap_scores = compute_shap_topk_importance(
+            X_tr, y_tr.values, seed=seed, task=task
+        )
         shap_ranked = sorted(shap_scores.items(), key=lambda kv: kv[1])
-        shap_bottom = {f for f, _ in shap_ranked[:max(1, n_harmful)]}
+        shap_bottom = {f for f, _ in shap_ranked[: max(1, n_harmful)]}
 
         # ---- MinShap negative ----
         from minppi_mofs.baselines.min_shap import compute_minshap_importance
+
         minshap_scores = compute_minshap_importance(
-            X_tr, y_tr.values, n_coalitions=100, per_coalition=5, seed=seed, task=task,
+            X_tr,
+            y_tr.values,
+            n_coalitions=100,
+            per_coalition=5,
+            seed=seed,
+            task=task,
         )
         minshap_neg = {f for f, v in minshap_scores.items() if v < 0}
         # If MinShap finds no negative features, use bottom-n_harmful by score
@@ -321,7 +362,12 @@ def run_c1_removal(
             if not keep:
                 return base_util, 1.0, 0.0  # can't remove all features
             post_u, post_t = train_and_eval(
-                X_tr[keep], y_tr.values, X_te[keep], y_te.values, task=task, seed=seed,
+                X_tr[keep],
+                y_tr.values,
+                X_te[keep],
+                y_te.values,
+                task=task,
+                seed=seed,
             )
             cr = len(to_remove) / n_features
             return post_u, cr, post_t
@@ -343,11 +389,15 @@ def run_c1_removal(
         rng = np.random.default_rng(seed)
         rand_deltas: list[float] = []
         for _ in range(N_RANDOM_TRIALS):
-            rand_remove = set(rng.choice(all_feats, size=max(1, n_harmful), replace=False))
+            rand_remove = set(
+                rng.choice(all_feats, size=max(1, n_harmful), replace=False)
+            )
             ru, _, _ = _remove_and_eval(rand_remove)
             rand_deltas.append(ru - base_util)
         rand_delta_mean = float(np.mean(rand_deltas))
-        rand_delta_std = float(np.std(rand_deltas, ddof=1)) if len(rand_deltas) > 1 else 0.0
+        rand_delta_std = (
+            float(np.std(rand_deltas, ddof=1)) if len(rand_deltas) > 1 else 0.0
+        )
 
         row: dict = {
             "dataset": prefix,
@@ -433,7 +483,10 @@ def run_c2_ground_truth(
     ):
         for seed in SEEDS:
             X_tr, y_tr, X_val, y_val, X_te, y_te = load_split(
-                prefix, target, processed_dir, seed=seed,
+                prefix,
+                target,
+                processed_dir,
+                seed=seed,
             )
             n_features = X_tr.shape[1]
             budget = _budget_for(prefix)
@@ -459,23 +512,38 @@ def run_c2_ground_truth(
 
             # ---- MinPPI ----
             sg_scores, sg_neighbors = build_guidance_from_data(
-                X_tr, y_tr.values, depth=1, m=5, seed=seed,
+                X_tr,
+                y_tr.values,
+                depth=1,
+                m=5,
+                seed=seed,
             )
             minppi = estimate_minppi(
-                X_tr, X_val, y_tr.values, y_val.values,
-                alpha=alpha, method="shapg_guided",
+                X_tr,
+                X_val,
+                y_tr.values,
+                y_val.values,
+                alpha=alpha,
+                method="shapg_guided",
                 K_adv=budget["K_adv"],
                 shapg_neighbors=sg_neighbors,
                 shapg_scores=sg_scores,
-                seed=seed, verbose=False, task=task,
+                seed=seed,
+                verbose=False,
+                task=task,
             )
             minppi_harmful = {f for f, v in minppi.items() if v == -1}
 
             # ---- MinShap ----
             from minppi_mofs.baselines.min_shap import compute_minshap_importance
+
             minshap_scores = compute_minshap_importance(
-                X_tr, y_tr.values, n_coalitions=100, per_coalition=5,
-                seed=seed, task=task,
+                X_tr,
+                y_tr.values,
+                n_coalitions=100,
+                per_coalition=5,
+                seed=seed,
+                task=task,
             )
             # Use all negative-scored features
             minshap_neg = {f for f, v in minshap_scores.items() if v < 0}
@@ -486,8 +554,12 @@ def run_c2_ground_truth(
 
             # ---- SHAP ----
             from minppi_mofs.baselines.shap_top_k import compute_shap_topk_importance
+
             shap_sc = compute_shap_topk_importance(
-                X_tr, y_tr.values, seed=seed, task=task,
+                X_tr,
+                y_tr.values,
+                seed=seed,
+                task=task,
             )
             ranked = sorted(shap_sc.items(), key=lambda kv: kv[1])
             k = max(1, len(minppi_harmful))
@@ -509,17 +581,19 @@ def run_c2_ground_truth(
                 ("shap", shap_bottom),
             ]:
                 prec, rec, f1 = _prf(pred_set)
-                rows.append({
-                    "dataset": prefix,
-                    "seed": seed,
-                    "method": method,
-                    "n_features": n_features,
-                    "n_gt_probes": n_gt_probes,
-                    "n_predicted": len(pred_set),
-                    "precision": prec,
-                    "recall": rec,
-                    "f1": f1,
-                })
+                rows.append(
+                    {
+                        "dataset": prefix,
+                        "seed": seed,
+                        "method": method,
+                        "n_features": n_features,
+                        "n_gt_probes": n_gt_probes,
+                        "n_predicted": len(pred_set),
+                        "precision": prec,
+                        "recall": rec,
+                        "f1": f1,
+                    }
+                )
                 print(
                     f"    {method:8s}: predicted={len(pred_set):3d}, "
                     f"P={prec:.3f}, R={rec:.3f}, F1={f1:.3f}",
@@ -532,9 +606,11 @@ def run_c2_ground_truth(
         print(f"\n  c2_madelon_ground_truth.csv saved ({len(df)} rows)", flush=True)
 
         # Aggregate: mean over seeds per method
-        agg = df.groupby("method")[["precision", "recall", "f1"]].agg(
-            ["mean", "std"]
-        ).round(4)
+        agg = (
+            df.groupby("method")[["precision", "recall", "f1"]]
+            .agg(["mean", "std"])
+            .round(4)
+        )
         agg.to_csv(removal_dir / "c2_madelon_ground_truth_agg.csv")
         print("  c2_madelon_ground_truth_agg.csv saved", flush=True)
         print(agg.to_string(), flush=True)
@@ -570,7 +646,10 @@ def run_c8_minshap_vs_minppi(
     ):
         for seed in SEEDS:
             X_tr, y_tr, X_val, y_val, _, _ = load_split(
-                prefix, target, processed_dir, seed=seed,
+                prefix,
+                target,
+                processed_dir,
+                seed=seed,
             )
             n_features = X_tr.shape[1]
             budget = _budget_for(prefix)
@@ -578,56 +657,80 @@ def run_c8_minshap_vs_minppi(
             # ---- MinPPI ----
             if task == "multiclass":
                 minppi = estimate_minppi_random_mc(
-                    X_tr, X_val, y_tr.values, y_val.values,
-                    alpha=alpha, K=200, shared_coalitions=True,
-                    per_coalition=5, seed=seed, verbose=False, task=task,
+                    X_tr,
+                    X_val,
+                    y_tr.values,
+                    y_val.values,
+                    alpha=alpha,
+                    K=200,
+                    shared_coalitions=True,
+                    per_coalition=5,
+                    seed=seed,
+                    verbose=False,
+                    task=task,
                 )
             else:
                 sg_scores, sg_neighbors = build_guidance_from_data(
-                    X_tr, y_tr.values, depth=1, m=5, seed=seed,
+                    X_tr,
+                    y_tr.values,
+                    depth=1,
+                    m=5,
+                    seed=seed,
                 )
                 minppi = estimate_minppi(
-                    X_tr, X_val, y_tr.values, y_val.values,
-                    alpha=alpha, method="shapg_guided",
+                    X_tr,
+                    X_val,
+                    y_tr.values,
+                    y_val.values,
+                    alpha=alpha,
+                    method="shapg_guided",
                     K_adv=budget["K_adv"],
                     shapg_neighbors=sg_neighbors,
                     shapg_scores=sg_scores,
-                    seed=seed, verbose=False, task=task,
+                    seed=seed,
+                    verbose=False,
+                    task=task,
                 )
             minppi_harmful = {f for f, v in minppi.items() if v == -1}
 
             # ---- MinShap ----
             from minppi_mofs.baselines.min_shap import compute_minshap_importance
+
             minshap_scores = compute_minshap_importance(
-                X_tr, y_tr.values, n_coalitions=100, per_coalition=5,
-                seed=seed, task=task,
+                X_tr,
+                y_tr.values,
+                n_coalitions=100,
+                per_coalition=5,
+                seed=seed,
+                task=task,
             )
             minshap_neg = {f for f, v in minshap_scores.items() if v < 0}
 
             # ---- Agreement ----
             inter_mp_ms = minppi_harmful & minshap_neg
             union_mp_ms = minppi_harmful | minshap_neg
-            jac_mp_ms = (
-                len(inter_mp_ms) / len(union_mp_ms) if union_mp_ms else 0.0
-            )
+            jac_mp_ms = len(inter_mp_ms) / len(union_mp_ms) if union_mp_ms else 0.0
 
             # Per-feature: how many MinShap < 0 are also MinPPI = −1?
             n_ms_neg = len(minshap_neg)
             n_ms_neg_and_mp_harm = len(inter_mp_ms)
 
-            rows.append({
-                "dataset": prefix,
-                "seed": seed,
-                "n_features": n_features,
-                "n_minppi_harmful": len(minppi_harmful),
-                "n_minshap_neg": n_ms_neg,
-                "n_both_harmful": n_ms_neg_and_mp_harm,
-                "jaccard_minppi_minshap": round(jac_mp_ms, 4),
-                "minshap_neg_as_minppi_rate": (
-                    round(n_ms_neg_and_mp_harm / n_ms_neg, 4)
-                    if n_ms_neg > 0 else 0.0
-                ),
-            })
+            rows.append(
+                {
+                    "dataset": prefix,
+                    "seed": seed,
+                    "n_features": n_features,
+                    "n_minppi_harmful": len(minppi_harmful),
+                    "n_minshap_neg": n_ms_neg,
+                    "n_both_harmful": n_ms_neg_and_mp_harm,
+                    "jaccard_minppi_minshap": round(jac_mp_ms, 4),
+                    "minshap_neg_as_minppi_rate": (
+                        round(n_ms_neg_and_mp_harm / n_ms_neg, 4)
+                        if n_ms_neg > 0
+                        else 0.0
+                    ),
+                }
+            )
             print(
                 f"\n  {prefix} s{seed}: MinPPI−1={len(minppi_harmful)}, "
                 f"MinShap<0={n_ms_neg}, overlap={n_ms_neg_and_mp_harm}, "
@@ -641,10 +744,19 @@ def run_c8_minshap_vs_minppi(
         print(f"\n  c8_minshap_vs_minppi.csv saved ({len(df)} rows)", flush=True)
 
         # Aggregate
-        agg = df.groupby("dataset")[
-            ["n_minppi_harmful", "n_minshap_neg", "n_both_harmful",
-             "jaccard_minppi_minshap", "minshap_neg_as_minppi_rate"]
-        ].agg(["mean", "std"]).round(4)
+        agg = (
+            df.groupby("dataset")[
+                [
+                    "n_minppi_harmful",
+                    "n_minshap_neg",
+                    "n_both_harmful",
+                    "jaccard_minppi_minshap",
+                    "minshap_neg_as_minppi_rate",
+                ]
+            ]
+            .agg(["mean", "std"])
+            .round(4)
+        )
         agg.to_csv(removal_dir / "c8_minshap_vs_minppi_agg.csv")
         print("  c8_minshap_vs_minppi_agg.csv saved", flush=True)
         print(agg.to_string(), flush=True)
@@ -737,10 +849,19 @@ def main() -> None:
 
     if cls_rows:
         df_cls = pd.DataFrame(cls_rows)
-        agg = df_cls.groupby("dataset")[
-            ["minppi_delta", "shap_delta", "minshap_delta",
-             "random_delta_mean", "minppi_cr"]
-        ].mean().round(4)
+        agg = (
+            df_cls.groupby("dataset")[
+                [
+                    "minppi_delta",
+                    "shap_delta",
+                    "minshap_delta",
+                    "random_delta_mean",
+                    "minppi_cr",
+                ]
+            ]
+            .mean()
+            .round(4)
+        )
         print("\n  c1 classification — mean ΔAUC by dataset:", flush=True)
         print(agg.to_string(), flush=True)
 
