@@ -137,6 +137,7 @@ def estimate_minppi_random_mc(
     shared_coalitions: bool = False,
     per_coalition: int = 5,
     acc_cache: Optional[AccFullCache] = None,
+    model_params: Optional[dict] = None,
     seed: int = 42,
     verbose: bool = False,
 ) -> dict[str, int]:
@@ -186,6 +187,7 @@ def estimate_minppi_random_mc(
             y_val,
             task=task,
             seed=seed,
+            model_params=model_params,
         )
     acc_cache.set_threshold(alpha)
 
@@ -596,6 +598,7 @@ def estimate_minppi(
     shared_coalitions: bool = False,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
+    model_params: Optional[dict] = None,
     seed: int = 42,
     verbose: bool = False,
 ) -> dict[str, int]:
@@ -654,6 +657,7 @@ def estimate_minppi(
         y_val,
         task=task,
         seed=seed,
+        model_params=model_params,
     )
 
     fn = methods[method]

@@ -34,7 +34,8 @@ from typing import Optional
 import networkx as nx
 import numpy as np
 import pandas as pd
-from sklearn.metrics import r2_score, roc_auc_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, XGBRegressor
 
@@ -317,6 +318,16 @@ class _CachedAUCCharacteristic:
                 val = float(r2_score(y_te, y_pred))
                 if val < 0.0:
                     val = 0.0
+            elif self._task == "multiclass":
+                model = LogisticRegression(
+                    max_iter=200,
+                    solver="lbfgs",
+                    random_state=self._seed,
+                )
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    model.fit(X_tr, y_tr)
+                val = float(accuracy_score(y_te, model.predict(X_te)))
             else:
                 model = XGBClassifier(
                     n_estimators=15,

@@ -67,11 +67,11 @@ DATASETS: list[tuple[str, str, str]] = [
 DATASET_BUDGET: dict[str, dict] = {
     "spambase": {"K_adv": 30},
     "madelon": {"K_adv": 20},
-    "isolet": {"K_adv": 8},
+    "isolet": {"K": 30, "per_coalition": 2},  # multiclass — ultra-light
     "gisette": {"K_adv": 10},
     "credit_card_fraud": {"K_adv": 30},
-    "crimedata": {"K_adv": 10},
-    "abalone": {"K_adv": 10},
+    "crimedata": {"K": 40, "per_coalition": 2},  # regression
+    "abalone": {"K": 40, "per_coalition": 2},  # regression, 8 feats
 }
 
 
@@ -123,18 +123,38 @@ def load_split(prefix, target, processed_dir, *, seed):
 
 
 def baseline_ranking(X, y, method, *, task="binary", seed=42):
+    # Use fewer coalitions for slow multiclass/regression evaluations
+    heavy = task != "binary"
     if method == "shaptopk":
         scores = compute_shap_topk_importance(X, y, seed=seed, task=task)
     elif method == "shapg":
         scores = compute_shapg_importance(X, y, seed=seed)
     elif method == "minshap":
         scores = compute_minshap_importance(
-            X, y, n_coalitions=100, per_coalition=5, seed=seed, task=task
+            X,
+            y,
+            n_coalitions=30 if heavy else 100,
+            per_coalition=3 if heavy else 5,
+            seed=seed,
+            task=task,
         )
     elif method == "banzhaf":
-        scores = compute_banzhaf_importance(X, y, per_coalition=5, seed=seed, task=task)
+        scores = compute_banzhaf_importance(
+            X,
+            y,
+            n_coalitions=40 if heavy else 200,
+            per_coalition=3 if heavy else 5,
+            seed=seed,
+            task=task,
+        )
     elif method == "powershap":
-        scores = compute_powershap_importance(X, y, seed=seed, task=task)
+        scores = compute_powershap_importance(
+            X,
+            y,
+            power_iterations=5 if heavy else 20,
+            seed=seed,
+            task=task,
+        )
     else:
         raise ValueError(f"Unknown: {method}")
     return [f for f, _ in sorted(scores.items(), key=lambda kv: kv[1], reverse=True)]
@@ -227,9 +247,9 @@ def main():
                     y_tr,
                     y_val,
                     alpha=ALPHA,
-                    K=200,
+                    K=bud.get("K", 200),
                     shared_coalitions=True,
-                    per_coalition=5,
+                    per_coalition=bud.get("per_coalition", 5),
                     seed=seed,
                     verbose=False,
                     task=task,
@@ -276,6 +296,12 @@ def main():
 
             if not keep:
                 print("    Stage 2 SKIP (0 features left)")
+                continue
+
+            # No harmful features removed → filtered set = full set,
+            # Stage 2 is identical to running baselines on the original data.
+            if n_h == 0:
+                print("    Stage 2 SKIP (0 harmful removed — identical to full)")
                 continue
 
             X_tr_f = X_tr[keep] if n_h > 0 else X_tr

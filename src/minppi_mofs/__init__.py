@@ -19,38 +19,63 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 
-# ── pre-import XGBoost patches ──────────────────────────────────────────
-# XGBoost ≥3.x `fit()` has a `verbose` parameter whose default may print
-# per-iteration metrics even when the constructor's `verbosity=0` and
-# `xgb.set_config(verbosity=0)` are set.  Monkey-patch so every `fit()`
-# call in the whole project defaults to silent.
 import xgboost as xgb
 
-_fit_orig = xgb.XGBModel.fit
+# ── XGBoost C++ stderr suppression ──────────────────────────────────────
+# XGBoost ≥3.0 writes per-iteration evaluation metrics
+# (``[98]    validation_0-logloss:0.17605``) to **stderr via the C++ core**,
+# using ``fprintf(stderr, ...)`` / ``std::cerr``.  This output writes to
+# OS file-descriptor 2 directly — it bypasses *every* Python-level control:
+# ``verbosity=0``, ``verbose_eval=False``, ``callbacks=[]``, ``logging``,
+# and ``contextlib.redirect_stderr`` are all ignored.
+#
+# The ONLY reliable way to stop it is to close fd 2 and replace it with
+# the null device at the OS level.  We patch ``xgb.train()`` (the single
+# choke-point ALL XGBoost training funnels through) to:
+#   1. dup fd 2 onto ``os.devnull`` (catches C++ ``fprintf(stderr)``)
+#   2. redirect ``sys.stderr`` to ``os.devnull`` (belt + suspenders)
+# Both are restored after training completes.  Genuine training errors
+# still raise Python exceptions.
+
+_train_orig = xgb.train
 
 
-def _fit_silent(self, *args, **kwargs):
-    kwargs.setdefault("verbose", False)
-    return _fit_orig(self, *args, **kwargs)
+def _train_silent(*args, **kwargs):
+    saved_fd = os.dup(2)
+    try:
+        null_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null_fd, 2)
+        os.close(null_fd)
+        saved_stderr = sys.stderr
+        try:
+            sys.stderr = open(os.devnull, "w")
+            return _train_orig(*args, **kwargs)
+        finally:
+            sys.stderr.close()
+            sys.stderr = saved_stderr
+    finally:
+        os.dup2(saved_fd, 2)
+        os.close(saved_fd)
 
 
-xgb.XGBModel.fit = _fit_silent  # type: ignore[method-assign]
+xgb.train = _train_silent  # type: ignore[assignment]
 
 xgb.set_config(verbosity=0)
-os.environ.setdefault("OMP_NUM_THREADS", "1")  # thread-pool hygiene
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 logging.getLogger("xgboost").setLevel(logging.ERROR)
-# ─────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────
 
-from minppi_mofs.voting_game import AccFullCache, compute_v_alpha, make_acc_full_cache
-from minppi_mofs.min_ppi import (
+from minppi_mofs.voting_game import AccFullCache, compute_v_alpha, make_acc_full_cache  # noqa: E402
+from minppi_mofs.min_ppi import (  # noqa: E402
     estimate_minppi,
     estimate_minppi_exact,
     estimate_minppi_hybrid,
     estimate_minppi_random_mc,
     estimate_minppi_shapg_guided,
 )
-from minppi_mofs.shapg_integration import (
+from minppi_mofs.shapg_integration import (  # noqa: E402
     compute_shapg_guidance_signal,
     get_correlated_neighbors,
 )

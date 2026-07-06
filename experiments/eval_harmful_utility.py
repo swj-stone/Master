@@ -99,13 +99,13 @@ N_RANDOM_TRIALS = 10
 
 # Per-dataset MinPPI budget (matches run_ablation.py)
 DATASET_BUDGET: dict[str, dict] = {
-    "spambase": {"K": 200, "K_adv": 30},
-    "madelon": {"K": 100, "K_adv": 20},
-    "isolet": {"K": 80, "K_adv": 8},
-    "credit_card_fraud": {"K": 200, "K_adv": 30},
-    "gisette": {"K": 50, "K_adv": 10},
-    "crimedata": {"K": 50, "K_adv": 10},
-    "abalone": {"K": 50, "K_adv": 10},
+    "spambase": {"K": 200, "per_coalition": 5, "K_adv": 30},
+    "madelon": {"K": 100, "per_coalition": 5, "K_adv": 20},
+    "isolet": {"K": 30, "per_coalition": 2, "K_adv": 8},
+    "credit_card_fraud": {"K": 200, "per_coalition": 5, "K_adv": 30},
+    "gisette": {"K": 50, "per_coalition": 3, "K_adv": 10},
+    "crimedata": {"K": 40, "per_coalition": 2, "K_adv": 10},
+    "abalone": {"K": 40, "per_coalition": 2, "K_adv": 10},
 }
 
 
@@ -295,9 +295,9 @@ def run_c1_removal(
                 y_tr.values,
                 y_val.values,
                 alpha=alpha,
-                K=200,
+                K=budget.get("K", 200),
                 shared_coalitions=True,
-                per_coalition=5,
+                per_coalition=budget.get("per_coalition", 5),
                 seed=seed,
                 verbose=False,
                 task=task,
@@ -662,9 +662,9 @@ def run_c8_minshap_vs_minppi(
                     y_tr.values,
                     y_val.values,
                     alpha=alpha,
-                    K=200,
+                    K=budget.get("K", 200),
                     shared_coalitions=True,
-                    per_coalition=5,
+                    per_coalition=budget.get("per_coalition", 5),
                     seed=seed,
                     verbose=False,
                     task=task,

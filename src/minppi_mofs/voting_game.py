@@ -39,6 +39,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
 from xgboost import XGBClassifier, XGBRegressor
 
@@ -95,9 +96,10 @@ class AccFullCache:
         self._seed = seed
         self._cache: dict[tuple[str, ...], float] = {}
         self._model_params = model_params or {
-            "n_estimators": 15,
-            "max_depth": 2,
+            "n_estimators": 3,
+            "max_depth": 1,
             "learning_rate": 0.3,
+            "n_jobs": 1,
         }
 
         # Compute U_full
@@ -137,6 +139,20 @@ class AccFullCache:
             val = float(r2_score(self._y_val, y_pred))
             if val < 0.0:
                 val = 0.0  # clamp: "no better than mean" satisfies U ≥ 0
+        elif self._task == "multiclass":
+            # LogisticRegression — O(n×p×K) via LBFGS, ~50× faster than
+            # XGBoost's internal 3×K trees for v_α's binary threshold.
+            X_tr_sub = self._X_train[cols].values
+            X_val_sub = self._X_val[cols].values
+            model = LogisticRegression(
+                max_iter=200,
+                solver="lbfgs",
+                random_state=_seed_base,
+            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model.fit(X_tr_sub, self._y_train)
+            val = float(accuracy_score(self._y_val, model.predict(X_val_sub)))
         else:
             X_tr_sub = self._X_train[cols].values
             X_val_sub = self._X_val[cols].values

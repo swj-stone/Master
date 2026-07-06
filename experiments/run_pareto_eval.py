@@ -67,11 +67,11 @@ DATASETS: list[tuple[str, str, str]] = [
 DATASET_BUDGET: dict[str, dict] = {
     "spambase": {"K_adv": 30},
     "madelon": {"K_adv": 20},
-    "isolet": {"K_adv": 8},
+    "isolet": {"K": 30, "per_coalition": 2},  # multiclass × 26 → ultra-light
     "gisette": {"K_adv": 10},
     "credit_card_fraud": {"K_adv": 30},
-    "crimedata": {"K_adv": 10},
-    "abalone": {"K_adv": 10},
+    "crimedata": {"K": 40, "per_coalition": 2},  # regression
+    "abalone": {"K": 40, "per_coalition": 2},  # regression, 8 feats
 }
 
 # ============================================================
@@ -265,9 +265,9 @@ def main() -> None:
                         y_tr,
                         y_val,
                         alpha=alpha,
-                        K=200,
+                        K=budget.get("K", 200),
                         shared_coalitions=True,
-                        per_coalition=5,
+                        per_coalition=budget.get("per_coalition", 5),
                         seed=seed,
                         verbose=False,
                         task=task,
