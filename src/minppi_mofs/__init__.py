@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 
 import xgboost as xgb
 
@@ -40,21 +39,17 @@ import xgboost as xgb
 # still raise Python exceptions.
 
 _train_orig = xgb.train
+_null_fd: int | None = None  # opened lazily, reused across all calls
 
 
 def _train_silent(*args, **kwargs):
+    global _null_fd
+    if _null_fd is None:
+        _null_fd = os.open(os.devnull, os.O_WRONLY)
     saved_fd = os.dup(2)
+    os.dup2(_null_fd, 2)
     try:
-        null_fd = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(null_fd, 2)
-        os.close(null_fd)
-        saved_stderr = sys.stderr
-        try:
-            sys.stderr = open(os.devnull, "w")
-            return _train_orig(*args, **kwargs)
-        finally:
-            sys.stderr.close()
-            sys.stderr = saved_stderr
+        return _train_orig(*args, **kwargs)
     finally:
         os.dup2(saved_fd, 2)
         os.close(saved_fd)

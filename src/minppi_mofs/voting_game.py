@@ -95,25 +95,42 @@ class AccFullCache:
         self._task = task
         self._seed = seed
         self._cache: dict[tuple[str, ...], float] = {}
-        self._model_params = model_params or {
-            "n_estimators": 3,
-            "max_depth": 1,
-            "learning_rate": 0.3,
-            "n_jobs": 1,
+        mp = model_params or {}
+        self._model_params = {
+            "n_estimators": mp.get("n_estimators", 3),
+            "max_depth": mp.get("max_depth", 1),
+            "learning_rate": mp.get("learning_rate", 0.3),
+            "n_jobs": mp.get("n_jobs", 1),
         }
+
+        # ── Reusable model objects (avoid constructor overhead, 6× speedup
+        #     for XGBoost on the hot path — see micro-benchmark) ─────────
+        if task == "regression":
+            self._model = XGBRegressor(
+                verbosity=0, random_state=seed, **self._model_params
+            )
+        elif task == "multiclass":
+            self._model = LogisticRegression(
+                max_iter=200,
+                solver="lbfgs",
+                random_state=seed,
+            )
+        else:
+            self._model = XGBClassifier(
+                verbosity=0, random_state=seed, **self._model_params
+            )
+        # ─────────────────────────────────────────────────────────────────
 
         # Compute U_full
         self.acc_full = self._evaluate_subset(set(X_train.columns), _seed_base=seed)
         self.threshold: Optional[float] = None  # set later when alpha is chosen
 
     def _evaluate_subset(self, S: set[str], *, _seed_base: int = 42) -> float:
-        """Train XGBoost on S and return utility on validation set.
+        """Train on *S* and return utility on validation set.
 
-        - Classification: AUC (binary) or accuracy (multiclass).
-        - Regression: R² (clamped to ≥ 0 to keep U ≥ 0).
-
-        Results are cached by sorted-tuple key for reuse across calls with
-        different α values.
+        Reuses ``self._model`` across calls — sklearn estimators replace
+        their internal state on ``.fit()``, so a single instance handles
+        all coalitions without Python-level constructor overhead.
         """
         key = tuple(sorted(S))
         if key in self._cache:
@@ -123,64 +140,38 @@ class AccFullCache:
         if len(cols) == 0:
             val = 0.5 if self._task != "regression" else 0.0
         elif self._task == "regression":
-            X_tr_sub = self._X_train[cols].values
-            X_val_sub = self._X_val[cols].values
-            model = XGBRegressor(
-                n_estimators=self._model_params.get("n_estimators", 15),
-                max_depth=self._model_params.get("max_depth", 2),
-                learning_rate=self._model_params.get("learning_rate", 0.3),
-                verbosity=0,
-                random_state=_seed_base,
-            )
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                model.fit(X_tr_sub, self._y_train)
-            y_pred = model.predict(X_val_sub)
+            Xtr = self._X_train[cols].values
+            Xva = self._X_val[cols].values
+            self._model.fit(Xtr, self._y_train)
+            y_pred = self._model.predict(Xva)
             val = float(r2_score(self._y_val, y_pred))
             if val < 0.0:
-                val = 0.0  # clamp: "no better than mean" satisfies U ≥ 0
+                val = 0.0
         elif self._task == "multiclass":
-            # LogisticRegression — O(n×p×K) via LBFGS, ~50× faster than
-            # XGBoost's internal 3×K trees for v_α's binary threshold.
-            X_tr_sub = self._X_train[cols].values
-            X_val_sub = self._X_val[cols].values
-            model = LogisticRegression(
-                max_iter=200,
-                solver="lbfgs",
-                random_state=_seed_base,
+            self._model.fit(
+                self._X_train[cols].values,
+                self._y_train,
             )
+            val = float(
+                accuracy_score(
+                    self._y_val,
+                    self._model.predict(self._X_val[cols].values),
+                )
+            )
+        else:  # binary
+            Xtr = self._X_train[cols].values
+            Xva = self._X_val[cols].values
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                model.fit(X_tr_sub, self._y_train)
-            val = float(accuracy_score(self._y_val, model.predict(X_val_sub)))
-        else:
-            X_tr_sub = self._X_train[cols].values
-            X_val_sub = self._X_val[cols].values
-            y_val_classes = np.unique(self._y_val)
-
-            model = XGBClassifier(
-                n_estimators=self._model_params.get("n_estimators", 15),
-                max_depth=self._model_params.get("max_depth", 2),
-                learning_rate=self._model_params.get("learning_rate", 0.3),
-                verbosity=0,
-                random_state=_seed_base,
-            )
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                model.fit(X_tr_sub, self._y_train)
-
-            y_prob = model.predict_proba(X_val_sub)
-            if len(y_val_classes) < 2:
+                self._model.fit(Xtr, self._y_train)
+            y_prob = self._model.predict_proba(Xva)
+            y_cls = np.unique(self._y_val)
+            if len(y_cls) < 2:
                 val = 0.5
             elif y_prob.shape[1] == 2:
                 val = float(roc_auc_score(self._y_val, y_prob[:, 1]))
             else:
-                # Multiclass: use accuracy to avoid O(K) OVR ROC overhead
-                # (26-class isolet runs K_adv × p × 2 evaluations — ~3000
-                # calls; OVR AUC per call is ~26× slower than accuracy).
-                # v_alpha uses the same metric for Acc_full, so the
-                # binary threshold semantics are unchanged.
-                val = float(accuracy_score(self._y_val, model.predict(X_val_sub)))
+                val = float(accuracy_score(self._y_val, self._model.predict(Xva)))
         self._cache[key] = val
         return val
 

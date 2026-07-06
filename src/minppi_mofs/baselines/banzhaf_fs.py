@@ -73,6 +73,29 @@ class _CachedAUC:
         self._max_samples = max_samples
         self._task = task
         self._cache: dict[tuple[str, ...], float] = {}
+        # Reusable model
+        if task == "regression":
+            self._model = XGBRegressor(
+                n_estimators=10,
+                max_depth=2,
+                learning_rate=0.3,
+                verbosity=0,
+                random_state=seed,
+            )
+        elif task == "multiclass":
+            self._model = LogisticRegression(
+                max_iter=200,
+                solver="lbfgs",
+                random_state=seed,
+            )
+        else:
+            self._model = XGBClassifier(
+                n_estimators=10,
+                max_depth=2,
+                learning_rate=0.3,
+                verbosity=0,
+                random_state=seed,
+            )
 
     def __call__(self, S: set[str]) -> float:
         key = tuple(sorted(S))
@@ -108,40 +131,19 @@ class _CachedAUC:
                     random_state=self._seed,
                 )
             if self._task == "regression":
-                model = XGBRegressor(
-                    n_estimators=10,
-                    max_depth=2,
-                    learning_rate=0.3,
-                    verbosity=0,
-                    random_state=self._seed,
-                )
-                model.fit(X_tr, y_tr)
-                y_pred = model.predict(X_te)
+                self._model.fit(X_tr, y_tr)
+                y_pred = self._model.predict(X_te)
                 val = float(r2_score(y_te, y_pred))
                 if val < 0.0:
                     val = 0.0
             elif self._task == "multiclass":
-                model = LogisticRegression(
-                    max_iter=200,
-                    solver="lbfgs",
-                    random_state=self._seed,
-                )
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    model.fit(X_tr, y_tr)
-                val = float(accuracy_score(y_te, model.predict(X_te)))
+                self._model.fit(X_tr, y_tr)
+                val = float(accuracy_score(y_te, self._model.predict(X_te)))
             else:
-                model = XGBClassifier(
-                    n_estimators=10,
-                    max_depth=2,
-                    learning_rate=0.3,
-                    verbosity=0,
-                    random_state=self._seed,
-                )
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    model.fit(X_tr, y_tr)
-                y_prob = model.predict_proba(X_te)
+                    self._model.fit(X_tr, y_tr)
+                y_prob = self._model.predict_proba(X_te)
                 y_test_classes = np.unique(y_te)
                 if len(y_test_classes) < 2:
                     val = 0.5
