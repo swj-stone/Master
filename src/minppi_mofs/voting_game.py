@@ -111,7 +111,7 @@ class AccFullCache:
             )
         elif task == "multiclass":
             self._model = LogisticRegression(
-                max_iter=200,
+                max_iter=500,
                 solver="lbfgs",
                 random_state=seed,
             )
@@ -148,10 +148,12 @@ class AccFullCache:
             if val < 0.0:
                 val = 0.0
         elif self._task == "multiclass":
-            self._model.fit(
-                self._X_train[cols].values,
-                self._y_train,
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                self._model.fit(
+                    self._X_train[cols].values,
+                    self._y_train,
+                )
             val = float(
                 accuracy_score(
                     self._y_val,

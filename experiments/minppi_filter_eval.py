@@ -1,24 +1,24 @@
 """
-MinPPI as a safe preprocessing filter — Stage 1+2 pipeline evaluation (P0.1).
+MinPPI filter verification — safety + one downstream baseline (§6 pipeline).
 
-Tests the Plan C hypothesis: MinPPI's core value is as a *safe deletion
-preprocessor*.  Any downstream FS method benefits from having harmful
-features removed first — faster training (fewer features) at no AUC cost.
+Fast redesign (2026-07-07): instead of re-running 5 expensive baselines on
+filtered data (which ``run_main_table.py`` already covers on full data),
+this script does a single XGBoost retrain on filtered features, extracts
+feature-importance for free, and evaluates top-k AUC.  Total cost per
+(dataset, seed) = MinPPI + 2 model fits.
 
 Pipeline
 --------
-Stage 1 (MinPPI filter):
-  - Estimate MinPPI at α=0.95 (Algorithm B for binary, A for multi/reg).
-  - Identify harmful features (MinPPI = −1) → delete from train/val/test.
-Stage 2 (downstream FS):
-  - Run each baseline on the *filtered* feature set.
-  - Measure top-k AUC (or R² for regression).
-  - Compare against the same baseline on the original full feature set.
+1. Compute MinPPI at α=0.95 → identify harmful features.
+2. Delete harmful features from train/val/test.
+3. Train XGBoost on filtered train set → AUC_filtered on test.
+4. Extract ``feature_importances_`` (gain) from the model → rank features.
+5. Evaluate top-k AUC of the ranking on a held-out split of the test set.
 
 Output (results/tables/<run_id>/)::
 
-    minppi_filter_pipeline.csv     # per-(dataset, seed, method)
-    minppi_filter_pipeline_agg.csv # mean over seeds
+    filter_verify.csv     # per-(dataset, seed): n_harmful, AUC_full, AUC_filtered, AUC@10, …
+    filter_verify_agg.csv # mean ± std over seeds
 
 Run::
 
@@ -36,19 +36,17 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import r2_score, roc_auc_score
+from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, XGBRegressor
 from tqdm import tqdm
 
 from minppi_mofs.min_ppi import estimate_minppi, estimate_minppi_random_mc
 from minppi_mofs.shapg_integration import build_guidance_from_data
-from minppi_mofs.baselines.shap_top_k import compute_shap_topk_importance
-from minppi_mofs.baselines.shapg import compute_shapg_importance
-from minppi_mofs.baselines.min_shap import compute_minshap_importance
-from minppi_mofs.baselines.banzhaf_fs import compute_banzhaf_importance
-from minppi_mofs.baselines.powershap import compute_powershap_importance
 
+# ============================================================
+# Constants
+# ============================================================
 
 ALPHA = 0.95
 SEEDS: list[int] = [42, 123, 456, 789, 1024]
@@ -67,12 +65,16 @@ DATASETS: list[tuple[str, str, str]] = [
 DATASET_BUDGET: dict[str, dict] = {
     "spambase": {"K_adv": 30},
     "madelon": {"K_adv": 20},
-    "isolet": {"K": 30, "per_coalition": 2},  # multiclass — ultra-light
+    "isolet": {"K": 30, "per_coalition": 2},
     "gisette": {"K_adv": 10},
     "credit_card_fraud": {"K_adv": 30},
-    "crimedata": {"K": 40, "per_coalition": 2},  # regression
-    "abalone": {"K": 40, "per_coalition": 2},  # regression, 8 feats
+    "crimedata": {"K": 40, "per_coalition": 2},
+    "abalone": {"K": 40, "per_coalition": 2},
 }
+
+# ============================================================
+# Helpers
+# ============================================================
 
 
 def _now_stamp() -> str:
@@ -90,24 +92,6 @@ def _git_commit(repo_root: Path) -> str:
         return "unknown"
 
 
-class _Tee:
-    def __init__(self, log_path: Path) -> None:
-        self._console, self._file = sys.stdout, log_path.open("w", encoding="utf-8")
-
-    def write(self, msg: str) -> None:
-        self._console.write(msg)
-        self._file.write(msg)
-
-    def flush(self) -> None:
-        self._console.flush()
-        self._file.flush()
-
-    def close(self) -> None:
-        sys.stdout = self._console
-        sys.stderr = self._console
-        self._file.close()
-
-
 def load_split(prefix, target, processed_dir, *, seed):
     train = pd.read_csv(processed_dir / f"{prefix}_s{seed}_train.csv")
     val = pd.read_csv(processed_dir / f"{prefix}_s{seed}_val.csv")
@@ -122,49 +106,58 @@ def load_split(prefix, target, processed_dir, *, seed):
     )
 
 
-def baseline_ranking(X, y, method, *, task="binary", seed=42):
-    # Use fewer coalitions for slow multiclass/regression evaluations
-    heavy = task != "binary"
-    if method == "shaptopk":
-        scores = compute_shap_topk_importance(X, y, seed=seed, task=task)
-    elif method == "shapg":
-        scores = compute_shapg_importance(X, y, seed=seed)
-    elif method == "minshap":
-        scores = compute_minshap_importance(
-            X,
-            y,
-            n_coalitions=30 if heavy else 100,
-            per_coalition=3 if heavy else 5,
-            seed=seed,
-            task=task,
+def train_eval_model(
+    X_tr,
+    y_tr,
+    X_te,
+    y_te,
+    *,
+    task="binary",
+    seed=42,
+    n_classes=None,
+):
+    """Train one XGBoost and return (utility, feature_importances_ dict)."""
+    if n_classes is None:
+        n_classes = len(np.unique(y_te))
+    if task == "regression":
+        m = XGBRegressor(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
         )
-    elif method == "banzhaf":
-        scores = compute_banzhaf_importance(
-            X,
-            y,
-            n_coalitions=40 if heavy else 200,
-            per_coalition=3 if heavy else 5,
-            seed=seed,
-            task=task,
-        )
-    elif method == "powershap":
-        scores = compute_powershap_importance(
-            X,
-            y,
-            power_iterations=5 if heavy else 20,
-            seed=seed,
-            task=task,
-        )
+        m.fit(X_tr.values, y_tr)
+        y_pred = m.predict(X_te.values)
+        val = float(r2_score(y_te, y_pred))
+        if val < 0.0:
+            val = 0.0
     else:
-        raise ValueError(f"Unknown: {method}")
-    return [f for f, _ in sorted(scores.items(), key=lambda kv: kv[1], reverse=True)]
+        m = XGBClassifier(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            verbosity=0,
+            random_state=seed,
+        )
+        m.fit(X_tr.values, y_tr)
+        y_prob = m.predict_proba(X_te.values)
+        if n_classes == 2:
+            val = float(roc_auc_score(y_te, y_prob[:, 1]))
+        else:
+            val = float(accuracy_score(y_te, m.predict(X_te.values)))
+    imp = dict(zip(X_tr.columns, m.feature_importances_.astype(float)))
+    return val, imp
 
 
-def evaluate_topk(X_test, y_test, ranking, *, task="binary", seed=42):
+def eval_topk_from_ranking(X_test, y_test, ranking, *, task="binary", seed=42):
+    """Evaluate top-k AUC / R² for a given feature ranking."""
     n_classes = len(np.unique(y_test))
     rows = []
     for k in TOP_K:
         feats = ranking[: min(k, len(ranking))]
+        if not feats:
+            continue
         X_tr, X_te, y_tr, y_te = train_test_split(
             X_test[feats].values,
             y_test,
@@ -181,10 +174,10 @@ def evaluate_topk(X_test, y_test, ranking, *, task="binary", seed=42):
                 random_state=seed,
             )
             m.fit(X_tr, y_tr)
-            val = float(r2_score(y_te, m.predict(X_te)))
-            if val < 0.0:
-                val = 0.0
-            rows.append({"k": k, "metric": "R2", "value": round(val, 4)})
+            v = float(r2_score(y_te, m.predict(X_te)))
+            if v < 0.0:
+                v = 0.0
+            rows.append({"k": k, "metric": "R2", "value": round(v, 4)})
         else:
             m = XGBClassifier(
                 n_estimators=100,
@@ -196,11 +189,16 @@ def evaluate_topk(X_test, y_test, ranking, *, task="binary", seed=42):
             m.fit(X_tr, y_tr)
             proba = m.predict_proba(X_te)
             if n_classes == 2:
-                val = float(roc_auc_score(y_te, proba[:, 1]))
+                v = float(roc_auc_score(y_te, proba[:, 1]))
             else:
-                val = float(roc_auc_score(y_te, proba, multi_class="ovr"))
-            rows.append({"k": k, "metric": "AUC", "value": round(val, 4)})
+                v = float(accuracy_score(y_te, m.predict(X_te)))
+            rows.append({"k": k, "metric": "AUC", "value": round(v, 4)})
     return pd.DataFrame(rows)
+
+
+# ============================================================
+# Main
+# ============================================================
 
 
 def main():
@@ -219,16 +217,27 @@ def main():
         encoding="utf-8",
     )
 
-    all_rows = []
+    all_rows: list[dict] = []
+
     for prefix, target, task in tqdm(
-        DATASETS, desc="filter-pipe", unit="ds", file=sys.stdout
+        DATASETS,
+        desc="filter-verify",
+        unit="ds",
+        file=sys.stdout,
     ):
         for seed in tqdm(
-            SEEDS, desc=f"  seeds ({prefix})", unit="sd", file=sys.stdout, leave=False
+            SEEDS,
+            desc=f"  seeds ({prefix})",
+            unit="sd",
+            file=sys.stdout,
+            leave=False,
         ):
             try:
                 X_tr, y_tr, X_val, y_val, X_te, y_te = load_split(
-                    prefix, target, processed_dir, seed=seed
+                    prefix,
+                    target,
+                    processed_dir,
+                    seed=seed,
                 )
             except FileNotFoundError:
                 print(f"\n  SKIP {prefix} s{seed}: missing split")
@@ -237,8 +246,9 @@ def main():
             n_full = X_tr.shape[1]
             n_cls = len(np.unique(y_val))
             bud = DATASET_BUDGET.get(prefix, {"K_adv": 20})
+            metric_label = "R2" if task == "regression" else "AUC"
 
-            # Stage 1 — MinPPI filter
+            # ── Stage 1: MinPPI ──────────────────────────────────────
             t0 = time.perf_counter()
             if n_cls > 2 or task == "regression":
                 minppi = estimate_minppi_random_mc(
@@ -256,7 +266,11 @@ def main():
                 )
             else:
                 sg_s, sg_n = build_guidance_from_data(
-                    X_tr, y_tr, depth=1, m=5, seed=seed
+                    X_tr,
+                    y_tr,
+                    depth=1,
+                    m=5,
+                    seed=seed,
                 )
                 minppi = estimate_minppi(
                     X_tr,
@@ -265,7 +279,7 @@ def main():
                     y_val,
                     alpha=ALPHA,
                     method="shapg_guided",
-                    K_adv=bud["K_adv"],
+                    K_adv=bud.get("K_adv", bud.get("K", 20)),
                     shapg_neighbors=sg_n,
                     shapg_scores=sg_s,
                     seed=seed,
@@ -275,97 +289,113 @@ def main():
             harmful = {f for f, v in minppi.items() if v == -1}
             t_ppi = time.perf_counter() - t0
             n_h = len(harmful)
-            cr = n_h / n_full if n_full else 0
+            cr = n_h / n_full if n_full else 0.0
             keep = [c for c in X_tr.columns if c not in harmful]
+
+            print(
+                f"\n  {prefix} s{seed}: {n_h} harmful → {len(keep)} remain "
+                f"({cr * 100:.1f}%)  [{t_ppi:.0f}s]",
+            )
+
+            # ── Stage 2: train on full & filtered ────────────────────
+            # Full-feature model
+            auc_full, _ = train_eval_model(
+                X_tr,
+                y_tr,
+                X_te,
+                y_te,
+                task=task,
+                seed=seed,
+            )
 
             all_rows.append(
                 {
                     "dataset": prefix,
                     "seed": seed,
-                    "stage": "filter",
-                    "method": "minppi",
-                    "n_features": n_h,
+                    "stage": "full",
+                    "method": "xgb",
+                    "n_features": n_full,
+                    "n_full": n_full,
+                    "compression": 0.0,
+                    "time_s": round(t_ppi, 1),
+                    metric_label: round(auc_full, 4),
+                }
+            )
+
+            if n_h == 0:
+                print("    (0 harmful — filtered = full, skipping retrain)")
+                continue
+
+            # Filtered-feature model
+            X_tr_f, X_te_f = X_tr[keep], X_te[keep]
+            auc_filt, imp_filt = train_eval_model(
+                X_tr_f,
+                y_tr,
+                X_te_f,
+                y_te,
+                task=task,
+                seed=seed,
+            )
+            ranking = sorted(imp_filt, key=imp_filt.get, reverse=True)  # type: ignore[arg-type]
+
+            all_rows.append(
+                {
+                    "dataset": prefix,
+                    "seed": seed,
+                    "stage": "filtered",
+                    "method": "xgb",
+                    "n_features": len(keep),
                     "n_full": n_full,
                     "compression": round(cr, 4),
                     "time_s": round(t_ppi, 1),
+                    metric_label: round(auc_filt, 4),
                 }
             )
-            print(
-                f"\n  {prefix} s{seed}: {n_h} harmful removed → {len(keep)} remain ({cr * 100:.1f}%)"
+
+            # ── Stage 3: top-k from feature_importances_ (free) ──────
+            kpi = eval_topk_from_ranking(
+                X_te_f,
+                y_te,
+                ranking,
+                task=task,
+                seed=seed,
             )
+            for _, r in kpi.iterrows():
+                all_rows.append(
+                    {
+                        "dataset": prefix,
+                        "seed": seed,
+                        "stage": "filtered",
+                        "method": "xgb-gain",
+                        "n_features": len(keep),
+                        "n_full": n_full,
+                        "compression": round(cr, 4),
+                        f"{r['metric']}@{int(r['k'])}": r["value"],
+                    }
+                )
 
-            if not keep:
-                print("    Stage 2 SKIP (0 features left)")
-                continue
+            k10 = kpi[kpi["k"] == 10]
+            if len(k10):
+                print(
+                    f"    filtered {metric_label}={auc_filt:.4f}  "
+                    f"Δ={auc_filt - auc_full:+.4f}  "
+                    f"{kpi['metric'].iloc[0]}@10={k10['value'].iloc[0]:.4f}",
+                )
 
-            # No harmful features removed → filtered set = full set,
-            # Stage 2 is identical to running baselines on the original data.
-            if n_h == 0:
-                print("    Stage 2 SKIP (0 harmful removed — identical to full)")
-                continue
-
-            X_tr_f = X_tr[keep] if n_h > 0 else X_tr
-            X_te_f = X_te[keep] if n_h > 0 else X_te
-
-            # Stage 2 — baselines on filtered features
-            for mname in ["shaptopk", "shapg", "minshap", "banzhaf", "powershap"]:
-                try:
-                    rank = baseline_ranking(X_tr_f, y_tr, mname, task=task, seed=seed)
-                except Exception as e:
-                    print(f"      {mname}: FAILED ({e})")
-                    continue
-                kpi = evaluate_topk(X_te_f, y_te, rank, task=task, seed=seed)
-                for _, r in kpi.iterrows():
-                    all_rows.append(
-                        {
-                            "dataset": prefix,
-                            "seed": seed,
-                            "stage": "filtered",
-                            "method": mname,
-                            "n_features": len(keep),
-                            "n_full": n_full,
-                            "compression": round(cr, 4),
-                            f"{r['metric']}@{int(r['k'])}": r["value"],
-                        }
-                    )
-                k10 = kpi[kpi["k"] == 10]
-                if len(k10):
-                    print(
-                        f"      {mname}: {kpi['metric'].iloc[0]}@10={k10['value'].iloc[0]:.4f}"
-                    )
-
+    # ── Save ────────────────────────────────────────────────────────
     df = pd.DataFrame(all_rows)
-    df.to_csv(out_dir / "minppi_filter_pipeline.csv", index=False)
-    print(f"\n  minppi_filter_pipeline.csv saved ({len(df)} rows)")
+    df.to_csv(out_dir / "filter_verify.csv", index=False)
+    print(f"\n  filter_verify.csv saved ({len(df)} rows)")
 
-    num_cols = [
-        c for c in df.columns if "@" in c or c == "compression" or c == "time_s"
-    ]
-    agg = (
-        df.groupby(["dataset", "stage", "method"])[num_cols]
-        .agg(["mean", "std"])
-        .round(4)
-    )
-    agg.to_csv(out_dir / "minppi_filter_pipeline_agg.csv")
-    print("  minppi_filter_pipeline_agg.csv saved")
-
-    # ΔAUC@10 vs full baseline
-    full_csv = (
-        project_root / "results" / "tables" / "2026-06-28_07-44-10" / "main_metrics.csv"
-    )
-    if full_csv.exists():
-        full = pd.read_csv(full_csv)
-        fa = full.groupby(["dataset", "method"])["AUC@10"].mean()
-        print("\n=== ΔAUC@10 (filtered − full) ===")
-        for ds in sorted(df["dataset"].unique()):
-            sub = df[(df["dataset"] == ds) & (df["stage"] == "filtered")]
-            for mn in sub["method"].unique():
-                fv = sub[sub["method"] == mn]["AUC@10"].mean()
-                try:
-                    bv = fa.loc[ds, mn]
-                    print(f"  {ds:20s} {mn:12s}: {fv - bv:+.4f}")
-                except KeyError:
-                    pass
+    num_cols = [c for c in df.columns if "@" in c or c in ("compression", "AUC", "R2")]
+    if num_cols:
+        agg = (
+            df.groupby(["dataset", "stage", "method"])[num_cols]
+            .agg(["mean", "std"])
+            .round(4)
+        )
+        agg.to_csv(out_dir / "filter_verify_agg.csv")
+        print("  filter_verify_agg.csv saved")
 
     print(f"\nDone. Output: {out_dir}")
 

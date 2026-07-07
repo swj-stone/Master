@@ -281,7 +281,7 @@ class _CachedAUCCharacteristic:
             )
         elif task == "multiclass":
             self._model = LogisticRegression(
-                max_iter=200,
+                max_iter=500,
                 solver="lbfgs",
                 random_state=seed,
             )
@@ -335,7 +335,9 @@ class _CachedAUCCharacteristic:
                 if val < 0.0:
                     val = 0.0
             elif self._task == "multiclass":
-                self._model.fit(X_tr, y_tr)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    self._model.fit(X_tr, y_tr)
                 val = float(accuracy_score(y_te, self._model.predict(X_te)))
             else:
                 with warnings.catch_warnings():
