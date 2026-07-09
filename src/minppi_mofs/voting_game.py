@@ -97,8 +97,8 @@ class AccFullCache:
         self._cache: dict[tuple[str, ...], float] = {}
         mp = model_params or {}
         self._model_params = {
-            "n_estimators": mp.get("n_estimators", 3),
-            "max_depth": mp.get("max_depth", 1),
+            "n_estimators": mp.get("n_estimators", 15),
+            "max_depth": mp.get("max_depth", 2),
             "learning_rate": mp.get("learning_rate", 0.3),
             "n_jobs": mp.get("n_jobs", 1),
         }

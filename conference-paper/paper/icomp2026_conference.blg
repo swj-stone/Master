@@ -3,44 +3,44 @@ Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: icomp2026_conference.aux
 The style file: icomp2026_conference.bst
 Database file #1: icomp2026_conference.bib
-You've used 25 entries,
+You've used 26 entries,
             2773 wiz_defined-function locations,
-            745 strings with 9663 characters,
-and the built_in function-call counts, 12313 in all, are:
-= -- 1096
-> -- 745
+            751 strings with 9907 characters,
+and the built_in function-call counts, 12819 in all, are:
+= -- 1142
+> -- 775
 < -- 17
-+ -- 250
-- -- 225
-* -- 1030
-:= -- 1895
-add.period$ -- 80
-call.type$ -- 25
-change.case$ -- 148
-chr.to.int$ -- 25
-cite$ -- 50
-duplicate$ -- 551
-empty$ -- 989
-format.name$ -- 264
-if$ -- 2572
++ -- 260
+- -- 234
+* -- 1078
+:= -- 1972
+add.period$ -- 83
+call.type$ -- 26
+change.case$ -- 154
+chr.to.int$ -- 26
+cite$ -- 52
+duplicate$ -- 572
+empty$ -- 1030
+format.name$ -- 274
+if$ -- 2676
 int.to.chr$ -- 1
 int.to.str$ -- 1
-missing$ -- 26
-newline$ -- 134
-num.names$ -- 104
-pop$ -- 276
+missing$ -- 27
+newline$ -- 139
+num.names$ -- 108
+pop$ -- 286
 preamble$ -- 1
-purify$ -- 124
+purify$ -- 129
 quote$ -- 0
-skip$ -- 425
+skip$ -- 440
 stack$ -- 0
-substring$ -- 480
-swap$ -- 57
+substring$ -- 507
+swap$ -- 58
 text.length$ -- 6
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 270
+type$ -- 281
 warning$ -- 0
-while$ -- 111
+while$ -- 116
 width$ -- 0
-write$ -- 335
+write$ -- 348

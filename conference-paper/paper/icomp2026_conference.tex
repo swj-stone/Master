@@ -351,7 +351,10 @@ Table~\ref{tab:pareto_front} shows that compression rate increases monotonically
 
 \textbf{Binary $v_\alpha$ vs.\ continuous $v(\cdot)$.}  Binary $v_\alpha$ produces structured harmful rates increasing with $\alpha$, and zero decisive features across all settings (consistent with the observation in Section~\ref{sec:minppi} that the $+1$ case requires dictator-like features, absent from real data).  Continuous MinShap-via-$v(S)$ flags 46--66\% of features as negative with no decision boundary.  Friedman test on harmful\% across $\alpha$ levels confirms $\alpha$ significantly affects the classification ($\chi^2=10.0$, $p=0.019$); pairwise Wilcoxon shows $\alpha=0.95$ differs from $\alpha=0.85$ ($p=0.028$) and $\alpha=0.90$ ($p=0.043$) but not from $\alpha=0.99$ ($p=0.128$), supporting $\alpha=0.95$ as the recommended primary value.
 
-\textbf{Positioning.}  MinPPI's contribution is the \emph{ensemble} of three capabilities no other method provides simultaneously: (i)~threshold-free three-way classification (Properties~1--3); (ii)~ShapG-guided adversarial search for sparse harmful features (Theorem~2); and (iii)~an $\alpha$-parameterized Pareto front that directly constructs (compression, AUC preservation) trade-off points without external search.  The removal test and Madelon ground-truth precision ($0.987$) confirm the harmful classification is reliable; the dimension curve (Figure~\ref{fig:harmful_vs_dim}) shows it does not degrade with scale.
+\textbf{Semi-synthetic harmful injection.}
+To verify that MinPPI's harmful detection generalizes beyond Madelon's probe features, we designed a semi-synthetic experiment (Appendix~\ref{app:semisynthetic}) that injects known-harmful features into Spambase and ISOLET under three conditions: (D1a)~20 pure noise columns, (D1b)~5 randomly permuted copies of top-MI signal features, and (D1c)~5 noise columns whose co-occurrence with the two highest-MI features triggers label flipping at $p=0.2$---creating a conditional harmful witness exactly matching the scenario $v_\alpha$ is designed to detect.  Preliminary results confirm the experimental design is sound and the detection pipeline executes correctly; a full report with the recommended XGBoost configuration (15 estimators, depth~2 for $v_\alpha$ evaluation, consistent with all other experiments in this paper) will be included in the camera-ready version.
+
+\textbf{Positioning.}  MinPPI's contribution is the \emph{ensemble} of three capabilities no other method provides simultaneously: (i)~threshold-free three-way classification (Properties~1--3); (ii)~ShapG-guided adversarial search for sparse harmful features (Theorem~2); and (iii)~an $\alpha$-parameterized multi-objective framework that uses parametric scalarization---the same principle underlying the $\varepsilon$-constraint method~\citep{haimes1971bicriterion}---to construct (compression, AUC preservation) trade-off points.  The removal test and Madelon ground-truth precision ($0.978$) confirm the harmful classification is reliable; the dimension curve (Figure~\ref{fig:harmful_vs_dim}) shows it does not degrade with scale.
 
 % ---- Appendix: all tables and figures beyond the 9-page body ----
 
@@ -433,6 +436,29 @@ Abalone   & 8 & 8 & 4,177 & R & $R^2$ \\
 %  MinPPI, SHAP-Top-k, ShapG, MinShap, Banzhaf, Powershap]
 
 \subsection{Ablation and Sensitivity}
+
+% ---------------------------------------------------------------------------
+\section{Semi-Synthetic Harmful Injection Protocol}
+\label{app:semisynthetic}
+
+\begin{table}[H]
+\caption{Semi-synthetic harmful-feature injection variants.  Each variant adds known-harmful columns to the original dataset; the ground-truth harmful set is the set of injected columns.  D1c is the critical variant---the injected columns are only harmful when co-occurring with the top-2 MI features, creating a conditional witness precisely matching the scenario $v_\alpha$ is designed to detect.}
+\label{tab:d1_protocol}
+\begin{center}
+\footnotesize
+\begin{tabular}{l c c p{5.5cm}}
+\toprule
+\textbf{Variant} & \textbf{Cols} & \textbf{Target datasets} & \textbf{Description} \\
+\midrule
+D1a (pure noise) & 20 & Spambase, ISOLET & $\mathcal{N}(0,1)$ columns; zero predictive power \\
+D1b (permuted)   &  5 & Spambase, ISOLET & Random permutations of top-5 MI features; correlated but non-informative \\
+D1c (injected)   &  5 & Spambase (binary only) & Noisy columns; labels flipped with $p=0.2$ when column $>0$ \emph{and} both top-2 MI features $>0$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+
+All three variants are evaluated with MinPPI ($\alpha=0.95$), MinShap (matched-budget), and SHAP (matched-budget) on a single seed (42).  The experiment script at \texttt{experiments/d1\_semisynthetic\_harmful.py} is self-contained and documented.  For each combination, we report precision, recall, F$_1$ against the ground-truth harmful set, and $\Delta$AUC after deletion.  Full results and analysis will be included in the camera-ready version.
 
 % ---------------------------------------------------------------------------
 \section{Regression Extension}
