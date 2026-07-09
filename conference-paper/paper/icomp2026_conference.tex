@@ -83,9 +83,10 @@ The value $v_\alpha$ is evaluated by actually training $\mathcal{M}_S$, so unlik
 
 \item {\bf ShapG-Guided Adversarial Search (Algorithm~B).} Random Monte Carlo for detecting harmful features suffers $O(1/p_-)$ sample complexity when harmful contexts are sparse. We leverage the ShapG correlation graph~\citep{zhao2025shapg} to guide adversarial search toward vulnerable coalitions, recovering sparse harmful features with substantially higher sample efficiency than uniform sampling (Theorem~2): on an engineered voting game where uniform MC requires $K\approx 90$ for $95\%$ detection, the ShapG-guided search achieves deterministic detection at $K_{\text{adv}}=1$, a gain of roughly two orders of magnitude under the structural condition that the harmful witness lies within the ShapG neighborhood.
 
-\item {\bf $\alpha$-Parameterized Multi-Objective Selection.} We formulate MinPPI as a standalone multi-objective method: sweeping the quota $\alpha \in \{0.85,0.90,0.95,0.99\}$ directly constructs a Pareto front in (compression rate, AUC preservation) space, with each $\alpha$ producing one operating point. The approach requires no external search algorithm---$\alpha$ itself is both the parameter and the coordinate on the frontier.
+\item {\bf $\alpha$-Parameterized Multi-Objective Selection.}
+MinPPI achieves multi-objective feature selection via parametric scalarization---the same principle that underlies classical methods such as the $\varepsilon$-constraint and weighted-sum approaches~\citep{haimes1971bicriterion}.  The quota $\alpha$ serves as a scalar parameter: varying $\alpha$ over $\{0.85,0.90,0.95,0.99\}$ produces a discrete set of Pareto-optimal (compression, AUC preservation) operating points.  Each $\alpha$ solves a single-objective subproblem (MinPPI estimation + deletion + retraining), yielding full interpretability---every operating point traces back to the specific coalitions that witnessed each deleted feature as harmful.  This approach requires no evolutionary search algorithm, yet delivers a principled multi-objective trade-off curve at a fraction of the computational cost of population-based methods.
 
-\item {\bf Comprehensive Empirical Validation.} We evaluate MinPPI against five baselines---SHAP-Top-$k$, ShapG, MinShap, Banzhaf-FS, and Powershap---on seven tabular datasets ($29$--$100$ features after MI filtering, five seeds each). MinPPI's removal test shows zero AUC degradation ($\leq 10^{-3}$) on 6 of 7 datasets; on Madelon, where ground-truth probe labels exist, MinPPI achieves precision $0.978$ against known noise features. The $\alpha$-Pareto front delivers up to 37.9\% compression (Credit-Card-Fraud at $\alpha=0.95$) with AUC preservation $\geq 0.985$, and an $\alpha$-recall curve confirms $\alpha$ as a controllable precision--recall knob.
+\item {\bf Comprehensive Empirical Validation.} We evaluate MinPPI against five baselines---SHAP-Top-$k$, ShapG, MinShap, Banzhaf-FS, and Powershap---on seven tabular datasets ($29$--$100$ features after MI filtering, five seeds each). MinPPI's removal test shows zero AUC degradation ($\leq 10^{-3}$) on 6 of 7 datasets; on Madelon, where ground-truth probe labels exist, MinPPI achieves precision $0.978$ against known noise features. The $\alpha$-parameterized operating curve delivers up to 37.9\% compression (Credit-Card-Fraud at $\alpha=0.95$) with AUC preservation $\geq 0.985$, and an $\alpha$-recall curve confirms $\alpha$ as a controllable precision--recall knob.
 \end{enumerate}
 
 \section{Related Work}
@@ -137,9 +138,11 @@ v_\alpha(S) = \mathbb{1}\!\bigl[\,U(\mathcal{M}_S) \;\geq\; \alpha \cdot U_{\tex
 \end{equation}
 The pair~$(N_1, v_\alpha)$ is a \emph{utility-threshold voting game} (UTVG). Unlike a classical weighted voting game, which is monotone by construction, $v_\alpha$ is \emph{not} guaranteed monotone: adding a feature can lower utility (noise, redundancy, overfitting), so $S \subset T$ with $v_\alpha(S) = 1$, $v_\alpha(T) = 0$ is possible. Formally $(N_1, v_\alpha)$ is thus a non-monotone \emph{simple game} rather than a weighted voting game, and this non-monotonicity is the empirical basis for the three-way classification of Section~\ref{sec:minppi}.
 
-\subsection{Pareto Optimality}
+\subsection{Pareto Optimality and Parametric Scalarization}
 
-A solution $\mathbf{x}$ \emph{Pareto-dominates} $\mathbf{x}'$ iff $f_j(\mathbf{x}) \leq f_j(\mathbf{x}')$ for all objectives $f_j$ with at least one strict inequality. The \emph{Pareto front} is the set of all non-dominated solutions. We construct a two-objective front in (compression rate, AUC preservation) space by sweeping $\alpha$ (Section~\ref{sec:alpha-pareto}).
+A solution $\mathbf{x}$ \emph{Pareto-dominates} $\mathbf{x}'$ iff $f_j(\mathbf{x}) \leq f_j(\mathbf{x}')$ for all objectives $f_j$ with at least one strict inequality. The \emph{Pareto front} is the set of all non-dominated solutions.
+
+Classical multi-objective optimization often converts a multi-objective problem into a sequence of single-objective subproblems parameterized by a scalar. The $\varepsilon$-constraint method~\citep{haimes1971bicriterion} minimizes one objective while constraining others below thresholds~$\varepsilon$; the weighted-sum method minimizes a linear combination $\lambda^T \mathbf{f}(\mathbf{x})$ for varying weight vectors~$\lambda$. Both produce Pareto-optimal points by sweeping the parameter.  MinPPI follows the same parametric-scalarization paradigm (Section~\ref{sec:alpha-pareto}): the quota $\alpha$ serves as the scalar parameter, and each $\alpha$ solves a single-objective subproblem (MinPPI estimation + deletion + retraining) to produce one (compression, AUC preservation) operating point.  Unlike evolutionary methods, MinPPI provides full interpretability---every operating point traces back to the specific coalitions that witnessed each deleted feature as harmful.
 
 \subsection{ShapG Overview}
 
@@ -213,16 +216,14 @@ $n \leq 20$: exact (abalone, 8).  $20 < n \leq 75$: Algorithm~B ($K_{\text{adv}}
 \subsection{$\alpha$-Parameterized Multi-Objective Selection}
 \label{sec:alpha-pareto}
 
-The MinPPI framework directly constructs a two-objective Pareto front without external search. For a fixed dataset, each quota $\alpha$ defines an operating point in (compression rate, AUC preservation) space:
+The MinPPI framework constructs multi-objective trade-off points via parametric scalarization. For a fixed dataset, each quota $\alpha$ defines an operating point in (compression rate, AUC preservation) space---obtained by solving a single-objective subproblem (MinPPI estimation, deletion of harmful features, and model retraining):
 \begin{itemize}
   \item \textbf{Compression rate} $c(\alpha) = |\mathcal{H}_\alpha|/n$, the fraction of features classified as harmful (MinPPI = $-1$) at quota $\alpha$.
   \item \textbf{AUC preservation} $p(\alpha) = \text{AUC}(\mathcal{M}_{N_1\setminus\mathcal{H}_\alpha}) / \text{AUC}(\mathcal{M}_{N_1})$, the ratio of model performance after deleting all harmful features to the full-feature baseline.
 \end{itemize}
-Varying $\alpha \in (0, 1]$ sweeps the harmfulness-conservativeness trade-off: lower $\alpha$ admits more features as harmful (higher compression, lower precision); higher $\alpha$ is stricter and only flags features with unambiguous harmful witnesses (lower compression, precision $>0.95$).
+Varying $\alpha \in (0, 1]$ sweeps the harmfulness-conservativeness trade-off: lower $\alpha$ admits more features as harmful (higher compression, potentially lower precision); higher $\alpha$ is stricter and only flags features with unambiguous harmful witnesses (lower compression, near-perfect precision, empirically $>0.95$ for $\alpha \geq 0.90$ on Madelon; Section~\ref{sec:harmful_utility}).
 
-The set of points $\{(c(\alpha), p(\alpha)) : \alpha \in \{0.85,0.90,0.95,0.99\}\}$ forms a Pareto front: no $\alpha$ simultaneously achieves higher compression and higher preservation than another $\alpha$. This follows from Property~2: raising $\alpha$ tightens the winning threshold, so $|\mathcal{H}_{\alpha}|$ is monotone non-increasing in $\alpha$, giving compression monotone decreasing while preservation is monotone non-decreasing.
-
-The $\alpha$-Pareto front is \emph{complete}: every achievable (compression, preservation) pair respecting the voting-game structure lies on or below this front, which follows from the min operator scanning all coalitions for the worst-case marginal. No external search algorithm is required; $\alpha$ serves as both the parameter and the coordinate on the frontier.
+The set of points $\{(c(\alpha), p(\alpha)) : \alpha \in \{0.85,0.90,0.95,0.99\}\}$ forms a discrete approximation of the compression--safety trade-off curve.  This approach is analogous to the $\varepsilon$-constraint method~\citep{haimes1971bicriterion} in classical multi-objective optimization, where varying the constraint threshold produces a sequence of Pareto-optimal points.  Here $\alpha$ serves as the scalar parameter, and each subproblem is solved analytically by the voting game---no numerical optimization or evolutionary search is required.  We recommend $\alpha=0.95$ as the default operating point, balancing meaningful harmful-feature detection against the risk of false positives.
 
 \subsection{Discussion}
 \label{sec:discussion}

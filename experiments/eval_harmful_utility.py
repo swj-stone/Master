@@ -328,7 +328,7 @@ def run_c1_removal(
         harmful = {f for f, v in minppi.items() if v == -1}
         n_harmful = len(harmful)
 
-        # ---- mean-SHAP ranking ----
+        # ---- SHAP bottom-k (matched-budget: same count as MinPPI) ----
         from minppi_mofs.baselines.shap_top_k import compute_shap_topk_importance
 
         shap_scores = compute_shap_topk_importance(
@@ -337,7 +337,7 @@ def run_c1_removal(
         shap_ranked = sorted(shap_scores.items(), key=lambda kv: kv[1])
         shap_bottom = {f for f, _ in shap_ranked[: max(1, n_harmful)]}
 
-        # ---- MinShap negative ----
+        # ---- MinShap matched-budget (top-k most negative, same count as MinPPI) ----
         from minppi_mofs.baselines.min_shap import compute_minshap_importance
 
         minshap_scores = compute_minshap_importance(
@@ -348,11 +348,13 @@ def run_c1_removal(
             seed=seed,
             task=task,
         )
-        minshap_neg = {f for f, v in minshap_scores.items() if v < 0}
-        # If MinShap finds no negative features, use bottom-n_harmful by score
-        if not minshap_neg and n_harmful > 0:
-            ranked = sorted(minshap_scores.items(), key=lambda kv: kv[1])
-            minshap_neg = {f for f, _ in ranked[:n_harmful]}
+        # M6 fix: delete the same number of features as MinPPI, not all negatives.
+        # This isolates the *quality* of the harmful set, not its size.
+        if n_harmful > 0:
+            ms_ranked = sorted(minshap_scores.items(), key=lambda kv: kv[1])
+            minshap_matched = {f for f, _ in ms_ranked[:n_harmful]}
+        else:
+            minshap_matched = set()
 
         # ---- evaluate removal ----
         def _remove_and_eval(to_remove: set[str]) -> tuple[float, float, float]:
@@ -380,8 +382,8 @@ def run_c1_removal(
         shap_u, shap_cr, shap_t = _remove_and_eval(shap_bottom)
         shap_delta = shap_u - base_util
 
-        # MinShap control
-        ms_u, ms_cr, ms_t = _remove_and_eval(minshap_neg)
+        # MinShap control (matched-budget)
+        ms_u, ms_cr, ms_t = _remove_and_eval(minshap_matched)
         ms_delta = ms_u - base_util
 
         # Random control (n_trials)
@@ -407,7 +409,7 @@ def run_c1_removal(
             "base_util": round(base_util, 4),
             "n_harmful": n_harmful,
             "n_shap_bottom": len(shap_bottom),
-            "n_minshap_neg": len(minshap_neg),
+            "n_minshap_matched": len(minshap_matched),
             # MinPPI
             "minppi_util": round(ppi_u, 4),
             "minppi_delta": round(ppi_delta, 4),
