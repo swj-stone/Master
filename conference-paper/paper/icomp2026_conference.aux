@@ -122,16 +122,16 @@
 \@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Harmful-feature fraction versus number of MI-selected features at three $\alpha $ levels (mean over 3 seeds). Harmful\% \emph  {decreases} as more features are included, countering the concern that MinPPI's harmful detection degrades with dimensionality.}}{9}{figure.3}\protected@file@percent }
 \newlabel{fig:harmful_vs_dim}{{3}{9}{Harmful-feature fraction versus number of MI-selected features at three $\alpha $ levels (mean over 3 seeds). Harmful\% \emph {decreases} as more features are included, countering the concern that MinPPI's harmful detection degrades with dimensionality}{figure.3}{}}
 \newlabel{fig:harmful_vs_dim@cref}{{[figure][3][]3}{[1][8][]9}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Ablation and Sensitivity}{9}{subsection.6.4}\protected@file@percent }
 \citation{haimes1971bicriterion}
 \bibdata{icomp2026_conference}
 \bibcite{banzhaf1965weighted}{{1}{1965}{{Banzhaf}}{{}}}
 \bibcite{chalkiadakis2011computational}{{2}{2011}{{Chalkiadakis et~al.}}{{Chalkiadakis, Elkind, and Wooldridge}}}
 \bibcite{chandrashekar2014survey}{{3}{2014}{{Chandrashekar \& Sahin}}{{Chandrashekar and Sahin}}}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Removal test: mean $\Delta $AUC after deleting MinPPI--harmful features vs.\ controls, mean $\pm $ std over 5 seeds. \emph  {Positive} $\Delta $AUC means deletion \emph  {improves} performance. $|F|_{\text  {removed}}$ is the fraction of features deleted.}}{10}{table.2}\protected@file@percent }
-\newlabel{tab:harmful_removal}{{2}{10}{Removal test: mean $\Delta $AUC after deleting MinPPI--harmful features vs.\ controls, mean $\pm $ std over 5 seeds. \emph {Positive} $\Delta $AUC means deletion \emph {improves} performance. $|F|_{\text {removed}}$ is the fraction of features deleted}{table.2}{}}
-\newlabel{tab:harmful_removal@cref}{{[table][2][]2}{[1][8][]10}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Ablation and Sensitivity}{10}{subsection.6.4}\protected@file@percent }
 \bibcite{cohen2007feature}{{4}{2007}{{Cohen et~al.}}{{Cohen, Dror, and Ruppin}}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Removal test: mean $\Delta $AUC after deleting MinPPI--harmful features vs.\ matched-budget controls (mean $\pm $ std over 5 seeds). All methods delete exactly $|\mathcal  {H}_{0.95}|$ features. \emph  {Positive} $\Delta $AUC means deletion \emph  {improves} performance. $|F|_{\text  {removed}}$ is the fraction of features deleted by all methods.}}{10}{table.2}\protected@file@percent }
+\newlabel{tab:harmful_removal}{{2}{10}{Removal test: mean $\Delta $AUC after deleting MinPPI--harmful features vs.\ matched-budget controls (mean $\pm $ std over 5 seeds). All methods delete exactly $|\mathcal {H}_{0.95}|$ features. \emph {Positive} $\Delta $AUC means deletion \emph {improves} performance. $|F|_{\text {removed}}$ is the fraction of features deleted by all methods}{table.2}{}}
+\newlabel{tab:harmful_removal@cref}{{[table][2][]2}{[1][8][]10}{}{}{}}
 \bibcite{deb2002fast}{{5}{2002}{{Deb et~al.}}{{Deb, Pratap, Agarwal, and Meyarivan}}}
 \bibcite{grabisch1999axiomatic}{{6}{1999}{{Grabisch \& Roubens}}{{Grabisch and Roubens}}}
 \bibcite{guyon2003introduction}{{7}{2003}{{Guyon \& Elisseeff}}{{Guyon and Elisseeff}}}
@@ -166,88 +166,91 @@
 \newlabel{tab:datasets@cref}{{[table][3][]3}{[1][13][]13}{}{}{}}
 \newlabel{app:protocol}{{B}{13}{Datasets and Protocol}{table.3}{}}
 \newlabel{app:protocol@cref}{{[section][2][]B}{[1][13][]13}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {C}Full Per-Dataset Tables}{13}{appendix.C}\protected@file@percent }
-\newlabel{app:full_tables}{{C}{13}{Full Per-Dataset Tables}{appendix.C}{}}
-\newlabel{app:full_tables@cref}{{[section][3][]C}{[1][13][]13}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.1}Single-Point AUC@$k$ (All Methods)}{13}{subsection.C.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.2}Ablation and Sensitivity}{13}{subsection.C.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {D}Semi-Synthetic Harmful Injection Protocol}{13}{appendix.D}\protected@file@percent }
-\newlabel{app:semisynthetic}{{D}{13}{Semi-Synthetic Harmful Injection Protocol}{appendix.D}{}}
-\newlabel{app:semisynthetic@cref}{{[section][4][]D}{[1][13][]13}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Semi-synthetic harmful-feature injection variants. Each variant adds known-harmful columns to the original dataset; the ground-truth harmful set is the set of injected columns. D1c is the critical variant---the injected columns are only harmful when co-occurring with the top-2 MI features, creating a conditional witness precisely matching the scenario $v_\alpha $ is designed to detect.}}{13}{table.4}\protected@file@percent }
-\newlabel{tab:d1_protocol}{{4}{13}{Semi-synthetic harmful-feature injection variants. Each variant adds known-harmful columns to the original dataset; the ground-truth harmful set is the set of injected columns. D1c is the critical variant---the injected columns are only harmful when co-occurring with the top-2 MI features, creating a conditional witness precisely matching the scenario $v_\alpha $ is designed to detect}{table.4}{}}
-\newlabel{tab:d1_protocol@cref}{{[table][4][]4}{[1][13][]13}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {E}Regression Extension}{14}{appendix.E}\protected@file@percent }
-\newlabel{app:regression}{{E}{14}{Regression Extension}{appendix.E}{}}
-\newlabel{app:regression@cref}{{[section][5][]E}{[1][14][]14}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces $\alpha $-Pareto front on two regression datasets (Crimedata, Abalone). Abalone's single-digit feature count ($n=8$) produces higher variance across seeds; Crimedata shows negligible compression at all $\alpha $ levels, indicating its MI-filtered features are all co-adapted under $R^2$.}}{14}{figure.4}\protected@file@percent }
-\newlabel{fig:pareto_front_reg}{{4}{14}{$\alpha $-Pareto front on two regression datasets (Crimedata, Abalone). Abalone's single-digit feature count ($n=8$) produces higher variance across seeds; Crimedata shows negligible compression at all $\alpha $ levels, indicating its MI-filtered features are all co-adapted under $R^2$}{figure.4}{}}
-\newlabel{fig:pareto_front_reg@cref}{{[figure][4][]4}{[1][14][]14}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Pipeline comparison: MinPPI vs.\ MinShap vs.\ Random preprocessing followed by SHAP-top-$k$ on five classification datasets. MinPPI filtering does not degrade downstream AUC@10 relative to no-filtering baseline; MinShap filtering shows mixed effects---slight improvement on ISOLET and Gisette, degradation on Spambase.}}{14}{figure.5}\protected@file@percent }
-\newlabel{fig:pipeline_comparison}{{5}{14}{Pipeline comparison: MinPPI vs.\ MinShap vs.\ Random preprocessing followed by SHAP-top-$k$ on five classification datasets. MinPPI filtering does not degrade downstream AUC@10 relative to no-filtering baseline; MinShap filtering shows mixed effects---slight improvement on ISOLET and Gisette, degradation on Spambase}{figure.5}{}}
-\newlabel{fig:pipeline_comparison@cref}{{[figure][5][]5}{[1][14][]14}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {F}Alpha Sensitivity}{14}{appendix.F}\protected@file@percent }
-\newlabel{app:alpha}{{F}{14}{Alpha Sensitivity}{appendix.F}{}}
-\newlabel{app:alpha@cref}{{[section][6][]F}{[1][14][]14}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Harmful feature \% vs.\ quota $\alpha $ (seed 42 for $\alpha \neq  0.95$; $\alpha {=}0.95$ column uses 5-seed mean from the removal-test pipeline). Algorithm~B on binary, Algorithm~A shared-coalition on multiclass/regression. ``---'' means zero harmful.}}{14}{table.5}\protected@file@percent }
-\newlabel{tab:alpha_sweep}{{5}{14}{Harmful feature \% vs.\ quota $\alpha $ (seed 42 for $\alpha \neq 0.95$; $\alpha {=}0.95$ column uses 5-seed mean from the removal-test pipeline). Algorithm~B on binary, Algorithm~A shared-coalition on multiclass/regression. ``---'' means zero harmful}{table.5}{}}
-\newlabel{tab:alpha_sweep@cref}{{[table][5][]5}{[1][14][]14}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {G}MinShap Comparison and Madelon Ground Truth}{15}{appendix.G}\protected@file@percent }
-\newlabel{app:minshap}{{G}{15}{MinShap Comparison and Madelon Ground Truth}{appendix.G}{}}
-\newlabel{app:minshap@cref}{{[section][7][]G}{[1][15][]15}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Madelon ground-truth probe recovery (100 features, 97 probes, 5 seeds).}}{15}{table.6}\protected@file@percent }
-\newlabel{tab:madelon_ground_truth}{{6}{15}{Madelon ground-truth probe recovery (100 features, 97 probes, 5 seeds)}{table.6}{}}
-\newlabel{tab:madelon_ground_truth@cref}{{[table][6][]6}{[1][15][]15}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces MinShap vs.\ MinPPI harmful-set agreement (Jaccard index, means over 5 seeds).}}{15}{table.7}\protected@file@percent }
-\newlabel{tab:minshap_vs_minppi}{{7}{15}{MinShap vs.\ MinPPI harmful-set agreement (Jaccard index, means over 5 seeds)}{table.7}{}}
-\newlabel{tab:minshap_vs_minppi@cref}{{[table][7][]7}{[1][15][]15}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {C}Full Per-Dataset Tables}{14}{appendix.C}\protected@file@percent }
+\newlabel{app:full_tables}{{C}{14}{Full Per-Dataset Tables}{appendix.C}{}}
+\newlabel{app:full_tables@cref}{{[section][3][]C}{[1][13][]14}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.1}Single-Point AUC@$k$ (All Methods)}{14}{subsection.C.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Single-point AUC at six cardinalities $k \in \{1,3,5,10,20,50\}$ for five ranking methods on five classification datasets (means over 5 seeds). Best per row \textbf  {bold}. MinPPI is excluded because it produces a three-way classification rather than a feature ranking; its performance is assessed through the deletion and ground-truth experiments in Section~\ref {sec:harmful_utility}.}}{14}{table.4}\protected@file@percent }
+\newlabel{tab:all_auc}{{4}{14}{Single-point AUC at six cardinalities $k \in \{1,3,5,10,20,50\}$ for five ranking methods on five classification datasets (means over 5 seeds). Best per row \textbf {bold}. MinPPI is excluded because it produces a three-way classification rather than a feature ranking; its performance is assessed through the deletion and ground-truth experiments in Section~\ref {sec:harmful_utility}}{table.4}{}}
+\newlabel{tab:all_auc@cref}{{[table][4][]4}{[1][13][]14}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.2}Ablation and Sensitivity}{15}{subsection.C.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {D}Semi-Synthetic Harmful Injection Protocol}{15}{appendix.D}\protected@file@percent }
+\newlabel{app:semisynthetic}{{D}{15}{Semi-Synthetic Harmful Injection Protocol}{appendix.D}{}}
+\newlabel{app:semisynthetic@cref}{{[section][4][]D}{[1][14][]15}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Semi-synthetic harmful-feature injection variants. Each variant adds known-harmful columns to the original dataset; the ground-truth harmful set is the set of injected columns. D1c is the critical variant---the injected columns are only harmful when co-occurring with the top-2 MI features, creating a conditional witness precisely matching the scenario $v_\alpha $ is designed to detect.}}{15}{table.5}\protected@file@percent }
+\newlabel{tab:d1_protocol}{{5}{15}{Semi-synthetic harmful-feature injection variants. Each variant adds known-harmful columns to the original dataset; the ground-truth harmful set is the set of injected columns. D1c is the critical variant---the injected columns are only harmful when co-occurring with the top-2 MI features, creating a conditional witness precisely matching the scenario $v_\alpha $ is designed to detect}{table.5}{}}
+\newlabel{tab:d1_protocol@cref}{{[table][5][]5}{[1][14][]15}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {E}Regression Extension}{15}{appendix.E}\protected@file@percent }
+\newlabel{app:regression}{{E}{15}{Regression Extension}{appendix.E}{}}
+\newlabel{app:regression@cref}{{[section][5][]E}{[1][15][]15}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces $\alpha $-Pareto front on two regression datasets (Crimedata, Abalone). Abalone's single-digit feature count ($n=8$) produces higher variance across seeds; Crimedata shows negligible compression at all $\alpha $ levels, indicating its MI-filtered features are all co-adapted under $R^2$.}}{15}{figure.4}\protected@file@percent }
+\newlabel{fig:pareto_front_reg}{{4}{15}{$\alpha $-Pareto front on two regression datasets (Crimedata, Abalone). Abalone's single-digit feature count ($n=8$) produces higher variance across seeds; Crimedata shows negligible compression at all $\alpha $ levels, indicating its MI-filtered features are all co-adapted under $R^2$}{figure.4}{}}
+\newlabel{fig:pareto_front_reg@cref}{{[figure][4][]4}{[1][15][]15}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Pipeline comparison: MinPPI vs.\ MinShap vs.\ Random preprocessing followed by SHAP-top-$k$ on five classification datasets. MinPPI filtering does not degrade downstream AUC@10 relative to no-filtering baseline; MinShap filtering shows mixed effects---slight improvement on ISOLET and Gisette, degradation on Spambase.}}{16}{figure.5}\protected@file@percent }
+\newlabel{fig:pipeline_comparison}{{5}{16}{Pipeline comparison: MinPPI vs.\ MinShap vs.\ Random preprocessing followed by SHAP-top-$k$ on five classification datasets. MinPPI filtering does not degrade downstream AUC@10 relative to no-filtering baseline; MinShap filtering shows mixed effects---slight improvement on ISOLET and Gisette, degradation on Spambase}{figure.5}{}}
+\newlabel{fig:pipeline_comparison@cref}{{[figure][5][]5}{[1][15][]16}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {F}Alpha Sensitivity}{16}{appendix.F}\protected@file@percent }
+\newlabel{app:alpha}{{F}{16}{Alpha Sensitivity}{appendix.F}{}}
+\newlabel{app:alpha@cref}{{[section][6][]F}{[1][16][]16}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Harmful feature \% vs.\ quota $\alpha $ (seed 42 for $\alpha \neq  0.95$; $\alpha {=}0.95$ column uses 5-seed mean from the removal-test pipeline). Algorithm~B on binary, Algorithm~A shared-coalition on multiclass/regression. ``---'' means zero harmful.}}{16}{table.6}\protected@file@percent }
+\newlabel{tab:alpha_sweep}{{6}{16}{Harmful feature \% vs.\ quota $\alpha $ (seed 42 for $\alpha \neq 0.95$; $\alpha {=}0.95$ column uses 5-seed mean from the removal-test pipeline). Algorithm~B on binary, Algorithm~A shared-coalition on multiclass/regression. ``---'' means zero harmful}{table.6}{}}
+\newlabel{tab:alpha_sweep@cref}{{[table][6][]6}{[1][16][]16}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {G}MinShap Comparison and Madelon Ground Truth}{16}{appendix.G}\protected@file@percent }
+\newlabel{app:minshap}{{G}{16}{MinShap Comparison and Madelon Ground Truth}{appendix.G}{}}
+\newlabel{app:minshap@cref}{{[section][7][]G}{[1][16][]16}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Madelon ground-truth probe recovery (100 features, 97 probes, 5 seeds).}}{16}{table.7}\protected@file@percent }
+\newlabel{tab:madelon_ground_truth}{{7}{16}{Madelon ground-truth probe recovery (100 features, 97 probes, 5 seeds)}{table.7}{}}
+\newlabel{tab:madelon_ground_truth@cref}{{[table][7][]7}{[1][16][]16}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces MinShap vs.\ MinPPI harmful-set agreement (Jaccard index, means over 5 seeds).}}{17}{table.8}\protected@file@percent }
+\newlabel{tab:minshap_vs_minppi}{{8}{17}{MinShap vs.\ MinPPI harmful-set agreement (Jaccard index, means over 5 seeds)}{table.8}{}}
+\newlabel{tab:minshap_vs_minppi@cref}{{[table][8][]8}{[1][16][]17}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces MinPPI precision and recall against Madelon probe ground truth as $\alpha $ varies (5 seeds). (a)~Precision is $>0.95$ for $\alpha \geq 0.90$; recall increases with $\alpha $, reaching $0.37$ at $\alpha {=}0.99$. (b)~F$_1$ comparison: MinPPI at $\alpha {=}0.99$ (0.52) vs.\ MinShap (0.79) vs.\ SHAP (0.28). MinShap's higher F$_1$ must be weighed against its $8.5\%$ AUC drop on Credit-Card (Table~\ref {tab:harmful_removal}).}}{17}{figure.6}\protected@file@percent }
+\newlabel{fig:madelon_alpha_recall}{{6}{17}{MinPPI precision and recall against Madelon probe ground truth as $\alpha $ varies (5 seeds). (a)~Precision is $>0.95$ for $\alpha \geq 0.90$; recall increases with $\alpha $, reaching $0.37$ at $\alpha {=}0.99$. (b)~F$_1$ comparison: MinPPI at $\alpha {=}0.99$ (0.52) vs.\ MinShap (0.79) vs.\ SHAP (0.28). MinShap's higher F$_1$ must be weighed against its $8.5\%$ AUC drop on Credit-Card (Table~\ref {tab:harmful_removal})}{figure.6}{}}
+\newlabel{fig:madelon_alpha_recall@cref}{{[figure][6][]6}{[1][17][]17}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Per-$\alpha $ MinPPI precision, recall, F$_1$ against Madelon probes (mean $\pm $ std over 5 seeds).}}{17}{table.9}\protected@file@percent }
+\newlabel{tab:madelon_alpha_recall}{{9}{17}{Per-$\alpha $ MinPPI precision, recall, F$_1$ against Madelon probes (mean $\pm $ std over 5 seeds)}{table.9}{}}
+\newlabel{tab:madelon_alpha_recall@cref}{{[table][9][]9}{[1][17][]17}{}{}{}}
 \citation{zhao2025shapg}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces MinPPI precision and recall against Madelon probe ground truth as $\alpha $ varies (5 seeds). (a)~Precision is $>0.95$ for $\alpha \geq 0.90$; recall increases with $\alpha $, reaching $0.37$ at $\alpha {=}0.99$. (b)~F$_1$ comparison: MinPPI at $\alpha {=}0.99$ (0.52) vs.\ MinShap (0.79) vs.\ SHAP (0.28). MinShap's higher F$_1$ must be weighed against its $8.5\%$ AUC drop on Credit-Card (Table~\ref {tab:harmful_removal}).}}{16}{figure.6}\protected@file@percent }
-\newlabel{fig:madelon_alpha_recall}{{6}{16}{MinPPI precision and recall against Madelon probe ground truth as $\alpha $ varies (5 seeds). (a)~Precision is $>0.95$ for $\alpha \geq 0.90$; recall increases with $\alpha $, reaching $0.37$ at $\alpha {=}0.99$. (b)~F$_1$ comparison: MinPPI at $\alpha {=}0.99$ (0.52) vs.\ MinShap (0.79) vs.\ SHAP (0.28). MinShap's higher F$_1$ must be weighed against its $8.5\%$ AUC drop on Credit-Card (Table~\ref {tab:harmful_removal})}{figure.6}{}}
-\newlabel{fig:madelon_alpha_recall@cref}{{[figure][6][]6}{[1][15][]16}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Per-$\alpha $ MinPPI precision, recall, F$_1$ against Madelon probes (mean $\pm $ std over 5 seeds).}}{16}{table.8}\protected@file@percent }
-\newlabel{tab:madelon_alpha_recall}{{8}{16}{Per-$\alpha $ MinPPI precision, recall, F$_1$ against Madelon probes (mean $\pm $ std over 5 seeds)}{table.8}{}}
-\newlabel{tab:madelon_alpha_recall@cref}{{[table][8][]8}{[1][16][]16}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {H}Ablation Tables}{16}{appendix.H}\protected@file@percent }
-\newlabel{app:ablation}{{H}{16}{Ablation Tables}{appendix.H}{}}
-\newlabel{app:ablation@cref}{{[section][8][]H}{[1][16][]16}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {I}Statistical Tests}{16}{appendix.I}\protected@file@percent }
-\newlabel{app:stats}{{I}{16}{Statistical Tests}{appendix.I}{}}
-\newlabel{app:stats@cref}{{[section][9][]I}{[1][16][]16}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {I.1}Nemenyi Pairwise Significance Matrices}{16}{subsection.I.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Friedman test summary for five baselines on five classification datasets. All pairs non-significant at $\alpha =0.05$ (Nemenyi CD $\approx 4.1$ ranks for $k=5, N=5$).}}{16}{table.9}\protected@file@percent }
-\newlabel{tab:friedman_summary}{{9}{16}{Friedman test summary for five baselines on five classification datasets. All pairs non-significant at $\alpha =0.05$ (Nemenyi CD $\approx 4.1$ ranks for $k=5, N=5$)}{table.9}{}}
-\newlabel{tab:friedman_summary@cref}{{[table][9][]9}{[1][16][]16}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Friedman leave-one-out: $\chi ^2$ and $p$-value after removing each classification dataset in turn. ``(full)'' = all five datasets.}}{17}{table.10}\protected@file@percent }
-\newlabel{tab:friedman_loo}{{10}{17}{Friedman leave-one-out: $\chi ^2$ and $p$-value after removing each classification dataset in turn. ``(full)'' = all five datasets}{table.10}{}}
-\newlabel{tab:friedman_loo@cref}{{[table][10][]10}{[1][16][]17}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces CD diagram for AUC@20 (5 methods, 5 classification datasets). Friedman $\chi ^2 = 13.28$, $p = 0.010$ (Kendall's $W = 0.33$).}}{17}{figure.7}\protected@file@percent }
-\newlabel{fig:cd_auc20}{{7}{17}{CD diagram for AUC@20 (5 methods, 5 classification datasets). Friedman $\chi ^2 = 13.28$, $p = 0.010$ (Kendall's $W = 0.33$)}{figure.7}{}}
-\newlabel{fig:cd_auc20@cref}{{[figure][7][]7}{[1][17][]17}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {J}Method Design-Space}{17}{appendix.J}\protected@file@percent }
-\newlabel{app:op_table}{{J}{17}{Method Design-Space}{appendix.J}{}}
-\newlabel{app:op_table@cref}{{[section][10][]J}{[1][17][]17}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Game-theoretic feature importance methods by aggregation operator and value function.}}{17}{table.11}\protected@file@percent }
-\newlabel{tab:operator-comparison}{{11}{17}{Game-theoretic feature importance methods by aggregation operator and value function}{table.11}{}}
-\newlabel{tab:operator-comparison@cref}{{[table][11][]11}{[1][17][]17}{}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {K}Empirical Verification of the Estimators}{17}{appendix.K}\protected@file@percent }
-\newlabel{app:verify}{{K}{17}{Empirical Verification of the Estimators}{appendix.K}{}}
-\newlabel{app:verify@cref}{{[section][11][]K}{[1][17][]17}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {K.1}MinPPI Trichotomy (Properties~1--3)}{17}{subsection.K.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces MinPPI trichotomy on two engineered voting games ($n=5$). (a)~Example~1: $f_0$ decisive ($\text  {MinSS}=+1$). (b)~Example~2: $f_1$ harmful ($\text  {MinSS}=-1$); $f_0$ is in every winning coalition yet $\text  {MinSS}(f_0)=0$, refuting the naive equivalence.}}{18}{figure.8}\protected@file@percent }
-\newlabel{fig:minppi_trichotomy}{{8}{18}{MinPPI trichotomy on two engineered voting games ($n=5$). (a)~Example~1: $f_0$ decisive ($\text {MinSS}=+1$). (b)~Example~2: $f_1$ harmful ($\text {MinSS}=-1$); $f_0$ is in every winning coalition yet $\text {MinSS}(f_0)=0$, refuting the naive equivalence}{figure.8}{}}
-\newlabel{fig:minppi_trichotomy@cref}{{[figure][8][]8}{[1][17][]18}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces MinSS and mean Shapley-Shubik values corresponding to Figure~\ref {fig:minppi_trichotomy}.}}{18}{table.12}\protected@file@percent }
-\newlabel{tab:minss_demo}{{12}{18}{MinSS and mean Shapley-Shubik values corresponding to Figure~\ref {fig:minppi_trichotomy}}{table.12}{}}
-\newlabel{tab:minss_demo@cref}{{[table][12][]12}{[1][18][]18}{}{}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {K.2}Algorithm~A vs.\ Algorithm~B}{18}{subsection.K.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Quantitative comparison of Algorithm~A and Algorithm~B on Example~2 (500 trials per setting).}}{18}{table.13}\protected@file@percent }
-\newlabel{tab:alg_ab_comparison}{{13}{18}{Quantitative comparison of Algorithm~A and Algorithm~B on Example~2 (500 trials per setting)}{table.13}{}}
-\newlabel{tab:alg_ab_comparison@cref}{{[table][13][]13}{[1][18][]18}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Proposition~1 verification on Example~2 ($p_-^i=0.0333$, 500 trials per $K$). Theory (solid) and empirical rates (circles) agree closely ($r = 0.9993$).}}{19}{figure.9}\protected@file@percent }
-\newlabel{fig:prop1}{{9}{19}{Proposition~1 verification on Example~2 ($p_-^i=0.0333$, 500 trials per $K$). Theory (solid) and empirical rates (circles) agree closely ($r = 0.9993$)}{figure.9}{}}
-\newlabel{fig:prop1@cref}{{[figure][9][]9}{[1][18][]19}{}{}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Algorithm~B vs.\ Algorithm~A on Example~2 (500 trials). (a)~Detection rate vs.\ budget $K$: Alg.~B finds the harmful feature at $K=1$ in every trial; Alg.~A needs $K\approx 90$. (b)~Sensitivity to $\mathcal  {N}(0,\sigma ^2)$ noise on $W$: Alg.~B retains $>50\%$ detection at $\sigma =0.50$ vs.\ Alg.~A's $\approx 15\%$.}}{19}{figure.10}\protected@file@percent }
-\newlabel{fig:alg_b_vs_a}{{10}{19}{Algorithm~B vs.\ Algorithm~A on Example~2 (500 trials). (a)~Detection rate vs.\ budget $K$: Alg.~B finds the harmful feature at $K=1$ in every trial; Alg.~A needs $K\approx 90$. (b)~Sensitivity to $\mathcal {N}(0,\sigma ^2)$ noise on $W$: Alg.~B retains $>50\%$ detection at $\sigma =0.50$ vs.\ Alg.~A's $\approx 15\%$}{figure.10}{}}
-\newlabel{fig:alg_b_vs_a@cref}{{[figure][10][]10}{[1][19][]19}{}{}{}}
-\gdef \@abspage@last{19}
+\@writefile{toc}{\contentsline {section}{\numberline {H}Ablation Tables}{18}{appendix.H}\protected@file@percent }
+\newlabel{app:ablation}{{H}{18}{Ablation Tables}{appendix.H}{}}
+\newlabel{app:ablation@cref}{{[section][8][]H}{[1][17][]18}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {I}Statistical Tests}{18}{appendix.I}\protected@file@percent }
+\newlabel{app:stats}{{I}{18}{Statistical Tests}{appendix.I}{}}
+\newlabel{app:stats@cref}{{[section][9][]I}{[1][17][]18}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {I.1}Nemenyi Pairwise Significance Matrices}{18}{subsection.I.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Friedman test summary for five baselines on five classification datasets. All pairs non-significant at $\alpha =0.05$ (Nemenyi CD $\approx 4.1$ ranks for $k=5, N=5$).}}{18}{table.10}\protected@file@percent }
+\newlabel{tab:friedman_summary}{{10}{18}{Friedman test summary for five baselines on five classification datasets. All pairs non-significant at $\alpha =0.05$ (Nemenyi CD $\approx 4.1$ ranks for $k=5, N=5$)}{table.10}{}}
+\newlabel{tab:friedman_summary@cref}{{[table][10][]10}{[1][17][]18}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Friedman leave-one-out: $\chi ^2$ and $p$-value after removing each classification dataset in turn. ``(full)'' = all five datasets.}}{18}{table.11}\protected@file@percent }
+\newlabel{tab:friedman_loo}{{11}{18}{Friedman leave-one-out: $\chi ^2$ and $p$-value after removing each classification dataset in turn. ``(full)'' = all five datasets}{table.11}{}}
+\newlabel{tab:friedman_loo@cref}{{[table][11][]11}{[1][18][]18}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces CD diagram for AUC@20 (5 methods, 5 classification datasets). Friedman $\chi ^2 = 13.28$, $p = 0.010$ (Kendall's $W = 0.33$).}}{18}{figure.7}\protected@file@percent }
+\newlabel{fig:cd_auc20}{{7}{18}{CD diagram for AUC@20 (5 methods, 5 classification datasets). Friedman $\chi ^2 = 13.28$, $p = 0.010$ (Kendall's $W = 0.33$)}{figure.7}{}}
+\newlabel{fig:cd_auc20@cref}{{[figure][7][]7}{[1][18][]18}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {J}Method Design-Space}{18}{appendix.J}\protected@file@percent }
+\newlabel{app:op_table}{{J}{18}{Method Design-Space}{appendix.J}{}}
+\newlabel{app:op_table@cref}{{[section][10][]J}{[1][18][]18}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Game-theoretic feature importance methods by aggregation operator and value function.}}{19}{table.12}\protected@file@percent }
+\newlabel{tab:operator-comparison}{{12}{19}{Game-theoretic feature importance methods by aggregation operator and value function}{table.12}{}}
+\newlabel{tab:operator-comparison@cref}{{[table][12][]12}{[1][18][]19}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {K}Empirical Verification of the Estimators}{19}{appendix.K}\protected@file@percent }
+\newlabel{app:verify}{{K}{19}{Empirical Verification of the Estimators}{appendix.K}{}}
+\newlabel{app:verify@cref}{{[section][11][]K}{[1][19][]19}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {K.1}MinPPI Trichotomy (Properties~1--3)}{19}{subsection.K.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces MinPPI trichotomy on two engineered voting games ($n=5$). (a)~Example~1: $f_0$ decisive ($\text  {MinSS}=+1$). (b)~Example~2: $f_1$ harmful ($\text  {MinSS}=-1$); $f_0$ is in every winning coalition yet $\text  {MinSS}(f_0)=0$, refuting the naive equivalence.}}{19}{figure.8}\protected@file@percent }
+\newlabel{fig:minppi_trichotomy}{{8}{19}{MinPPI trichotomy on two engineered voting games ($n=5$). (a)~Example~1: $f_0$ decisive ($\text {MinSS}=+1$). (b)~Example~2: $f_1$ harmful ($\text {MinSS}=-1$); $f_0$ is in every winning coalition yet $\text {MinSS}(f_0)=0$, refuting the naive equivalence}{figure.8}{}}
+\newlabel{fig:minppi_trichotomy@cref}{{[figure][8][]8}{[1][19][]19}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces MinSS and mean Shapley-Shubik values corresponding to Figure~\ref {fig:minppi_trichotomy}.}}{19}{table.13}\protected@file@percent }
+\newlabel{tab:minss_demo}{{13}{19}{MinSS and mean Shapley-Shubik values corresponding to Figure~\ref {fig:minppi_trichotomy}}{table.13}{}}
+\newlabel{tab:minss_demo@cref}{{[table][13][]13}{[1][19][]19}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {K.2}Algorithm~A vs.\ Algorithm~B}{20}{subsection.K.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Quantitative comparison of Algorithm~A and Algorithm~B on Example~2 (500 trials per setting).}}{20}{table.14}\protected@file@percent }
+\newlabel{tab:alg_ab_comparison}{{14}{20}{Quantitative comparison of Algorithm~A and Algorithm~B on Example~2 (500 trials per setting)}{table.14}{}}
+\newlabel{tab:alg_ab_comparison@cref}{{[table][14][]14}{[1][20][]20}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Proposition~1 verification on Example~2 ($p_-^i=0.0333$, 500 trials per $K$). Theory (solid) and empirical rates (circles) agree closely ($r = 0.9993$).}}{20}{figure.9}\protected@file@percent }
+\newlabel{fig:prop1}{{9}{20}{Proposition~1 verification on Example~2 ($p_-^i=0.0333$, 500 trials per $K$). Theory (solid) and empirical rates (circles) agree closely ($r = 0.9993$)}{figure.9}{}}
+\newlabel{fig:prop1@cref}{{[figure][9][]9}{[1][20][]20}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Algorithm~B vs.\ Algorithm~A on Example~2 (500 trials). (a)~Detection rate vs.\ budget $K$: Alg.~B finds the harmful feature at $K=1$ in every trial; Alg.~A needs $K\approx 90$. (b)~Sensitivity to $\mathcal  {N}(0,\sigma ^2)$ noise on $W$: Alg.~B retains $>50\%$ detection at $\sigma =0.50$ vs.\ Alg.~A's $\approx 15\%$.}}{21}{figure.10}\protected@file@percent }
+\newlabel{fig:alg_b_vs_a}{{10}{21}{Algorithm~B vs.\ Algorithm~A on Example~2 (500 trials). (a)~Detection rate vs.\ budget $K$: Alg.~B finds the harmful feature at $K=1$ in every trial; Alg.~A needs $K\approx 90$. (b)~Sensitivity to $\mathcal {N}(0,\sigma ^2)$ noise on $W$: Alg.~B retains $>50\%$ detection at $\sigma =0.50$ vs.\ Alg.~A's $\approx 15\%$}{figure.10}{}}
+\newlabel{fig:alg_b_vs_a@cref}{{[figure][10][]10}{[1][20][]21}{}{}{}}
+\gdef \@abspage@last{21}
