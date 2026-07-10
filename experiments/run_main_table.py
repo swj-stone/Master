@@ -1,31 +1,26 @@
 """
-Main-table experiment: MOFS-MinPPI + 7 baselines × 7 datasets × 5 seeds.
+Main-table experiment: 6 baselines × 7 datasets × 5 seeds.
 
 Methods
 -------
-  - MOFS-MinPPI      (proposed: MinPPI-guided NSGA-II)
   - SHAP-Top-k       (classic TreeExplainer ranking)
-  - MOFS-SHAP        (SHAP-guided NSGA-II ablation)
-  - NSGA-II-uniform  (no-guidance multi-objective control)
   - Banzhaf FS       (Karavas et al. 2017)
   - MinShap          (Zheng & Raskutti 2026)
   - ShapG            (Zhao, Liu, Parilina 2025)
   - Powershap        (Verhaeghe et al. 2022)
+  - NSGA-II          (standard multi-objective FS, Deb et al. 2002)
 
 Metrics
 -------
 All methods:
   - top-k AUC @ {1, 3, 5, 10, 20, 50, 100}
-NSGA-II methods (MOFS-MinPPI, MOFS-SHAP, NSGA2-uniform):
-  - Pareto-front hypervolume (HV)
-  - Compression rate @ 1% / 3% / 5% AUC-loss
 Statistical:
   - Friedman + Nemenyi (all methods × datasets)
 
 Outputs
 -------
 ``results/logs/<run_id>/``   — per-method per-seed details + global metrics.
-``results/tables/<run_id>/``  — aggregated tables (mean ± std), pivots, HV, CR.
+``results/tables/<run_id>/``  — aggregated tables (mean ± std), pivots.
 
 Run:
     python -u experiments/run_main_table.py
@@ -44,7 +39,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
-from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
+from sklearn.metrics import r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, XGBRegressor
 
@@ -68,11 +63,14 @@ from minppi_mofs.baselines.shapg import (
     compute_shapg_importance,
     rank_features as rank_shapg,
 )
+from minppi_mofs.baselines.nsga2_fs import (
+    nsga2_ranking,
+)
 from scipy.stats import friedmanchisquare, wilcoxon
 
 
 # ---------------------------------------------------------------------------
-# Registry — 5 baselines (Plan C: no NSGA-II methods)
+# Registry — 6 baselines (Plan E: α-parameterized MOFS)
 # ---------------------------------------------------------------------------
 
 BASELINES: dict[str, dict] = {
@@ -116,6 +114,12 @@ BASELINES: dict[str, dict] = {
         "kwargs": {"power_iterations": 10, "alpha": 0.01, "seed": 42, "verbose": True},
         "score_col": "powershap_value",
     },
+    "nsga2": {
+        "compute": nsga2_ranking,
+        "rank": lambda scores: scores,  # already a list of (name, score) tuples
+        "kwargs": {"pop_size": 20, "max_gen": 20, "seed": 42, "verbose": True},
+        "score_col": "nsga2_gain",
+    },
 }
 
 DATASETS: list[tuple[str, str, str]] = [
@@ -144,41 +148,7 @@ DATASET_MINSHAP_BUDGET: dict[str, dict] = {
     "abalone": {"n_coalitions": 100, "per_coalition": 5},
 }
 
-DATASET_MOFSPPI_BUDGET: dict[str, dict] = {
-    "spambase": {"K_adv": 30, "pop_size": 30, "generations": 20},
-    "madelon": {"K_adv": 20, "pop_size": 20, "generations": 15},
-    "isolet": {"K_adv": 8, "pop_size": 20, "generations": 10},
-    "gisette": {"K_adv": 10, "pop_size": 15, "generations": 8},
-    "credit_card_fraud": {"K_adv": 30, "pop_size": 30, "generations": 20},
-    "crimedata": {"K_adv": 8, "pop_size": 15, "generations": 8},
-    "abalone": {"K_adv": 8, "pop_size": 30, "generations": 20},
-}
-
-# NSGA2-uniform shares MOFS-MinPPI's pop/gen per dataset for fair HV comparison
-DATASET_NSGA2U_BUDGET: dict[str, dict] = {
-    "spambase": {"pop_size": 30, "generations": 20},
-    "madelon": {"pop_size": 20, "generations": 15},
-    "isolet": {"pop_size": 20, "generations": 10},
-    "gisette": {"pop_size": 15, "generations": 8},
-    "credit_card_fraud": {"pop_size": 30, "generations": 20},
-    "crimedata": {"pop_size": 15, "generations": 8},
-    "abalone": {"pop_size": 30, "generations": 20},
-}
-
-# MOFS-SHAP n_samples scaled per dataset
-DATASET_MOFSSHAP_BUDGET: dict[str, dict] = {
-    "spambase": {"n_samples": 100},
-    "madelon": {"n_samples": 80},
-    "isolet": {"n_samples": 80},
-    "gisette": {"n_samples": 60},
-    "credit_card_fraud": {"n_samples": 100},
-    "crimedata": {"n_samples": 60},
-    "abalone": {"n_samples": 80},
-}
-
 TOP_K_KPIS: tuple[int, ...] = (1, 3, 5, 10, 20, 50, 100)
-AUC_LOSS_THRESHOLDS: tuple[float, ...] = (0.01, 0.03, 0.05)
-
 SEEDS: list[int] = [42, 123, 456, 789, 1024]
 
 
@@ -303,99 +273,6 @@ def evaluate_topk(
     return pd.DataFrame(rows)
 
 
-def refit_pareto_front(
-    masks: np.ndarray,
-    X: pd.DataFrame,
-    y: np.ndarray,
-    features: list[str],
-    *,
-    n_classes: int = 2,
-    seed: int = 42,
-    task: str = "binary",
-) -> np.ndarray:
-    """Re-evaluate Pareto masks with strong XGBoost (100 estimators, depth 4).
-
-    All NSGA-II methods share this refit so HV and compression are computed
-    on equal footing regardless of the weak model used during search.
-    """
-    import warnings
-    import time as _time
-
-    safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
-    X_s = X.rename(columns=safe_cols)
-    features_s = [safe_cols.get(f, f) for f in features]
-    n_masks = len(masks)
-    fitness = np.zeros((n_masks, 3), dtype=float)
-    for i in range(n_masks):
-        cols = [features_s[j] for j in range(len(features_s)) if masks[i, j]]
-        if len(cols) == 0:
-            fitness[i] = (0.0, 1.0, 0.0)
-            continue
-        X_tr, X_te, y_tr, y_te = train_test_split(
-            X_s[cols],
-            y,
-            test_size=0.2,
-            random_state=seed,
-            stratify=y if task != "regression" else None,
-        )
-        t0 = _time.perf_counter()
-        if task == "regression":
-            model = XGBRegressor(
-                n_estimators=100,
-                max_depth=4,
-                learning_rate=0.1,
-                verbosity=0,
-                random_state=seed,
-            )
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                model.fit(X_tr, y_tr)
-            y_pred = model.predict(X_te)
-            perf = float(r2_score(y_te, y_pred))
-            if perf < 0.0:
-                perf = 0.0
-        else:
-            model = XGBClassifier(
-                n_estimators=100,
-                max_depth=4,
-                learning_rate=0.1,
-                verbosity=0,
-                random_state=seed,
-            )
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                model.fit(X_tr, y_tr)
-            y_prob = model.predict_proba(X_te)
-            perf = float(
-                roc_auc_score(y_te, y_prob[:, 1])
-                if n_classes == 2
-                else accuracy_score(y_te, model.predict(X_te))
-            )
-        elapsed = _time.perf_counter() - t0
-        fitness[i] = (float(len(cols)), 1.0 - perf, float(elapsed))
-    return fitness
-
-
-def compression_rate_from_fitness(
-    full_auc: float,
-    fitness: np.ndarray,
-    auc_loss: float,
-    n_total: int,
-) -> float:
-    """Compression ratio (1 − |F|/n) for best solution within AUC-loss budget.
-
-    *fitness* has columns (|F|, 1−AUC, time).  Returns 0 if no solution
-    meets the budget.
-    """
-    threshold = full_auc - auc_loss
-    auc_col = 1.0 - fitness[:, 1]
-    candidates = np.where(auc_col >= threshold)[0]
-    if len(candidates) == 0:
-        return 0.0
-    best = candidates[np.argmin(fitness[candidates, 0])]
-    return 1.0 - float(fitness[best, 0]) / max(1, n_total)
-
-
 def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
     """Build per-seed raw table, aggregated (mean ± std), and per-KPI pivots."""
     tables_dir.mkdir(parents=True, exist_ok=True)
@@ -403,14 +280,11 @@ def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
     raw_df.to_csv(tables_dir / "main_metrics.csv", index=False)
     print(f"\n  main_metrics.csv  ({len(raw_df)} rows)", flush=True)
 
-    # Separate top-k KPI columns from HV/compression columns
+    # Top-k KPI columns
     kpi_cols = [
         c for c in raw_df.columns if "@" in c and c.split("@")[0] in ("AUC", "R²")
     ]
-    hv_cr_cols = [
-        c for c in raw_df.columns if c.startswith("hv") or c.startswith("cr_")
-    ]
-    num_cols = ["n_features", "time_s"] + kpi_cols + hv_cr_cols
+    num_cols = ["n_features", "time_s"] + kpi_cols
     num_cols = [c for c in num_cols if c in raw_df.columns]
     group_cols = ["method", "dataset"]
 
@@ -443,21 +317,6 @@ def _build_tables(raw_df: pd.DataFrame, tables_dir: Path) -> None:
         pivot_sorted = pivot.reindex(columns=sorted(pivot.columns))
         pivot_sorted.to_csv(tables_dir / f"table_{metric}_at_{k}.csv")
         print(f"  table_{metric}_at_{k}.csv", flush=True)
-
-    # HV / compression pivot tables (NSGA-II methods only)
-    for cr_col in hv_cr_cols:
-        if cr_col in mean_df.columns:
-            pivot = mean_df.pivot_table(
-                index="dataset",
-                columns="method",
-                values=cr_col,
-                aggfunc="first",
-            )
-            pivot = pivot.round(4)
-            pivot_sorted = pivot.reindex(columns=sorted(pivot.columns))
-            short = cr_col.replace("compression", "cr").replace("_pct", "pct")
-            pivot_sorted.to_csv(tables_dir / f"table_{short}.csv")
-            print(f"  table_{short}.csv", flush=True)
 
 
 def _stat_test(
@@ -566,7 +425,6 @@ def main() -> None:
         "seeds": SEEDS,
         "datasets": [d[0] for d in DATASETS],
         "methods": list(BASELINES.keys()),
-        "nsga2_methods": [],
         "topk_kpis": list(TOP_K_KPIS),
     }
     (run_dir / "metadata.json").write_text(
@@ -580,12 +438,11 @@ def main() -> None:
 
     # ---- config.yaml ----
     run_config: dict = {
-        "description": "Main table — MOFS-MinPPI + 7 baselines × 7 datasets × 5 seeds",
+        "description": "Main table — 6 baselines × 7 datasets × 5 seeds",
         "baselines": {},
         "seeds": SEEDS,
         "datasets": [{"prefix": d[0], "target": d[1], "task": d[2]} for d in DATASETS],
         "topk_kpis": list(TOP_K_KPIS),
-        "nsga2_metrics": ["hv", "cr_1pct", "cr_3pct", "cr_5pct"],
     }
     for name, c in BASELINES.items():
         entry: dict = {
@@ -615,7 +472,6 @@ def main() -> None:
                     "method": method,
                     "kwargs": cfg["kwargs"],
                     "score_col": cfg["score_col"],
-                    "nsga2": cfg.get("nsga2", False),
                 },
                 indent=2,
             ),
@@ -625,7 +481,6 @@ def main() -> None:
         rank_fn = cfg["rank"]
         base_kwargs = cfg["kwargs"]
         score_col = cfg["score_col"]
-        is_nsga2 = cfg.get("nsga2", False)
         method_metrics: list[dict] = []
 
         for prefix, target, task in DATASETS:
@@ -638,33 +493,13 @@ def main() -> None:
 
                 X, y = load_data(prefix, target, processed_dir, seed=seed)
                 n_total = X.shape[1]
-                n_classes = len(np.unique(y))
-                print(f"  Shape: {X.shape}", flush=True)
-                print(f"  Classes: {len(np.unique(y))}", flush=True)
+                print(f"  Shape: {X.shape}  Classes: {len(np.unique(y))}", flush=True)
 
-                call_kwargs = dict(base_kwargs, seed=seed)
+                call_kwargs = dict(base_kwargs, seed=seed, task=task)
                 if method == "banzhaf" and prefix in DATASET_BANZHAF_BUDGET:
                     call_kwargs.update(DATASET_BANZHAF_BUDGET[prefix])
                 if method == "minshap" and prefix in DATASET_MINSHAP_BUDGET:
                     call_kwargs.update(DATASET_MINSHAP_BUDGET[prefix])
-                if method == "mofs_minppi" and prefix in DATASET_MOFSPPI_BUDGET:
-                    call_kwargs.update(DATASET_MOFSPPI_BUDGET[prefix])
-                if method == "nsga2_uniform" and prefix in DATASET_NSGA2U_BUDGET:
-                    call_kwargs.update(DATASET_NSGA2U_BUDGET[prefix])
-                if method == "mofs_shap" and prefix in DATASET_MOFSSHAP_BUDGET:
-                    call_kwargs.update(DATASET_MOFSSHAP_BUDGET[prefix])
-
-                call_kwargs["task"] = task
-
-                if method == "mofs_minppi" and task == "regression":
-                    call_kwargs["verbose"] = (
-                        False  # suppress verbose for regression run
-                    )
-
-                # ---- NSGA-II methods: capture Pareto front via side-channel ----
-                result_box: list = []
-                if is_nsga2:
-                    call_kwargs["_result_box"] = result_box
 
                 t0 = time.perf_counter()
                 try:
@@ -686,10 +521,6 @@ def main() -> None:
                     _metric = "R²" if task == "regression" else "AUC"
                     for k in TOP_K_KPIS:
                         failed[f"{_metric}@{k}"] = None
-                    if is_nsga2:
-                        failed["hv"] = None
-                        for loss in AUC_LOSS_THRESHOLDS:
-                            failed[f"cr_{int(loss * 100):d}pct"] = None
                     method_metrics.append(failed)
                     all_rows.append(failed)
                     print()
@@ -732,91 +563,6 @@ def main() -> None:
                 for _, kpi_row in kpi_df.iterrows():
                     row[f"{metric_name}@{int(kpi_row['k'])}"] = round(
                         float(kpi_row["value"]), 6
-                    )
-
-                # ---- NSGA-II: HV + compression rate (strong-model refit) ----
-                if is_nsga2 and result_box:
-                    pf_data = result_box[0]
-                    pf_fitness = pf_data["fitness"]
-
-                    # MOFS-MinPPI refits inside its wrapper; the other two use
-                    # weak models during search — refit here for fair comparison.
-                    if method != "mofs_minppi":
-                        pf_fitness = refit_pareto_front(
-                            pf_data["masks"],
-                            X,
-                            y,
-                            features=list(X.columns),
-                            n_classes=n_classes,
-                            seed=seed,
-                            task=task,
-                        )
-
-                    # Save Pareto front (refit fitness) for post-hoc
-                    # IGD/IGD+/Spacing via compute_pareto_metrics.py
-                    np.savetxt(
-                        method_dir / f"{prefix}_s{seed}_pareto.csv",
-                        pf_fitness,
-                        delimiter=",",
-                        header="n_features,one_minus_quality,time_s",
-                        comments="",
-                    )
-
-                    # HV — not computed (Plan C: no NSGA-II methods)
-
-                    # Compression rate — full-model baseline
-                    safe_cols = {c: f"f{i}" for i, c in enumerate(X.columns)}
-                    X_safe = X.rename(columns=safe_cols)
-                    X_tr, X_te, y_tr, y_te = train_test_split(
-                        X_safe,
-                        y,
-                        test_size=0.2,
-                        random_state=seed,
-                        stratify=y if task != "regression" else None,
-                    )
-                    if task == "regression":
-                        full_model = XGBRegressor(
-                            n_estimators=100,
-                            max_depth=4,
-                            learning_rate=0.1,
-                            verbosity=0,
-                            random_state=seed,
-                        )
-                        full_model.fit(X_tr, y_tr)
-                        y_pred = full_model.predict(X_te)
-                        full_metric = float(r2_score(y_te, y_pred))
-                        if full_metric < 0.0:
-                            full_metric = 0.0
-                    else:
-                        full_model = XGBClassifier(
-                            n_estimators=100,
-                            max_depth=4,
-                            learning_rate=0.1,
-                            verbosity=0,
-                            random_state=seed,
-                        )
-                        full_model.fit(X_tr, y_tr)
-                        full_prob = full_model.predict_proba(X_te)
-                        full_metric = float(
-                            roc_auc_score(y_te, full_prob[:, 1])
-                            if n_classes == 2
-                            else accuracy_score(y_te, full_model.predict(X_te))
-                        )
-                    for loss in AUC_LOSS_THRESHOLDS:
-                        cr = compression_rate_from_fitness(
-                            full_metric,
-                            pf_fitness,
-                            loss,
-                            n_total,
-                        )
-                        row[f"cr_{int(loss * 100):d}pct"] = round(cr, 4)
-                    print(
-                        "  "
-                        + "  ".join(
-                            f"CR@{int(loss * 100)}%={row[f'cr_{int(loss * 100):d}pct']:.3f}"
-                            for loss in AUC_LOSS_THRESHOLDS
-                        ),
-                        flush=True,
                     )
 
                 method_metrics.append(row)
