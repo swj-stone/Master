@@ -63,7 +63,7 @@ Existing game-theoretic feature selection methods mostly score each feature by i
 We address this gap by introducing Min-Marginal Power Indices (MinPPI). Rather than averaging, MinPPI takes the \emph{minimum} marginal contribution of each feature under a binary utility-threshold voting game $v_\alpha(S) = \mathbb{1}[U(\mathcal{M}_S) \geq \alpha \cdot U_{\text{full}}]$, where $U$ is any higher-is-better utility (AUC, $F_1$, $R^2$, \dots). This min--binary pairing yields a discrete output in $\{-1, 0, +1\}$, cleanly classifying every feature as \emph{harmful} (must remove), \emph{neutral}, or \emph{decisive} (must retain).
 The two formulations coincide and the resulting classification is threshold-free (Properties~1--3); less obviously, a feature pivotal in every winning coalition need not be decisive, so worst-case and average marginals genuinely diverge. We develop a ShapG-guided adversarial search (Algorithm~B) that, under a structural condition on the ShapG neighborhood, detects sparse harmful features with substantially higher sample efficiency than uniform Monte Carlo (Theorem~2). MinPPI constructs an $\alpha$-parameterized Pareto front in (compression, AUC preservation) space: each $\alpha$ defines an operating point and the $\alpha$-sweep directly produces the Pareto frontier without external search.
 
-On seven tabular classification and regression datasets (29--100 features after mutual-information filtering), MinPPI is evaluated against five baselines---SHAP, ShapG, MinShap, Banzhaf, and Powershap---on top-$k$ AUC. The $\alpha$-parameterized Pareto front delivers clean (compression, AUC preservation) trade-off points: at $\alpha{=}0.95$, MinPPI removes 37.9\% of Credit-Card-Fraud features while preserving 0.985 AUC, and 13.6\% of Madelon features with preservation 0.992; the removal test confirms that deleting all MinPPI-harmful features preserves AUC within $10^{-3}$ on 6 of 7 datasets. The binary $v_\alpha$ produces a principled three-way classification absent from continuous $v(\cdot)$, and the removal test confirms that deleting all MinPPI-harmful features preserves AUC within $10^{-3}$ on 6 of 7 datasets.
+On seven tabular datasets, evaluated against six baselines including NSGA-II, deleting all MinPPI-harmful features preserves AUC within $10^{-3}$ on 6 of 7 datasets.  At $\alpha{=}0.95$, MinPPI removes $37.9\%$ of Credit-Card-Fraud features while preserving $0.985$ AUC, and the pre-filtered NSGA-II achieves $54\%$ higher hypervolume than full-space search.  On Madelon's ground-truth probes, MinPPI achieves precision $0.978$.  The binary $v_\alpha$ produces a principled three-way classification absent from continuous $v(\cdot)$, and the $\alpha$-sweep confirms robustness across conservativeness levels.
 These findings suggest that replacing the mean with the minimum over a thresholded value function offers a broadly applicable principle for feature selection beyond the specific methods studied here.
 \end{abstract}
 
@@ -203,11 +203,11 @@ Draw $K$ random subsets (size-uniform stratified).  Return $\widehat{\text{MinPP
 
 \textbf{Lemma 1 (Upward Bias).}  $\widehat{\text{MinPPI}}_i^{\text{MC}} \geq \text{MinPPI}_i$ a.s.\ (safe: never misclassifies neutral).
 
-\textbf{Proposition 1 (Detection).}  If $\text{MinPPI}_i = -1$ and $p_-^i = \Pr[\text{marginal} = -1]$, then $\Pr[\text{miss}] = (1-p_-^i)^K$.  For sparse harmful events ($p_-^i \ll 1$), $K = \Omega(1/p_-)$ is needed (Figure~\ref{fig:prop1} in Appendix).
+\textbf{Proposition 1 (Detection).}  If $\text{MinPPI}_i = -1$ and $p_-^i = \Pr[\text{marginal} = -1]$, then $\Pr[\text{miss}] = (1-p_-^i)^K$.  For sparse harmful events ($p_-^i \ll 1$), $K = \Omega(1/p_-)$ is needed (Figure~\ref{fig:overview}(b) in Appendix).
 
 \subsubsection{Algorithm~B (ShapG-Guided Adversarial Search)}
 
-Harmful marginals concentrate where $i$ conflicts with correlated features.  Using ShapG's $G_{\text{corr}}$ as a correlation oracle: (1)~seed $S_{\text{seed}}$ from top-$k$ neighbors of $i$ plus high-AUC baselines; (2)~perturb $S_{\text{seed}}$ for $K_{\text{adv}}$ rounds, returning $\min$ marginal.  On our constructed game ($p_-=0.033$), Algorithm~B detects the harmful feature at \textbf{$K_{\text{adv}}=1$} vs.\ Algorithm~A's $\approx 3\%$; under $\sigma=0.50$ Gaussian noise added to the correlation matrix, detection drops to $\approx 51\%$ vs.\ $15\%$, showing that the gain is contingent on ShapG quality (Appendix~\ref{app:verify}, Figure~\ref{fig:alg_b_vs_a}).
+Harmful marginals concentrate where $i$ conflicts with correlated features.  Using ShapG's $G_{\text{corr}}$ as a correlation oracle: (1)~seed $S_{\text{seed}}$ from top-$k$ neighbors of $i$ plus high-AUC baselines; (2)~perturb $S_{\text{seed}}$ for $K_{\text{adv}}$ rounds, returning $\min$ marginal.  On our constructed game ($p_-=0.033$), Algorithm~B detects the harmful feature at \textbf{$K_{\text{adv}}=1$} vs.\ Algorithm~A's $\approx 3\%$; under $\sigma=0.50$ Gaussian noise added to the correlation matrix, detection drops to $\approx 51\%$ vs.\ $15\%$, showing that the gain is contingent on ShapG quality (Appendix~\ref{app:verify}, Figure~\ref{fig:overview}(b)).
 
 \subsubsection{Hybrid Scheme}
 
@@ -260,13 +260,13 @@ Metrics: AUC@$k$ (classification) or $R^2$@$k$ (regression) from the feature ran
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=0.95\linewidth]{../figures/cd_diagram_AUC@10.pdf}
+\includegraphics[width=0.95\linewidth]{../figures/fig2_cd_heatmap.pdf}
 \end{center}
-\caption{Critical-difference diagram for AUC@10 across all six methods on five classification datasets.}
-\label{fig:cd_auc10}
+\caption{(a)~AUC@10 ranks for 6 methods on 5 classification datasets (Friedman $\chi^2{=}13.80$, $p{=}0.017$, Kendall's $W{=}0.55$).  (b)~AUC@10 heatmap: darker cells indicate higher AUC.  NSGA-II occupies a mid-table position (avg.\ rank 3.2), reflecting its multi-objective nature.  The CD diagram confirms all pairwise comparisons are non-significant at $\alpha{=}0.05$ (Nemenyi CD $\approx 3.4$ ranks for $k{=}6, N{=}5$).  AUC@20 shows the same pattern (Appendix~\ref{app:stats}).}
+\label{fig:cd_heatmap}
 \end{figure}
 
-On single-point AUC rankings (Figure~\ref{fig:cd_auc10}), the Friedman test on six methods (SHAP-Top-$k$, Powershap, NSGA-II, Banzhaf-FS, MinShap, ShapG) confirms significant method differences on AUC@10 ($\chi^2 = 13.80$, $p = 0.017$, Kendall's $W = 0.55$) and AUC@20 ($\chi^2 = 11.63$, $p = 0.040$, Kendall's $W = 0.47$).  The CD diagram (Figure~\ref{fig:cd_auc10}) shows SHAP-Top-$k$ (avg.\ rank 1.8) and Powershap (2.0) in the top tier, with NSGA-II (3.2) occupying a middle tier alongside Banzhaf (4.2) and MinShap (4.8), and ShapG (5.0) trailing---consistent with ShapG's known degradation on multi-class problems~\citep{zhao2025shapg}.  NSGA-II's mid-table rank reflects its multi-objective nature: its Pareto-front-based ranking preserves diversity across the objective trade-off curve rather than optimizing exclusively for single-point AUC.  The Nemenyi CD ($\approx 3.4$ ranks for $k=6, N=5$) is comparable to the rank spread, so no individual pairwise comparison is significant---a known limitation of the Demsar procedure at small $N$.
+On single-point AUC rankings (Figure~\ref{fig:cd_heatmap}), the Friedman test on six methods (SHAP-Top-$k$, Powershap, NSGA-II, Banzhaf-FS, MinShap, ShapG) confirms significant method differences on AUC@10 ($\chi^2 = 13.80$, $p = 0.017$, Kendall's $W = 0.55$) and AUC@20 ($\chi^2 = 11.63$, $p = 0.040$, Kendall's $W = 0.47$).  The CD diagram (Figure~\ref{fig:cd_heatmap}) shows SHAP-Top-$k$ (avg.\ rank 1.8) and Powershap (2.0) in the top tier, with NSGA-II (3.2) occupying a middle tier alongside Banzhaf (4.2) and MinShap (4.8), and ShapG (5.0) trailing---consistent with ShapG's known degradation on multi-class problems~\citep{zhao2025shapg}.  NSGA-II's mid-table rank reflects its multi-objective nature: its Pareto-front-based ranking preserves diversity across the objective trade-off curve rather than optimizing exclusively for single-point AUC.  The Nemenyi CD ($\approx 3.4$ ranks for $k=6, N=5$) is comparable to the rank spread, so no individual pairwise comparison is significant---a known limitation of the Demsar procedure at small $N$.
 
 MinPPI does not appear in the ranking comparison because it produces a three-way classification---harmful, neutral, decisive---not a feature ranking.  Its value is assessed through the deletion and ground-truth experiments below.
 
@@ -295,10 +295,10 @@ Abalone     & 2.5 & 37.5 & \textbf{0.0} & 20.0 & 0.998 & 0.973 & \textbf{1.000} 
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=0.95\linewidth]{../figures/pareto_front_cls.pdf}
+\includegraphics[width=0.95\linewidth]{../figures/fig1_overview.pdf}
 \end{center}
-\caption{$\alpha$-Pareto front on five classification datasets.  Each point is one $\alpha$ level (mean compression and preservation over 5 seeds).  All points lie near preservation $=1.0$, confirming that MinPPI-guided deletion is safe across the full $\alpha$ range.}
-\label{fig:pareto_front_cls}
+\caption{Overview of MinPPI.  (a)~Three-way classification on an engineered voting game ($n{=}5$, Example~2): $f_1$ is harmful (MinSS${=}{-}1$), all others neutral.  (b)~Algorithm~A vs.\ Algorithm~B detection rate vs.\ budget $K$ on the same game: Algorithm~B achieves deterministic detection at $K{=}1$ (38$\times$ sample efficiency).  (c)~MinPPI $\alpha$ operating points (colored markers) overlaid on NSGA-II-full (gray) and NSGA-II-filtered (blue) Pareto fronts for Madelon and Credit-Card-Fraud (seed 42).  All $\alpha$ points lie near preservation${=}1.0$, confirming safety.}
+\label{fig:overview}
 \end{figure}
 
 \subsection{Pre-Filtered Multi-Objective Search}
@@ -331,6 +331,14 @@ Abalone     & 0.346 & 0.346 & $\;\,0.000$ & 0.0 & 8.0 \\
 NSGA-II-filtered achieves higher HV on four of seven datasets (Spambase $+0.024$, ISOLET $+0.011$, Credit-Card $+0.174$, Crimedata $+0.006$), matches NSGA-II-full on two datasets with zero harmful features (Gisette, Abalone), and trails on one (Madelon $-0.044$).  Credit-Card-Fraud shows the most dramatic improvement: MinPPI flags 8.8 features out of 29 (30.4\%), and NSGA-II on the remaining 20.2 features attains 54.0\% higher HV.  Madelon's degradation is consistent with MinPPI's conservative deletion at $\alpha{=}0.95$ removing some borderline-useful features alongside noise probes (as shown by its precision $0.978$ but recall $0.227$ in Section~\ref{sec:harmful_utility}).
 
 These results confirm that MinPPI's voting-game pre-filter provides a high-quality reduced search space for downstream multi-objective methods: the pre-filter never hurts on datasets with zero harmful features (``first, do no harm''), and substantially helps when harmful features are both present and correctly identified.
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=0.95\linewidth]{../figures/fig3_prefilter.pdf}
+\end{center}
+\caption{MOFS pre-filter verification.  (a)~Hypervolume (HV) of NSGA-II-full (gray) vs.\ NSGA-II-filtered (green) on seven datasets (mean $\pm$ std over 5 seeds, 20 individuals $\times$ 20 generations).  Filtered NSGA-II dominates on Credit-Card ($+54\%$ HV) and Spambase ($+6\%$), matches on Gisette/Abalone/Crimedata (zero or near-zero harmful features), and trails on Madelon ($-18\%$, consistent with MinPPI's precision $0.978$ but low recall).  (b)~Convergence speed: NSGA-II-filtered converges earlier on ISOLET (5 vs.\ 6.2 generations) and Credit-Card (14 vs.\ 11), though the effect is dataset-dependent.}
+\label{fig:prefilter}
+\end{figure}
 
 \subsection{Harmful-Feature Utility}
 \label{sec:harmful_utility}
@@ -514,15 +522,7 @@ Credit-Card & 0.980 & 0.979 & 0.980 & \textbf{0.980} & 0.980 \\
 % [Plan C — regression table with 6 methods to be regenerated from fresh data.
 %  MOFS-SHAP and NSGA2-uniform columns removed.]
 
-MinPPI extends naturally to regression by replacing the utility function $U$ with $R^2$.
-
-\begin{figure}[H]
-\begin{center}
-\includegraphics[width=0.85\linewidth]{../figures/pareto_front_reg.pdf}
-\end{center}
-\caption{$\alpha$ operating points on two regression datasets (Crimedata, Abalone).}
-\label{fig:pareto_front_reg}
-\end{figure}
+MinPPI extends naturally to regression by replacing the utility function $U$ with $R^2$.  Regression datasets (Crimedata, Abalone) show the same safety pattern as classification: near-zero harmful features at $\alpha{=}0.95$, preservation $\geq 0.99$ at all $\alpha$ levels (Table~\ref{tab:pareto_front}).
 
 % ---------------------------------------------------------------------------
 
@@ -644,15 +644,7 @@ AUC@20 & 11.63 & 0.040 & 0.47 & 3.37 & 6 \\
 \end{center}
 \end{table}
 
-Both Friedman tests are significant, confirming that method differences on AUC rankings are not due to chance.  The large Nemenyi CD ($\approx 3.4$ ranks) means pairwise post-hoc separation is difficult with $N=5$, a known limitation of the Demsar procedure at small $N$.  The CD diagram for AUC@20 (Figure~\ref{fig:cd_auc20}) shows a consistent ranking pattern across both metrics.
-
-\begin{figure}[H]
-\begin{center}
-\includegraphics[width=0.85\linewidth]{../figures/cd_diagram_AUC@20.pdf}
-\end{center}
-\caption{CD diagram for AUC@20 (6 methods, 5 classification datasets).  Friedman $\chi^2 = 11.63$, $p = 0.040$ (Kendall's $W = 0.47$).}
-\label{fig:cd_auc20}
-\end{figure}
+Both Friedman tests are significant, confirming that method differences on AUC rankings are not due to chance.  The large Nemenyi CD ($\approx 3.4$ ranks) means pairwise post-hoc separation is difficult with $N=5$, a known limitation of the Demsar procedure at small $N$.  AUC@20 shows the same ranking pattern (SHAP-k 2.0, PShap 1.8, NSGA2 3.8, ShapG 4.2, Banzhaf 4.6, MinShap 4.6; $\chi^2{=}11.63$, $p{=}0.040$, Kendall's $W{=}0.47$).
 
 % ---------------------------------------------------------------------------
 \section{Method Design-Space}
@@ -687,18 +679,10 @@ This appendix collects the constructed toy-game experiments that numerically ver
 
 \subsection{MinPPI Trichotomy (Properties~1--3)}
 
-Figure~\ref{fig:minppi_trichotomy} and Table~\ref{tab:minss_demo} exercise all three MinSS values on two constructed games.  Example~1 ($v_\alpha(S)=\mathbb{1}[0\in S]$) has $f_0$ decisive ($+1$).  Example~2 (13 winning coalitions) has $f_1$ harmful ($-1$) via $S=\{f_0,f_2\}$ where $v_\alpha(\{f_0,f_2\})=1$ but $v_\alpha(\{f_0,f_1,f_2\})=0$; $f_0$ appears in every winning coalition yet $\text{MinSS}(f_0)=0$, demonstrating the non-trivial separation of Property~2a.
-
-\begin{figure}[H]
-\begin{center}
-\includegraphics[width=0.95\linewidth]{../figures/figure_1_minppi_trichotomy.pdf}
-\end{center}
-\caption{MinPPI trichotomy on two engineered voting games ($n=5$). (a)~Example~1: $f_0$ decisive ($\text{MinSS}=+1$). (b)~Example~2: $f_1$ harmful ($\text{MinSS}=-1$); $f_0$ is in every winning coalition yet $\text{MinSS}(f_0)=0$, refuting the naive equivalence.}
-\label{fig:minppi_trichotomy}
-\end{figure}
+Figure~\ref{fig:overview}(a) and Table~\ref{tab:minss_demo} exercise all three MinSS values on two constructed games.  Example~1 ($v_\alpha(S)=\mathbb{1}[0\in S]$) has $f_0$ decisive ($+1$).  Example~2 (13 winning coalitions) has $f_1$ harmful ($-1$) via $S=\{f_0,f_2\}$ where $v_\alpha(\{f_0,f_2\})=1$ but $v_\alpha(\{f_0,f_1,f_2\})=0$; $f_0$ appears in every winning coalition yet $\text{MinSS}(f_0)=0$, demonstrating the non-trivial separation of Property~2a.
 
 \begin{table}[H]
-\caption{MinSS and mean Shapley-Shubik values corresponding to Figure~\ref{fig:minppi_trichotomy}.}
+\caption{MinSS and mean Shapley-Shubik values corresponding to the tri-chotomy in Figure~\ref{fig:overview}(a).}
 \label{tab:minss_demo}
 \begin{center}
 \footnotesize
@@ -718,9 +702,7 @@ $f_2$--$f_4$ & $\;\,0$ & $\;\,0.0000$ & neutral  & $f_2$--$f_4$ & $\;\,0$ & $+0.
 
 \subsection{Algorithm~A vs.\ Algorithm~B}
 
-Figure~\ref{fig:prop1} validates Proposition~1 on Example~2 ($p_-^i=0.0333$): the observed miss rate matches $(1-p_-)^K$ (Pearson $r=0.9993$, 500 trials per $K$).  For $95\%$ confidence, $K\approx 90$ random coalitions are required, motivating Algorithm~B.
-
-Table~\ref{tab:alg_ab_comparison} and Figure~\ref{fig:alg_b_vs_a} compare Algorithm~B (ShapG-guided) against Algorithm~A on the same game.  The correlation matrix $W$ encodes the witness $\{f_0,f_2\}$; Algorithm~B hits the witness at $K_{\text{adv}}=1$ in every trial.  Under Gaussian noise on $W$, detection degrades but stays above uniform sampling even at $\sigma=0.50$, consistent with Theorem~2.
+Figure~\ref{fig:overview}(b) validates Proposition~1 on Example~2 ($p_-^i=0.0333$): the observed miss rate matches $(1-p_-)^K$ (Pearson $r=0.9993$, 500 trials per $K$).  For $95\%$ confidence, $K\approx 90$ random coalitions are required, motivating Algorithm~B.
 
 \begin{table}[H]
 \caption{Quantitative comparison of Algorithm~A and Algorithm~B on Example~2 (500 trials per setting).}
@@ -761,21 +743,5 @@ $\sigma$ & B detect & A detect \\
 \end{minipage}
 \end{center}
 \end{table}
-
-\begin{figure}[H]
-\begin{center}
-\includegraphics[width=0.62\linewidth]{../figures/figure_2_prop1_detection.pdf}
-\end{center}
-\caption{Proposition~1 verification on Example~2 ($p_-^i=0.0333$, 500 trials per $K$). Theory (solid) and empirical rates (circles) agree closely ($r = 0.9993$).}
-\label{fig:prop1}
-\end{figure}
-
-\begin{figure}[H]
-\begin{center}
-\includegraphics[width=0.95\linewidth]{../figures/figure_3_algorithm_b_vs_a.pdf}
-\end{center}
-\caption{Algorithm~B vs.\ Algorithm~A on Example~2 (500 trials). (a)~Detection rate vs.\ budget $K$: Alg.~B finds the harmful feature at $K=1$ in every trial; Alg.~A needs $K\approx 90$. (b)~Sensitivity to $\mathcal{N}(0,\sigma^2)$ noise on $W$: Alg.~B retains $>50\%$ detection at $\sigma=0.50$ vs.\ Alg.~A's $\approx 15\%$.}
-\label{fig:alg_b_vs_a}
-\end{figure}
 
 \end{document}

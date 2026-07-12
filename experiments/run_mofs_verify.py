@@ -162,6 +162,8 @@ def main() -> None:
     (tables_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
 
     all_rows: list[dict] = []
+    front_rows: list[dict] = []    # Pareto front scatter points
+    history_rows: list[dict] = []  # HV per generation
 
     for prefix, target, task in tqdm(
         DATASETS,
@@ -263,6 +265,19 @@ def main() -> None:
                     "converged_gen": r_full.converged_gen,
                 }
             )
+            # Save Pareto front scatter points
+            for mask, (card_ratio, one_minus_auc) in r_full.pareto_front:
+                front_rows.append({
+                    "dataset": prefix, "seed": seed, "method": "nsga2_full",
+                    "compression": round(float(card_ratio), 4),
+                    "auc": round(1.0 - float(one_minus_auc), 4),
+                })
+            # Save HV per generation
+            for gen, hv_val in enumerate(r_full.hv_history):
+                history_rows.append({
+                    "dataset": prefix, "seed": seed, "method": "nsga2_full",
+                    "generation": gen, "hv": round(hv_val, 4),
+                })
 
             # ── NSGA-II on FILTERED features ───────────────────────
             if len(keep) < 2:
@@ -298,11 +313,30 @@ def main() -> None:
                     "converged_gen": r_filt.converged_gen,
                 }
             )
+            # Save Pareto front scatter points
+            for mask, (card_ratio, one_minus_auc) in r_filt.pareto_front:
+                front_rows.append({
+                    "dataset": prefix, "seed": seed, "method": "nsga2_filtered",
+                    "compression": round(float(card_ratio), 4),
+                    "auc": round(1.0 - float(one_minus_auc), 4),
+                })
+            # Save HV per generation
+            for gen, hv_val in enumerate(r_filt.hv_history):
+                history_rows.append({
+                    "dataset": prefix, "seed": seed, "method": "nsga2_filtered",
+                    "generation": gen, "hv": round(hv_val, 4),
+                })
 
     # ── Save ───────────────────────────────────────────────────────
     df = pd.DataFrame(all_rows)
     df.to_csv(tables_dir / "mofs_verify.csv", index=False)
     print(f"\n  mofs_verify.csv saved ({len(df)} rows)")
+
+    pd.DataFrame(front_rows).to_csv(tables_dir / "mofs_verify_fronts.csv", index=False)
+    print(f"  mofs_verify_fronts.csv saved ({len(front_rows)} rows)")
+
+    pd.DataFrame(history_rows).to_csv(tables_dir / "mofs_verify_history.csv", index=False)
+    print(f"  mofs_verify_history.csv saved ({len(history_rows)} rows)")
 
     agg = (
         df.groupby(["dataset", "method"])[
