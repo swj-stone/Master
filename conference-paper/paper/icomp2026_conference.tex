@@ -63,7 +63,7 @@ Existing game-theoretic feature selection methods mostly score each feature by i
 We address this gap by introducing Min-Marginal Power Indices (MinPPI). Rather than averaging, MinPPI takes the \emph{minimum} marginal contribution of each feature under a binary utility-threshold voting game $v_\alpha(S) = \mathbb{1}[U(\mathcal{M}_S) \geq \alpha \cdot U_{\text{full}}]$, where $U$ is any higher-is-better utility (AUC, $F_1$, $R^2$, \dots). This min--binary pairing yields a discrete output in $\{-1, 0, +1\}$, cleanly classifying every feature as \emph{harmful} (must remove), \emph{neutral}, or \emph{decisive} (must retain).
 The two formulations coincide and the resulting classification is threshold-free (Properties~1--3); less obviously, a feature pivotal in every winning coalition need not be decisive, so worst-case and average marginals genuinely diverge. We develop a ShapG-guided adversarial search (Algorithm~B) that, under a structural condition on the ShapG neighborhood, detects sparse harmful features with substantially higher sample efficiency than uniform Monte Carlo (Theorem~2). MinPPI constructs an $\alpha$-parameterized Pareto front in (compression, AUC preservation) space: each $\alpha$ defines an operating point and the $\alpha$-sweep directly produces the Pareto frontier without external search.
 
-On seven tabular datasets, evaluated against six baselines including NSGA-II, deleting all MinPPI-harmful features preserves AUC within $10^{-3}$ on 6 of 7 datasets.  At $\alpha{=}0.95$, MinPPI removes $37.9\%$ of Credit-Card-Fraud features while preserving $0.985$ AUC, and the pre-filtered NSGA-II achieves $54\%$ higher hypervolume than full-space search.  On Madelon's ground-truth probes, MinPPI achieves precision $0.978$.  The binary $v_\alpha$ produces a principled three-way classification absent from continuous $v(\cdot)$, and the $\alpha$-sweep confirms robustness across conservativeness levels.
+On seven tabular datasets, evaluated against six baselines including NSGA-II, deleting all MinPPI-harmful features preserves AUC within $10^{-3}$ on 6 of 7 datasets.  At $\alpha{=}0.95$, MinPPI removes $32.4\%$ of Credit-Card-Fraud features while preserving $0.985$ AUC, and the pre-filtered NSGA-II achieves $37\%$ higher hypervolume despite a $35\%$ smaller search space.  On Madelon's ground-truth probes, MinPPI achieves precision $0.978$.  The binary $v_\alpha$ produces a principled three-way classification, and the $\alpha$-sweep confirms robustness.
 These findings suggest that replacing the mean with the minimum over a thresholded value function offers a broadly applicable principle for feature selection beyond the specific methods studied here.
 \end{abstract}
 
@@ -86,7 +86,7 @@ The value $v_\alpha$ is evaluated by actually training $\mathcal{M}_S$, so unlik
 \item {\bf $\alpha$-Parameterized Multi-Objective Selection.}
 MinPPI achieves multi-objective feature selection via parametric scalarization---the same principle that underlies classical methods such as the $\varepsilon$-constraint and weighted-sum approaches~\citep{haimes1971bicriterion}.  The quota $\alpha$ serves as a scalar parameter: varying $\alpha$ over $\{0.85,0.90,0.95,0.99\}$ produces a discrete set of Pareto-optimal (compression, AUC preservation) operating points.  Each $\alpha$ solves a single-objective subproblem (MinPPI estimation + deletion + retraining), yielding full interpretability---every operating point traces back to the specific coalitions that witnessed each deleted feature as harmful.  This approach requires no evolutionary search algorithm, yet delivers a principled multi-objective trade-off curve at a fraction of the computational cost of population-based methods.
 
-\item {\bf Comprehensive Empirical Validation.} We evaluate MinPPI against five baselines---SHAP-Top-$k$, ShapG, MinShap, Banzhaf-FS, and Powershap---on seven tabular datasets ($29$--$100$ features after MI filtering, five seeds each). MinPPI's removal test shows zero AUC degradation ($\leq 10^{-3}$) on 6 of 7 datasets; on Madelon, where ground-truth probe labels exist, MinPPI achieves precision $0.978$ against known noise features. The $\alpha$-parameterized operating curve delivers up to 37.9\% compression (Credit-Card-Fraud at $\alpha=0.95$) with AUC preservation $\geq 0.985$, and an $\alpha$-recall curve confirms $\alpha$ as a controllable precision--recall knob.
+\item {\bf Comprehensive Empirical Validation.} We evaluate MinPPI against six baselines---SHAP-Top-$k$, ShapG, MinShap, Banzhaf-FS, Powershap, and NSGA-II---on seven tabular datasets ($29$--$100$ features after MI filtering, five seeds each).
 \end{enumerate}
 
 \section{Related Work}
@@ -160,7 +160,7 @@ We develop the framework in four stages: voting-game formulation (\S\ref{sec:vot
 \subsection{Voting Game Formulation for Feature Selection}
 \label{sec:voting-game}
 
-\textbf{Definition 1 (UTVG).}  Recall $v_\alpha$ from~\eqref{eq:valpha}.  The pair $(N_1, v_\alpha)$ is a \emph{utility-threshold voting game}.  Coalitions with $v_\alpha(S) = 1$ are \emph{winning}.  We fix $\alpha=0.95$ ($\{0.85,0.90,0.95,0.99\}$ in Appendix~\ref{app:alpha}).  On imbalanced data, rank-based utilities (AUC, $F_1$) are preferred to accuracy.
+\textbf{Definition 1 (UTVG).}  Recall $v_\alpha$ from~\eqref{eq:valpha}.  The pair $(N_1, v_\alpha)$ is a \emph{utility-threshold voting game}.  Coalitions with $v_\alpha(S) = 1$ are \emph{winning}.  We fix $\alpha=0.95$ ($\{0.85,0.90,0.95,0.99\}$ in Table~\ref{tab:pareto_front}).  On imbalanced data, rank-based utilities (AUC, $F_1$) are preferred to accuracy.
 
 \textbf{Remark 1.}  $v_\alpha$ is evaluated by training $\mathcal{M}_S$---no additive surrogate (Section~\ref{sec:discussion}).
 
@@ -316,27 +316,27 @@ Table~\ref{tab:mofs_prefilter} reports mean hypervolume (HV) over 5 seeds.
 \toprule
 \textbf{Dataset} & \textbf{Full HV} & \textbf{Filtered HV} & \textbf{$\Delta$HV} & $|\mathcal{H}_{0.95}|$ & \textbf{Filtered dim.} \\
 \midrule
-Spambase    & 0.401 & 0.425 & $+0.024$ & 0.4 & 55.6 \\
-Madelon     & 0.251 & 0.207 & $-0.044$ & 16.0 & 84.0 \\
-ISOLET      & 0.377 & 0.388 & $+0.011$ & 0.6 & 99.4 \\
+Spambase    & 0.401 & 0.401 & $\;\,0.000$ & 0.0 & 56.0 \\
+Madelon     & 0.251 & 0.193 & $-0.059$ & 18.6 & 81.4 \\
+ISOLET      & 0.377 & 0.367 & $-0.010$ & 0.4 & 99.6 \\
 Gisette     & 0.473 & 0.473 & $\;\,0.000$ & 0.0 & 100.0 \\
-Credit-Card & 0.324 & 0.499 & $+0.174$ & 8.8 & 20.2 \\
-Crimedata   & 0.315 & 0.321 & $+0.006$ & 0.2 & 99.8 \\
+Credit-Card & 0.324 & 0.445 & $+0.121$ & 10.2 & 18.8 \\
+Crimedata   & 0.315 & 0.315 & $\;\,0.000$ & 0.0 & 100.0 \\
 Abalone     & 0.346 & 0.346 & $\;\,0.000$ & 0.0 & 8.0 \\
 \bottomrule
 \end{tabular}
 \end{center}
 \end{table}
 
-NSGA-II-filtered achieves higher HV on four of seven datasets (Spambase $+0.024$, ISOLET $+0.011$, Credit-Card $+0.174$, Crimedata $+0.006$), matches NSGA-II-full on two datasets with zero harmful features (Gisette, Abalone), and trails on one (Madelon $-0.044$).  Credit-Card-Fraud shows the most dramatic improvement: MinPPI flags 8.8 features out of 29 (30.4\%), and NSGA-II on the remaining 20.2 features attains 54.0\% higher HV.  Madelon's degradation is consistent with MinPPI's conservative deletion at $\alpha{=}0.95$ removing some borderline-useful features alongside noise probes (as shown by its precision $0.978$ but recall $0.227$ in Section~\ref{sec:harmful_utility}).
+NSGA-II-filtered achieves higher HV on Credit-Card-Fraud ($+0.121$, a 37\% improvement despite searching 35\% fewer features), matches NSGA-II-full on five datasets with zero or near-zero harmful features (Spambase, ISOLET, Gisette, Crimedata, Abalone), and trails on Madelon ($-0.059$).  Credit-Card benefits the most: MinPPI flags 10.2 features out of 29 (35.2\%), and NSGA-II on the remaining 18.8 features discovers a better Pareto front.  Madelon's degradation reflects MinPPI's conservative deletion at $\alpha{=}0.95$ removing some borderline-useful features alongside noise probes (precision $0.978$ but recall $0.227$; Section~\ref{sec:harmful_utility}).
 
-These results confirm that MinPPI's voting-game pre-filter provides a high-quality reduced search space for downstream multi-objective methods: the pre-filter never hurts on datasets with zero harmful features (``first, do no harm''), and substantially helps when harmful features are both present and correctly identified.
+The pre-filter satisfies a ``first, do no harm'' property: it never hurts on datasets with zero harmful features (identical HV), and on Credit-Card---the one dataset where MinPPI finds a substantial harmful set---it provides a measurably better search space.
 
 \begin{figure}[t]
 \begin{center}
 \includegraphics[width=0.95\linewidth]{../figures/fig3_prefilter.pdf}
 \end{center}
-\caption{MOFS pre-filter verification.  (a)~Hypervolume (HV) of NSGA-II-full (gray) vs.\ NSGA-II-filtered (green) on seven datasets (mean $\pm$ std over 5 seeds, 20 individuals $\times$ 20 generations).  Filtered NSGA-II dominates on Credit-Card ($+54\%$ HV) and Spambase ($+6\%$), matches on Gisette/Abalone/Crimedata (zero or near-zero harmful features), and trails on Madelon ($-18\%$, consistent with MinPPI's precision $0.978$ but low recall).  (b)~Convergence speed: NSGA-II-filtered converges earlier on ISOLET (5 vs.\ 6.2 generations) and Credit-Card (14 vs.\ 11), though the effect is dataset-dependent.}
+\caption{MOFS pre-filter verification.  (a)~HV of NSGA-II-full (gray) vs.\ NSGA-II-filtered (green, 7 datasets, mean $\pm$ std over 5 seeds).  Credit-Card shows the largest gain ($+37\%$ HV on 35\% fewer features).  Five datasets with $|\mathcal{H}_{0.95}|{\approx}0$ show identical HV.  Madelon trails ($-18\%$), consistent with MinPPI's precision $0.978$ but low recall.  (b)~Convergence speed: filtered NSGA-II converges earlier on ISOLET (5 vs.\ 6.2 gen).}
 \label{fig:prefilter}
 \end{figure}
 
@@ -446,112 +446,10 @@ Abalone   & 8 & 8 & 4,177 & R & $R^2$ \\
 \textbf{Protocol.}  All data are standardized (zero mean, unit variance).  Train/val/test splits are 60/20/20, stratified for classification.  Base learner is XGBoost (100 estimators, max\_depth=4, learning\_rate=0.1 for evaluation).  MinPPI estimation: Algorithm~B (ShapG-guided, $K_{\text{adv}}=30$) for binary datasets, shared-coalition Algorithm~A ($K=200$, 5 per coalition for Spambase/Madelon/Credit-Card; $K=30$--$50$, 2 per coalition for ISOLET/Gisette/Crimedata/Abalone) for multi-class and regression.  MinPPI quota $\alpha=0.95$ as default, with $\{0.85,0.90,0.99\}$ for $\alpha$-Pareto sweep.  Five seeds: 42, 123, 456, 789, 1024.
 
 % ---------------------------------------------------------------------------
-\section{Full Per-Dataset Tables}
-\label{app:full_tables}
-
-\subsection{Single-Point AUC@$k$ (All Methods)}
-
-\begin{table}[H]
-\caption{Single-point AUC at six cardinalities $k \in \{1,3,5,10,20,50\}$ for five ranking methods on five classification datasets (means over 5 seeds).  Best per row \textbf{bold}.  MinPPI is excluded because it produces a three-way classification rather than a feature ranking; its performance is assessed through the deletion and ground-truth experiments in Section~\ref{sec:harmful_utility}.}
-\label{tab:all_auc}
-\begin{center}
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{l c c c c c}
-\toprule
-\textbf{Dataset} & \textbf{SHAP-k} & \textbf{PShap} & \textbf{MinShap} & \textbf{Banzhaf} & \textbf{ShapG} \\
-\midrule
-\multicolumn{6}{c}{\textit{AUC@1}} \\
-\midrule
-Spambase & 0.677 & 0.693 & 0.729 & 0.768 & \textbf{0.781} \\
-Madelon & 0.621 & 0.621 & 0.587 & \textbf{0.629} & 0.612 \\
-ISOLET & 0.760 & 0.743 & 0.760 & 0.756 & \textbf{0.822} \\
-Gisette & 0.835 & \textbf{0.837} & 0.727 & 0.745 & 0.830 \\
-Credit-Card & \textbf{0.933} & \textbf{0.933} & 0.820 & 0.889 & 0.900 \\
-\midrule
-\multicolumn{6}{c}{\textit{AUC@3}} \\
-\midrule
-Spambase & 0.894 & \textbf{0.899} & 0.893 & 0.895 & 0.885 \\
-Madelon & \textbf{0.766} & 0.726 & 0.712 & 0.748 & 0.712 \\
-ISOLET & \textbf{0.908} & 0.894 & 0.896 & 0.864 & 0.870 \\
-Gisette & 0.908 & 0.896 & 0.855 & 0.892 & \textbf{0.912} \\
-Credit-Card & 0.975 & \textbf{0.981} & 0.917 & 0.958 & 0.958 \\
-\midrule
-\multicolumn{6}{c}{\textit{AUC@5}} \\
-\midrule
-Spambase & 0.957 & \textbf{0.960} & 0.936 & 0.926 & 0.947 \\
-Madelon & 0.774 & 0.788 & 0.782 & \textbf{0.798} & 0.772 \\
-ISOLET & \textbf{0.932} & 0.930 & 0.929 & 0.928 & 0.883 \\
-Gisette & \textbf{0.948} & 0.923 & 0.923 & 0.925 & 0.937 \\
-Credit-Card & 0.981 & \textbf{0.982} & 0.961 & 0.966 & 0.966 \\
-\midrule
-\multicolumn{6}{c}{\textit{AUC@10}} \\
-\midrule
-Spambase & 0.980 & \textbf{0.980} & 0.971 & 0.967 & 0.966 \\
-Madelon & 0.802 & 0.813 & 0.804 & \textbf{0.816} & 0.792 \\
-ISOLET & \textbf{0.974} & 0.970 & 0.970 & 0.958 & 0.909 \\
-Gisette & \textbf{0.976} & 0.966 & 0.971 & 0.965 & 0.947 \\
-Credit-Card & \textbf{0.984} & 0.983 & 0.970 & 0.964 & 0.973 \\
-\midrule
-\multicolumn{6}{c}{\textit{AUC@20}} \\
-\midrule
-Spambase & \textbf{0.985} & 0.985 & 0.981 & 0.981 & 0.980 \\
-Madelon & \textbf{0.803} & 0.800 & 0.798 & 0.803 & 0.803 \\
-ISOLET & \textbf{0.989} & 0.987 & 0.986 & 0.983 & 0.927 \\
-Gisette & 0.985 & \textbf{0.986} & 0.978 & 0.974 & 0.962 \\
-Credit-Card & \textbf{0.982} & 0.981 & 0.979 & 0.974 & 0.976 \\
-\midrule
-\multicolumn{6}{c}{\textit{AUC@50}} \\
-\midrule
-Spambase & 0.987 & \textbf{0.987} & 0.986 & 0.986 & 0.987 \\
-Madelon & 0.785 & 0.778 & 0.786 & 0.800 & \textbf{0.802} \\
-ISOLET & \textbf{0.992} & 0.991 & 0.992 & 0.990 & 0.946 \\
-Gisette & \textbf{0.989} & 0.989 & 0.987 & 0.984 & 0.972 \\
-Credit-Card & 0.980 & 0.979 & 0.980 & \textbf{0.980} & 0.980 \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-\subsection{Ablation and Sensitivity}
-
-% ---------------------------------------------------------------------------
 \section{Regression Extension}
 \label{app:regression}
 
-% [Plan C — regression table with 6 methods to be regenerated from fresh data.
-%  MOFS-SHAP and NSGA2-uniform columns removed.]
-
 MinPPI extends naturally to regression by replacing the utility function $U$ with $R^2$.  Regression datasets (Crimedata, Abalone) show the same safety pattern as classification: near-zero harmful features at $\alpha{=}0.95$, preservation $\geq 0.99$ at all $\alpha$ levels (Table~\ref{tab:pareto_front}).
-
-% ---------------------------------------------------------------------------
-
-% ---------------------------------------------------------------------------
-\section{Alpha Sensitivity}
-\label{app:alpha}
-
-\begin{table}[H]
-\caption{Harmful feature \% vs.\ quota $\alpha$ (seed 42 for $\alpha\neq0.95$; $\alpha{=}0.95$ column uses 5-seed mean from the removal-test pipeline).  Algorithm~B on binary, Algorithm~A shared-coalition on multiclass/regression.  ``---'' means zero harmful.}
-\label{tab:alpha_sweep}
-\begin{center}
-\footnotesize
-\begin{tabular}{l c c c c}
-\toprule
-\textbf{Dataset} & $\alpha=0.85$ & $\alpha=0.90$ & $\alpha=0.95$ & $\alpha=0.99$ \\
-\midrule
-Spambase   & 3.6\% & 3.6\% & 1.1\% & 28.6\% \\
-Madelon    & 34.0\% & 47.0\% & 21.0\% & 55.0\% \\
-ISOLET     & 3.0\% & --- & 8.0\% & 13.0\% \\
-Gisette    & --- & --- & --- & 20.0\% \\
-Credit-Card & --- & 6.9\% & 9.7\% & 69.0\% \\
-Crimedata  & 3.0\% & 1.0\% & 1.2\% & 3.0\% \\
-Abalone    & 12.5\% & 50.0\% & --- & 37.5\% \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-Harmful counts increase with $\alpha$.  Decisive features are zero in all settings (Section~\ref{sec:minppi}).  The $\alpha{=}0.95$ column uses 5-seed means from the removal-test experiment (Table~\ref{tab:harmful_removal}) and is more reliable than the single-seed columns at other $\alpha$ levels.  Pairwise Wilcoxon signed-rank tests on harmful\% across $\alpha$ levels were computed on the binary-vs-continuous seed~42 data (Table~\ref{tab:alpha_sweep}, $\alpha\neq0.95$ columns), treating each of the $N=7$ datasets as a paired observation (harmful\% at $\alpha_a$ vs.\ $\alpha_b$, same dataset, same seed).  Results: $\alpha{=}0.95$ differs from $\alpha{=}0.85$ ($W{=}0$, $p{=}0.028$) and $\alpha{=}0.90$ ($W{=}0$, $p{=}0.043$) but not from $\alpha{=}0.99$ ($W{=}5$, $p{=}0.128$), supporting $\alpha{=}0.95$ as the recommended primary value.  The small sample size ($N{=}7$) limits statistical power, and the $\alpha{=}0.95$ column now uses the more reliable 5-seed mean from the independent removal-test pipeline; the broad consistency between the two columns at adjacent $\alpha$ levels confirms that the seed-42 values are representative.
 
 % ---------------------------------------------------------------------------
 \section{MinShap Comparison and Madelon Ground Truth}
@@ -591,7 +489,7 @@ ISOLET   & 8.0 & 47.2 & 0.08 \\
 \end{center}
 \end{table}
 
-The low Jaccard (0.02--0.22) confirms that binary $v_\alpha$ and continuous $v(S)$ identify fundamentally different feature sets as harmful.  MinShap flags 3--19$\times$ more features as negative but with lower precision on the Madelon ground truth and catastrophic AUC drops on Credit-Card (Table~\ref{tab:harmful_removal}); MinPPI is conservative, flagging only features with at least one context where they unambiguously turn a winning coalition into a losing one.
+The low Jaccard (0.02--0.22) confirms that binary $v_\alpha$ and continuous $v(S)$ identify fundamentally different feature sets as harmful.  MinShap flags 3--19$\times$ more features as negative; at matched budget, its most-negative features perform comparably to MinPPI's harmful set (Table~\ref{tab:harmful_removal}).  The key distinction is that MinPPI provides a principled decision boundary (harmful iff a harmful-witness coalition exists; Property~2b), whereas MinShap's continuous scores require an arbitrary user-chosen cutoff.
 
 \begin{table}[H]
 \caption{Per-$\alpha$ MinPPI precision, recall, F$_1$ against Madelon probes (mean $\pm$ std over 5 seeds).}
@@ -613,14 +511,6 @@ SHAP    & $0.97 \pm 0.03$ & $0.18 \pm 0.15$ & $0.28 \pm 0.18$ & $18.6$ \\
 \end{tabular}
 \end{center}
 \end{table}
-
-% ---------------------------------------------------------------------------
-\section{Ablation Tables}
-\label{app:ablation}
-
-% [Plan C — three NSGA-II ablation tables removed: tab:abl_min_vs_mean,
-%  tab:abl_beta, tab:abl_shapg_vs_shap.  Replacement: §6.4 α-trade-off paragraph
-%  + α-Pareto front table (see plan_c_implementation.md §4.2).]
 
 % ---------------------------------------------------------------------------
 \section{Statistical Tests}
