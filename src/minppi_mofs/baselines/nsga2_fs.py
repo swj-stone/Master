@@ -52,7 +52,8 @@ class NSGA2Result:
         pareto_front: List of ``(binary_mask, (card_ratio, 1−AUC))`` tuples.
         hv: Hypervolume with respect to reference point ``(1.0, 1.0)``.
         runtime_s: Wall-clock runtime in seconds.
-        converged_gen: Earliest generation reaching ≥90% of final HV.
+        converged_gen: First generation whose cumulative-best HV reaches
+            ≥95% of the final-best HV (post-hoc, 1-indexed).
         hv_history: HV at each generation (len = max_gen).
     """
 
@@ -208,20 +209,52 @@ def _crowding_distance(
 
 
 def _compute_hv(front: np.ndarray, ref: np.ndarray) -> float:
-    """Hypervolume in 2-D.
+    """Hypervolume in 2-D for minimisation (standard sweep-line algorithm).
 
-    Assumes the front is sorted by the first objective.
+    Filters dominated and duplicate points, sorts by the first objective,
+    and sweeps left to right accumulating rectangular contributions.
     """
-    if len(front) == 0:
+    points = np.asarray(front, dtype=float)
+    if points.size == 0:
         return 0.0
-    order = np.argsort(front[:, 0])
-    sf = front[order]
+    # Keep only points that are not worse than the reference in every objective
+    points = points[np.all(points <= ref, axis=1)]
+    if len(points) == 0:
+        return 0.0
+    # De-duplicate and keep only non-dominated points
+    points = np.unique(points, axis=0)
+    points = points[_non_dominated_sort(points)[0]]
+    if len(points) == 0:
+        return 0.0
+    # Sort by first objective ascending (second objective will be descending
+    # because the points are mutually non-dominated)
+    points = points[np.argsort(points[:, 0])]
     hv = 0.0
-    prev_x = 0.0
-    for i in range(len(sf)):
-        hv += (sf[i, 0] - prev_x) * (ref[1] - sf[i, 1])
-        prev_x = sf[i, 0]
+    best_y = float(ref[1])
+    for x, y in points:
+        if y < best_y:
+            hv += (float(ref[0]) - float(x)) * (best_y - float(y))
+            best_y = float(y)
     return max(hv, 0.0)
+
+
+def _converged_gen(hv_history: list[float]) -> int:
+    """First generation whose cumulative-best HV reaches ≥95% of the final best.
+
+    This is a post-hoc metric — it does **not** influence the NSGA-II loop.
+    """
+    if not hv_history:
+        return 0
+    best = max(hv_history)
+    if best == 0.0:
+        return len(hv_history)
+    cum_best = -np.inf
+    for i, hv in enumerate(hv_history):
+        if hv > cum_best:
+            cum_best = hv
+        if cum_best >= 0.95 * best:
+            return i + 1  # 1-indexed generation
+    return len(hv_history)
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +317,7 @@ def nsga2_feature_selection(
             for i in range(pop_size)
         ]
     )
-    converged_gen = max_gen
+    converged_gen: int = 0  # computed post-hoc below
     hv_history: list[float] = []
 
     # ── Generations ──
@@ -357,11 +390,6 @@ def nsga2_feature_selection(
         hv = _compute_hv(fit[pf_idx], np.array(ref_point))
         hv_history.append(hv)
 
-        # Convergence detection
-        if gen >= 5 and converged_gen == max_gen:
-            if len(hv_history) >= 5 and hv >= 0.9 * max(hv_history):
-                converged_gen = gen
-
         if verbose and (gen % 5 == 0 or gen == max_gen - 1):
             print(
                 f"  NSGA2 gen {gen:3d}: HV={hv:.4f}  {len(pf_idx)} non-dominated",
@@ -369,6 +397,7 @@ def nsga2_feature_selection(
             )
 
     runtime = time.perf_counter() - t0
+    converged_gen = _converged_gen(hv_history)
     pf_idx = _non_dominated_sort(fit)[0]
     hv_final = _compute_hv(fit[pf_idx], np.array(ref_point))
 
