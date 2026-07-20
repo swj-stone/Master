@@ -53,7 +53,9 @@ class NSGA2Result:
         hv: Hypervolume with respect to reference point ``(1.0, 1.0)``.
         runtime_s: Wall-clock runtime in seconds.
         converged_gen: First generation whose cumulative-best HV reaches
-            ≥95% of the final-best HV (post-hoc, 1-indexed).
+            ≥95% of the final-best HV (post-hoc, 1-indexed).  If no
+            generation obtains positive HV, ``max_gen`` is returned as a
+            sentinel for "no meaningful convergence".
         hv_history: HV at each generation (len = max_gen).
     """
 
@@ -242,11 +244,15 @@ def _converged_gen(hv_history: list[float]) -> int:
     """First generation whose cumulative-best HV reaches ≥95% of the final best.
 
     This is a post-hoc metric — it does **not** influence the NSGA-II loop.
+    An all-zero history has no meaningful positive-HV convergence, so its
+    final generation is returned as a sentinel.
     """
     if not hv_history:
         return 0
     best = max(hv_history)
     if best == 0.0:
+        # Avoid reporting generation 1 as "converged" when no dominated
+        # hypervolume was obtained at any point in the run.
         return len(hv_history)
     cum_best = -np.inf
     for i, hv in enumerate(hv_history):

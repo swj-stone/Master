@@ -34,6 +34,15 @@ def test_hv_single_point() -> None:
     assert _compute_hv(front, ref) == pytest.approx(0.45)
 
 
+def test_hv_respects_non_unit_reference_point() -> None:
+    """The supplied reference point, rather than a hard-coded unit point, is used."""
+    front = np.array([[0.2, 0.8], [0.8, 0.2]])
+    ref = np.array([1.1, 1.2])
+    # Rectangle union:
+    #   0.9*0.4 + 0.3*1.0 - 0.3*0.4 = 0.54
+    assert _compute_hv(front, ref) == pytest.approx(0.54)
+
+
 def test_hv_ignores_duplicate_and_dominated_points() -> None:
     """Duplicates and a dominated point (0.9, 0.9) are filtered out."""
     front = np.array([[0.2, 0.8], [0.2, 0.8], [0.9, 0.9], [0.8, 0.2]])
@@ -51,6 +60,13 @@ def test_hv_all_outside_ref() -> None:
     front = np.array([[1.5, 0.5], [0.5, 1.5]])
     ref = np.array([1.0, 1.0])
     assert _compute_hv(front, ref) == pytest.approx(0.0)
+
+
+def test_hv_outside_points_do_not_remove_valid_contribution() -> None:
+    """Reference-exceeding points are ignored without discarding valid points."""
+    front = np.array([[0.25, 0.40], [1.20, 0.20], [0.20, 1.30]])
+    ref = np.array([1.0, 1.0])
+    assert _compute_hv(front, ref) == pytest.approx(0.45)
 
 
 def test_hv_with_dominated_single_point() -> None:
@@ -76,11 +92,6 @@ def test_hv_many_points_correctness() -> None:
     )
     ref = np.array([1.0, 1.0])
     hv = _compute_hv(front, ref)
-    # Manual (right→left):
-    #   (1-0.9)*(1-0.1)=0.1*0.9=0.09
-    #   (1-0.7)*(0.9-0.3)=0.3*0.6=0.18
-    #   (1-0.5)*(0.6-0.4)=0.5*0.2=0.10
-    #   (1-0.3)*(0.4-0.6)... wait y increases so no.
     # Left→right sweep:
     #   best_y=1.0
     #   (0.1,0.9): y<1→(1-0.1)*(1-0.9)=0.9*0.1=0.09, best_y=0.9
@@ -121,8 +132,8 @@ def test_converged_gen_plateau() -> None:
     assert _converged_gen(h) == 4
 
 
-def test_converged_gen_zero_hv() -> None:
-    """All zero HV → returns len(history)."""
+def test_converged_gen_zero_hv_uses_max_generation_sentinel() -> None:
+    """No positive HV means no meaningful convergence; return max generation."""
     assert _converged_gen([0.0, 0.0, 0.0]) == 3
 
 
