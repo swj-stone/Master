@@ -27,12 +27,90 @@ Usage::
 from __future__ import annotations
 
 import itertools
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
 
 from minppi_mofs.voting_game import AccFullCache, make_acc_full_cache
+
+
+SharedCoalitionStep = tuple[frozenset[str], tuple[str, ...]]
+SharedCoalitionPlan = tuple[SharedCoalitionStep, ...]
+
+
+def make_shared_coalition_plan(
+    features: Sequence[str],
+    *,
+    K: int,
+    per_coalition: int,
+    seed: int,
+) -> SharedCoalitionPlan:
+    """Build a utility-independent shared-coalition evaluation plan."""
+    feature_order = tuple(features)
+    if len(set(feature_order)) != len(feature_order):
+        raise ValueError("features must be unique")
+    if K < 0:
+        raise ValueError("K must be non-negative")
+    if per_coalition < 0:
+        raise ValueError("per_coalition must be non-negative")
+
+    rng = np.random.default_rng(seed)
+    hits = {feature: 0 for feature in feature_order}
+    steps: list[SharedCoalitionStep] = []
+
+    for _ in range(K):
+        coalition_size = int(rng.integers(0, len(feature_order) + 1))
+        coalition = frozenset(
+            rng.choice(feature_order, size=coalition_size, replace=False).tolist()
+        )
+        absent = [feature for feature in feature_order if feature not in coalition]
+        rng.shuffle(absent)
+        evaluated = tuple(absent[:per_coalition])
+        steps.append((coalition, evaluated))
+        for feature in evaluated:
+            hits[feature] += 1
+
+    for feature in feature_order:
+        if hits[feature] >= 2:
+            continue
+        others = [candidate for candidate in feature_order if candidate != feature]
+        for _ in range(5 - hits[feature]):
+            coalition_size = int(rng.integers(0, len(others) + 1))
+            coalition = frozenset(
+                rng.choice(others, size=coalition_size, replace=False).tolist()
+            )
+            steps.append((coalition, (feature,)))
+            hits[feature] += 1
+
+    return tuple(steps)
+
+
+def _validate_shared_coalition_plan(
+    plan: SharedCoalitionPlan,
+    features: Sequence[str],
+) -> None:
+    """Validate every plan step before any model or cache is used."""
+    valid_features = set(features)
+    for step_index, (coalition, evaluated) in enumerate(plan):
+        unknown_coalition = set(coalition) - valid_features
+        if unknown_coalition:
+            raise ValueError(
+                f"shared_plan step {step_index} has unknown coalition features: "
+                f"{sorted(unknown_coalition)}"
+            )
+        unknown_evaluated = set(evaluated) - valid_features
+        if unknown_evaluated:
+            raise ValueError(
+                f"shared_plan step {step_index} has unknown evaluated features: "
+                f"{sorted(unknown_evaluated)}"
+            )
+        not_absent = set(evaluated) & set(coalition)
+        if not_absent:
+            raise ValueError(
+                f"shared_plan step {step_index} evaluated features must be absent "
+                f"from the coalition: {sorted(not_absent)}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +211,7 @@ def estimate_minppi_random_mc(
     K: int = 200,
     shared_coalitions: bool = False,
     per_coalition: int = 5,
+    shared_plan: Optional[SharedCoalitionPlan] = None,
     utility: Optional[str] = None,
     acc_cache: Optional[AccFullCache] = None,
     model_params: Optional[dict] = None,
@@ -149,9 +228,9 @@ def estimate_minppi_random_mc(
 
     **Shared-coalition mode** (``shared_coalitions=True``):
     Draws *K* coalitions once.  For each coalition S, up to *per_coalition*
-    absent features are evaluated (same strategy as Banzhaf/MinShap).
-    Total XGBoost evaluations: O(K · per_coalition) instead of O(p·K).
-    Suitable for alpha sweeps and multiclass datasets.
+    absent features are evaluated (same strategy as Banzhaf/MinShap), followed
+    by fixed supplemental steps for under-sampled features. The complete plan
+    is utility-independent and can be reused across metric views.
 
     **Upward bias** (Lemma 3):  sample_min ≥ population_min almost surely.
 
@@ -169,6 +248,9 @@ def estimate_minppi_random_mc(
         shared_coalitions: If True, use shared-coalition sampling.
         per_coalition: Max absent features to evaluate per coalition
             (shared-coalition mode only).
+        shared_plan: Optional immutable evaluation plan for shared-coalition
+            mode. Supplying one guarantees identical coalition-feature
+            comparisons across utility views.
         acc_cache: Optional pre-built accuracy cache.
         seed: Random seed.
         verbose: Print progress.
@@ -176,6 +258,21 @@ def estimate_minppi_random_mc(
     Returns:
         Dict ``{feature_name: minppi}`` (values ∈ {-1, 0, +1}).
     """
+    features = list(X_train.columns)
+    n = len(features)
+    all_features = set(features)
+    if shared_plan is not None and not shared_coalitions:
+        raise ValueError("shared_plan requires shared_coalitions=True")
+    if shared_coalitions:
+        if shared_plan is None:
+            shared_plan = make_shared_coalition_plan(
+                features,
+                K=K,
+                per_coalition=per_coalition,
+                seed=seed,
+            )
+        _validate_shared_coalition_plan(shared_plan, features)
+
     rng = np.random.default_rng(seed)
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
@@ -184,19 +281,17 @@ def estimate_minppi_random_mc(
         )
     acc_cache.set_threshold(alpha)
 
-    features = list(X_train.columns)
-    n = len(features)
-    all_features = set(features)
     minppi: dict[str, int] = {}
 
     if shared_coalitions:
-        # ── shared‑coalition mode (Banzhaf-style) ──
-        # Draw K coalitions once.  For each S, evaluate v(S) and at most
-        # *per_coalition* randomly chosen absent features.  Total evals:
-        # K × (1 + per_coalition).
+        assert shared_plan is not None
+        # ── fixed shared-coalition mode (Banzhaf-style) ──
+        # Execute every pre-generated step.  Supplemental coverage steps
+        # are included in the plan and cannot depend on utility outcomes.
         if verbose:
             print(
-                f"  Algorithm A (shared): K={K}, per_cc={per_coalition}, {n} features",
+                f"  Algorithm A (shared): K={K}, per_cc={per_coalition}, "
+                f"plan_steps={len(shared_plan)}, {n} features",
                 flush=True,
             )
 
@@ -204,40 +299,18 @@ def estimate_minppi_random_mc(
         hits = {f: 0 for f in features}
         n_eval = 0
 
-        for _ in range(K):
-            s_size = rng.integers(0, n + 1)
-            S_list = rng.choice(features, size=s_size, replace=False).tolist()
-            S = set(S_list)
+        for coalition, evaluated in shared_plan:
+            S = set(coalition)
             vS = 1 if acc_cache.is_winning(S) else 0
             n_eval += 1
 
-            absent = [f for f in features if f not in S]
-            rng.shuffle(absent)
-            for feat in absent[:per_coalition]:
-                if minppi[feat] <= -0.99:
-                    continue
+            for feat in evaluated:
                 vSi = 1 if acc_cache.is_winning(S | {feat}) else 0
                 n_eval += 1
                 marg = vSi - vS
                 if marg < minppi[feat]:
                     minppi[feat] = marg
                 hits[feat] += 1
-
-        # Second pass: any feature with < 2 evaluations?  Run a few
-        # dedicated coalitions to get a baseline (coupon-collector edge).
-        needs_more = [f for f in features if hits[f] < 2]
-        for feat in needs_more:
-            others = list(all_features - {feat})
-            for _ in range(max(0, 5 - hits[feat])):
-                s_size = rng.integers(0, len(others) + 1)
-                S = set(rng.choice(others, size=s_size, replace=False).tolist())
-                marg = acc_cache.eval_marginal(S, feat)
-                n_eval += 1
-                if marg < minppi[feat]:
-                    minppi[feat] = marg
-                hits[feat] += 1
-                if marg == -1:
-                    break
 
         minppi = {f: minppi[f] if hits[f] > 0 else 0 for f in features}
         if verbose:

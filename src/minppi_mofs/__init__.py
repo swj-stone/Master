@@ -64,11 +64,14 @@ logging.getLogger("xgboost").setLevel(logging.ERROR)
 
 from minppi_mofs.voting_game import AccFullCache, UtilityView, compute_v_alpha, make_acc_full_cache  # noqa: E402
 from minppi_mofs.min_ppi import (  # noqa: E402
+    SharedCoalitionPlan,
+    SharedCoalitionStep,
     estimate_minppi,
     estimate_minppi_exact,
     estimate_minppi_hybrid,
     estimate_minppi_random_mc,
     estimate_minppi_mi_guided,
+    make_shared_coalition_plan,
 )
 from minppi_mofs.shapg_integration import (  # noqa: E402
     compute_mi_guidance_signal,
@@ -84,11 +87,14 @@ __all__ = [
     "UtilityView",
     "make_acc_full_cache",
     # min_ppi
+    "SharedCoalitionPlan",
+    "SharedCoalitionStep",
     "estimate_minppi",
     "estimate_minppi_exact",
     "estimate_minppi_random_mc",
     "estimate_minppi_mi_guided",
     "estimate_minppi_hybrid",
+    "make_shared_coalition_plan",
     # shapg_integration
     "compute_mi_guidance_signal",
     "get_correlated_neighbors",

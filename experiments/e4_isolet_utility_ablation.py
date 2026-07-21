@@ -14,7 +14,8 @@ different metrics:
        ↓                        ↓
     harmful_acc               harmful_ovr
 
-Budget: K=8 shared coalitions, per_coalition=2.
+Base budget: K=8 shared coalitions, per_coalition=2, plus deterministic
+supplemental coverage steps generated once and reused by both utilities.
 Model: XGBoost (n_estimators=15, max_depth=2).
 
 Run:
@@ -33,7 +34,10 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 from xgboost import XGBClassifier
 
-from minppi_mofs.min_ppi import estimate_minppi_random_mc
+from minppi_mofs.min_ppi import (
+    estimate_minppi_random_mc,
+    make_shared_coalition_plan,
+)
 from minppi_mofs.voting_game import AccFullCache, UtilityView
 
 K_ABLATION = 8
@@ -44,6 +48,20 @@ SEED = 42
 
 def _now_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+
+
+def _assert_same_prediction_keys(
+    before: set[tuple[str, ...]],
+    after: set[tuple[str, ...]],
+) -> None:
+    """Refuse results unless both utility passes used identical coalitions."""
+    added = after - before
+    missing = before - after
+    if added or missing:
+        raise RuntimeError(
+            "Utility passes used different prediction-cache keys: "
+            f"added={len(added)}, missing={len(missing)}"
+        )
 
 
 def _eval_removal(
@@ -89,6 +107,13 @@ def main() -> None:
     print(f"ISOLET seed={SEED}: {X_tr.shape[1]} features, {n_cls} classes")
     print(f"  train={len(y_tr)}  val={len(y_va)}  test={len(y_te)}")
     print(f"Budget: K={K_ABLATION}, per_coalition={PER_COALITION}")
+    shared_plan = make_shared_coalition_plan(
+        X_tr.columns,
+        K=K_ABLATION,
+        per_coalition=PER_COALITION,
+        seed=SEED,
+    )
+    print(f"Fixed shared plan: {len(shared_plan)} steps")
 
     # ── Build ONE prediction cache (each coalition trained once) ──────
     print("\nBuilding shared prediction cache ...", flush=True)
@@ -116,6 +141,7 @@ def main() -> None:
         X_tr, X_va, y_tr, y_va,
         alpha=ALPHA, K=K_ABLATION,
         shared_coalitions=True, per_coalition=PER_COALITION,
+        shared_plan=shared_plan,
         seed=SEED, verbose=True, task="multiclass", utility="accuracy",
         acc_cache=view_acc,          # ← reads from shared predictions
     )
@@ -124,7 +150,8 @@ def main() -> None:
     print(f"  Done: {len(harmful_acc)} harmful [{t_acc:.0f}s]")
 
     # ── MinPPI under OVR-AUC view (SAME predictions, DIFFERENT metric) ─
-    n_cached = len(cache._preds)  # models already trained from first pass
+    cached_keys_before = set(cache._preds)
+    n_cached = len(cached_keys_before)  # models already trained from first pass
     print(f"\n[2/2] OVR-AUC-based MinPPI  (cache has {n_cached} coalitions) ...",
           flush=True)
     t_ovr = time.perf_counter()
@@ -132,6 +159,7 @@ def main() -> None:
         X_tr, X_va, y_tr, y_va,
         alpha=ALPHA, K=K_ABLATION,
         shared_coalitions=True, per_coalition=PER_COALITION,
+        shared_plan=shared_plan,
         seed=SEED, verbose=True, task="multiclass", utility="ovr_auc",
         acc_cache=view_auc,         # ← same predictions, different metric
     )
@@ -140,7 +168,9 @@ def main() -> None:
 
     # Verify: second pass should be entirely cache hits (all coalitions
     # were already trained in the first pass with identical inputs).
-    n_cached_after = len(cache._preds)
+    cached_keys_after = set(cache._preds)
+    _assert_same_prediction_keys(cached_keys_before, cached_keys_after)
+    n_cached_after = len(cached_keys_after)
     print(f"  Done: {len(harmful_ovr)} harmful [{t_ovr:.0f}s]")
     print(f"  Cache: {n_cached} → {n_cached_after} coalitions stored  "
           f"({'+' if n_cached_after > n_cached else ''}"
@@ -191,6 +221,7 @@ def main() -> None:
         "run_id": run_id, "jaccard": round(jaccard, 4),
         "delta_auc_acc": round(d_acc, 4), "delta_auc_ovr": round(d_ovr, 4),
         "K": K_ABLATION, "per_coalition": PER_COALITION,
+        "shared_plan_steps": len(shared_plan),
         "data": "processed_v2, train/val/test split",
         "model": "XGBClassifier(15,2) — trained ONCE per coalition",
         "protocol": "shared AccFullCache → 2 UtilityViews read SAME predictions",

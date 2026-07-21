@@ -483,3 +483,134 @@ class TestTrainValidationSeparation:
         # The key check: predictions shape matches val, not train
         preds = cache.get_predictions({"f"})
         assert preds.shape[0] == 20  # val size, not 50 (train size)
+
+
+class TestEvaluateRejectsUtilityOverride:
+    """Explicit metric overrides must respect the cache task."""
+
+    def test_classification_cache_rejects_regression_override(self) -> None:
+        cache = _cache(task="binary", utility="roc_auc")
+
+        with pytest.raises(ValueError, match="regression-only"):
+            cache.evaluate({"f"}, utility="r2")
+
+    def test_regression_cache_rejects_classification_override(self) -> None:
+        cache = _cache(task="regression", utility="r2")
+
+        with pytest.raises(ValueError, match="classification-only"):
+            cache.evaluate({"f"}, utility="accuracy")
+
+    def test_rejects_unknown_override_as_unknown(self) -> None:
+        cache = _cache(task="binary", utility="roc_auc")
+
+        with pytest.raises(ValueError, match="Unknown utility"):
+            cache.evaluate({"f"}, utility="f1")
+
+
+class TestPredictionKeyGuard:
+    """E4 must refuse to label divergent cache keys as shared predictions."""
+
+    def test_accepts_identical_key_sets(self) -> None:
+        from experiments.e4_isolet_utility_ablation import (
+            _assert_same_prediction_keys,
+        )
+
+        keys = {("f0",), ("f0", "f1")}
+        _assert_same_prediction_keys(keys, set(keys))
+
+    @pytest.mark.parametrize(
+        "before, after, expected",
+        [
+            ({("f0",)}, {("f0",), ("f1",)}, "added=1, missing=0"),
+            ({("f0",), ("f1",)}, {("f0",)}, "added=0, missing=1"),
+        ],
+    )
+    def test_rejects_changed_key_sets(
+        self,
+        before: set[tuple[str, ...]],
+        after: set[tuple[str, ...]],
+        expected: str,
+    ) -> None:
+        from experiments.e4_isolet_utility_ablation import (
+            _assert_same_prediction_keys,
+        )
+
+        with pytest.raises(RuntimeError, match=expected):
+            _assert_same_prediction_keys(before, after)
+
+
+class TestFullRunCacheConsistency:
+    """Two complete utility runs must reuse one fixed evaluation plan."""
+
+    def test_same_plan_reuses_all_predictions_without_refitting(self) -> None:
+        import pandas as pd
+        from unittest import mock
+
+        from experiments.e4_isolet_utility_ablation import (
+            _assert_same_prediction_keys,
+        )
+        from minppi_mofs.min_ppi import (
+            estimate_minppi_random_mc,
+            make_shared_coalition_plan,
+        )
+        from minppi_mofs.voting_game import AccFullCache, UtilityView
+
+        rng = np.random.default_rng(2)
+        n_rows, n_features = 75, 8
+        X = pd.DataFrame(
+            rng.normal(size=(n_rows, n_features)),
+            columns=[f"f{i}" for i in range(n_features)],
+        )
+        logits = np.column_stack([
+            1.2 * X["f0"] - 0.5 * X["f3"],
+            1.1 * X["f1"] + 0.4 * X["f4"],
+            1.0 * X["f2"] - 0.4 * X["f5"],
+        ]) + rng.normal(scale=0.9, size=(n_rows, 3))
+        y = logits.argmax(axis=1)
+        X_train, X_val = X.iloc[:50], X.iloc[50:]
+        y_train, y_val = y[:50], y[50:]
+
+        cache = AccFullCache(
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            task="multiclass",
+            seed=42,
+            model_params={"n_estimators": 5, "max_depth": 2},
+        )
+        view_accuracy = UtilityView(cache, utility="accuracy", alpha=0.95)
+        view_ovr_auc = UtilityView(cache, utility="ovr_auc", alpha=0.95)
+        shared_plan = make_shared_coalition_plan(
+            X_train.columns,
+            K=8,
+            per_coalition=2,
+            seed=42,
+        )
+        common = {
+            "alpha": 0.95,
+            "K": 8,
+            "shared_coalitions": True,
+            "per_coalition": 2,
+            "shared_plan": shared_plan,
+            "seed": 42,
+            "task": "multiclass",
+        }
+
+        estimate_minppi_random_mc(
+            X_train, X_val, y_train, y_val,
+            utility="accuracy", acc_cache=view_accuracy, **common,
+        )
+        keys_after_accuracy = set(cache._preds)
+        with mock.patch.object(
+            cache._model, "fit", wraps=cache._model.fit,
+        ) as spy_fit:
+            estimate_minppi_random_mc(
+                X_train, X_val, y_train, y_val,
+                utility="ovr_auc", acc_cache=view_ovr_auc, **common,
+            )
+            assert spy_fit.call_count == 0
+        keys_after_ovr_auc = set(cache._preds)
+
+        assert keys_after_ovr_auc == keys_after_accuracy
+        _assert_same_prediction_keys(keys_after_accuracy, keys_after_ovr_auc)

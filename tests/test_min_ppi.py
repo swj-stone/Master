@@ -28,6 +28,7 @@ from minppi_mofs.min_ppi import (
     estimate_minppi_hybrid,
     estimate_minppi_random_mc,
     estimate_minppi_mi_guided,
+    make_shared_coalition_plan,
     minppi_stats,
 )
 from minppi_mofs.voting_game import make_acc_full_cache
@@ -187,6 +188,127 @@ class TestTheorem1ThreeWay:
 # ---------------------------------------------------------------------------
 # Algorithm A — Random MC
 # ---------------------------------------------------------------------------
+
+
+class TestSharedCoalitionPlan:
+    """Utility-independent shared-coalition evaluation schedule."""
+
+    def test_is_immutable_and_seed_reproducible(self) -> None:
+        features = ("a", "b", "c", "d", "e")
+
+        first = make_shared_coalition_plan(
+            features, K=4, per_coalition=2, seed=42,
+        )
+        second = make_shared_coalition_plan(
+            features, K=4, per_coalition=2, seed=42,
+        )
+
+        assert isinstance(first, tuple)
+        assert first == second
+        assert all(isinstance(coalition, frozenset) for coalition, _ in first)
+        assert all(isinstance(evaluated, tuple) for _, evaluated in first)
+
+    def test_features_are_absent_and_supplemental_coverage_is_fixed(self) -> None:
+        features = ("a", "b", "c", "d", "e")
+        K = 3
+        plan = make_shared_coalition_plan(
+            features, K=K, per_coalition=2, seed=7,
+        )
+
+        base_hits = {feature: 0 for feature in features}
+        final_hits = {feature: 0 for feature in features}
+        for step_index, (coalition, evaluated) in enumerate(plan):
+            assert coalition <= set(features)
+            for feature in evaluated:
+                assert feature in features
+                assert feature not in coalition
+                final_hits[feature] += 1
+                if step_index < K:
+                    base_hits[feature] += 1
+
+        for feature in features:
+            if base_hits[feature] < 2:
+                assert final_hits[feature] == 5
+            else:
+                assert final_hits[feature] == base_hits[feature]
+
+
+class TestSharedCoalitionPlanExecution:
+    """Explicit plans are validated and executed without adaptive skips."""
+
+    def test_executes_a_valid_explicit_plan(
+        self,
+        small_data: tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray],
+        acc_cache,
+    ) -> None:
+        X_train, X_val, y_train, y_val = small_data
+        plan = (
+            (frozenset(), ("f_signal",)),
+            (frozenset({"f_noise1"}), ("f_weak",)),
+        )
+
+        result = estimate_minppi_random_mc(
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            alpha=0.90,
+            shared_coalitions=True,
+            shared_plan=plan,
+            acc_cache=acc_cache,
+            seed=42,
+        )
+
+        assert set(result) == set(X_train.columns)
+        assert tuple() in acc_cache._preds
+        assert ("f_signal",) in acc_cache._preds
+        assert ("f_noise1",) in acc_cache._preds
+        assert ("f_noise1", "f_weak") in acc_cache._preds
+
+    @pytest.mark.parametrize(
+        "plan, message",
+        [
+            (((frozenset({"unknown"}), ("f_signal",)),), "coalition"),
+            (((frozenset(), ("unknown",)),), "evaluated"),
+            (((frozenset({"f_signal"}), ("f_signal",)),), "absent"),
+        ],
+    )
+    def test_rejects_invalid_plan_before_cache_use(
+        self,
+        small_data: tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray],
+        plan,
+        message: str,
+    ) -> None:
+        X_train, X_val, y_train, y_val = small_data
+
+        with pytest.raises(ValueError, match=message):
+            estimate_minppi_random_mc(
+                X_train,
+                X_val,
+                y_train,
+                y_val,
+                shared_coalitions=True,
+                shared_plan=plan,
+                acc_cache=object(),
+            )
+
+    def test_rejects_plan_outside_shared_mode(
+        self,
+        small_data: tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray],
+    ) -> None:
+        X_train, X_val, y_train, y_val = small_data
+        plan = ((frozenset(), ("f_signal",)),)
+
+        with pytest.raises(ValueError, match="shared_coalitions"):
+            estimate_minppi_random_mc(
+                X_train,
+                X_val,
+                y_train,
+                y_val,
+                shared_coalitions=False,
+                shared_plan=plan,
+                acc_cache=object(),
+            )
 
 
 class TestAlgorithmA:

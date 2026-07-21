@@ -203,8 +203,13 @@ class AccFullCache:
 
         Reads from the shared prediction cache — no model retraining.
         """
-        preds = self.get_predictions(S)
         metric = utility if utility is not None else self._utility
+        if metric not in _ALL_METRICS:
+            raise ValueError(
+                f"Unknown utility {metric!r}. Choose from {sorted(_ALL_METRICS)}."
+            )
+        _validate_task_utility(self._task, metric)
+        preds = self.get_predictions(S)
         return compute_utility(self._y_val, preds, metric=metric)
 
     # ------------------------------------------------------------------
