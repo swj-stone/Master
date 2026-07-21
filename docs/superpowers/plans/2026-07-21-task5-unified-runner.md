@@ -401,7 +401,7 @@ Run all protocol tests and `git diff --check`.
 - Produces: `StatusStore`, `ResumeDecision`, `assert_stage_complete(layout, manifest, required_stages)`
 - Consumes: manifest jobs and canonical result records
 
-- [ ] **Step 1: Write a parameterized status test matrix**
+- [x] **Step 1: Write a parameterized status test matrix**
 
 ```python
 @pytest.mark.parametrize(
@@ -422,11 +422,11 @@ Also assert attempt increments, stale-running recovery metadata, aggregate root
 status, approved skips only, and completeness failure for absent, failed,
 running, duplicate, schema-invalid, or foreign-protocol results.
 
-- [ ] **Step 2: Confirm RED**
+- [x] **Step 2: Confirm RED**
 
 Run the status/completeness tests and observe missing API failures.
 
-- [ ] **Step 3: Implement `StatusStore`**
+- [x] **Step 3: Implement `StatusStore`**
 
 Store per-stage status at `<stage>/status.json` and rebuild the root aggregate
 after each transition.  Permit only:
@@ -442,14 +442,14 @@ Every transition stores UTC timestamp, attempt, result path, exception class,
 message, and traceback path.  A `success` transition must call
 `read_result_record` first.
 
-- [ ] **Step 4: Implement strict completeness**
+- [x] **Step 4: Implement strict completeness**
 
 `assert_stage_complete(layout, manifest, required_stages)` must compare the
 manifest to validated records, never to averages or glob counts.  Return a
 structured report for success; raise `IncompleteRunError` listing every missing
 or invalid job otherwise.
 
-- [ ] **Step 5: Verify Task 4**
+- [x] **Step 5: Verify Task 4**
 
 Run all protocol tests twice to prove status tests are isolated from prior
 runs.

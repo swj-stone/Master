@@ -14,7 +14,10 @@ import yaml
 
 import minppi_mofs.experiment_protocol as protocol_module
 from minppi_mofs.experiment_protocol import (
+    IncompleteRunError,
     ResultRecord,
+    StatusStore,
+    assert_stage_complete,
     atomic_write_json,
     build_job_manifest,
     canonical_hash,
@@ -1163,3 +1166,534 @@ def test_atomic_write_json_cleans_temporary_file_when_replace_fails(
 def test_atomic_write_json_rejects_nonfinite_values(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         atomic_write_json(tmp_path / "record.json", {"metric": float("inf")})
+
+
+def _status_fixture(tmp_path: Path, resolved_protocol):
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    return layout, jobs, StatusStore(layout, jobs)
+
+
+def _write_canonical_result(layout, job) -> None:
+    atomic_write_json(
+        layout.root / job.output_relpath,
+        {
+            "job_id": job.job_id,
+            "protocol_hash": job.protocol_hash,
+            "stage": job.stage,
+            "dataset_id": job.dataset_id,
+            "seed": job.seed,
+            "method": job.method,
+            "metrics": {"score": 1.0},
+            "artifacts": {},
+            "started_at": "2026-07-21T00:00:00+00:00",
+            "finished_at": "2026-07-21T00:00:01+00:00",
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("state", "has_valid_output", "expected"),
+    [
+        ("pending", False, "execute"),
+        ("running", False, "execute"),
+        ("failed", False, "execute"),
+        ("success", True, "skip"),
+        ("success", False, "execute"),
+    ],
+)
+def test_status_store_resume_decision_matrix(
+    tmp_path: Path,
+    resolved_protocol,
+    state: str,
+    has_valid_output: bool,
+    expected: str,
+) -> None:
+    layout = create_new_run(tmp_path / "results", "symlink-complete", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    status = StatusStore(layout, jobs)
+    job = jobs[0]
+    if state != "pending":
+        status.start(job.job_id)
+        if state == "failed":
+            status.fail(job.job_id, RuntimeError("expected"))
+        elif state == "success":
+            _write_canonical_result(layout, job)
+            status.succeed(job.job_id)
+            if not has_valid_output:
+                (layout.root / job.output_relpath).unlink()
+
+    decision = status.decide(job.job_id)
+
+    assert decision.action == expected
+    assert decision.reason in {"pending", "stale_running", "failed", "valid_success", "invalid_success"}
+    if state == "success" and not has_valid_output:
+        assert status.entry(job.job_id)["state"] == "failed"
+
+
+def test_status_store_recovers_stale_attempt_and_rebuilds_aggregate(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    job = jobs[0]
+    assert status.start(job.job_id)["attempt"] == 1
+    assert status.decide(job.job_id).reason == "stale_running"
+    recovered = status.start(job.job_id)
+
+    assert recovered["state"] == "running"
+    assert recovered["attempt"] == 2
+    assert recovered["recovery"]["event"] == "interrupted_recovery"
+    root = json.loads(layout.status_path.read_text(encoding="utf-8"))
+    assert root["stages"][job.stage]["running"] == 1
+
+
+def test_status_store_success_validation_and_illegal_transition_are_atomic(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    job = jobs[0]
+    status.start(job.job_id)
+    root_before = layout.status_path.read_bytes()
+    stage_path = layout.root / job.stage / "status.json"
+    stage_before = stage_path.read_bytes()
+    with pytest.raises(ValueError, match="result"):
+        status.succeed(job.job_id)
+    assert layout.status_path.read_bytes() == root_before
+    assert stage_path.read_bytes() == stage_before
+    status.fail(job.job_id, RuntimeError("expected"))
+    root_before = layout.status_path.read_bytes()
+    stage_before = stage_path.read_bytes()
+    with pytest.raises(RuntimeError, match="illegal"):
+        status.succeed(job.job_id)
+    assert layout.status_path.read_bytes() == root_before
+    assert stage_path.read_bytes() == stage_before
+
+
+def test_status_store_rejects_unapproved_skip_and_manifest_drift(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    status = StatusStore(layout, jobs)
+    with pytest.raises(ValueError, match="approved"):
+        status.skip(jobs[0].job_id, "not-approved")
+    layout = create_new_run(tmp_path / "results", "approved-run", resolved_protocol)
+    approved = StatusStore(layout, jobs, approved_skips={jobs[0].job_id: "waived"})
+    approved.skip(jobs[0].job_id, "waived")
+    approved.start(jobs[1].job_id)
+    with pytest.raises(ValueError, match="manifest"):
+        StatusStore(layout, jobs[1:])
+
+
+def test_status_store_reconstruction_preserves_attempts_and_rejects_malformed_status(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    status.start(jobs[0].job_id)
+    resumed = StatusStore(layout, jobs)
+    assert resumed.entry(jobs[0].job_id)["attempt"] == 1
+    atomic_write_json(layout.status_path, {"schema_version": True})
+    with pytest.raises(ValueError, match="schema"):
+        StatusStore(layout, jobs)
+
+
+def test_assert_stage_complete_aggregates_manifest_authoritative_defects(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    status = StatusStore(
+        layout, jobs, approved_skips={jobs[1].job_id: "not applicable"}
+    )
+    first, second = jobs
+    status.start(first.job_id)
+    status.fail(first.job_id, RuntimeError("expected"))
+    with pytest.raises(IncompleteRunError) as raised:
+        assert_stage_complete(layout, (first, second, second), ("preprocess",))
+
+    message = str(raised.value)
+    assert first.job_id in message
+    assert second.job_id in message
+    assert "duplicate manifest job ID" in message
+
+
+def test_assert_stage_complete_accepts_only_valid_success_or_exact_approved_skip(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    status = StatusStore(
+        layout, jobs, approved_skips={jobs[1].job_id: "not applicable"}
+    )
+    first, second = jobs
+    _write_canonical_result(layout, first)
+    status.start(first.job_id)
+    status.succeed(first.job_id)
+    status.skip(second.job_id, "not applicable")
+
+    report = assert_stage_complete(layout, jobs, ("preprocess",))
+
+    assert report.complete_job_ids == tuple(job.job_id for job in jobs)
+
+
+def test_assert_stage_complete_rejects_foreign_result_and_ignores_extra_files(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    status = StatusStore(
+        layout, jobs, approved_skips={jobs[1].job_id: "not applicable"}
+    )
+    _write_canonical_result(layout, jobs[0])
+    status.start(jobs[0].job_id)
+    status.succeed(jobs[0].job_id)
+    status.skip(jobs[1].job_id, "not applicable")
+    atomic_write_json(layout.root / "raw_metrics" / "unrelated.json", {"noise": True})
+    payload = json.loads((layout.root / jobs[0].output_relpath).read_text(encoding="utf-8"))
+    payload["protocol_hash"] = "foreign"
+    atomic_write_json(layout.root / jobs[0].output_relpath, payload)
+
+    with pytest.raises(IncompleteRunError, match="foreign-protocol"):
+        assert_stage_complete(layout, jobs, ("preprocess",))
+
+
+def test_completeness_is_read_only_and_reports_missing_required_stage(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+
+    with pytest.raises(IncompleteRunError, match="estimator: no manifest jobs"):
+        assert_stage_complete(layout, jobs, ("preprocess", "estimator"))
+
+    assert not layout.status_path.exists()
+    assert not (layout.root / "preprocess" / "status.json").exists()
+
+
+def test_status_store_recovers_missing_root_from_authoritative_stage_docs(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    status = StatusStore(
+        layout, jobs, approved_skips={jobs[1].job_id: "not applicable"}
+    )
+    status.start(jobs[0].job_id)
+    status.skip(jobs[1].job_id, "not applicable")
+    layout.status_path.unlink()
+
+    resumed = StatusStore(layout, jobs)
+
+    assert resumed.entry(jobs[0].job_id)["attempt"] == 1
+    assert resumed.decide(jobs[1].job_id).reason == "approved_skip"
+    assert json.loads(layout.status_path.read_text(encoding="utf-8"))["approved_skips"] == {
+        jobs[1].job_id: "not applicable"
+    }
+
+
+def test_status_store_reconciles_stale_root_but_rejects_partial_stage_set(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess", "validate"))
+    status = StatusStore(layout, jobs)
+    status.start(next(job.job_id for job in jobs if job.stage == "preprocess"))
+    root = json.loads(layout.status_path.read_text(encoding="utf-8"))
+    root["stages"]["preprocess"]["running"] = 0
+    root["stages"]["preprocess"]["pending"] += 1
+    atomic_write_json(layout.status_path, root)
+    assert StatusStore(layout, jobs).entry(
+        next(job.job_id for job in jobs if job.stage == "preprocess")
+    )["state"] == "running"
+    (layout.root / "validate" / "status.json").unlink()
+    with pytest.raises(ValueError, match="partial"):
+        StatusStore(layout, jobs)
+
+
+def test_root_write_failure_poisoned_store_recovers_without_losing_stage_progress(
+    tmp_path: Path, resolved_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    real_write = protocol_module.atomic_write_json
+
+    def fail_root(path: Path, value: object) -> None:
+        if Path(path) == layout.status_path:
+            raise OSError("root write failed")
+        real_write(path, value)
+
+    monkeypatch.setattr(protocol_module, "atomic_write_json", fail_root)
+    with pytest.raises(OSError, match="root write"):
+        status.start(jobs[0].job_id)
+    with pytest.raises(RuntimeError, match="reopen"):
+        status.decide(jobs[0].job_id)
+    monkeypatch.setattr(protocol_module, "atomic_write_json", real_write)
+    resumed = StatusStore(layout, jobs)
+    assert resumed.entry(jobs[0].job_id)["state"] == "running"
+    assert resumed.entry(jobs[0].job_id)["attempt"] == 1
+
+
+@pytest.mark.parametrize(
+    ("state", "changes"),
+    [
+        ("pending", {"attempt": 1}),
+        ("running", {"attempt": 0}),
+        ("success", {"recovery": {"event": "interrupted_recovery", "at": "2026-07-21T00:00:00+00:00", "previous_attempt": 0}}),
+        ("failed", {"exception_class": ""}),
+        ("skipped", {"attempt": 1}),
+    ],
+)
+def test_status_store_rejects_state_semantic_violations(
+    tmp_path: Path, resolved_protocol, state: str, changes: dict[str, object]
+) -> None:
+    if state == "skipped":
+        layout = create_new_run(tmp_path / "results", "skipped-run", resolved_protocol)
+        jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+        status = StatusStore(
+            layout, jobs, approved_skips={jobs[0].job_id: "waived"}
+        )
+    else:
+        layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    job = jobs[0]
+    if state in {"running", "failed", "success"}:
+        status.start(job.job_id)
+    if state == "failed":
+        status.fail(job.job_id, RuntimeError("expected"))
+    elif state == "success":
+        _write_canonical_result(layout, job)
+        status.succeed(job.job_id)
+    elif state == "skipped":
+        status.skip(job.job_id, "waived")
+    entry = status.entry(job.job_id)
+    entry.update(changes)
+    payload = json.loads((layout.root / job.stage / "status.json").read_text(encoding="utf-8"))
+    payload["jobs"][job.job_id] = entry
+    atomic_write_json(layout.root / job.stage / "status.json", payload)
+    with pytest.raises(ValueError):
+        StatusStore(layout, jobs)
+
+
+def test_status_store_rejects_bool_root_counts_and_non_utc_status_timestamp(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    root = json.loads(layout.status_path.read_text(encoding="utf-8"))
+    root["stages"][jobs[0].stage]["pending"] = True
+    atomic_write_json(layout.status_path, root)
+    with pytest.raises(ValueError, match="aggregate"):
+        StatusStore(layout, jobs)
+    root["stages"][jobs[0].stage]["pending"] = len(jobs)
+    atomic_write_json(layout.status_path, root)
+    stage = json.loads((layout.root / jobs[0].stage / "status.json").read_text(encoding="utf-8"))
+    stage["jobs"][jobs[0].job_id]["timestamp"] = "2026-07-21T00:00:00+03:00"
+    atomic_write_json(layout.root / jobs[0].stage / "status.json", stage)
+    with pytest.raises(ValueError, match="UTC"):
+        StatusStore(layout, jobs)
+
+
+@pytest.mark.parametrize("damage", ["missing", "malformed"])
+def test_completeness_ignores_unrequested_stage_status_damage(
+    tmp_path: Path, resolved_protocol, damage: str
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("validate", "preprocess"))
+    status = StatusStore(layout, jobs)
+    requested = tuple(job for job in jobs if job.stage == "preprocess")
+    for job in requested:
+        _write_canonical_result(layout, job)
+        status.start(job.job_id)
+        status.succeed(job.job_id)
+    foreign_stage = layout.root / "validate" / "status.json"
+    if damage == "missing":
+        foreign_stage.unlink()
+    else:
+        atomic_write_json(foreign_stage, {"broken": True})
+
+    assert assert_stage_complete(layout, jobs, ("preprocess",)).complete_job_ids == tuple(
+        job.job_id for job in requested
+    )
+
+
+def test_completeness_scopes_stage_files_but_keeps_full_manifest_identity(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("validate", "preprocess"))
+    status = StatusStore(layout, jobs)
+    for job in jobs:
+        if job.stage == "preprocess":
+            _write_canonical_result(layout, job)
+            status.start(job.job_id)
+            status.succeed(job.job_id)
+    root = json.loads(layout.status_path.read_text(encoding="utf-8"))
+    stage_path = layout.root / "preprocess" / "status.json"
+    stage = json.loads(stage_path.read_text(encoding="utf-8"))
+    root["manifest_hash"] = stage["manifest_hash"] = "forged-manifest-hash"
+    atomic_write_json(layout.status_path, root)
+    atomic_write_json(stage_path, stage)
+    (layout.root / "validate" / "status.json").unlink()
+
+    with pytest.raises(IncompleteRunError, match="manifest"):
+        assert_stage_complete(layout, jobs, ("preprocess",))
+
+
+def test_completeness_reports_running_schema_invalid_and_unapproved_skip(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    status.start(jobs[0].job_id)
+    stage_path = layout.root / jobs[0].stage / "status.json"
+    stage = json.loads(stage_path.read_text(encoding="utf-8"))
+    skipped = stage["jobs"][jobs[1].job_id]
+    skipped.update({"state": "skipped", "skip_reason": "unapproved"})
+    stage["jobs"][jobs[1].job_id] = skipped
+    atomic_write_json(stage_path, stage)
+
+    with pytest.raises(IncompleteRunError) as raised:
+        assert_stage_complete(layout, jobs, ("preprocess",))
+
+    message = str(raised.value)
+    assert "status is running" in message
+    assert "skipped" in message
+
+
+@pytest.mark.parametrize(
+    ("state", "action"),
+    [
+        ("pending", "succeed"), ("pending", "fail"),
+        ("running", "skip"),
+        ("failed", "succeed"), ("failed", "fail"), ("failed", "skip"),
+        ("success", "start"), ("success", "succeed"), ("success", "fail"), ("success", "skip"),
+        ("skipped", "start"), ("skipped", "succeed"), ("skipped", "fail"), ("skipped", "skip"),
+    ],
+)
+def test_full_illegal_transition_matrix_preserves_status_bytes(
+    tmp_path: Path, resolved_protocol, state: str, action: str
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    status = StatusStore(layout, jobs, approved_skips={jobs[0].job_id: "waived"})
+    job = jobs[0]
+    if state in {"running", "success", "failed"}:
+        status.start(job.job_id)
+    if state == "success":
+        _write_canonical_result(layout, job)
+        status.succeed(job.job_id)
+    elif state == "failed":
+        status.fail(job.job_id, RuntimeError("expected"))
+    elif state == "skipped":
+        status.skip(job.job_id, "waived")
+    root_before = layout.status_path.read_bytes()
+    stage_before = (layout.root / job.stage / "status.json").read_bytes()
+    illegal = {
+        "start": lambda: status.start(job.job_id),
+        "succeed": lambda: status.succeed(job.job_id),
+        "fail": lambda: status.fail(job.job_id, RuntimeError("expected")),
+        "skip": lambda: status.skip(job.job_id, "waived"),
+    }[action]
+
+    with pytest.raises((RuntimeError, ValueError)):
+        illegal()
+    assert layout.status_path.read_bytes() == root_before
+    assert (layout.root / job.stage / "status.json").read_bytes() == stage_before
+
+
+def test_status_store_rejects_result_symlink_escape(
+    tmp_path: Path, resolved_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    job = jobs[0]
+    status.start(job.job_id)
+    _write_canonical_result(layout, job)
+    real_within = protocol_module._require_within
+
+    def escaped(parent: Path, candidate: Path, context: str) -> None:
+        if context == "result path":
+            raise RuntimeError("result path escapes the run directory")
+        real_within(parent, candidate, context)
+
+    monkeypatch.setattr(protocol_module, "_require_within", escaped)
+
+    with pytest.raises(ValueError, match="result path"):
+        status.succeed(job.job_id)
+
+
+def test_symlink_escape_resume_fails_success_and_completeness_aggregates(
+    tmp_path: Path, resolved_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout = create_new_run(tmp_path / "results", "symlink-run", resolved_protocol)
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    status = StatusStore(layout, jobs)
+    job = jobs[0]
+    _write_canonical_result(layout, job)
+    status.start(job.job_id)
+    status.succeed(job.job_id)
+    real_within = protocol_module._require_within
+
+    def escaped(parent: Path, candidate: Path, context: str) -> None:
+        if context == "result path":
+            raise RuntimeError("result path escapes the run directory")
+        real_within(parent, candidate, context)
+
+    monkeypatch.setattr(protocol_module, "_require_within", escaped)
+    assert status.decide(job.job_id).action == "execute"
+    assert status.entry(job.job_id)["state"] == "failed"
+
+    monkeypatch.setattr(protocol_module, "_require_within", real_within)
+    layout = create_new_run(
+        tmp_path / "results", "symlink-complete", resolved_protocol
+    )
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    status = StatusStore(layout, jobs)
+    job = jobs[0]
+    _write_canonical_result(layout, job)
+    status.start(job.job_id)
+    status.succeed(job.job_id)
+    monkeypatch.setattr(protocol_module, "_require_within", escaped)
+    with pytest.raises(IncompleteRunError, match="result path"):
+        assert_stage_complete(layout, jobs, ("preprocess",))
+
+
+def test_completeness_rejects_schema_invalid_success_result(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    job = jobs[0]
+    _write_canonical_result(layout, job)
+    status.start(job.job_id)
+    status.succeed(job.job_id)
+    path = layout.root / job.output_relpath
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    del payload["method"]
+    atomic_write_json(path, payload)
+
+    with pytest.raises(IncompleteRunError, match="invalid or foreign-protocol result"):
+        assert_stage_complete(layout, jobs, ("preprocess",))
+
+
+def test_failed_retry_after_reconstruction_increments_attempt_and_keeps_empty_message(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    status.start(jobs[0].job_id)
+    status.fail(jobs[0].job_id, RuntimeError())
+    resumed = StatusStore(layout, jobs)
+
+    assert resumed.entry(jobs[0].job_id)["message"] == ""
+    assert resumed.start(jobs[0].job_id)["attempt"] == 2
+
+
+def test_entry_returns_a_deep_copy_and_completeness_aggregates_simultaneous_defects(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout, jobs, status = _status_fixture(tmp_path, resolved_protocol)
+    status.start(jobs[0].job_id)
+    recovered = status.start(jobs[0].job_id)
+    recovered["recovery"]["event"] = "tampered"
+    assert status.entry(jobs[0].job_id)["recovery"]["event"] == "interrupted_recovery"
+    status.fail(jobs[0].job_id, RuntimeError("expected"))
+
+    with pytest.raises(IncompleteRunError) as raised:
+        assert_stage_complete(layout, jobs, ("preprocess",))
+
+    assert jobs[0].job_id in str(raised.value)
+    assert jobs[1].job_id in str(raised.value)

@@ -14,11 +14,13 @@ import os
 import platform
 import re
 import subprocess
+from copy import deepcopy
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 import yaml
@@ -180,6 +182,36 @@ class RunLayout:
     manifest_path: Path
     status_path: Path
     log_path: Path
+
+
+@dataclass(frozen=True)
+class ResumeDecision:
+    """The deterministic action to take when resuming one manifest job."""
+
+    action: str
+    reason: str
+
+    def __post_init__(self) -> None:
+        if self.action not in {"execute", "skip"}:
+            raise ValueError("resume decision action is invalid")
+        if not isinstance(self.reason, str) or not self.reason:
+            raise ValueError("resume decision reason is invalid")
+
+
+@dataclass(frozen=True)
+class CompletenessReport:
+    """Validated, manifest-authoritative completion information."""
+
+    required_stages: tuple[str, ...]
+    complete_job_ids: tuple[str, ...]
+
+
+class IncompleteRunError(RuntimeError):
+    """Raised when one or more manifest jobs are not canonical and complete."""
+
+    def __init__(self, issues: Sequence[str]) -> None:
+        self.issues = tuple(issues)
+        super().__init__("incomplete run: " + "; ".join(self.issues))
 
 
 def canonical_hash(value: object) -> str:
@@ -783,6 +815,780 @@ def read_result_record(path: Path, expected_job: JobSpec) -> ResultRecord:
     if finished_at < started_at:
         raise ValueError("result record finished_at precedes started_at")
     return ResultRecord(expected_job.job_id, expected_job.protocol_hash, expected_job.stage, expected_job.dataset_id, expected_job.seed, expected_job.method, metrics, artifacts, payload["started_at"], payload["finished_at"])
+
+
+class StatusStore:
+    """Durable, manifest-bound state transitions for one experiment run.
+
+    Stage documents own individual job states while the root document contains
+    only a rebuilt aggregate.  Both are atomically replaced after every legal
+    transition; a later constructor validates their exact schemas before it
+    permits a resumed controller to use them.
+    """
+
+    _SCHEMA_VERSION = 1
+    _ENTRY_KEYS = frozenset(
+        {
+            "state",
+            "timestamp",
+            "attempt",
+            "result_path",
+            "exception_class",
+            "message",
+            "traceback_path",
+            "recovery",
+            "skip_reason",
+        }
+    )
+
+    def __init__(
+        self,
+        layout: RunLayout,
+        manifest: Sequence[JobSpec],
+        approved_skips: Mapping[str, str] | None = None,
+    ) -> None:
+        if layout != _run_layout(layout.root):
+            raise ValueError("run layout must use the canonical paths")
+        self._layout = layout
+        self._manifest = _validated_status_manifest(manifest)
+        self._by_id = {job.job_id: job for job in self._manifest}
+        self._stages = tuple(dict.fromkeys(job.stage for job in self._manifest))
+        self._manifest_hash = _status_manifest_hash(self._manifest)
+        supplied_skips = _validated_approved_skips(approved_skips, self._by_id)
+        self._usable = True
+        stage_exists = tuple(self._stage_path(stage).exists() for stage in self._stages)
+        if not layout.status_path.exists() and not any(stage_exists):
+            self._approved_skips = MappingProxyType(dict(supplied_skips))
+            self._entries = {
+                job.job_id: self._new_entry(job) for job in self._manifest
+            }
+            self._persist_all()
+        elif not layout.status_path.exists():
+            if not all(stage_exists):
+                raise ValueError("partial status initialization has missing stage status")
+            self._entries, persisted_skips = self._load_stage_entries()
+            if approved_skips is not None and supplied_skips != persisted_skips:
+                raise ValueError("approved skips do not match persisted status")
+            self._approved_skips = MappingProxyType(dict(persisted_skips))
+            self._persist_root()
+        else:
+            if not all(stage_exists):
+                raise ValueError("partial status initialization has missing stage status")
+            root = _read_status_json(layout.status_path, "root status")
+            persisted_skips = self._validate_root(root)
+            if approved_skips is not None and supplied_skips != persisted_skips:
+                raise ValueError("approved skips do not match persisted status")
+            self._approved_skips = MappingProxyType(dict(persisted_skips))
+            self._entries, stage_skips = self._load_stage_entries()
+            if stage_skips != persisted_skips:
+                raise ValueError("root and stage approved skips do not match")
+            if root["stages"] != self._aggregate():
+                self._persist_root()
+
+    def entry(self, job_id: str) -> dict[str, object]:
+        """Return an isolated copy of one current entry."""
+        self._require_usable()
+        job = self._job(job_id)
+        return deepcopy(self._entries[job.job_id])
+
+    def decide(self, job_id: str) -> ResumeDecision:
+        """Return whether a job may be skipped, validating prior success."""
+        self._require_usable()
+        job = self._job(job_id)
+        entry = self._entries[job.job_id]
+        state = entry["state"]
+        if state == "pending":
+            return ResumeDecision("execute", "pending")
+        if state == "running":
+            return ResumeDecision("execute", "stale_running")
+        if state == "failed":
+            return ResumeDecision("execute", "failed")
+        if state == "skipped":
+            reason = entry["skip_reason"]
+            if self._approved_skips.get(job.job_id) == reason:
+                return ResumeDecision("skip", "approved_skip")
+            raise RuntimeError("persisted skipped job is not approved")
+        if state != "success":  # guarded by schema validation
+            raise RuntimeError("persisted status state is invalid")
+        try:
+            read_result_record(self._result_path(job), job)
+        except ValueError as exc:
+            self._replace_entry(
+                job,
+                self._updated_entry(
+                    entry,
+                    state="failed",
+                    exception_class=type(exc).__name__,
+                    message=str(exc),
+                    traceback_path=None,
+                    recovery=None,
+                    skip_reason=None,
+                ),
+            )
+            return ResumeDecision("execute", "invalid_success")
+        return ResumeDecision("skip", "valid_success")
+
+    def start(self, job_id: str) -> dict[str, object]:
+        """Start pending/failed work, or explicitly recover stale running work."""
+        self._require_usable()
+        job = self._job(job_id)
+        entry = self._entries[job.job_id]
+        state = entry["state"]
+        if state not in {"pending", "failed", "running"}:
+            raise RuntimeError(f"illegal status transition {state} -> running")
+        recovery = None
+        if state == "running":
+            recovery = {
+                "event": "interrupted_recovery",
+                "at": _utc_timestamp(),
+                "previous_attempt": entry["attempt"],
+            }
+        updated = self._updated_entry(
+            entry,
+            state="running",
+            attempt=_status_attempt(entry["attempt"]) + 1,
+            exception_class=None,
+            message=None,
+            traceback_path=None,
+            recovery=recovery,
+            skip_reason=None,
+        )
+        self._replace_entry(job, updated)
+        return deepcopy(updated)
+
+    mark_running = start
+
+    def succeed(self, job_id: str) -> dict[str, object]:
+        """Validate the canonical record before recording a successful job."""
+        self._require_usable()
+        job = self._job(job_id)
+        entry = self._entries[job.job_id]
+        if entry["state"] != "running":
+            raise RuntimeError(
+                f"illegal status transition {entry['state']} -> success"
+            )
+        # Validation is deliberately before any status write, so a bad result
+        # cannot make either status file claim success.
+        read_result_record(self._result_path(job), job)
+        updated = self._updated_entry(
+            entry,
+            state="success",
+            exception_class=None,
+            message=None,
+            traceback_path=None,
+            recovery=None,
+            skip_reason=None,
+        )
+        self._replace_entry(job, updated)
+        return deepcopy(updated)
+
+    mark_success = succeed
+
+    def fail(
+        self,
+        job_id: str,
+        exception: BaseException,
+        *,
+        traceback_path: str | None = None,
+    ) -> dict[str, object]:
+        """Record an execution failure without swallowing its provenance."""
+        self._require_usable()
+        if not isinstance(exception, BaseException):
+            raise TypeError("status failure exception must be a BaseException")
+        job = self._job(job_id)
+        entry = self._entries[job.job_id]
+        if entry["state"] != "running":
+            raise RuntimeError(
+                f"illegal status transition {entry['state']} -> failed"
+            )
+        _optional_status_relpath(traceback_path, "traceback_path")
+        updated = self._updated_entry(
+            entry,
+            state="failed",
+            exception_class=type(exception).__name__,
+            message=str(exception),
+            traceback_path=traceback_path,
+            recovery=None,
+            skip_reason=None,
+        )
+        self._replace_entry(job, updated)
+        return deepcopy(updated)
+
+    mark_failed = fail
+
+    def skip(self, job_id: str, reason: str) -> dict[str, object]:
+        """Record only an exactly pre-approved manifest exception."""
+        self._require_usable()
+        job = self._job(job_id)
+        entry = self._entries[job.job_id]
+        if entry["state"] != "pending":
+            raise RuntimeError(
+                f"illegal status transition {entry['state']} -> skipped"
+            )
+        if self._approved_skips.get(job.job_id) != reason:
+            raise ValueError("job skip is not exactly approved")
+        updated = self._updated_entry(
+            entry,
+            state="skipped",
+            exception_class=None,
+            message=None,
+            traceback_path=None,
+            recovery=None,
+            skip_reason=reason,
+        )
+        self._replace_entry(job, updated)
+        return deepcopy(updated)
+
+    def _job(self, job_id: str) -> JobSpec:
+        if not isinstance(job_id, str) or job_id not in self._by_id:
+            raise ValueError("status job ID is not in the manifest")
+        return self._by_id[job_id]
+
+    def _require_usable(self) -> None:
+        if not self._usable:
+            raise RuntimeError("status store must be reopened after a root write failure")
+
+    def _new_entry(self, job: JobSpec) -> dict[str, object]:
+        return {
+            "state": "pending",
+            "timestamp": _utc_timestamp(),
+            "attempt": 0,
+            "result_path": job.output_relpath,
+            "exception_class": None,
+            "message": None,
+            "traceback_path": None,
+            "recovery": None,
+            "skip_reason": None,
+        }
+
+    def _updated_entry(self, entry: Mapping[str, object], **updates: object) -> dict[str, object]:
+        return {**entry, **updates, "timestamp": _utc_timestamp()}
+
+    def _replace_entry(self, job: JobSpec, entry: dict[str, object]) -> None:
+        _validate_status_entry(entry, job)
+        previous = self._entries[job.job_id]
+        self._entries[job.job_id] = entry
+        try:
+            self._persist_stage(job.stage)
+        except Exception:
+            self._entries[job.job_id] = previous
+            raise
+        try:
+            self._persist_root()
+        except Exception:
+            # The stage replacement is already durable.  Do not let this live
+            # object write a stale in-memory view over it; reopen to reconcile.
+            self._usable = False
+            raise
+
+    def _persist_all(self) -> None:
+        for stage in self._stages:
+            self._persist_stage(stage)
+        self._persist_root()
+
+    def _persist_stage(self, stage: str) -> None:
+        jobs = {
+            job.job_id: self._entries[job.job_id]
+            for job in self._manifest
+            if job.stage == stage
+        }
+        atomic_write_json(
+            self._stage_path(stage),
+            {
+                "schema_version": self._SCHEMA_VERSION,
+                "manifest_hash": self._manifest_hash,
+                "stage": stage,
+                "approved_skips": {
+                    job.job_id: self._approved_skips[job.job_id]
+                    for job in self._manifest
+                    if job.stage == stage and job.job_id in self._approved_skips
+                },
+                "jobs": jobs,
+            },
+        )
+
+    def _persist_root(self) -> None:
+        atomic_write_json(
+            self._layout.status_path,
+            {
+                "schema_version": self._SCHEMA_VERSION,
+                "manifest_hash": self._manifest_hash,
+                "approved_skips": dict(self._approved_skips),
+                "stages": self._aggregate(),
+            },
+        )
+
+    def _validate_root(self, root: object) -> dict[str, str]:
+        if not isinstance(root, dict) or set(root) != {
+            "schema_version", "manifest_hash", "approved_skips", "stages"
+        }:
+            raise ValueError("root status has an invalid schema")
+        if not _exact_int(root["schema_version"], self._SCHEMA_VERSION):
+            raise ValueError("root status schema version is invalid")
+        if root["manifest_hash"] != self._manifest_hash:
+            raise ValueError("status manifest does not match the supplied manifest")
+        persisted_skips = _validated_approved_skips(root["approved_skips"], self._by_id)
+        if not isinstance(root["stages"], dict) or set(root["stages"]) != set(self._stages):
+            raise ValueError("root status has foreign or missing stages")
+        for stage, counts in root["stages"].items():
+            _validate_stage_counts(counts, stage)
+        return persisted_skips
+
+    def _aggregate(self) -> dict[str, dict[str, int]]:
+        return {
+            stage: _stage_counts(
+                self._entries[job.job_id]
+                for job in self._manifest
+                if job.stage == stage
+            )
+            for stage in self._stages
+        }
+
+    def _load_stage_entries(self) -> tuple[dict[str, dict[str, object]], dict[str, str]]:
+        entries: dict[str, dict[str, object]] = {}
+        approvals: dict[str, str] = {}
+        for stage in self._stages:
+            payload = _read_status_json(self._stage_path(stage), f"{stage} status")
+            expected_ids = {
+                job.job_id for job in self._manifest if job.stage == stage
+            }
+            if not isinstance(payload, dict) or set(payload) != {
+                "schema_version", "manifest_hash", "stage", "approved_skips", "jobs"
+            }:
+                raise ValueError(f"{stage} status has an invalid schema")
+            if (
+                not _exact_int(payload["schema_version"], self._SCHEMA_VERSION)
+                or payload["manifest_hash"] != self._manifest_hash
+                or payload["stage"] != stage
+                or not isinstance(payload["approved_skips"], dict)
+                or not isinstance(payload["jobs"], dict)
+                or set(payload["jobs"]) != expected_ids
+            ):
+                raise ValueError(f"{stage} status is foreign or malformed")
+            for job_id, entry in payload["jobs"].items():
+                job = self._by_id[job_id]
+                _validate_status_entry(entry, job)
+                entries[job_id] = dict(entry)
+            stage_approvals = _validated_approved_skips(
+                payload["approved_skips"],
+                {job.job_id: job for job in self._manifest if job.stage == stage},
+            )
+            approvals.update(stage_approvals)
+            for job_id, entry in payload["jobs"].items():
+                if entry["state"] == "skipped" and approvals.get(job_id) != entry["skip_reason"]:
+                    raise ValueError("skipped stage status does not match approval")
+        return entries, approvals
+
+    def _stage_path(self, stage: str) -> Path:
+        return self._layout.root / stage / "status.json"
+
+    def _result_path(self, job: JobSpec) -> Path:
+        return _canonical_result_path(self._layout, job)
+
+
+def assert_stage_complete(
+    layout: RunLayout,
+    manifest: Sequence[JobSpec],
+    required_stages: Sequence[str],
+) -> CompletenessReport:
+    """Return completion only when every required manifest job is canonical.
+
+    Files that are not named by the manifest are intentionally ignored: neither
+    their presence nor their count can make a run complete.
+    """
+    issues: list[str] = []
+    required = _required_completion_stages(required_stages)
+    jobs = tuple(manifest)
+    ids = [job.job_id for job in jobs if isinstance(job, JobSpec)]
+    duplicate_ids = tuple(sorted(job_id for job_id in set(ids) if ids.count(job_id) > 1))
+    for job_id in duplicate_ids:
+        issues.append(f"duplicate manifest job ID: {job_id}")
+    for stage in required:
+        if not any(isinstance(job, JobSpec) and job.stage == stage for job in jobs):
+            issues.append(f"{stage}: no manifest jobs")
+    full_manifest_hash: str | None = None
+    try:
+        full_manifest_hash = _status_manifest_hash(_validated_status_manifest(jobs))
+    except (TypeError, ValueError) as exc:
+        issues.append(f"full manifest is invalid: {exc}")
+    unique_jobs = tuple(
+        job for index, job in enumerate(jobs)
+        if (
+            isinstance(job, JobSpec)
+            and job.stage in required
+            and job.job_id not in ids[:index]
+        )
+    )
+    entries, approvals, snapshot_issues = _read_completion_snapshot(
+        layout, unique_jobs, expected_manifest_hash=full_manifest_hash
+    )
+    issues.extend(snapshot_issues)
+
+    complete_ids: list[str] = []
+    seen: set[str] = set()
+    for job in jobs:
+        if not isinstance(job, JobSpec):
+            issues.append("manifest contains a non-JobSpec entry")
+            continue
+        if job.stage not in required or job.job_id in seen:
+            continue
+        seen.add(job.job_id)
+        entry = entries.get(job.job_id)
+        if entry is None:
+            issues.append(f"{job.job_id}: missing or invalid status")
+            continue
+        state = entry["state"]
+        if state == "skipped":
+            if approvals.get(job.job_id) == entry["skip_reason"]:
+                complete_ids.append(job.job_id)
+            else:
+                issues.append(f"{job.job_id}: unapproved skipped status")
+            continue
+        if state != "success":
+            issues.append(f"{job.job_id}: status is {state}")
+            continue
+        try:
+            read_result_record(_canonical_result_path(layout, job), job)
+        except ValueError as exc:
+            issues.append(f"{job.job_id}: invalid or foreign-protocol result: {exc}")
+            continue
+        complete_ids.append(job.job_id)
+    if issues:
+        raise IncompleteRunError(tuple(issues))
+    return CompletenessReport(tuple(required), tuple(complete_ids))
+
+
+def _validated_status_manifest(manifest: Sequence[JobSpec]) -> tuple[JobSpec, ...]:
+    if not isinstance(manifest, Sequence) or isinstance(manifest, (str, bytes)):
+        raise TypeError("status manifest must be a sequence of JobSpec entries")
+    jobs = tuple(manifest)
+    if not jobs or not all(isinstance(job, JobSpec) for job in jobs):
+        raise ValueError("status manifest must contain JobSpec entries")
+    _ensure_unique(tuple(job.job_id for job in jobs), "duplicate manifest job IDs")
+    for job in jobs:
+        _safe_identifier(job.job_id, "manifest job ID")
+        if job.stage not in _STAGE_ORDER:
+            raise ValueError("manifest job has an unknown stage")
+        _safe_relative_path(job.output_relpath, "manifest result path")
+    return jobs
+
+
+def _status_manifest_hash(manifest: Sequence[JobSpec]) -> str:
+    return canonical_hash(
+        [
+            {
+                "job_id": job.job_id,
+                "protocol_hash": job.protocol_hash,
+                "stage": job.stage,
+                "dataset_id": job.dataset_id,
+                "seed": job.seed,
+                "method": job.method,
+                "parameters": _json_safe(job.parameters),
+                "depends_on": list(job.depends_on),
+                "output_relpath": job.output_relpath,
+            }
+            for job in manifest
+        ]
+    )
+
+
+def _validated_approved_skips(
+    value: Mapping[str, str] | object,
+    jobs: Mapping[str, JobSpec],
+) -> dict[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError("approved skips must be a mapping")
+    approved: dict[str, str] = {}
+    for job_id, reason in value.items():
+        if (
+            not isinstance(job_id, str)
+            or job_id not in jobs
+            or not isinstance(reason, str)
+            or not reason.strip()
+        ):
+            raise ValueError("approved skips contain an unknown job or invalid reason")
+        approved[job_id] = reason
+    return approved
+
+
+def _read_status_json(path: Path, context: str) -> object:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{context} is not valid JSON") from exc
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds")
+
+
+def _status_attempt(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError("status attempt must be a non-negative integer")
+    return value
+
+
+def _exact_int(value: object, expected: int) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and value == expected
+
+
+def _optional_status_text(value: object, context: str) -> None:
+    if value is not None and not isinstance(value, str):
+        raise ValueError(f"status {context} is invalid")
+
+
+def _safe_relative_path(value: object, context: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{context} is invalid")
+    candidate = Path(value)
+    if (
+        candidate.is_absolute()
+        or candidate.drive
+        or candidate.root
+        or "\\" in value
+        or any(part in {"", ".", ".."} for part in candidate.parts)
+    ):
+        raise ValueError(f"{context} is invalid")
+    return value
+
+
+def _optional_status_relpath(value: object, context: str) -> None:
+    if value is not None:
+        _safe_relative_path(value, f"status {context}")
+
+
+def _validate_status_entry(entry: object, job: JobSpec) -> None:
+    if not isinstance(entry, dict) or set(entry) != StatusStore._ENTRY_KEYS:
+        raise ValueError("status entry has an invalid schema")
+    if entry["state"] not in {"pending", "running", "success", "failed", "skipped"}:
+        raise ValueError("status entry state is invalid")
+    attempt = _status_attempt(entry["attempt"])
+    if entry["result_path"] != job.output_relpath:
+        raise ValueError("status entry result path is foreign")
+    _utc_status_timestamp(entry["timestamp"], "status timestamp")
+    _optional_status_text(entry["exception_class"], "exception class")
+    _optional_status_text(entry["message"], "message")
+    _optional_status_relpath(entry["traceback_path"], "traceback path")
+    recovery = entry["recovery"]
+    if recovery is not None:
+        if not isinstance(recovery, dict) or set(recovery) != {
+            "event", "at", "previous_attempt"
+        }:
+            raise ValueError("status recovery metadata is invalid")
+        if recovery["event"] != "interrupted_recovery":
+            raise ValueError("status recovery event is invalid")
+        _utc_status_timestamp(recovery["at"], "status recovery timestamp")
+        previous_attempt = _status_attempt(recovery["previous_attempt"])
+    else:
+        previous_attempt = None
+    skip_reason = entry["skip_reason"]
+    _optional_status_text(skip_reason, "skip reason")
+    state = entry["state"]
+    if state == "skipped" and skip_reason is None:
+        raise ValueError("skipped status requires a reason")
+    if state != "skipped" and skip_reason is not None:
+        raise ValueError("non-skipped status cannot have a skip reason")
+    has_error = (
+        entry["exception_class"] is not None
+        or entry["message"] is not None
+        or entry["traceback_path"] is not None
+    )
+    if state == "pending":
+        if attempt != 0 or has_error or recovery is not None:
+            raise ValueError("pending status has invalid semantic fields")
+    elif state == "running":
+        if attempt < 1 or has_error:
+            raise ValueError("running status has invalid semantic fields")
+        if recovery is not None and (previous_attempt is None or previous_attempt < 1 or previous_attempt != attempt - 1):
+            raise ValueError("running status recovery does not match attempt")
+    elif state == "success":
+        if attempt < 1 or has_error or recovery is not None:
+            raise ValueError("success status has invalid semantic fields")
+    elif state == "failed":
+        if (
+            attempt < 1
+            or not isinstance(entry["exception_class"], str)
+            or not entry["exception_class"]
+            or not isinstance(entry["message"], str)
+            or recovery is not None
+        ):
+            raise ValueError("failed status has invalid semantic fields")
+    elif state == "skipped":
+        if attempt != 0 or has_error or recovery is not None:
+            raise ValueError("skipped status has invalid semantic fields")
+
+
+def _utc_status_timestamp(value: object, context: str) -> datetime:
+    timestamp = _result_timestamp(value, context)
+    if timestamp.utcoffset() != timedelta(0):
+        raise ValueError(f"{context} must use UTC")
+    return timestamp
+
+
+def _validate_stage_counts(value: object, stage: str) -> None:
+    expected = {"pending", "running", "success", "failed", "skipped"}
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError(f"root status aggregate for {stage} has an invalid schema")
+    for count in value.values():
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise ValueError(f"root status aggregate for {stage} is invalid")
+
+
+def _stage_counts(entries: Sequence[Mapping[str, object]] | object) -> dict[str, int]:
+    counts = {state: 0 for state in ("pending", "running", "success", "failed", "skipped")}
+    for entry in entries:  # type: ignore[union-attr]
+        state = entry["state"]
+        if state not in counts:
+            raise ValueError("status entry state is invalid")
+        counts[state] += 1
+    return counts
+
+
+def _required_completion_stages(required_stages: Sequence[str]) -> tuple[str, ...]:
+    if (
+        not isinstance(required_stages, Sequence)
+        or isinstance(required_stages, (str, bytes))
+        or not required_stages
+    ):
+        raise ValueError("required stages must be a non-empty sequence")
+    requested = tuple(required_stages)
+    if not all(isinstance(stage, str) for stage in requested):
+        raise ValueError("required stages must be strings")
+    _ensure_unique(requested, "duplicate required stages")
+    unknown = set(requested) - set(_STAGE_ORDER)
+    if unknown:
+        raise ValueError(f"unknown required stages: {sorted(unknown)}")
+    return tuple(stage for stage in _STAGE_ORDER if stage in requested)
+
+
+def _canonical_result_path(layout: RunLayout, job: JobSpec) -> Path:
+    _safe_relative_path(job.output_relpath, "manifest result path")
+    candidate = layout.root / job.output_relpath
+    try:
+        _require_within(layout.root, candidate, "result path")
+    except RuntimeError as exc:
+        raise ValueError("result path escapes the run directory") from exc
+    return candidate.resolve(strict=False)
+
+
+def _read_completion_snapshot(
+    layout: RunLayout,
+    jobs: Sequence[JobSpec],
+    *,
+    expected_manifest_hash: str | None,
+) -> tuple[dict[str, dict[str, object]], dict[str, str], list[str]]:
+    """Read the same status schema as ``StatusStore`` without mutating it."""
+    entries: dict[str, dict[str, object]] = {}
+    approvals: dict[str, str] = {}
+    issues: list[str] = []
+    if not jobs:
+        return entries, approvals, issues
+    try:
+        valid_jobs = _validated_status_manifest(jobs)
+    except (TypeError, ValueError) as exc:
+        return entries, approvals, [f"manifest status validation failed: {exc}"]
+    by_id = {job.job_id: job for job in valid_jobs}
+    stages = tuple(dict.fromkeys(job.stage for job in valid_jobs))
+    manifest_hash: str | None = None
+    root: object | None = None
+    if not layout.status_path.exists():
+        issues.append("root status is missing")
+    else:
+        try:
+            root = _read_status_json(layout.status_path, "root status")
+            if not isinstance(root, dict) or set(root) != {
+                "schema_version", "manifest_hash", "approved_skips", "stages"
+            }:
+                raise ValueError("root status has an invalid schema")
+            if not _exact_int(root["schema_version"], StatusStore._SCHEMA_VERSION):
+                raise ValueError("root status schema version is invalid")
+            if not isinstance(root["manifest_hash"], str) or not root["manifest_hash"]:
+                raise ValueError("root status manifest is invalid")
+            manifest_hash = root["manifest_hash"]
+            if (
+                expected_manifest_hash is not None
+                and manifest_hash != expected_manifest_hash
+            ):
+                raise ValueError("root status manifest does not match full manifest")
+            if not isinstance(root["stages"], dict) or not set(stages).issubset(root["stages"]):
+                raise ValueError("root status has foreign or missing stages")
+            for stage in stages:
+                _validate_stage_counts(root["stages"][stage], stage)
+            if not isinstance(root["approved_skips"], dict):
+                raise ValueError("root status approved skips are invalid")
+            approvals = _validated_approved_skips(
+                {
+                    job_id: reason
+                    for job_id, reason in root["approved_skips"].items()
+                    if job_id in by_id
+                },
+                by_id,
+            )
+        except ValueError as exc:
+            issues.append(f"root status is invalid: {exc}")
+            root = None
+    stage_approvals: dict[str, str] = {}
+    for stage in stages:
+        path = layout.root / stage / "status.json"
+        if not path.exists():
+            issues.append(f"{stage} status is missing")
+            continue
+        try:
+            payload = _read_status_json(path, f"{stage} status")
+            expected_ids = {job.job_id for job in valid_jobs if job.stage == stage}
+            if not isinstance(payload, dict) or set(payload) != {
+                "schema_version", "manifest_hash", "stage", "approved_skips", "jobs"
+            }:
+                raise ValueError("invalid schema")
+            if (
+                not _exact_int(payload["schema_version"], StatusStore._SCHEMA_VERSION)
+                or not isinstance(payload["manifest_hash"], str)
+                or (manifest_hash is not None and payload["manifest_hash"] != manifest_hash)
+                or (
+                    expected_manifest_hash is not None
+                    and payload["manifest_hash"] != expected_manifest_hash
+                )
+                or payload["stage"] != stage
+                or not isinstance(payload["jobs"], dict)
+                or set(payload["jobs"]) != expected_ids
+            ):
+                raise ValueError("foreign or malformed")
+            local_approvals = _validated_approved_skips(
+                payload["approved_skips"],
+                {job.job_id: job for job in valid_jobs if job.stage == stage},
+            )
+            for job_id, entry in payload["jobs"].items():
+                try:
+                    _validate_status_entry(entry, by_id[job_id])
+                    if (
+                        entry["state"] == "skipped"
+                        and local_approvals.get(job_id) != entry["skip_reason"]
+                    ):
+                        raise ValueError("skipped entry is not exactly approved")
+                    entries[job_id] = dict(entry)
+                except ValueError as exc:
+                    issues.append(f"{job_id}: status is invalid: {exc}")
+            stage_approvals.update(local_approvals)
+        except ValueError as exc:
+            issues.append(f"{stage} status is invalid: {exc}")
+    if root is not None:
+        if approvals != stage_approvals:
+            issues.append("root and stage approved skips do not match")
+        aggregate = {
+            stage: _stage_counts(
+                entries[job.job_id]
+                for job in valid_jobs
+                if job.stage == stage and job.job_id in entries
+            )
+            for stage in stages
+        }
+        for stage, counts in aggregate.items():
+            if root["stages"][stage] != counts:
+                issues.append("root status aggregate does not match stage status")
+                break
+    return entries, stage_approvals, issues
 
 
 def _manifest_stages(stages: tuple[str, ...]) -> tuple[str, ...]:
