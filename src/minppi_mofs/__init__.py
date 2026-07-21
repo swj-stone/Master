@@ -7,8 +7,8 @@ A Voting-Game Approach that synthesises:
 - **Min operator** (inspired by MinShap): min over coalitions instead of mean
 - **MinPPI NSGA-II**: multi-objective evolutionary search with MinPPI-guided
   mutation and crossover operators
-- **ShapG integration**: correlation-graph importance signal used for
-  adversarial search guidance (Algorithm B)
+- **MI-correlation guidance**: mutual-information ranking plus a weighted
+  correlation tree for adversarial search (Algorithm B)
 
 Public API
 ----------
@@ -69,13 +69,21 @@ from minppi_mofs.min_ppi import (  # noqa: E402
     estimate_minppi,
     estimate_minppi_exact,
     estimate_minppi_hybrid,
+    estimate_minppi_mi_correlation_guided,
     estimate_minppi_random_mc,
     estimate_minppi_mi_guided,
     make_shared_coalition_plan,
 )
 from minppi_mofs.shapg_integration import (  # noqa: E402
+    build_guidance_from_data,
+    build_mi_correlation_guidance,
     compute_mi_guidance_signal,
+    filter_top_by_mi,
+    filter_top_by_shapg,
+    get_correlation_neighbors,
     get_correlated_neighbors,
+    rank_by_mi,
+    rank_by_shapg,
 )
 from minppi_mofs.data_protocol import DataSplit, prepare_split  # noqa: E402
 from minppi_mofs.utility import compute_utility  # noqa: E402
@@ -92,12 +100,21 @@ __all__ = [
     "estimate_minppi",
     "estimate_minppi_exact",
     "estimate_minppi_random_mc",
+    "estimate_minppi_mi_correlation_guided",
     "estimate_minppi_mi_guided",
     "estimate_minppi_hybrid",
     "make_shared_coalition_plan",
-    # shapg_integration
+    # MI-correlation guidance
     "compute_mi_guidance_signal",
+    "get_correlation_neighbors",
+    "build_mi_correlation_guidance",
+    "rank_by_mi",
+    "filter_top_by_mi",
+    # deprecated guidance aliases
     "get_correlated_neighbors",
+    "build_guidance_from_data",
+    "rank_by_shapg",
+    "filter_top_by_shapg",
     # data_protocol
     "DataSplit",
     "prepare_split",

@@ -284,7 +284,7 @@ def _compute_alg_b_data() -> dict:
     winning = _make_winning_set_example_2()
     v_alpha = _make_v_alpha_harmful(winning)
 
-    # ShapG proxy correlation matrix
+    # Weighted correlation matrix used by Algorithm B
     W_demo = np.array(
         [
             [0.00, 0.40, 0.50, 0.10, 0.10],
@@ -559,7 +559,7 @@ def _make_figure_3(alg_data: dict, save_path: Path) -> None:
         color="#2ca02c",
         linewidth=1.5,
         markersize=5,
-        label="Algorithm B (ShapG-guided)",
+        label="Algorithm B (MI-correlation-guided)",
     )
     ax1.plot(
         K_vals,
@@ -615,7 +615,7 @@ def _make_figure_3(alg_data: dict, save_path: Path) -> None:
     ax2.set_ylabel("Detection rate")
     ax2.set_ylim(-0.05, 1.10)
     ax2.legend(loc="upper right", framealpha=0.9, fontsize=7)
-    ax2.set_title("(b) Robustness to ShapG $W$ noise", fontsize=10)
+    ax2.set_title("(b) Robustness to correlation-weight noise", fontsize=10)
     ax2.grid(True, alpha=0.3)
 
     plt.suptitle(
@@ -793,7 +793,7 @@ def _make_table_2(alg_data: dict, save_path: Path) -> None:
 
     plt.suptitle(
         "Table 2: Algorithm A (random MC) vs"
-        " Algorithm B (ShapG-guided adversarial search)",
+        " Algorithm B (MI-correlation-guided adversarial search)",
         fontsize=10,
         y=1.03,
     )

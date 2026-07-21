@@ -15,6 +15,7 @@ from __future__ import annotations
 import networkx as nx
 import numpy as np
 import pandas as pd
+import pytest
 
 from minppi_mofs.baselines.shapg import (
     _corr_matrix,
@@ -36,16 +37,14 @@ class TestGraphSpanningTreeInvariants:
         G = build_feature_graph(X, corr_method="pearson")
         assert nx.is_connected(G), "Graph must be connected"
 
-    def test_edge_count_at_least_n_minus_1(self) -> None:
-        """A connected graph on n nodes needs at least n-1 edges.
-        The MST algorithm may include cycle edges if they appear before
-        the last successful union, so edge count ≥ n-1."""
+    def test_edge_count_equals_n_minus_1(self) -> None:
+        """A strict spanning tree on n nodes has exactly n-1 edges."""
         rng = np.random.default_rng(43)
         X = pd.DataFrame({f"f{i}": rng.normal(0, 1, 200) for i in range(8)})
         G = build_feature_graph(X, corr_method="pearson")
         n = X.shape[1]
-        assert G.number_of_edges() >= n - 1, (
-            f"Graph has {G.number_of_edges()} edges with {n} nodes — not enough for connectivity"
+        assert G.number_of_edges() == n - 1, (
+            f"Graph has {G.number_of_edges()} edges with {n} nodes; expected {n - 1}"
         )
 
     def test_no_isolated_nodes(self) -> None:
@@ -94,6 +93,49 @@ class TestGraphDeterminism:
         assert set(G.nodes()) == set(cols)
 
 
+class TestGraphWeights:
+    """Accepted MST edges retain their absolute correlation strength."""
+
+    def test_networkx_weights_match_reduced_matrix(self) -> None:
+        rng = np.random.default_rng(52)
+        n = 160
+        base = rng.normal(0, 1, n)
+        X = pd.DataFrame({
+            "strong": base,
+            "strong_copy": 0.9 * base + rng.normal(0, 0.1, n),
+            "medium": 0.5 * base + rng.normal(0, 0.7, n),
+            "noise": rng.normal(0, 1, n),
+        })
+        W = _corr_matrix(X)
+        adj, red = _create_minimal_edge_graph(W)
+        G = build_feature_graph(X)
+
+        expected_edges = {
+            frozenset((left, right))
+            for left in X.columns
+            for right in X.columns
+            if left < right and adj.loc[left, right] == 1
+        }
+        actual_edges = {frozenset((left, right)) for left, right in G.edges()}
+        assert actual_edges == expected_edges
+        for left, right, data in G.edges(data=True):
+            assert data["weight"] == pytest.approx(red.loc[left, right])
+        assert any(data["weight"] != 1.0 for _, _, data in G.edges(data=True))
+
+    def test_zero_weight_tree_edges_are_preserved(self) -> None:
+        X = pd.DataFrame({
+            "a": np.ones(20),
+            "b": np.ones(20),
+            "c": np.ones(20),
+        })
+
+        G = build_feature_graph(X)
+
+        assert nx.is_tree(G)
+        assert G.number_of_edges() == 2
+        assert all(data["weight"] == 0.0 for _, _, data in G.edges(data=True))
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Edge semantics — strong correlations appear as edges
 # ═══════════════════════════════════════════════════════════════════════════
@@ -139,6 +181,8 @@ class TestMinimalEdgeGraphAdjacency:
         # Build a graph from the adjacency and check it's connected
         G = nx.Graph(adj)
         assert nx.is_connected(G), "adjacency-based graph not connected"
+        assert nx.is_tree(G), "minimal-edge adjacency must not contain cycles"
+        assert G.number_of_edges() == len(X.columns) - 1
 
         # Redundancy-weight matrix mirrors adjacency (edges are the same)
         edge_mask = adj.values > 0

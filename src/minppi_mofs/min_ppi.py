@@ -20,13 +20,14 @@ Usage::
 
     from minppi_mofs.min_ppi import estimate_minppi
     minppi = estimate_minppi(X_train, X_val, y_train, y_val, alpha=0.95,
-                              method="mi_guided", seed=42)
+                              method="mi_correlation_guided", seed=42)
     # minppi: dict {feature_name: minppi_value}  (values ∈ {-1, 0, +1})
 """
 
 from __future__ import annotations
 
 import itertools
+import warnings
 from typing import Optional, Sequence
 
 import numpy as np
@@ -161,7 +162,8 @@ def estimate_minppi_exact(
     if n > 20:
         raise ValueError(
             f"Exact enumeration requires n ≤ 20, got {n}. "
-            f"Use estimate_minppi with method='random_mc' or 'mi_guided'."
+            "Use estimate_minppi with method='random_mc' or "
+            "'mi_correlation_guided'."
         )
 
     if verbose:
@@ -354,11 +356,11 @@ def estimate_minppi_random_mc(
 
 
 # ---------------------------------------------------------------------------
-# Algorithm B — MI-Guided Adversarial Search (§4.3.2)
+# Algorithm B — MI-Correlation-Guided Adversarial Search (§4.3.2)
 # ---------------------------------------------------------------------------
 
 
-def estimate_minppi_mi_guided(
+def estimate_minppi_mi_correlation_guided(
     X_train: pd.DataFrame,
     X_val: pd.DataFrame,
     y_train: np.ndarray,
@@ -367,18 +369,18 @@ def estimate_minppi_mi_guided(
     alpha: float = 0.95,
     task: str = "binary",
     K_adv: int = 30,
-    shapg_neighbors: Optional[dict[str, list[str]]] = None,
-    shapg_scores: Optional[dict[str, float]] = None,
+    correlation_neighbors: Optional[dict[str, list[str]]] = None,
+    mi_scores: Optional[dict[str, float]] = None,
     utility: Optional[str] = None,
     acc_cache: Optional[AccFullCache] = None,
     seed: int = 42,
     verbose: bool = False,
 ) -> dict[str, int]:
-    """Estimate MinPPI via MI-guided adversarial search (Algorithm B).
+    """Estimate MinPPI via MI-correlation-guided search (Algorithm B).
 
     For each feature *i*:
 
-    1. Identifies correlated neighbours C from the ShapG correlation graph.
+    1. Identifies correlated neighbours C from a weighted correlation tree.
     2. Constructs a seed coalition S_seed that includes C (the context where
        *i* is most likely to be redundant).
     3. Perturbs S_seed *K_adv* times, evaluating v_alpha margins.
@@ -395,10 +397,10 @@ def estimate_minppi_mi_guided(
         y_val: Validation target.
         alpha: Quota parameter.
         K_adv: Adversarial search budget per feature.
-        shapg_neighbors: Pre-computed ShapG neighbor dict
+        correlation_neighbors: Pre-computed correlation-neighbor dict
             ``{feature: [neighbor_features, ...]}`` sorted by correlation.
             If None, falls back to random MC (Algorithm A).
-        shapg_scores: ShapG importance scores ``{feature: value}``.
+        mi_scores: Mutual-information scores ``{feature: value}``.
             Used to construct the seed coalition. If None, uses uniform.
         acc_cache: Optional pre-built accuracy cache.
         seed: Random seed.
@@ -420,19 +422,21 @@ def estimate_minppi_mi_guided(
     all_features = set(features)
     minppi: dict[str, int] = {}
 
-    # Build seed coalition: top features by ShapG score (or uniform)
-    if shapg_scores is not None:
-        top_order = sorted(shapg_scores.items(), key=lambda kv: kv[1], reverse=True)
+    # Build seed coalition: top features by MI score (or uniform)
+    if mi_scores is not None:
+        top_order = sorted(mi_scores.items(), key=lambda kv: kv[1], reverse=True)
         top_half = [f for f, _ in top_order[: max(1, n // 2)]]
     else:
         top_half = list(features)
 
     if verbose:
         n_neighbors = (
-            sum(len(v) for v in shapg_neighbors.values()) if shapg_neighbors else 0
+            sum(len(v) for v in correlation_neighbors.values())
+            if correlation_neighbors else 0
         )
         print(
-            f"  Algorithm B (ShapG-guided): K_adv={K_adv}, {n} features, "
+            f"  Algorithm B (MI-correlation-guided): K_adv={K_adv}, "
+            f"{n} features, "
             f"neighbors={n_neighbors}",
             flush=True,
         )
@@ -441,8 +445,8 @@ def estimate_minppi_mi_guided(
         best_marg = 1
 
         # Build seed context: include correlated neighbors when available
-        if shapg_neighbors and feat in shapg_neighbors:
-            correlated = shapg_neighbors.get(feat, [])
+        if correlation_neighbors and feat in correlation_neighbors:
+            correlated = correlation_neighbors.get(feat, [])
             # Build S_seed: features correlated with feat + top-scored features
             seed_core = set(correlated[: min(10, len(correlated))])
             # Pad to a reasonable coalition size with top features
@@ -494,6 +498,73 @@ def estimate_minppi_mi_guided(
     return minppi
 
 
+def estimate_minppi_mi_guided(
+    X_train: pd.DataFrame,
+    X_val: pd.DataFrame,
+    y_train: np.ndarray,
+    y_val: np.ndarray,
+    *,
+    alpha: float = 0.95,
+    task: str = "binary",
+    K_adv: int = 30,
+    shapg_neighbors: Optional[dict[str, list[str]]] = None,
+    shapg_scores: Optional[dict[str, float]] = None,
+    utility: Optional[str] = None,
+    acc_cache: Optional[AccFullCache] = None,
+    seed: int = 42,
+    verbose: bool = False,
+) -> dict[str, int]:
+    """Deprecated wrapper for MI-correlation-guided Algorithm B."""
+    warnings.warn(
+        "estimate_minppi_mi_guided is deprecated; use "
+        "estimate_minppi_mi_correlation_guided",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return estimate_minppi_mi_correlation_guided(
+        X_train,
+        X_val,
+        y_train,
+        y_val,
+        alpha=alpha,
+        task=task,
+        K_adv=K_adv,
+        correlation_neighbors=shapg_neighbors,
+        mi_scores=shapg_scores,
+        utility=utility,
+        acc_cache=acc_cache,
+        seed=seed,
+        verbose=verbose,
+    )
+
+
+def _resolve_guidance_aliases(
+    correlation_neighbors: Optional[dict[str, list[str]]],
+    mi_scores: Optional[dict[str, float]],
+    shapg_neighbors: Optional[dict[str, list[str]]],
+    shapg_scores: Optional[dict[str, float]],
+) -> tuple[Optional[dict[str, list[str]]], Optional[dict[str, float]]]:
+    """Resolve deprecated ShapG-labelled parameters into canonical names."""
+    if correlation_neighbors is not None and shapg_neighbors is not None:
+        raise ValueError(
+            "Do not provide both correlation_neighbors and shapg_neighbors"
+        )
+    if mi_scores is not None and shapg_scores is not None:
+        raise ValueError("Do not provide both mi_scores and shapg_scores")
+    if shapg_neighbors is not None or shapg_scores is not None:
+        warnings.warn(
+            "shapg_neighbors/shapg_scores are deprecated; use "
+            "correlation_neighbors/mi_scores",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+    return (
+        correlation_neighbors
+        if correlation_neighbors is not None else shapg_neighbors,
+        mi_scores if mi_scores is not None else shapg_scores,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Hybrid dispatcher (§4.3.3)
 # ---------------------------------------------------------------------------
@@ -510,6 +581,8 @@ def estimate_minppi_hybrid(
     K: int = 200,
     K_adv: int = 30,
     shared_coalitions: bool = False,
+    correlation_neighbors: Optional[dict[str, list[str]]] = None,
+    mi_scores: Optional[dict[str, float]] = None,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
     utility: Optional[str] = None,
@@ -522,7 +595,7 @@ def estimate_minppi_hybrid(
     Dispatches based on feature count *n*:
 
     - n ≤ 20: exact enumeration
-    - 20 < n ≤ 75: Algorithm B (ShapG-guided), fallback to Algorithm A
+    - 20 < n ≤ 75: Algorithm B (MI-correlation-guided), fallback to Algorithm A
     - n > 75: Algorithm A + Algorithm B, take the min of both estimates
 
     Args:
@@ -534,8 +607,10 @@ def estimate_minppi_hybrid(
         K: Random MC budget (Algorithm A).
         K_adv: Adversarial search budget (Algorithm B).
         shared_coalitions: Forwarded to Algorithm A.
-        shapg_neighbors: ShapG neighbor dict for Algorithm B.
-        shapg_scores: ShapG scores for seed construction.
+        correlation_neighbors: Correlation-neighbor dict for Algorithm B.
+        mi_scores: MI scores for seed construction.
+        shapg_neighbors: Deprecated alias for ``correlation_neighbors``.
+        shapg_scores: Deprecated alias for ``mi_scores``.
         acc_cache: Optional pre-built accuracy cache.
         seed: Random seed.
         verbose: Print progress.
@@ -543,6 +618,12 @@ def estimate_minppi_hybrid(
     Returns:
         Dict ``{feature_name: minppi}`` (values ∈ {-1, 0, +1}).
     """
+    correlation_neighbors, mi_scores = _resolve_guidance_aliases(
+        correlation_neighbors,
+        mi_scores,
+        shapg_neighbors,
+        shapg_scores,
+    )
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
             X_train, X_val, y_train, y_val, task=task, seed=seed, utility=utility,
@@ -562,10 +643,10 @@ def estimate_minppi_hybrid(
     if n <= 75:
         if verbose:
             print(f"  Hybrid: 20 < n={n} ≤ 75 → Algorithm B", flush=True)
-        if shapg_neighbors is None:
+        if correlation_neighbors is None:
             if verbose:
                 print(
-                    "  No ShapG neighbors available → fallback to Algorithm A",
+                    "  No correlation neighbors available → fallback to Algorithm A",
                     flush=True,
                 )
             return estimate_minppi_random_mc(
@@ -574,10 +655,10 @@ def estimate_minppi_hybrid(
                 shared_coalitions=shared_coalitions, acc_cache=acc_cache,
                 seed=seed, verbose=verbose,
             )
-        return estimate_minppi_mi_guided(
+        return estimate_minppi_mi_correlation_guided(
             X_train, X_val, y_train, y_val,
             alpha=alpha, task=task, utility=utility, K_adv=K_adv,
-            shapg_neighbors=shapg_neighbors, shapg_scores=shapg_scores,
+            correlation_neighbors=correlation_neighbors, mi_scores=mi_scores,
             acc_cache=acc_cache, seed=seed, verbose=verbose,
         )
 
@@ -593,11 +674,11 @@ def estimate_minppi_hybrid(
     )
 
     minppi_b: dict[str, int] = {}
-    if shapg_neighbors is not None:
-        minppi_b = estimate_minppi_mi_guided(
+    if correlation_neighbors is not None:
+        minppi_b = estimate_minppi_mi_correlation_guided(
             X_train, X_val, y_train, y_val,
             alpha=alpha, task=task, utility=utility, K_adv=K_adv,
-            shapg_neighbors=shapg_neighbors, shapg_scores=shapg_scores,
+            correlation_neighbors=correlation_neighbors, mi_scores=mi_scores,
             acc_cache=acc_cache, seed=seed, verbose=False,
         )
 
@@ -631,6 +712,8 @@ def estimate_minppi(
     K: int = 200,
     K_adv: int = 30,
     shared_coalitions: bool = False,
+    correlation_neighbors: Optional[dict[str, list[str]]] = None,
+    mi_scores: Optional[dict[str, float]] = None,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
     utility: Optional[str] = None,
@@ -653,13 +736,16 @@ def estimate_minppi(
 
             - ``"exact"`` — enumerate all coalitions (n ≤ 20 only)
             - ``"random_mc"`` — Algorithm A, random MC sampling
-            - ``"mi_guided"`` — Algorithm B, MI-guided adversarial search
+            - ``"mi_correlation_guided"`` — Algorithm B,
+              MI-correlation-guided adversarial search
             - ``"hybrid"`` — auto-select based on *n* (§4.3.3, default)
         K: Number of random samples per feature (Algorithm A).
         K_adv: Adversarial search budget per feature (Algorithm B).
         shared_coalitions: Forwarded to Algorithm A (shared-coalition mode).
-        shapg_neighbors: ShapG neighbour dict for Algorithm B.
-        shapg_scores: ShapG scores for seed coalition construction.
+        correlation_neighbors: Correlation-neighbor dict for Algorithm B.
+        mi_scores: MI scores for seed coalition construction.
+        shapg_neighbors: Deprecated alias for ``correlation_neighbors``.
+        shapg_scores: Deprecated alias for ``mi_scores``.
         seed: Random seed.
         verbose: Print progress.
 
@@ -673,10 +759,19 @@ def estimate_minppi(
         >>> harmful = {f for f, v in minppi.items() if v == -1}
         >>> decisive = {f for f, v in minppi.items() if v == +1}
     """
+    if method == "mi_guided":
+        warnings.warn(
+            "method='mi_guided' is deprecated; use "
+            "method='mi_correlation_guided'",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        method = "mi_correlation_guided"
+
     methods = {
         "exact": estimate_minppi_exact,
         "random_mc": estimate_minppi_random_mc,
-        "mi_guided": estimate_minppi_mi_guided,
+        "mi_correlation_guided": estimate_minppi_mi_correlation_guided,
         "hybrid": estimate_minppi_hybrid,
     }
 
@@ -684,6 +779,13 @@ def estimate_minppi(
         raise ValueError(
             f"Unknown method '{method}'. Choose from {sorted(methods.keys())}."
         )
+
+    correlation_neighbors, mi_scores = _resolve_guidance_aliases(
+        correlation_neighbors,
+        mi_scores,
+        shapg_neighbors,
+        shapg_scores,
+    )
 
     # Build acc_cache once and reuse
     acc_cache = make_acc_full_cache(
@@ -707,24 +809,23 @@ def estimate_minppi(
 
     if method == "exact":
         return fn(**common)  # type: ignore[call-arg]
-    elif method == "random_mc":
+    if method == "random_mc":
         return fn(K=K, shared_coalitions=shared_coalitions, **common)  # type: ignore[call-arg]
-    elif method == "mi_guided":
+    if method == "mi_correlation_guided":
         return fn(
             K_adv=K_adv,
-            shapg_neighbors=shapg_neighbors,
-            shapg_scores=shapg_scores,
+            correlation_neighbors=correlation_neighbors,
+            mi_scores=mi_scores,
             **common,
         )  # type: ignore[call-arg]
-    else:  # hybrid
-        return fn(
-            K=K,
-            K_adv=K_adv,
-            shared_coalitions=shared_coalitions,
-            shapg_neighbors=shapg_neighbors,
-            shapg_scores=shapg_scores,
-            **common,
-        )  # type: ignore[call-arg]
+    return fn(
+        K=K,
+        K_adv=K_adv,
+        shared_coalitions=shared_coalitions,
+        correlation_neighbors=correlation_neighbors,
+        mi_scores=mi_scores,
+        **common,
+    )  # type: ignore[call-arg]
 
 
 # ---------------------------------------------------------------------------

@@ -53,7 +53,7 @@ from minppi_mofs.min_ppi import (
     estimate_minppi,
     estimate_minppi_random_mc,
 )
-from minppi_mofs.shapg_integration import build_guidance_from_data
+from minppi_mofs.shapg_integration import build_mi_correlation_guidance
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -303,11 +303,10 @@ def run_c1_removal(
                 task=task,
             )
         else:
-            sg_scores, sg_neighbors = build_guidance_from_data(
+            mi_scores, correlation_neighbors = build_mi_correlation_guidance(
                 X_tr,
                 y_tr.values,
-                depth=1,
-                m=5,
+                task=task,
                 seed=seed,
             )
             minppi = estimate_minppi(
@@ -316,10 +315,10 @@ def run_c1_removal(
                 y_tr.values,
                 y_val.values,
                 alpha=alpha,
-                method="mi_guided",
+                method="mi_correlation_guided",
                 K_adv=budget["K_adv"],
-                shapg_neighbors=sg_neighbors,
-                shapg_scores=sg_scores,
+                correlation_neighbors=correlation_neighbors,
+                mi_scores=mi_scores,
                 seed=seed,
                 verbose=False,
                 task=task,
@@ -513,11 +512,10 @@ def run_c2_ground_truth(
             )
 
             # ---- MinPPI ----
-            sg_scores, sg_neighbors = build_guidance_from_data(
+            mi_scores, correlation_neighbors = build_mi_correlation_guidance(
                 X_tr,
                 y_tr.values,
-                depth=1,
-                m=5,
+                task=task,
                 seed=seed,
             )
             minppi = estimate_minppi(
@@ -526,10 +524,10 @@ def run_c2_ground_truth(
                 y_tr.values,
                 y_val.values,
                 alpha=alpha,
-                method="mi_guided",
+                method="mi_correlation_guided",
                 K_adv=budget["K_adv"],
-                shapg_neighbors=sg_neighbors,
-                shapg_scores=sg_scores,
+                correlation_neighbors=correlation_neighbors,
+                mi_scores=mi_scores,
                 seed=seed,
                 verbose=False,
                 task=task,
@@ -672,11 +670,10 @@ def run_c8_minshap_vs_minppi(
                     task=task,
                 )
             else:
-                sg_scores, sg_neighbors = build_guidance_from_data(
+                mi_scores, correlation_neighbors = build_mi_correlation_guidance(
                     X_tr,
                     y_tr.values,
-                    depth=1,
-                    m=5,
+                    task=task,
                     seed=seed,
                 )
                 minppi = estimate_minppi(
@@ -685,10 +682,10 @@ def run_c8_minshap_vs_minppi(
                     y_tr.values,
                     y_val.values,
                     alpha=alpha,
-                    method="mi_guided",
+                    method="mi_correlation_guided",
                     K_adv=budget["K_adv"],
-                    shapg_neighbors=sg_neighbors,
-                    shapg_scores=sg_scores,
+                    correlation_neighbors=correlation_neighbors,
+                    mi_scores=mi_scores,
                     seed=seed,
                     verbose=False,
                     task=task,

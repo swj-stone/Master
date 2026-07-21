@@ -1,27 +1,30 @@
-"""
-ShapG integration for MinPPI guidance (§4.3.2).
+"""MI-correlation guidance for MinPPI Algorithm B (§4.3.2).
 
-Fast redesign (2026-07-07): the original ``compute_mi_guidance_signal``
-called the full ShapG pipeline (graph build → enumerate 2^{d}-subsets per
-node → XGBoost per subset).  For a 56-feature dataset that took **276 s**
-— dwarfing MinPPI's 39 s.  The replacement uses:
+The guidance signal has two explicitly separate components:
 
-1. **Mutual-information scores** (sklearn, O(np)) for seed-coalition ranking
-   — same role as the old ShapG scores, ~1000× faster.
-2. **Pearson-correlation neighbours** (unchanged) via the minimal-edge graph
-   for ``shapg_neighbors`` in Algorithm B.
+1. **Mutual-information scores** for seed-coalition ranking.
+2. **Weighted correlation-tree neighbours** for local coalition contexts.
+
+This lightweight heuristic is distinct from the full ShapG baseline.  Legacy
+ShapG-labelled helper names remain only as deprecated compatibility wrappers.
 
 Usage::
 
     from minppi_mofs.shapg_integration import (
+        build_mi_correlation_guidance,
         compute_mi_guidance_signal,
-        get_correlated_neighbors,
+        get_correlation_neighbors,
     )
-    signal = compute_mi_guidance_signal(X, y, seed=42)
-    neighbors = get_correlated_neighbors(X, top_k=10, seed=42)
+    signal = compute_mi_guidance_signal(X, y, task="binary", seed=42)
+    neighbors = get_correlation_neighbors(X, top_k=10, seed=42)
+    signal, neighbors = build_mi_correlation_guidance(
+        X, y, task="binary", top_k=10, seed=42
+    )
 """
 
 from __future__ import annotations
+
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -39,33 +42,42 @@ def compute_mi_guidance_signal(
     X: pd.DataFrame,
     y: np.ndarray,
     *,
-    depth: int = 1,
-    m: int = 5,
+    task: str,
+    depth: int | None = None,
+    m: int | None = None,
     seed: int = 42,
     verbose: bool = False,
 ) -> dict[str, float]:
     """Compute feature-importance scores for seed-coalition construction.
 
-    Uses mutual information (classification) or MI-regression — O(np),
-    ~1000× faster than the original ShapG pipeline with identical utility
-    for Algorithm B's seed-coalition heuristic.
+    Uses mutual information for classification or regression as the ranking
+    signal in Algorithm B's seed-coalition heuristic.
 
     Args:
         X: Feature DataFrame.
         y: Target array.
-        depth: Ignored (kept for API compatibility).
-        m: Ignored.
+        task: One of ``"binary"``, ``"multiclass"``, or ``"regression"``.
+        depth: Deprecated compatibility keyword; ignored.
+        m: Deprecated compatibility keyword; ignored.
         seed: Random seed for MI computation.
         verbose: Ignored.
 
     Returns:
         Dict ``{feature_name: score}`` sorted descending.
     """
-    classes = np.unique(y)
-    if len(classes) < 2:
+    valid_tasks = {"binary", "multiclass", "regression"}
+    if task not in valid_tasks:
+        raise ValueError(f"task must be one of {sorted(valid_tasks)}, got {task!r}")
+    if depth is not None or m is not None:
+        warnings.warn(
+            "depth and m are deprecated for MI guidance and are ignored",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if len(np.unique(y)) < 2:
         return {c: 0.0 for c in X.columns}
-    if len(classes) > 20 or y.dtype.kind == "f":
-        # Regression or many-class → use regression variant
+    if task == "regression":
         mi = mutual_info_regression(X, y, random_state=seed)
     else:
         mi = mutual_info_classif(X, y, random_state=seed)
@@ -73,21 +85,20 @@ def compute_mi_guidance_signal(
     return dict(sorted(scores.items(), key=lambda kv: kv[1], reverse=True))
 
 
-def get_correlated_neighbors(
+def get_correlation_neighbors(
     X: pd.DataFrame,
     *,
     top_k: int = 10,
     corr_method: str = "pearson",
     seed: int = 42,
 ) -> dict[str, list[str]]:
-    """Get ShapG-correlated neighbours for each feature.
+    """Get correlation-graph neighbours for each feature.
 
-    Builds the same correlation graph used by ShapG and returns, per feature,
-    a list of its neighbours sorted by decreasing edge weight (the ShapG
-    minimal-edge graph's adjacency).
+    Builds a maximum-weight correlation tree and returns, per feature, a list
+    of its neighbours sorted by decreasing edge weight.
 
-    This is the ``shapg_neighbors`` argument consumed by
-    :func:`~minppi_mofs.min_ppi.estimate_minppi_mi_guided` (Algorithm B).
+    This is the ``correlation_neighbors`` argument consumed by
+    :func:`~minppi_mofs.min_ppi.estimate_minppi_mi_correlation_guided`.
 
     Args:
         X: Feature DataFrame.
@@ -119,23 +130,42 @@ def get_correlated_neighbors(
     return neighbors
 
 
-def build_guidance_from_data(
+def get_correlated_neighbors(
+    X: pd.DataFrame,
+    *,
+    top_k: int = 10,
+    corr_method: str = "pearson",
+    seed: int = 42,
+) -> dict[str, list[str]]:
+    """Deprecated alias for :func:`get_correlation_neighbors`."""
+    warnings.warn(
+        "get_correlated_neighbors is deprecated; use get_correlation_neighbors",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return get_correlation_neighbors(
+        X,
+        top_k=top_k,
+        corr_method=corr_method,
+        seed=seed,
+    )
+
+
+def build_mi_correlation_guidance(
     X: pd.DataFrame,
     y: np.ndarray,
     *,
-    depth: int = 1,
-    m: int = 5,
+    task: str,
     top_k: int = 10,
     seed: int = 42,
     verbose: bool = False,
 ) -> tuple[dict[str, float], dict[str, list[str]]]:
-    """Compute both fast-MI scores and correlation neighbours in one call.
+    """Compute MI scores and weighted correlation-tree neighbours.
 
     Args:
         X: Feature DataFrame.
         y: Target array.
-        depth: Ignored (API compat).
-        m: Ignored.
+        task: One of ``"binary"``, ``"multiclass"``, or ``"regression"``.
         top_k: Max neighbours to return per feature.
         seed: Random seed.
         verbose: Ignored.
@@ -143,9 +173,46 @@ def build_guidance_from_data(
     Returns:
         Tuple ``(scores, neighbors)``.
     """
-    scores = compute_mi_guidance_signal(X, y, depth=depth, m=m, seed=seed)
-    neighbors = get_correlated_neighbors(X, top_k=top_k, seed=seed)
+    scores = compute_mi_guidance_signal(X, y, task=task, seed=seed)
+    neighbors = get_correlation_neighbors(X, top_k=top_k, seed=seed)
     return scores, neighbors
+
+
+def _infer_legacy_task(y: np.ndarray) -> str:
+    """Best-effort task inference used only by deprecated wrappers."""
+    if y.dtype.kind == "f":
+        return "regression"
+    return "binary" if len(np.unique(y)) <= 2 else "multiclass"
+
+
+def build_guidance_from_data(
+    X: pd.DataFrame,
+    y: np.ndarray,
+    *,
+    task: str | None = None,
+    depth: int = 1,
+    m: int = 5,
+    top_k: int = 10,
+    seed: int = 42,
+    verbose: bool = False,
+) -> tuple[dict[str, float], dict[str, list[str]]]:
+    """Deprecated alias for :func:`build_mi_correlation_guidance`."""
+    del depth, m
+    warnings.warn(
+        "build_guidance_from_data is deprecated; "
+        "use build_mi_correlation_guidance",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    resolved_task = task if task is not None else _infer_legacy_task(y)
+    return build_mi_correlation_guidance(
+        X,
+        y,
+        task=resolved_task,
+        top_k=top_k,
+        seed=seed,
+        verbose=verbose,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +220,7 @@ def build_guidance_from_data(
 # ---------------------------------------------------------------------------
 
 
-def rank_by_shapg(
+def rank_by_mi(
     scores: dict[str, float],
 ) -> list[tuple[str, float]]:
     """Rank features by score (descending).
@@ -167,13 +234,24 @@ def rank_by_shapg(
     return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
 
 
-def filter_top_by_shapg(
+def rank_by_shapg(
+    scores: dict[str, float],
+) -> list[tuple[str, float]]:
+    """Deprecated alias for :func:`rank_by_mi`."""
+    warnings.warn(
+        "rank_by_shapg is deprecated; use rank_by_mi",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return rank_by_mi(scores)
+
+
+def filter_top_by_mi(
     X: pd.DataFrame,
     y: np.ndarray,
     *,
+    task: str,
     top_k: int = 50,
-    depth: int = 1,
-    m: int = 5,
     seed: int = 42,
 ) -> list[str]:
     """Return the top-k MI-ranked features.
@@ -185,16 +263,42 @@ def filter_top_by_shapg(
         X: Feature DataFrame.
         y: Target array.
         top_k: Number of features to retain.
-        depth: Ignored.
-        m: Ignored.
+        task: One of ``"binary"``, ``"multiclass"``, or ``"regression"``.
         seed: Random seed.
 
     Returns:
         List of top-k feature names in descending MI-score order.
     """
-    scores = compute_mi_guidance_signal(X, y, depth=depth, m=m, seed=seed)
-    ranked = rank_by_shapg(scores)
+    scores = compute_mi_guidance_signal(X, y, task=task, seed=seed)
+    ranked = rank_by_mi(scores)
     return [f for f, _ in ranked[:top_k]]
+
+
+def filter_top_by_shapg(
+    X: pd.DataFrame,
+    y: np.ndarray,
+    *,
+    task: str | None = None,
+    top_k: int = 50,
+    depth: int = 1,
+    m: int = 5,
+    seed: int = 42,
+) -> list[str]:
+    """Deprecated alias for :func:`filter_top_by_mi`."""
+    del depth, m
+    warnings.warn(
+        "filter_top_by_shapg is deprecated; use filter_top_by_mi",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    resolved_task = task if task is not None else _infer_legacy_task(y)
+    return filter_top_by_mi(
+        X,
+        y,
+        task=resolved_task,
+        top_k=top_k,
+        seed=seed,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +310,7 @@ if __name__ == "__main__":
     def _demo_banner(t: str) -> None:
         print("\n" + "=" * 72 + "\n" + t + "\n" + "=" * 72)
 
-    _demo_banner("ShapG Integration (fast MI) — synthetic demo")
+    _demo_banner("MI-correlation guidance — synthetic demo")
 
     rng = np.random.default_rng(42)
     n_samp = 200
@@ -222,12 +326,17 @@ if __name__ == "__main__":
     X_demo["f2"] = X_demo["f0"] * 0.8 + rng.normal(0, 0.3, n_samp)
     y_demo = np.where(X_demo["f0"] + 0.1 * X_demo["f1"] > 0, 1, 0)
 
-    scores = compute_mi_guidance_signal(X_demo, y_demo, depth=1, m=2, verbose=True)
+    scores = compute_mi_guidance_signal(
+        X_demo,
+        y_demo,
+        task="binary",
+        verbose=True,
+    )
     print("\nMI-based feature scores:")
     for feat, val in scores.items():
         print(f"  {feat}: {val:.6f}")
 
-    neighbors = get_correlated_neighbors(X_demo, top_k=5)
+    neighbors = get_correlation_neighbors(X_demo, top_k=5)
     print("\nCorrelated neighbors (Pearson graph):")
     for feat, nbrs in neighbors.items():
         print(f"  {feat}: {nbrs}")

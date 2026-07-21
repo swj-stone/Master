@@ -66,7 +66,7 @@ def make_fig1_overview():
     ax.plot(K_vals, A_detect, "s-", color="gray", label="Alg. A (random MC)",
             markersize=5)
     ax.plot(K_vals, B_detect, "o-", color="#1f77b4",
-            label="Alg. B (ShapG-guided)", markersize=5)
+            label="Alg. B (MI-correlation-guided)", markersize=5)
     ax.set_xscale("log")
     ax.set_xlabel("Budget K")
     ax.set_ylabel("Detection rate")

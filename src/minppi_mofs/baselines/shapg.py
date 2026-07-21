@@ -6,7 +6,7 @@ correlation graph via local-neighbourhood approximation.  Applied to tabular
 data the pipeline is:
 
   1. Build a Kendall-tau correlation matrix over features (``matrix_generator``).
-  2. Reduce to a minimal-edge graph that preserves connectivity
+  2. Reduce to a strict maximum-weight spanning tree
      (``create_minimal_edge_graph``, version v3).
   3. Define a characteristic function  v(S) = AUC of an XGBoost classifier
      trained on feature subset S.
@@ -65,10 +65,12 @@ def _corr_matrix(X: pd.DataFrame, *, method: str = "pearson") -> pd.DataFrame:
 def _create_minimal_edge_graph(
     W: pd.DataFrame, *, reverse: bool = True
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Reduce weight matrix to minimal connected adjacency (v3 / Kruskal-like).
+    """Reduce a weight matrix to a strict spanning tree using Kruskal's rule.
 
-    Edges are processed in descending |weight| order; edge insertion stops
-    as soon as all nodes belong to a single connected component (Union-Find).
+    By default, edges are processed in descending absolute-weight order,
+    producing a maximum-weight spanning tree.  An edge is written only when
+    it joins two components, so a non-empty result has exactly ``p - 1``
+    edges and no cycles.
 
     Args:
         W: Square weight / correlation matrix.
@@ -109,10 +111,10 @@ def _create_minimal_edge_graph(
     for w, i, j in edges:
         if components == 1:
             break
-        n1, n2 = cols[i], cols[j]
-        adj.loc[n1, n2] = adj.loc[n2, n1] = 1
-        red.loc[n1, n2] = red.loc[n2, n1] = w
         if union(i, j):
+            n1, n2 = cols[i], cols[j]
+            adj.loc[n1, n2] = adj.loc[n2, n1] = 1
+            red.loc[n1, n2] = red.loc[n2, n1] = w
             components -= 1
 
     return adj, red
@@ -123,7 +125,7 @@ def build_feature_graph(
 ) -> nx.Graph:
     """Build a correlation-based feature graph from a tabular dataset.
 
-    Steps: correlation matrix → minimal-edge graph → nx.Graph.
+    Steps: correlation matrix → maximum-weight spanning tree → nx.Graph.
 
     Args:
         X: Feature DataFrame.
@@ -132,11 +134,18 @@ def build_feature_graph(
         seed: Forwarded for reproducibility (not used in deterministic v3).
 
     Returns:
-        A ``networkx.Graph`` whose nodes are feature names.
+        A weighted ``networkx.Graph`` whose nodes are feature names and whose
+        edges carry the selected absolute correlation as ``weight``.
     """
     W = _corr_matrix(X, method=corr_method)
-    adj, _ = _create_minimal_edge_graph(W)
-    G = nx.Graph(adj)
+    adj, red = _create_minimal_edge_graph(W)
+    G = nx.Graph()
+    G.add_nodes_from(X.columns)
+    columns = list(X.columns)
+    for i, left in enumerate(columns):
+        for right in columns[i + 1:]:
+            if adj.loc[left, right] == 1:
+                G.add_edge(left, right, weight=float(red.loc[left, right]))
     return G
 
 

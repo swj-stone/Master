@@ -44,7 +44,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from minppi_mofs.min_ppi import estimate_minppi, estimate_minppi_random_mc
-from minppi_mofs.shapg_integration import build_guidance_from_data
+from minppi_mofs.shapg_integration import build_mi_correlation_guidance
 from minppi_mofs.baselines.nsga2_fs import (
     _compute_hv,
     _evaluate_individual,
@@ -239,13 +239,16 @@ def main() -> None:
                     seed=seed, verbose=False, task=task,
                 )
             else:
-                sg_s, sg_n = build_guidance_from_data(X_tr, y_tr, seed=seed)
+                mi_scores, correlation_neighbors = build_mi_correlation_guidance(
+                    X_tr, y_tr, task=task, seed=seed
+                )
                 minppi = estimate_minppi(
                     X_tr, X_va, y_tr, y_va,
                     alpha=ALPHA,
-                    method="mi_guided",
+                    method="mi_correlation_guided",
                     K_adv=budget.get("K_adv", 30),
-                    shapg_neighbors=sg_n, shapg_scores=sg_s,
+                    correlation_neighbors=correlation_neighbors,
+                    mi_scores=mi_scores,
                     seed=seed, verbose=False, task=task,
                 )
             harmful = {f for f, v in minppi.items() if v == -1}

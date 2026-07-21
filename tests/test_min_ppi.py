@@ -26,6 +26,7 @@ from minppi_mofs.min_ppi import (
     estimate_minppi,
     estimate_minppi_exact,
     estimate_minppi_hybrid,
+    estimate_minppi_mi_correlation_guided,
     estimate_minppi_random_mc,
     estimate_minppi_mi_guided,
     make_shared_coalition_plan,
@@ -364,33 +365,50 @@ class TestAlgorithmA:
 
 
 # ---------------------------------------------------------------------------
-# Algorithm B — ShapG-guided adversarial search
+# Algorithm B — MI-correlation-guided adversarial search
 # ---------------------------------------------------------------------------
 
 
 class TestAlgorithmB:
-    """Algorithm B: ShapG-guided adversarial search."""
+    """Algorithm B: MI-correlation-guided adversarial search."""
 
     def test_falls_back_to_random_when_no_neighbors(
         self, small_data, acc_cache
     ) -> None:
-        """Without shapg_neighbors, Algorithm B should not crash."""
+        """Without correlation neighbors, Algorithm B should not crash."""
         X_tr, X_val, y_tr, y_val = small_data
-        minppi = estimate_minppi_mi_guided(
+        minppi = estimate_minppi_mi_correlation_guided(
             X_tr,
             X_val,
             y_tr,
             y_val,
             alpha=0.90,
             K_adv=20,
-            shapg_neighbors=None,
-            shapg_scores=None,
+            correlation_neighbors=None,
+            mi_scores=None,
             acc_cache=acc_cache,
             seed=42,
         )
         assert len(minppi) == 5
         for val in minppi.values():
             assert val in {-1, 0, +1}
+
+    def test_legacy_estimator_warns(self, small_data, acc_cache) -> None:
+        X_tr, X_val, y_tr, y_val = small_data
+
+        with pytest.warns(DeprecationWarning, match="mi_correlation_guided"):
+            estimate_minppi_mi_guided(
+                X_tr,
+                X_val,
+                y_tr,
+                y_val,
+                alpha=0.90,
+                K_adv=2,
+                shapg_neighbors=None,
+                shapg_scores=None,
+                acc_cache=acc_cache,
+                seed=42,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -475,6 +493,63 @@ class TestMinppiStats:
 
 class TestEstimateMinppiAPI:
     """Main entry-point routing."""
+
+    def test_canonical_guidance_method_routes(self, small_data) -> None:
+        X_tr, X_val, y_tr, y_val = small_data
+        neighbors = {feature: [] for feature in X_tr.columns}
+        scores = {feature: float(i) for i, feature in enumerate(X_tr.columns)}
+
+        result = estimate_minppi(
+            X_tr,
+            X_val,
+            y_tr,
+            y_val,
+            alpha=0.90,
+            method="mi_correlation_guided",
+            K_adv=2,
+            correlation_neighbors=neighbors,
+            mi_scores=scores,
+            seed=42,
+        )
+
+        assert set(result) == set(X_tr.columns)
+
+    def test_legacy_method_and_parameters_warn(self, small_data) -> None:
+        X_tr, X_val, y_tr, y_val = small_data
+        neighbors = {feature: [] for feature in X_tr.columns}
+        scores = {feature: float(i) for i, feature in enumerate(X_tr.columns)}
+
+        with pytest.warns(DeprecationWarning):
+            result = estimate_minppi(
+                X_tr,
+                X_val,
+                y_tr,
+                y_val,
+                alpha=0.90,
+                method="mi_guided",
+                K_adv=2,
+                shapg_neighbors=neighbors,
+                shapg_scores=scores,
+                seed=42,
+            )
+
+        assert set(result) == set(X_tr.columns)
+
+    def test_rejects_canonical_and_legacy_guidance_together(
+        self, small_data,
+    ) -> None:
+        X_tr, X_val, y_tr, y_val = small_data
+
+        with pytest.raises(ValueError, match="both"):
+            estimate_minppi(
+                X_tr,
+                X_val,
+                y_tr,
+                y_val,
+                method="mi_correlation_guided",
+                correlation_neighbors={},
+                shapg_neighbors={},
+            )
 
     def test_unknown_method_raises(self, small_data) -> None:
         X_tr, X_val, y_tr, y_val = small_data
