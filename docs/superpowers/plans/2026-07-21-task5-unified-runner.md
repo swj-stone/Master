@@ -40,7 +40,7 @@
 - Produces: `canonical_hash(value) -> str`
 - Consumes: existing YAML files and CLI seed/backend overrides
 
-- [ ] **Step 1: Write failing configuration tests**
+- [x] **Step 1: Write failing configuration tests**
 
 Add tests that create a temporary global config plus two dataset configs and assert the exact merged fields:
 
@@ -65,7 +65,7 @@ def test_load_resolved_protocol_merges_global_and_dataset_configs(tmp_path):
 
 Also test unknown global keys, missing target, invalid task/utility pairs, duplicate IDs, alpha outside `(0, 1]`, a nonpositive budget, seed duplication, and a hypervolume reference point other than the frozen two-number list `[1.1, 1.1]`.
 
-- [ ] **Step 2: Run the tests and confirm the missing API failure**
+- [x] **Step 2: Run the tests and confirm the missing API failure**
 
 Run:
 
@@ -75,7 +75,7 @@ Run:
 
 Expected: collection fails because `minppi_mofs.experiment_protocol` does not exist.
 
-- [ ] **Step 3: Add immutable protocol value objects and strict validation**
+- [x] **Step 3: Add immutable protocol value objects and strict validation**
 
 Implement these public shapes:
 
@@ -144,7 +144,7 @@ def canonical_hash(value: object) -> str:
 
 Do not add Pydantic or another dependency.  Reject unknown keys explicitly so a misspelled budget cannot be ignored.
 
-- [ ] **Step 4: Normalize the eight YAML files**
+- [x] **Step 4: Normalize the eight YAML files**
 
 The global file must contain these top-level keys and frozen formal defaults:
 
@@ -207,7 +207,7 @@ split:
 
 Use `ovr_auc` for ISOLET and `r2` for Crimedata/Abalone.  Preserve dataset-specific raw paths, targets, variance thresholds, and feature caps from the current files.
 
-- [ ] **Step 5: Run focused and regression checks**
+- [x] **Step 5: Run focused and regression checks**
 
 Run:
 

@@ -1,34 +1,16 @@
-# Preprocessing configuration for ISOLET (OpenML, originally UCI)
-# Dataset: 617 features, 7797 samples, 26-class classification (letter speech)
-
 dataset:
-  name: "ISOLET"
-  source: "openml"
-  openml_name: "isolet"
-  openml_version: 1
-  n_features: 617
-  n_samples: 7797
-  classes: 26
-  target_name: "letter"
-
-paths:
-  raw_dir: "data/raw"
-  processed_dir: "data/processed"
-  raw_filename: "isolet.csv"
-  file_prefix: "isolet"
-
-feature_engineering:
-  drop_duplicates: true
-  variance_threshold: 0.005
-  max_features: 100000
+  id: isolet
+  display_name: ISOLET
+  raw_path: data/raw/isolet.csv
+  target: letter
+  task: multiclass
+  utility: ovr_auc
 
 preprocessing:
-  standardize: true
-  shuffle: true
+  max_features: 100
+  variance_threshold: 0.005
 
 split:
-  feature_seed: 42
-  seeds: [42, 123, 456, 789, 1024]
-  test_size: 0.2
-  val_size: 0.25
-  stratify: true
+  train_frac: 0.64
+  val_frac: 0.16
+  test_frac: 0.20

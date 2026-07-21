@@ -1,33 +1,16 @@
-# Preprocessing configuration for Abalone (regression).
-# Raw: 8 features, 4177 rows.  Target = Rings (continuous R²).
-# Source: Vector-s-Lab repo mirror.
-
 dataset:
-  name: "Abalone"
-  source: "url"
-  url: "https://raw.githubusercontent.com/Vector-s-Lab/LinearRegression/main/data/abalone_processing.csv"
-  n_features: 8
-  n_samples: 4177
-  target_name: "Rings"
-
-paths:
-  raw_dir: "data/raw"
-  processed_dir: "data/processed"
-  raw_filename: "abalone.csv"
-  file_prefix: "abalone"
-
-feature_engineering:
-  drop_duplicates: true
-  variance_threshold: 0.0
-  max_features: 100000
+  id: abalone
+  display_name: Abalone
+  raw_path: data/raw/abalone.csv
+  target: Rings
+  task: regression
+  utility: r2
 
 preprocessing:
-  standardize: true
-  shuffle: true
+  max_features: 100
+  variance_threshold: 0.0
 
 split:
-  feature_seed: 42
-  seeds: [42, 123, 456, 789, 1024]
-  test_size: 0.2
-  val_size: 0.25
-  # Continuous target – no stratification for regression.
+  train_frac: 0.64
+  val_frac: 0.16
+  test_frac: 0.20
