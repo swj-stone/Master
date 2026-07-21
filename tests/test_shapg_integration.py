@@ -2,7 +2,7 @@
 Tests for ``minppi_mofs.shapg_integration`` — ShapG guidance signal and neighbours.
 
 Covers:
-- compute_shapg_guidance_signal returns valid scores for all features
+- compute_mi_guidance_signal returns valid scores for all features
 - get_correlated_neighbors structure integrity
 - build_guidance_from_data returns both
 - filter_top_by_shapg count correctness
@@ -21,7 +21,7 @@ import pytest
 
 from minppi_mofs.shapg_integration import (
     build_guidance_from_data,
-    compute_shapg_guidance_signal,
+    compute_mi_guidance_signal,
     filter_top_by_shapg,
     get_correlated_neighbors,
     rank_by_shapg,
@@ -46,7 +46,7 @@ def toy_data() -> tuple[pd.DataFrame, np.ndarray]:
 
 
 # ---------------------------------------------------------------------------
-# compute_shapg_guidance_signal
+# compute_mi_guidance_signal
 # ---------------------------------------------------------------------------
 
 
@@ -55,7 +55,7 @@ class TestComputeShapgGuidanceSignal:
 
     def test_returns_dict_with_all_features(self, toy_data) -> None:
         X, y = toy_data
-        scores = compute_shapg_guidance_signal(X, y, depth=1, m=5, seed=42)
+        scores = compute_mi_guidance_signal(X, y, depth=1, m=5, seed=42)
         assert isinstance(scores, dict)
         assert len(scores) == 10
         for col in X.columns:
@@ -63,14 +63,14 @@ class TestComputeShapgGuidanceSignal:
 
     def test_scores_are_numeric(self, toy_data) -> None:
         X, y = toy_data
-        scores = compute_shapg_guidance_signal(X, y, depth=1, m=5, seed=42)
+        scores = compute_mi_guidance_signal(X, y, depth=1, m=5, seed=42)
         for val in scores.values():
             assert isinstance(val, (int, float))
             assert not np.isnan(val)
 
     def test_descending_order(self, toy_data) -> None:
         X, y = toy_data
-        scores = compute_shapg_guidance_signal(X, y, depth=1, m=5, seed=42)
+        scores = compute_mi_guidance_signal(X, y, depth=1, m=5, seed=42)
         items = list(scores.items())
         for i in range(len(items) - 1):
             assert items[i][1] >= items[i + 1][1], (
@@ -79,16 +79,16 @@ class TestComputeShapgGuidanceSignal:
 
     def test_seed_reproducibility(self, toy_data) -> None:
         X, y = toy_data
-        s1 = compute_shapg_guidance_signal(X, y, depth=1, m=5, seed=42)
-        s2 = compute_shapg_guidance_signal(X, y, depth=1, m=5, seed=42)
+        s1 = compute_mi_guidance_signal(X, y, depth=1, m=5, seed=42)
+        s2 = compute_mi_guidance_signal(X, y, depth=1, m=5, seed=42)
         for f in X.columns:
             assert s1[f] == pytest.approx(s2[f])
 
     def test_different_seed_gives_different(self, toy_data) -> None:
         """Different seeds may produce different scores (but similar ranking)."""
         X, y = toy_data
-        s1 = compute_shapg_guidance_signal(X, y, depth=1, m=5, seed=42)
-        s2 = compute_shapg_guidance_signal(X, y, depth=1, m=5, seed=123)
+        s1 = compute_mi_guidance_signal(X, y, depth=1, m=5, seed=42)
+        s2 = compute_mi_guidance_signal(X, y, depth=1, m=5, seed=123)
         # At least the top feature should be among top-3 in both
         top_f1 = next(iter(s1))
         top3_f2 = list(s2.keys())[:3]
@@ -183,14 +183,14 @@ class TestRankByShapg:
 
     def test_descending_order(self, toy_data) -> None:
         X, y = toy_data
-        scores = compute_shapg_guidance_signal(X, y, seed=42)
+        scores = compute_mi_guidance_signal(X, y, seed=42)
         ranked = rank_by_shapg(scores)
         for i in range(len(ranked) - 1):
             assert ranked[i][1] >= ranked[i + 1][1]
 
     def test_returns_tuples(self, toy_data) -> None:
         X, y = toy_data
-        scores = compute_shapg_guidance_signal(X, y, seed=42)
+        scores = compute_mi_guidance_signal(X, y, seed=42)
         ranked = rank_by_shapg(scores)
         assert all(isinstance(r, tuple) and len(r) == 2 for r in ranked)
 

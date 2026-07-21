@@ -279,7 +279,7 @@ def main() -> None:
                         y_tr,
                         y_val,
                         alpha=alpha,
-                        method="shapg_guided",
+                        method="mi_guided",
                         K_adv=budget["K_adv"],
                         shapg_neighbors=sg_neighbors,
                         shapg_scores=sg_scores,

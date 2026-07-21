@@ -1,7 +1,7 @@
 """
 ShapG integration for MinPPI guidance (§4.3.2).
 
-Fast redesign (2026-07-07): the original ``compute_shapg_guidance_signal``
+Fast redesign (2026-07-07): the original ``compute_mi_guidance_signal``
 called the full ShapG pipeline (graph build → enumerate 2^{d}-subsets per
 node → XGBoost per subset).  For a 56-feature dataset that took **276 s**
 — dwarfing MinPPI's 39 s.  The replacement uses:
@@ -14,10 +14,10 @@ node → XGBoost per subset).  For a 56-feature dataset that took **276 s**
 Usage::
 
     from minppi_mofs.shapg_integration import (
-        compute_shapg_guidance_signal,
+        compute_mi_guidance_signal,
         get_correlated_neighbors,
     )
-    signal = compute_shapg_guidance_signal(X, y, seed=42)
+    signal = compute_mi_guidance_signal(X, y, seed=42)
     neighbors = get_correlated_neighbors(X, top_k=10, seed=42)
 """
 
@@ -35,7 +35,7 @@ from minppi_mofs.baselines.shapg import build_feature_graph
 # ---------------------------------------------------------------------------
 
 
-def compute_shapg_guidance_signal(
+def compute_mi_guidance_signal(
     X: pd.DataFrame,
     y: np.ndarray,
     *,
@@ -87,7 +87,7 @@ def get_correlated_neighbors(
     minimal-edge graph's adjacency).
 
     This is the ``shapg_neighbors`` argument consumed by
-    :func:`~minppi_mofs.min_ppi.estimate_minppi_shapg_guided` (Algorithm B).
+    :func:`~minppi_mofs.min_ppi.estimate_minppi_mi_guided` (Algorithm B).
 
     Args:
         X: Feature DataFrame.
@@ -143,7 +143,7 @@ def build_guidance_from_data(
     Returns:
         Tuple ``(scores, neighbors)``.
     """
-    scores = compute_shapg_guidance_signal(X, y, depth=depth, m=m, seed=seed)
+    scores = compute_mi_guidance_signal(X, y, depth=depth, m=m, seed=seed)
     neighbors = get_correlated_neighbors(X, top_k=top_k, seed=seed)
     return scores, neighbors
 
@@ -192,7 +192,7 @@ def filter_top_by_shapg(
     Returns:
         List of top-k feature names in descending MI-score order.
     """
-    scores = compute_shapg_guidance_signal(X, y, depth=depth, m=m, seed=seed)
+    scores = compute_mi_guidance_signal(X, y, depth=depth, m=m, seed=seed)
     ranked = rank_by_shapg(scores)
     return [f for f, _ in ranked[:top_k]]
 
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     X_demo["f2"] = X_demo["f0"] * 0.8 + rng.normal(0, 0.3, n_samp)
     y_demo = np.where(X_demo["f0"] + 0.1 * X_demo["f1"] > 0, 1, 0)
 
-    scores = compute_shapg_guidance_signal(X_demo, y_demo, depth=1, m=2, verbose=True)
+    scores = compute_mi_guidance_signal(X_demo, y_demo, depth=1, m=2, verbose=True)
     print("\nMI-based feature scores:")
     for feat, val in scores.items():
         print(f"  {feat}: {val:.6f}")

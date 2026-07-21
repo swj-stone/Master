@@ -68,10 +68,10 @@ from minppi_mofs.min_ppi import (  # noqa: E402
     estimate_minppi_exact,
     estimate_minppi_hybrid,
     estimate_minppi_random_mc,
-    estimate_minppi_shapg_guided,
+    estimate_minppi_mi_guided,
 )
 from minppi_mofs.shapg_integration import (  # noqa: E402
-    compute_shapg_guidance_signal,
+    compute_mi_guidance_signal,
     get_correlated_neighbors,
 )
 from minppi_mofs.data_protocol import DataSplit, prepare_split  # noqa: E402
@@ -87,10 +87,10 @@ __all__ = [
     "estimate_minppi",
     "estimate_minppi_exact",
     "estimate_minppi_random_mc",
-    "estimate_minppi_shapg_guided",
+    "estimate_minppi_mi_guided",
     "estimate_minppi_hybrid",
     # shapg_integration
-    "compute_shapg_guidance_signal",
+    "compute_mi_guidance_signal",
     "get_correlated_neighbors",
     # data_protocol
     "DataSplit",

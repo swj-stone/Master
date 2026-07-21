@@ -243,7 +243,7 @@ def main() -> None:
                 minppi = estimate_minppi(
                     X_tr, X_va, y_tr, y_va,
                     alpha=ALPHA,
-                    method="shapg_guided",
+                    method="mi_guided",
                     K_adv=budget.get("K_adv", 30),
                     shapg_neighbors=sg_n, shapg_scores=sg_s,
                     seed=seed, verbose=False, task=task,

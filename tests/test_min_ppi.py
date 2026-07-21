@@ -27,7 +27,7 @@ from minppi_mofs.min_ppi import (
     estimate_minppi_exact,
     estimate_minppi_hybrid,
     estimate_minppi_random_mc,
-    estimate_minppi_shapg_guided,
+    estimate_minppi_mi_guided,
     minppi_stats,
 )
 from minppi_mofs.voting_game import make_acc_full_cache
@@ -254,7 +254,7 @@ class TestAlgorithmB:
     ) -> None:
         """Without shapg_neighbors, Algorithm B should not crash."""
         X_tr, X_val, y_tr, y_val = small_data
-        minppi = estimate_minppi_shapg_guided(
+        minppi = estimate_minppi_mi_guided(
             X_tr,
             X_val,
             y_tr,

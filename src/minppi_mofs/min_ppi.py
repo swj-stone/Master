@@ -7,7 +7,7 @@ Provides three estimation strategies for the Min-Marginal Power Index:
 2. **Algorithm A — Random MC** (§4.3.1): sample K random coalitions, take min.
    Upward biased (sample min ≥ population min).  Proposition 1 gives the
    concentration bound for harmful detection.
-3. **Algorithm B — ShapG-Guided Adversarial Search** (§4.3.2): use the ShapG
+3. **Algorithm B — MI-Guided Adversarial Search** (§4.3.2): use MI-guided
    correlation graph to find the coalitions where feature *i* is most likely
    to be harmful, then adversarially search them.
 
@@ -20,7 +20,7 @@ Usage::
 
     from minppi_mofs.min_ppi import estimate_minppi
     minppi = estimate_minppi(X_train, X_val, y_train, y_val, alpha=0.95,
-                              method="shapg_guided", seed=42)
+                              method="mi_guided", seed=42)
     # minppi: dict {feature_name: minppi_value}  (values ∈ {-1, 0, +1})
 """
 
@@ -83,7 +83,7 @@ def estimate_minppi_exact(
     if n > 20:
         raise ValueError(
             f"Exact enumeration requires n ≤ 20, got {n}. "
-            f"Use estimate_minppi with method='random_mc' or 'shapg_guided'."
+            f"Use estimate_minppi with method='random_mc' or 'mi_guided'."
         )
 
     if verbose:
@@ -281,11 +281,11 @@ def estimate_minppi_random_mc(
 
 
 # ---------------------------------------------------------------------------
-# Algorithm B — ShapG-Guided Adversarial Search (§4.3.2)
+# Algorithm B — MI-Guided Adversarial Search (§4.3.2)
 # ---------------------------------------------------------------------------
 
 
-def estimate_minppi_shapg_guided(
+def estimate_minppi_mi_guided(
     X_train: pd.DataFrame,
     X_val: pd.DataFrame,
     y_train: np.ndarray,
@@ -301,7 +301,7 @@ def estimate_minppi_shapg_guided(
     seed: int = 42,
     verbose: bool = False,
 ) -> dict[str, int]:
-    """Estimate MinPPI via ShapG-guided adversarial search (Algorithm B).
+    """Estimate MinPPI via MI-guided adversarial search (Algorithm B).
 
     For each feature *i*:
 
@@ -501,7 +501,7 @@ def estimate_minppi_hybrid(
                 shared_coalitions=shared_coalitions, acc_cache=acc_cache,
                 seed=seed, verbose=verbose,
             )
-        return estimate_minppi_shapg_guided(
+        return estimate_minppi_mi_guided(
             X_train, X_val, y_train, y_val,
             alpha=alpha, task=task, utility=utility, K_adv=K_adv,
             shapg_neighbors=shapg_neighbors, shapg_scores=shapg_scores,
@@ -521,7 +521,7 @@ def estimate_minppi_hybrid(
 
     minppi_b: dict[str, int] = {}
     if shapg_neighbors is not None:
-        minppi_b = estimate_minppi_shapg_guided(
+        minppi_b = estimate_minppi_mi_guided(
             X_train, X_val, y_train, y_val,
             alpha=alpha, task=task, utility=utility, K_adv=K_adv,
             shapg_neighbors=shapg_neighbors, shapg_scores=shapg_scores,
@@ -580,7 +580,7 @@ def estimate_minppi(
 
             - ``"exact"`` — enumerate all coalitions (n ≤ 20 only)
             - ``"random_mc"`` — Algorithm A, random MC sampling
-            - ``"shapg_guided"`` — Algorithm B, ShapG-guided adversarial search
+            - ``"mi_guided"`` — Algorithm B, MI-guided adversarial search
             - ``"hybrid"`` — auto-select based on *n* (§4.3.3, default)
         K: Number of random samples per feature (Algorithm A).
         K_adv: Adversarial search budget per feature (Algorithm B).
@@ -603,7 +603,7 @@ def estimate_minppi(
     methods = {
         "exact": estimate_minppi_exact,
         "random_mc": estimate_minppi_random_mc,
-        "shapg_guided": estimate_minppi_shapg_guided,
+        "mi_guided": estimate_minppi_mi_guided,
         "hybrid": estimate_minppi_hybrid,
     }
 
@@ -636,7 +636,7 @@ def estimate_minppi(
         return fn(**common)  # type: ignore[call-arg]
     elif method == "random_mc":
         return fn(K=K, shared_coalitions=shared_coalitions, **common)  # type: ignore[call-arg]
-    elif method == "shapg_guided":
+    elif method == "mi_guided":
         return fn(
             K_adv=K_adv,
             shapg_neighbors=shapg_neighbors,
