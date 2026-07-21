@@ -48,6 +48,7 @@ def estimate_minppi_exact(
     *,
     alpha: float = 0.95,
     task: str = "binary",
+    utility: Optional[str] = None,
     acc_cache: Optional[AccFullCache] = None,
     seed: int = 42,
     verbose: bool = False,
@@ -72,12 +73,8 @@ def estimate_minppi_exact(
     """
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
-            X_train,
-            X_val,
-            y_train,
-            y_val,
-            task=task,
-            seed=seed,
+            X_train, X_val, y_train, y_val,
+            task=task, seed=seed, utility=utility,
         )
     acc_cache.set_threshold(alpha)
 
@@ -136,6 +133,7 @@ def estimate_minppi_random_mc(
     K: int = 200,
     shared_coalitions: bool = False,
     per_coalition: int = 5,
+    utility: Optional[str] = None,
     acc_cache: Optional[AccFullCache] = None,
     model_params: Optional[dict] = None,
     seed: int = 42,
@@ -181,13 +179,8 @@ def estimate_minppi_random_mc(
     rng = np.random.default_rng(seed)
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
-            X_train,
-            X_val,
-            y_train,
-            y_val,
-            task=task,
-            seed=seed,
-            model_params=model_params,
+            X_train, X_val, y_train, y_val,
+            task=task, seed=seed, utility=utility, model_params=model_params,
         )
     acc_cache.set_threshold(alpha)
 
@@ -303,6 +296,7 @@ def estimate_minppi_shapg_guided(
     K_adv: int = 30,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
+    utility: Optional[str] = None,
     acc_cache: Optional[AccFullCache] = None,
     seed: int = 42,
     verbose: bool = False,
@@ -343,12 +337,8 @@ def estimate_minppi_shapg_guided(
     rng = np.random.default_rng(seed)
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
-            X_train,
-            X_val,
-            y_train,
-            y_val,
-            task=task,
-            seed=seed,
+            X_train, X_val, y_train, y_val,
+            task=task, seed=seed, utility=utility,
         )
     acc_cache.set_threshold(alpha)
 
@@ -449,6 +439,7 @@ def estimate_minppi_hybrid(
     shared_coalitions: bool = False,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
+    utility: Optional[str] = None,
     acc_cache: Optional[AccFullCache] = None,
     seed: int = 42,
     verbose: bool = False,
@@ -480,7 +471,9 @@ def estimate_minppi_hybrid(
         Dict ``{feature_name: minppi}`` (values ∈ {-1, 0, +1}).
     """
     if acc_cache is None:
-        acc_cache = make_acc_full_cache(X_train, X_val, y_train, y_val, seed=seed)
+        acc_cache = make_acc_full_cache(
+            X_train, X_val, y_train, y_val, task=task, seed=seed, utility=utility,
+        )
 
     n = len(X_train.columns)
 
@@ -488,14 +481,9 @@ def estimate_minppi_hybrid(
         if verbose:
             print(f"  Hybrid: n={n} ≤ 20 → exact enumeration", flush=True)
         return estimate_minppi_exact(
-            X_train,
-            X_val,
-            y_train,
-            y_val,
-            alpha=alpha,
-            acc_cache=acc_cache,
-            seed=seed,
-            verbose=verbose,
+            X_train, X_val, y_train, y_val,
+            alpha=alpha, task=task, utility=utility, acc_cache=acc_cache,
+            seed=seed, verbose=verbose,
         )
 
     if n <= 75:
@@ -508,29 +496,16 @@ def estimate_minppi_hybrid(
                     flush=True,
                 )
             return estimate_minppi_random_mc(
-                X_train,
-                X_val,
-                y_train,
-                y_val,
-                alpha=alpha,
-                K=K,
-                shared_coalitions=shared_coalitions,
-                acc_cache=acc_cache,
-                seed=seed,
-                verbose=verbose,
+                X_train, X_val, y_train, y_val,
+                alpha=alpha, task=task, utility=utility, K=K,
+                shared_coalitions=shared_coalitions, acc_cache=acc_cache,
+                seed=seed, verbose=verbose,
             )
         return estimate_minppi_shapg_guided(
-            X_train,
-            X_val,
-            y_train,
-            y_val,
-            alpha=alpha,
-            K_adv=K_adv,
-            shapg_neighbors=shapg_neighbors,
-            shapg_scores=shapg_scores,
-            acc_cache=acc_cache,
-            seed=seed,
-            verbose=verbose,
+            X_train, X_val, y_train, y_val,
+            alpha=alpha, task=task, utility=utility, K_adv=K_adv,
+            shapg_neighbors=shapg_neighbors, shapg_scores=shapg_scores,
+            acc_cache=acc_cache, seed=seed, verbose=verbose,
         )
 
     # n > 75: run both and take element-wise min
@@ -538,32 +513,19 @@ def estimate_minppi_hybrid(
         print(f"  Hybrid: n={n} > 75 → Algorithm A + B combined", flush=True)
 
     minppi_a = estimate_minppi_random_mc(
-        X_train,
-        X_val,
-        y_train,
-        y_val,
-        alpha=alpha,
-        K=K,
-        shared_coalitions=shared_coalitions,
-        acc_cache=acc_cache,
-        seed=seed,
-        verbose=False,
+        X_train, X_val, y_train, y_val,
+        alpha=alpha, task=task, utility=utility, K=K,
+        shared_coalitions=shared_coalitions, acc_cache=acc_cache,
+        seed=seed, verbose=False,
     )
 
     minppi_b: dict[str, int] = {}
     if shapg_neighbors is not None:
         minppi_b = estimate_minppi_shapg_guided(
-            X_train,
-            X_val,
-            y_train,
-            y_val,
-            alpha=alpha,
-            K_adv=K_adv,
-            shapg_neighbors=shapg_neighbors,
-            shapg_scores=shapg_scores,
-            acc_cache=acc_cache,
-            seed=seed,
-            verbose=False,
+            X_train, X_val, y_train, y_val,
+            alpha=alpha, task=task, utility=utility, K_adv=K_adv,
+            shapg_neighbors=shapg_neighbors, shapg_scores=shapg_scores,
+            acc_cache=acc_cache, seed=seed, verbose=False,
         )
 
     combined: dict[str, int] = {}
@@ -598,6 +560,7 @@ def estimate_minppi(
     shared_coalitions: bool = False,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
+    utility: Optional[str] = None,
     model_params: Optional[dict] = None,
     seed: int = 42,
     verbose: bool = False,
@@ -651,13 +614,8 @@ def estimate_minppi(
 
     # Build acc_cache once and reuse
     acc_cache = make_acc_full_cache(
-        X_train,
-        X_val,
-        y_train,
-        y_val,
-        task=task,
-        seed=seed,
-        model_params=model_params,
+        X_train, X_val, y_train, y_val,
+        task=task, seed=seed, utility=utility, model_params=model_params,
     )
 
     fn = methods[method]
@@ -668,6 +626,7 @@ def estimate_minppi(
         "y_val": y_val,
         "alpha": alpha,
         "task": task,
+        "utility": utility,
         "acc_cache": acc_cache,
         "seed": seed,
         "verbose": verbose,

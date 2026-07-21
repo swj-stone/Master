@@ -74,6 +74,8 @@ from minppi_mofs.shapg_integration import (  # noqa: E402
     compute_shapg_guidance_signal,
     get_correlated_neighbors,
 )
+from minppi_mofs.data_protocol import DataSplit, prepare_split  # noqa: E402
+from minppi_mofs.utility import compute_utility  # noqa: E402
 
 __all__ = [
     # voting_game
@@ -89,4 +91,9 @@ __all__ = [
     # shapg_integration
     "compute_shapg_guidance_signal",
     "get_correlated_neighbors",
+    # data_protocol
+    "DataSplit",
+    "prepare_split",
+    # utility
+    "compute_utility",
 ]

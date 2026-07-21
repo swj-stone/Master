@@ -1,9 +1,14 @@
 """
 ISOLET utility-function ablation: accuracy-based vs OVR-AUC-based v_α.
 
-Lightweight ablation — uses reduced sampling budget (K=8, per_coalition=2)
-and lightweight XGBoost (n_estimators=5 for OVR path) to keep runtime under
-15 minutes.  Reports Jaccard similarity and saves results to CSV.
+**Fixed in Task 3**: Both conditions now use the *same* XGBoost model
+producing the *same* probability predictions.  The only difference is
+which utility metric is computed from those probabilities to decide
+whether a coalition wins.  This isolates the utility function as the
+sole independent variable.
+
+Budget: K=8 shared coalitions, per_coalition=2 (lightweight for rapid
+turnaround).  Model: XGBoost with 15 estimators, max_depth=2.
 
 Run:
     python -u experiments/e4_isolet_utility_ablation.py
@@ -19,9 +24,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
+from xgboost import XGBClassifier
 
 from minppi_mofs.min_ppi import estimate_minppi_random_mc
-from minppi_mofs.voting_game import AccFullCache
 
 K_ABLATION = 8
 PER_COALITION = 2
@@ -33,7 +38,21 @@ def _now_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 
 
-def main():
+def _eval_removal(harmful_set: set[str], X_tr: pd.DataFrame, y_tr: np.ndarray,
+                  X_te: pd.DataFrame, y_te: np.ndarray) -> float:
+    """Retrain on X_tr without harmful features, evaluate OVR-AUC on X_te."""
+    keep = [c for c in X_tr.columns if c not in harmful_set] if harmful_set \
+           else list(X_tr.columns)
+    m = XGBClassifier(
+        n_estimators=100, max_depth=4, learning_rate=0.1,
+        verbosity=0, random_state=SEED,
+    )
+    m.fit(X_tr[keep].values, y_tr)
+    proba = m.predict_proba(X_te[keep].values)
+    return float(roc_auc_score(y_te, proba, multi_class="ovr"))
+
+
+def main() -> None:
     project_root = Path(__file__).resolve().parent.parent
     processed_dir = project_root / "data" / "processed"
     run_id = _now_stamp()
@@ -50,74 +69,39 @@ def main():
 
     print(f"ISOLET seed=42: {X_tr.shape[1]} features, {n_cls} classes")
     print(f"Budget: K={K_ABLATION}, per_coalition={PER_COALITION}")
-    print(f"Evals per condition: {K_ABLATION} x (1+{PER_COALITION}) = "
-          f"{K_ABLATION * (1 + PER_COALITION)} model fits")
 
-    # ── Condition 1: Accuracy-based (current approach) ──────────────
-    # Multiclass uses LogisticRegression internally → fast (~90s).
+    # ── Condition 1: Accuracy utility ─────────────────────────────────
     print("\n[1/2] Accuracy-based MinPPI ...", flush=True)
     t0 = time.perf_counter()
     minppi_acc = estimate_minppi_random_mc(
         X_tr, X_tr, y_tr, y_tr,
         alpha=ALPHA, K=K_ABLATION,
         shared_coalitions=True, per_coalition=PER_COALITION,
-        seed=SEED, verbose=True, task="multiclass",
+        seed=SEED, verbose=True, task="multiclass", utility="accuracy",
     )
     t_acc = time.perf_counter() - t0
     harmful_acc = {f for f, v in minppi_acc.items() if v == -1}
     print(f"  Done: {len(harmful_acc)} harmful [{t_acc:.0f}s]")
 
-    # ── Condition 2: OVR-AUC-based ──────────────────────────────────
-    # Override _evaluate_subset to use OVR AUC instead of accuracy.
-    # Use lightweight XGBoost (n_estimators=5) since we only need
-    # binary threshold decisions, not precise AUC values.
-    class _OVRAUCCache(AccFullCache):
-        def _evaluate_subset(self, S, *, _seed_base=42):
-            key = tuple(sorted(S))
-            if key in self._cache:
-                return self._cache[key]
-            cols = list(S)
-            if len(cols) == 0:
-                val = 0.5
-            else:
-                import warnings
-                from xgboost import XGBClassifier
-                m = XGBClassifier(
-                    n_estimators=5, max_depth=2, learning_rate=0.3,
-                    verbosity=0, random_state=_seed_base,
-                )
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    m.fit(self._X_train[cols].values, self._y_train)
-                proba = m.predict_proba(self._X_val[cols].values)
-                val = float(roc_auc_score(self._y_val, proba,
-                                          multi_class="ovr"))
-            self._cache[key] = val
-            return val
-
-    print("\n[2/2] OVR-AUC-based MinPPI (n_estimators=5, ~10-15 min) ...",
-          flush=True)
+    # ── Condition 2: OVR-AUC utility (SAME model, different metric) ───
+    print("\n[2/2] OVR-AUC-based MinPPI ...", flush=True)
     t0 = time.perf_counter()
-    ovr_cache = _OVRAUCCache(
-        X_tr, X_tr, y_tr, y_tr, task="multiclass", seed=SEED,
-    )
     minppi_ovr = estimate_minppi_random_mc(
         X_tr, X_tr, y_tr, y_tr,
         alpha=ALPHA, K=K_ABLATION,
         shared_coalitions=True, per_coalition=PER_COALITION,
-        seed=SEED, verbose=True, task="multiclass",
-        acc_cache=ovr_cache,
+        seed=SEED, verbose=True, task="multiclass", utility="ovr_auc",
     )
     t_ovr = time.perf_counter() - t0
     harmful_ovr = {f for f, v in minppi_ovr.items() if v == -1}
     print(f"  Done: {len(harmful_ovr)} harmful [{t_ovr:.0f}s]")
 
-    # ── Comparison ──────────────────────────────────────────────────
+    # ── Comparison ────────────────────────────────────────────────────
     union = harmful_acc | harmful_ovr
     inter = harmful_acc & harmful_ovr
     jaccard = len(inter) / len(union) if union else 1.0
 
-    print(f"\n{'=' * 60}")
+    print(f"\n{'='*60}")
     print(f"  Accuracy-based: {len(harmful_acc)} harmful [{t_acc:.0f}s]")
     print(f"  OVR-AUC-based:   {len(harmful_ovr)} harmful [{t_ovr:.0f}s]")
     print(f"  Jaccard:         {jaccard:.3f}")
@@ -125,58 +109,40 @@ def main():
     print(f"  Acc-only:        {len(harmful_acc - harmful_ovr)}")
     print(f"  OVR-only:        {len(harmful_ovr - harmful_acc)}")
 
-    # ── ΔAUC comparison ─────────────────────────────────────────────
-    from xgboost import XGBClassifier
-
-    def _eval_removal(harmful_set):
-        keep = [c for c in X_tr.columns if c not in harmful_set] if harmful_set \
-               else list(X_tr.columns)
-        m = XGBClassifier(
-            n_estimators=100, max_depth=4, learning_rate=0.1,
-            verbosity=0, random_state=SEED,
-        )
-        m.fit(X_tr[keep].values, y_tr)
-        proba = m.predict_proba(X_te[keep].values)
-        return float(roc_auc_score(y_te, proba, multi_class="ovr"))
-
-    base_auc = _eval_removal(set())
-    auc_acc = _eval_removal(harmful_acc)
-    auc_ovr = _eval_removal(harmful_ovr)
+    # ── ΔAUC comparison (both evaluated with OVR-AUC) ─────────────────
+    base_auc = _eval_removal(set(), X_tr, y_tr, X_te, y_te)
+    auc_acc = _eval_removal(harmful_acc, X_tr, y_tr, X_te, y_te)
+    auc_ovr = _eval_removal(harmful_ovr, X_tr, y_tr, X_te, y_te)
     d_acc = auc_acc - base_auc
     d_ovr = auc_ovr - base_auc
 
     print(f"\n  Baseline OVR AUC:  {base_auc:.4f}")
-    print(f"  Delete acc-H:      {auc_acc:.4f}  (Delta={d_acc:+.4f})")
-    print(f"  Delete ovr-H:      {auc_ovr:.4f}  (Delta={d_ovr:+.4f})")
+    print(f"  Delete acc-H:      {auc_acc:.4f}  (Δ={d_acc:+.4f})")
+    print(f"  Delete ovr-H:      {auc_ovr:.4f}  (Δ={d_ovr:+.4f})")
 
     if jaccard >= 0.70:
         print("\n  Jaccard >= 0.7 — accuracy is a valid proxy for OVR AUC.")
     else:
         print("\n  Jaccard < 0.7 — the two utilities produce different sets.")
 
-    # ── Save results ────────────────────────────────────────────────
+    # ── Save ──────────────────────────────────────────────────────────
     rows = [
-        {
-            "dataset": "isolet", "seed": SEED, "n_features": X_tr.shape[1],
-            "n_classes": n_cls, "alpha": ALPHA,
-            "utility": "accuracy", "n_harmful": len(harmful_acc),
-            "time_s": round(t_acc, 1),
-        },
-        {
-            "dataset": "isolet", "seed": SEED, "n_features": X_tr.shape[1],
-            "n_classes": n_cls, "alpha": ALPHA,
-            "utility": "ovr_auc", "n_harmful": len(harmful_ovr),
-            "time_s": round(t_ovr, 1),
-        },
+        {"dataset": "isolet", "seed": SEED, "n_features": X_tr.shape[1],
+         "n_classes": n_cls, "alpha": ALPHA,
+         "utility": "accuracy", "n_harmful": len(harmful_acc),
+         "time_s": round(t_acc, 1)},
+        {"dataset": "isolet", "seed": SEED, "n_features": X_tr.shape[1],
+         "n_classes": n_cls, "alpha": ALPHA,
+         "utility": "ovr_auc", "n_harmful": len(harmful_ovr),
+         "time_s": round(t_ovr, 1)},
     ]
-    df = pd.DataFrame(rows)
-    df.to_csv(out_dir / "e4_isolet_utility_ablation.csv", index=False)
-    (out_dir / "metadata.json").write_text(json.dumps(
-        {"run_id": run_id, "jaccard": round(jaccard, 4),
-         "delta_auc_acc": round(d_acc, 4), "delta_auc_ovr": round(d_ovr, 4),
-         "K": K_ABLATION, "per_coalition": PER_COALITION},
-        indent=2,
-    ))
+    pd.DataFrame(rows).to_csv(out_dir / "e4_isolet_utility_ablation.csv", index=False)
+    (out_dir / "metadata.json").write_text(json.dumps({
+        "run_id": run_id, "jaccard": round(jaccard, 4),
+        "delta_auc_acc": round(d_acc, 4), "delta_auc_ovr": round(d_ovr, 4),
+        "K": K_ABLATION, "per_coalition": PER_COALITION,
+        "model": "XGBClassifier(15,2) — same for both conditions",
+    }, indent=2))
     print(f"\nSaved: {out_dir / 'e4_isolet_utility_ablation.csv'}")
 
 
