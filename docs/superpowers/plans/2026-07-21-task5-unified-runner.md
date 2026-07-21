@@ -306,7 +306,7 @@ Run focused tests, Ruff, and `python -m py_compile` for the protocol module.
 - Produces: `atomic_write_json(path, value)` and `read_result_record(path, expected_job)`
 - Consumes: the frozen `ResolvedProtocol`
 
-- [ ] **Step 1: Write failing manifest tests**
+- [x] **Step 1: Write failing manifest tests**
 
 Assert stable IDs under dictionary reordering, unique IDs, smoke-only datasets,
 and exact stage dimensions:
@@ -323,11 +323,11 @@ Add an atomic-write test that monkeypatches `os.replace` and verifies the
 temporary file and destination share a parent.  Add schema rejection tests for
 wrong job ID, protocol hash, stage, dataset, seed, method, or non-finite metric.
 
-- [ ] **Step 2: Confirm RED**
+- [x] **Step 2: Confirm RED**
 
 Run only the manifest/result tests; expect missing-symbol failures.
 
-- [ ] **Step 3: Implement canonical job and result types**
+- [x] **Step 3: Implement canonical job and result types**
 
 ```python
 @dataclass(frozen=True)
@@ -361,7 +361,7 @@ Compute `job_id` from canonical JSON of every field except `output_relpath` and
 the ID itself.  Write one JSON record per job under
 `raw_metrics/<stage>/<job_id>.json`.
 
-- [ ] **Step 4: Expand stage-specific job matrices**
+- [x] **Step 4: Expand stage-specific job matrices**
 
 Use explicit expansion rules:
 
@@ -385,7 +385,7 @@ preprocess manifest is frozen first; estimator/removal/alpha/NSGA-II manifests
 are then derived from the frozen `data_manifest.csv` and appended atomically to
 the root manifest.  Never mutate a stage manifest after its first job starts.
 
-- [ ] **Step 5: Verify Task 3**
+- [x] **Step 5: Verify Task 3**
 
 Run all protocol tests and `git diff --check`.
 

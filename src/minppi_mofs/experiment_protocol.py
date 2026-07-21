@@ -33,6 +33,27 @@ _VALID_BACKENDS = frozenset({"cpu", "cuda"})
 _VALID_ESTIMATORS = frozenset(
     {"exact", "random_mc", "mi_correlation_guided", "hybrid"}
 )
+_CANONICAL_REMOVAL_CONTROLS = (
+    "full",
+    "minppi",
+    "shap_bottom",
+    "minshap_bottom",
+    "banzhaf_bottom",
+    "random_matched",
+)
+_CANONICAL_NSGA2_VARIANTS = ("full", "minppi_prefilter")
+_STAGE_ORDER = (
+    "validate",
+    "preprocess",
+    "estimator",
+    "removal",
+    "alpha",
+    "nsga2",
+    "ablation",
+    "summarize",
+    "figures",
+)
+_RUN_LEVEL_DATASET_ID = "__run__"
 
 _GLOBAL_KEYS = frozenset(
     {
@@ -113,6 +134,37 @@ class ResolvedProtocol:
     removal: dict[str, object]
     ablations: dict[str, object]
     smoke: dict[str, object]
+
+
+@dataclass(frozen=True)
+class JobSpec:
+    """One deterministic unit of work in a frozen experiment manifest."""
+
+    job_id: str
+    protocol_hash: str
+    stage: str
+    dataset_id: str
+    seed: int
+    method: str
+    parameters: dict[str, object]
+    depends_on: tuple[str, ...]
+    output_relpath: str
+
+
+@dataclass(frozen=True)
+class ResultRecord:
+    """The complete, validated output of one manifest job."""
+
+    job_id: str
+    protocol_hash: str
+    stage: str
+    dataset_id: str
+    seed: int
+    method: str
+    metrics: dict[str, float | int | str | bool | None]
+    artifacts: dict[str, str]
+    started_at: str
+    finished_at: str
 
 
 @dataclass(frozen=True)
@@ -544,22 +596,382 @@ def _nvidia_driver_version() -> str:
     return ",".join(versions) if versions else "unavailable"
 
 
+def build_job_manifest(
+    protocol: ResolvedProtocol,
+    stages: tuple[str, ...],
+    *,
+    data_manifest: tuple[dict[str, object], ...] | list[dict[str, object]]
+    | None = None,
+) -> tuple[JobSpec, ...]:
+    """Expand selected protocol stages into a stable, immutable job sequence."""
+    requested_stages = _manifest_stages(stages)
+    selected_features = (
+        _selected_feature_counts(protocol, data_manifest)
+        if {"estimator", "ablation"}.intersection(requested_stages)
+        else None
+    )
+    protocol_hash = _protocol_hash(protocol)
+    jobs: list[JobSpec] = []
+    for stage in requested_stages:
+        if stage == "validate":
+            jobs.append(_make_job(protocol_hash, stage, _RUN_LEVEL_DATASET_ID, 0, "environment_validation", {"backend": protocol.backend}))
+        elif stage == "preprocess":
+            for dataset in protocol.datasets:
+                for seed in protocol.seeds:
+                    jobs.append(
+                        _make_job(
+                            protocol_hash,
+                            stage,
+                            dataset.dataset_id,
+                            seed,
+                            "prepare_split",
+                            _dataset_parameters(dataset),
+                        )
+                    )
+        elif stage == "estimator":
+            if selected_features is None:
+                raise AssertionError("estimator data manifest was not loaded")
+            for dataset in protocol.datasets:
+                for seed in protocol.seeds:
+                    count = selected_features[(dataset.dataset_id, seed)]
+                    for method in protocol.estimator_methods:
+                        if method == "exact" and count > protocol.exact_max_features:
+                            continue
+                        for budget in protocol.estimator_budgets:
+                            jobs.append(
+                                _make_job(
+                                    protocol_hash,
+                                    stage,
+                                    dataset.dataset_id,
+                                    seed,
+                                    method,
+                                    _dataset_parameters(dataset, budget=budget),
+                                )
+                            )
+        elif stage == "removal":
+            for dataset in protocol.datasets:
+                for seed in protocol.seeds:
+                    plan = _make_job(
+                        protocol_hash,
+                        stage,
+                        dataset.dataset_id,
+                        seed,
+                        "selection_plan",
+                        _dataset_parameters(
+                            dataset,
+                            random_repeats=protocol.removal["random_repeats"],
+                        ),
+                    )
+                    jobs.append(plan)
+                    for method in protocol.removal["controls"]:
+                        jobs.append(
+                            _make_job(
+                                protocol_hash,
+                                stage,
+                                dataset.dataset_id,
+                                seed,
+                                str(method),
+                                _dataset_parameters(dataset),
+                                depends_on=(plan.job_id,),
+                            )
+                        )
+        elif stage == "alpha":
+            for dataset in protocol.datasets:
+                for seed in protocol.seeds:
+                    plan = _make_job(
+                        protocol_hash,
+                        stage,
+                        dataset.dataset_id,
+                        seed,
+                        "selection_plan",
+                        _dataset_parameters(
+                            dataset, alpha_grid=list(protocol.alpha_grid)
+                        ),
+                    )
+                    jobs.append(plan)
+                    for alpha in protocol.alpha_grid:
+                        jobs.append(
+                            _make_job(
+                                protocol_hash,
+                                stage,
+                                dataset.dataset_id,
+                                seed,
+                                "alpha_evaluation",
+                                _dataset_parameters(dataset, alpha=alpha),
+                                depends_on=(plan.job_id,),
+                            )
+                        )
+        elif stage == "nsga2":
+            for dataset in protocol.datasets:
+                for seed in protocol.seeds:
+                    for variant in protocol.nsga2["variants"]:
+                        jobs.append(
+                            _make_job(
+                                protocol_hash,
+                                stage,
+                                dataset.dataset_id,
+                                seed,
+                                str(variant),
+                                _dataset_parameters(
+                                    dataset,
+                                    evaluations=protocol.nsga2["evaluations"],
+                                    population=protocol.nsga2["population"],
+                                    ref_point=list(protocol.nsga2["ref_point"]),
+                                ),
+                            )
+                        )
+        elif stage == "ablation":
+            if selected_features is None:
+                raise AssertionError("ablation data manifest was not loaded")
+            for dataset in protocol.datasets:
+                for seed in protocol.seeds:
+                    for axis in sorted(protocol.ablations):
+                        if axis == "utility" and dataset.dataset_id != "isolet":
+                            continue
+                        for value in protocol.ablations[axis]:
+                            if (
+                                axis == "dispatcher"
+                                and value == "exact"
+                                and selected_features[(dataset.dataset_id, seed)]
+                                > protocol.exact_max_features
+                            ):
+                                continue
+                            jobs.append(
+                                _make_job(
+                                    protocol_hash,
+                                    stage,
+                                    dataset.dataset_id,
+                                    seed,
+                                    axis,
+                                    _dataset_parameters(
+                                        dataset, axis=axis, value=value
+                                    ),
+                                )
+                            )
+        elif stage == "summarize":
+            jobs.append(_make_job(protocol_hash, stage, _RUN_LEVEL_DATASET_ID, 0, "aggregate_results", {"required_stages": _STAGE_ORDER[2:7]}))
+        elif stage == "figures":
+            jobs.append(_make_job(protocol_hash, stage, _RUN_LEVEL_DATASET_ID, 0, "generate_figures", {"required_stages": ("summarize",)}))
+    _ensure_unique(tuple(job.job_id for job in jobs), "duplicate manifest job IDs")
+    return tuple(jobs)
+
+
+def atomic_write_json(path: Path, value: object) -> None:
+    """Atomically replace *path* with finite, canonical JSON."""
+    _atomic_write_json(Path(path), value)
+
+
+def read_result_record(path: Path, expected_job: JobSpec) -> ResultRecord:
+    """Read one result record only if it exactly matches its manifest job."""
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("result record is not valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("result record must be a JSON object")
+    expected_keys = {"job_id", "protocol_hash", "stage", "dataset_id", "seed", "method", "metrics", "artifacts", "started_at", "finished_at"}
+    if set(payload) != expected_keys:
+        raise ValueError("result record has an invalid schema")
+    for field in ("job_id", "protocol_hash", "stage", "dataset_id", "seed", "method"):
+        if payload[field] != getattr(expected_job, field):
+            raise ValueError(f"result record {field} does not match manifest job")
+    _positive_or_zero_int(payload["seed"], "result record seed")
+    metrics = _result_metrics(payload["metrics"])
+    artifacts = _result_artifacts(payload["artifacts"])
+    started_at = _result_timestamp(payload["started_at"], "started_at")
+    finished_at = _result_timestamp(payload["finished_at"], "finished_at")
+    if finished_at < started_at:
+        raise ValueError("result record finished_at precedes started_at")
+    return ResultRecord(expected_job.job_id, expected_job.protocol_hash, expected_job.stage, expected_job.dataset_id, expected_job.seed, expected_job.method, metrics, artifacts, payload["started_at"], payload["finished_at"])
+
+
+def _manifest_stages(stages: tuple[str, ...]) -> tuple[str, ...]:
+    if not isinstance(stages, tuple) or not stages:
+        raise ValueError("stages must be a non-empty tuple")
+    if not all(isinstance(stage, str) for stage in stages):
+        raise ValueError("stage names must be strings")
+    if len(set(stages)) != len(stages):
+        raise ValueError("duplicate stage requested")
+    unknown = sorted(set(stages) - set(_STAGE_ORDER))
+    if unknown:
+        raise ValueError(f"unknown stage requested: {unknown}")
+    return tuple(stage for stage in _STAGE_ORDER if stage in stages)
+
+
+def _make_job(
+    protocol_hash: str,
+    stage: str,
+    dataset_id: str,
+    seed: int,
+    method: str,
+    parameters: dict[str, object],
+    *,
+    depends_on: tuple[str, ...] = (),
+) -> JobSpec:
+    canonical_parameters = _json_safe(parameters)
+    if not isinstance(canonical_parameters, dict):
+        raise TypeError("job parameters must serialize to a mapping")
+    identity = {
+        "protocol_hash": protocol_hash,
+        "stage": stage,
+        "dataset_id": dataset_id,
+        "seed": seed,
+        "method": method,
+        "parameters": canonical_parameters,
+        "depends_on": depends_on,
+    }
+    job_id = canonical_hash(identity)
+    return JobSpec(
+        job_id=job_id,
+        protocol_hash=protocol_hash,
+        stage=stage,
+        dataset_id=dataset_id,
+        seed=seed,
+        method=method,
+        parameters=canonical_parameters,
+        depends_on=depends_on,
+        output_relpath=f"raw_metrics/{stage}/{job_id}.json",
+    )
+
+
+def _dataset_parameters(
+    dataset: DatasetSpec, **parameters: object
+) -> dict[str, object]:
+    return {"task": dataset.task, "utility": dataset.utility, **parameters}
+
+
+def _selected_feature_counts(
+    protocol: ResolvedProtocol,
+    data_manifest: tuple[dict[str, object], ...] | list[dict[str, object]]
+    | None,
+) -> dict[tuple[str, int], int]:
+    if data_manifest is None or not isinstance(data_manifest, (tuple, list)):
+        raise ValueError("estimator stage requires a data_manifest")
+    expected = {
+        (dataset.dataset_id, seed)
+        for dataset in protocol.datasets
+        for seed in protocol.seeds
+    }
+    counts: dict[tuple[str, int], int] = {}
+    for index, entry in enumerate(data_manifest):
+        if not isinstance(entry, dict) or set(entry) != {
+            "dataset_id",
+            "seed",
+            "selected_feature_count",
+        }:
+            raise ValueError(f"data_manifest[{index}] has an invalid schema")
+        dataset_id = entry["dataset_id"]
+        seed = entry["seed"]
+        if not isinstance(dataset_id, str) or not dataset_id:
+            raise ValueError(f"data_manifest[{index}].dataset_id is invalid")
+        _positive_or_zero_int(seed, f"data_manifest[{index}].seed")
+        count = entry["selected_feature_count"]
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise ValueError(
+                f"data_manifest[{index}].selected_feature_count must be a positive integer"
+            )
+        key = (dataset_id, seed)
+        if key in counts:
+            raise ValueError("data_manifest contains duplicate dataset/seed rows")
+        counts[key] = count
+    if set(counts) != expected:
+        raise ValueError("data_manifest does not match the selected dataset/seed scope")
+    return counts
+
+
+def _positive_or_zero_int(value: object, context: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{context} must be a non-negative integer")
+    return value
+
+
+def _result_metrics(value: object) -> dict[str, float | int | str | bool | None]:
+    if not isinstance(value, dict) or not all(
+        isinstance(key, str) and key for key in value
+    ):
+        raise ValueError("result record metrics must be a string-keyed mapping")
+    metrics: dict[str, float | int | str | bool | None] = {}
+    for key, metric in value.items():
+        if metric is None or isinstance(metric, (str, bool)):
+            metrics[key] = metric
+        elif isinstance(metric, int):
+            metrics[key] = metric
+        elif isinstance(metric, float) and -float("inf") < metric < float("inf"):
+            metrics[key] = metric
+        else:
+            raise ValueError(f"result record metric {key!r} is invalid")
+    return metrics
+
+
+def _result_artifacts(value: object) -> dict[str, str]:
+    if not isinstance(value, dict) or not all(
+        isinstance(key, str) and key and isinstance(item, str)
+        for key, item in value.items()
+    ):
+        raise ValueError("result record artifacts must be a string mapping")
+    artifacts = dict(value)
+    for artifact in artifacts.values():
+        candidate = Path(artifact)
+        if (
+            not artifact
+            or candidate.is_absolute()
+            or candidate.drive
+            or candidate.root
+            or "\\" in artifact
+            or any(part in {"", ".", ".."} for part in candidate.parts)
+        ):
+            raise ValueError("result record artifact path is invalid")
+    return artifacts
+
+
+def _result_timestamp(value: object, context: str) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError(f"result record {context} must be an ISO timestamp")
+    try:
+        timestamp = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(
+            f"result record {context} must be an ISO timestamp"
+        ) from exc
+    if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+        raise ValueError(f"result record {context} must include a timezone")
+    return timestamp
+
+
 def _atomic_write_json(path: Path, value: object) -> None:
     _atomic_write_text(path, _json_text(value))
 
 
 def _json_text(value: object) -> str:
-    return json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    return json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n"
 
 
 def _atomic_write_text(path: Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     try:
-        temporary.write_text(value, encoding="utf-8", newline="\n")
+        with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(value)
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary, path)
+        _sync_parent_directory(path.parent)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _sync_parent_directory(parent: Path) -> None:
+    try:
+        descriptor = os.open(parent, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        try:
+            os.fsync(descriptor)
+        except OSError:
+            pass
+    finally:
+        os.close(descriptor)
 
 
 def load_resolved_protocol(
@@ -671,7 +1083,10 @@ def load_resolved_protocol(
     removal = _mapping(global_config["removal"], "removal")
     _expect_exact_keys(removal, _REMOVAL_KEYS, "removal")
     controls = _string_tuple(removal["controls"], "removal.controls")
-    _ensure_unique(controls, "duplicate removal controls")
+    if controls != _CANONICAL_REMOVAL_CONTROLS:
+        raise ValueError(
+            "removal.controls must use the canonical ordered control set"
+        )
     random_repeats = _positive_int(
         smoke_config["random_repeats"] if smoke else removal["random_repeats"],
         "removal.random_repeats",
@@ -684,7 +1099,10 @@ def load_resolved_protocol(
     nsga2 = _mapping(global_config["nsga2"], "nsga2")
     _expect_exact_keys(nsga2, _NSGA2_KEYS, "nsga2")
     variants = _string_tuple(nsga2["variants"], "nsga2.variants")
-    _ensure_unique(variants, "duplicate nsga2 variants")
+    if variants != _CANONICAL_NSGA2_VARIANTS:
+        raise ValueError(
+            "nsga2.variants must use the canonical ordered variant set"
+        )
     population = _positive_int(
         smoke_config["nsga2_population"] if smoke else nsga2["population"],
         "nsga2.population",
