@@ -468,7 +468,7 @@ runs.
 - Guarantees: stage code cannot obtain test arrays through the supported API
   without an allowed stage/reason pair
 
-- [ ] **Step 1: Write failing allowed/denied audit tests**
+- [x] **Step 1: Write failing allowed/denied audit tests**
 
 ```python
 def test_estimator_cannot_access_test(tmp_path, prepared_paths):
@@ -476,7 +476,7 @@ def test_estimator_cannot_access_test(tmp_path, prepared_paths):
         prepared_paths,
         stage="estimator",
         job_id="job-estimator",
-        audit=AuditLog(tmp_path / "protocol_audit.json"),
+        audit=AuditLog.from_manifest(tmp_path / "protocol_audit.json", manifest),
     )
     access.load_train_validation()
     with pytest.raises(TestAccessViolation):
@@ -484,7 +484,7 @@ def test_estimator_cannot_access_test(tmp_path, prepared_paths):
 
 
 def test_removal_final_evaluation_is_audited(tmp_path, prepared_paths):
-    audit = AuditLog(tmp_path / "protocol_audit.json")
+    audit = AuditLog.from_manifest(tmp_path / "protocol_audit.json", manifest)
     access = AuditedSplitAccess(
         prepared_paths, stage="removal", job_id="job-removal", audit=audit
     )
@@ -497,11 +497,11 @@ Cover alpha reason `final_alpha_grid_evaluation` and NSGA-II reason
 `final_nsga2_front_evaluation`.  All other stage/reason pairs must be denied and
 recorded.
 
-- [ ] **Step 2: Confirm RED**
+- [x] **Step 2: Confirm RED**
 
 Run the two new tests and confirm the audit classes are missing.
 
-- [ ] **Step 3: Implement immutable split paths and audit log**
+- [x] **Step 3: Implement immutable split paths and audit log**
 
 ```python
 @dataclass(frozen=True)
@@ -525,13 +525,13 @@ _ALLOWED_TEST_ACCESS = {
 records the event before returning or raising.  Use sequential atomic JSON
 rewrites; Task 5 has a single process and does not need a lock service.
 
-- [ ] **Step 4: Add audit integrity checks**
+- [x] **Step 4: Add audit integrity checks**
 
 Reject malformed events, unknown job IDs, foreign run IDs, and an allowed event
 whose reason is not in the frozen whitelist.  Completeness must fail if any
 denied event is unresolved.
 
-- [ ] **Step 5: Verify Task 5**
+- [x] **Step 5: Verify Task 5**
 
 Run protocol plus stage tests and inspect the temporary audit files through
 assertions only.

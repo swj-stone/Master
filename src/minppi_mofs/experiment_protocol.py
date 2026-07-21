@@ -13,6 +13,7 @@ import json
 import os
 import platform
 import re
+import stat
 import subprocess
 from copy import deepcopy
 from dataclasses import asdict, dataclass
@@ -23,6 +24,7 @@ from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
+import pandas as pd
 import yaml
 
 
@@ -56,6 +58,14 @@ _STAGE_ORDER = (
     "figures",
 )
 _RUN_LEVEL_DATASET_ID = "__run__"
+_ALLOWED_TEST_ACCESS = frozenset(
+    {
+        ("removal", "final_removal_evaluation"),
+        ("alpha", "final_alpha_grid_evaluation"),
+        ("nsga2", "final_nsga2_front_evaluation"),
+    }
+)
+_AUDIT_SCHEMA_VERSION = 1
 
 _GLOBAL_KEYS = frozenset(
     {
@@ -212,6 +222,477 @@ class IncompleteRunError(RuntimeError):
     def __init__(self, issues: Sequence[str]) -> None:
         self.issues = tuple(issues)
         super().__init__("incomplete run: " + "; ".join(self.issues))
+
+
+class TestAccessViolation(PermissionError):
+    """Raised when a stage attempts an unapproved test-partition read."""
+
+
+@dataclass(frozen=True)
+class PreparedSplitPaths:
+    """Immutable CSV locations for one already-prepared dataset split."""
+
+    dataset_id: str
+    seed: int
+    target: str
+    train_csv: Path
+    val_csv: Path
+    test_csv: Path
+
+    def __post_init__(self) -> None:
+        _safe_identifier(self.dataset_id, "dataset_id")
+        if isinstance(self.seed, bool) or not isinstance(self.seed, int) or self.seed < 0:
+            raise ValueError("seed must be a non-negative integer")
+        if not isinstance(self.target, str) or not self.target or "\x00" in self.target:
+            raise ValueError("target must be a non-empty CSV column name")
+        parents: set[Path] = set()
+        identities: dict[str, tuple[int, int] | None] = {}
+        for field in ("train_csv", "val_csv", "test_csv"):
+            raw_path = Path(getattr(self, field))
+            if (
+                not raw_path.name
+                or raw_path.suffix.lower() != ".csv"
+                or "\x00" in str(raw_path)
+                or ".." in raw_path.parts
+            ):
+                raise ValueError(f"{field} is not a safe path")
+            identity = _split_file_identity(raw_path, field, allow_missing=False)
+            path = raw_path.resolve()
+            parents.add(path.parent)
+            object.__setattr__(self, field, path)
+            identities[field] = identity
+        if len(parents) != 1:
+            raise ValueError("split CSV paths must share one prepared split directory")
+        existing_identities = {value for value in identities.values() if value is not None}
+        if (
+            len({self.train_csv, self.val_csv, self.test_csv}) != 3
+            or len(existing_identities)
+            != sum(value is not None for value in identities.values())
+        ):
+            raise ValueError("train, validation, and test CSV paths must be distinct")
+        object.__setattr__(self, "_identities", MappingProxyType(identities))
+
+
+class AuditLog:
+    """Append-only audit log; ``AuditLog(path)`` fails closed for test reads."""
+
+    def __init__(
+        self,
+        path: Path,
+        *,
+        run_id: str | None = None,
+    ) -> None:
+        self._path = Path(path)
+        if not self._path.name:
+            raise ValueError("audit path is invalid")
+        derived_run_id = self._path.parent.name
+        self._run_id = _safe_identifier(derived_run_id, "audit run_id")
+        if run_id is not None and _safe_identifier(run_id, "audit run_id") != self._run_id:
+            raise ValueError("audit run_id must match the audit path parent")
+        self._job_authority: Mapping[str, tuple[str, str, int]] | None = None
+        self._manifest_hash: str | None = None
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    @property
+    def run_id(self) -> str:
+        return self._run_id
+
+    @classmethod
+    def from_manifest(cls, path: Path, manifest: Sequence[JobSpec]) -> "AuditLog":
+        """Bind test access to the complete trusted manifest authority."""
+        jobs = _validated_status_manifest(manifest)
+        audit = cls(path)
+        authority = {
+            job.job_id: (job.stage, job.dataset_id, job.seed) for job in jobs
+        }
+        object.__setattr__(audit, "_job_authority", MappingProxyType(authority))
+        object.__setattr__(audit, "_manifest_hash", _status_manifest_hash(jobs))
+        return audit
+
+    def read_events(self) -> list[dict[str, object]]:
+        """Return a deep copy of all persisted events without creating a file."""
+        return deepcopy(self._read_document()["events"])
+
+    def append_test_access(
+        self,
+        *,
+        job_id: str,
+        stage: str,
+        reason: object,
+        decision: str,
+        dataset_id: str = "__audit__",
+        seed: int = 0,
+    ) -> dict[str, object]:
+        """Persist one test-access decision before the CSV can be read."""
+        _safe_identifier(job_id, "audit job_id")
+        _safe_identifier(dataset_id, "audit dataset_id")
+        _positive_or_zero_int(seed, "audit seed")
+        _audit_text(stage, "audit stage")
+        normalized_reason = _audit_reason(reason)
+        if decision not in {"allowed", "denied"}:
+            raise ValueError("audit decision is invalid")
+        document = self._read_document()
+        authority = None if self._job_authority is None else self._job_authority.get(job_id)
+        decision = (
+            "allowed"
+            if (
+                decision == "allowed"
+                and (stage, normalized_reason) in _ALLOWED_TEST_ACCESS
+                and authority == (stage, dataset_id, seed)
+            )
+            else "denied"
+        )
+        event: dict[str, object] = {
+            "event_id": uuid4().hex,
+            "event_type": "test_access",
+            "run_id": self._run_id,
+            "job_id": job_id,
+            "stage": stage,
+            "dataset_id": dataset_id,
+            "seed": seed,
+            "reason": normalized_reason,
+            "decision": decision,
+            "at": _utc_timestamp(),
+        }
+        document["events"].append(event)
+        atomic_write_json(self._path, document)
+        return deepcopy(event)
+
+    def resolve_denied(
+        self, denied_event_id: str, resolution: str
+    ) -> dict[str, object]:
+        """Append the explicit resolution of one currently unresolved denial."""
+        _safe_identifier(denied_event_id, "denied audit event ID")
+        if not isinstance(resolution, str) or not resolution.strip() or "\x00" in resolution:
+            raise ValueError("resolution must be non-empty")
+        document = self._read_document()
+        events = document["events"]
+        denied = next(
+            (
+                event
+                for event in events
+                if event["event_type"] == "test_access"
+                and event["event_id"] == denied_event_id
+                and event["decision"] == "denied"
+                and event["run_id"] == self._run_id
+            ),
+            None,
+        )
+        if denied is None:
+            raise ValueError("resolution must reference a real denied audit event")
+        if any(
+            event["event_type"] == "denied_resolution"
+            and event["denied_event_id"] == denied_event_id
+            for event in events
+        ):
+            raise ValueError("denied audit event is already resolved")
+        event: dict[str, object] = {
+            "event_id": uuid4().hex,
+            "event_type": "denied_resolution",
+            "run_id": self._run_id,
+            "denied_event_id": denied_event_id,
+            "resolution": resolution.strip(),
+            "at": _utc_timestamp(),
+        }
+        events.append(event)
+        atomic_write_json(self._path, document)
+        return deepcopy(event)
+
+    def integrity_issues(
+        self,
+        *,
+        expected_run_id: str,
+        allowed_job_ids: Sequence[str],
+        expected_job_authority: Mapping[str, tuple[str, str, int]] | None = None,
+    ) -> tuple[str, ...]:
+        """Validate the on-disk trail against trusted run and manifest identity."""
+        expected = _safe_identifier(expected_run_id, "expected audit run_id")
+        allowlist = {_safe_identifier(job_id, "manifest job ID") for job_id in allowed_job_ids}
+        authority = (
+            None
+            if expected_job_authority is None
+            else {
+                _safe_identifier(job_id, "manifest job ID"): (
+                    _audit_text(details[0], "manifest job stage"),
+                    _safe_identifier(details[1], "manifest dataset ID"),
+                    _positive_or_zero_int(details[2], "manifest seed"),
+                )
+                for job_id, details in expected_job_authority.items()
+            }
+        )
+        if authority is not None and set(authority) != allowlist:
+            raise ValueError("audit manifest authority does not match the job allowlist")
+        if not self._path.exists():
+            return ()
+        try:
+            payload = json.loads(self._path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return (f"audit malformed: {exc}",)
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != {"schema_version", "events"}
+            or not _exact_int(payload.get("schema_version"), _AUDIT_SCHEMA_VERSION)
+            or not isinstance(payload.get("events"), list)
+        ):
+            return ("audit malformed: invalid document schema",)
+        issues: list[str] = []
+        valid: list[dict[str, object]] = []
+        event_ids: set[str] = set()
+        duplicate_event_ids: set[str] = set()
+        for index, raw_event in enumerate(payload["events"]):
+            try:
+                event = _validated_audit_event(raw_event)
+            except ValueError as exc:
+                issues.append(f"audit event {index} malformed: {exc}")
+                continue
+            valid.append(event)
+            event_id = event["event_id"]
+            if event_id in event_ids:
+                duplicate_event_ids.add(event_id)
+                issues.append(f"audit event {index} has duplicate event ID")
+            event_ids.add(event_id)
+            if event["run_id"] != expected:
+                issues.append(f"audit event {index} has foreign run ID")
+            if event["event_type"] == "test_access":
+                if event["job_id"] not in allowlist:
+                    issues.append(f"audit event {index} has unknown job ID")
+                elif authority is not None and (
+                    event["stage"], event["dataset_id"], event["seed"]
+                ) != authority[event["job_id"]]:
+                    issues.append(
+                        f"audit event {index} does not match manifest job authority"
+                    )
+                if (
+                    event["decision"] == "allowed"
+                    and (event["stage"], event["reason"]) not in _ALLOWED_TEST_ACCESS
+                ):
+                    issues.append(f"audit event {index} has forged allowed reason")
+        denied_by_id = {
+            event["event_id"]: event
+            for event in valid
+            if event["event_type"] == "test_access" and event["decision"] == "denied"
+        }
+        resolved_ids: set[str] = set()
+        prior_denied: dict[str, dict[str, object]] = {}
+        for index, event in enumerate(valid):
+            if (
+                event["event_type"] == "test_access"
+                and event["decision"] == "denied"
+            ):
+                prior_denied[event["event_id"]] = event
+                continue
+            if event["event_type"] != "denied_resolution":
+                continue
+            denied_event_id = event["denied_event_id"]
+            denied = prior_denied.get(denied_event_id)
+            if denied is None:
+                issues.append(
+                    f"audit event {index} resolution references no prior denied event"
+                )
+            elif denied["run_id"] != event["run_id"]:
+                issues.append(f"audit event {index} resolution has foreign denied event")
+            elif denied_event_id in resolved_ids:
+                issues.append(f"audit event {index} duplicate denied resolution")
+            else:
+                resolved_ids.add(denied_event_id)
+        for event_id, event in denied_by_id.items():
+            if (
+                event["run_id"] == expected
+                and (event_id not in resolved_ids or event_id in duplicate_event_ids)
+            ):
+                issues.append(f"audit denied event {event_id} is unresolved denied access")
+        return tuple(issues)
+
+    def _read_document(self) -> dict[str, object]:
+        if not self._path.exists():
+            return {"schema_version": _AUDIT_SCHEMA_VERSION, "events": []}
+        try:
+            payload = json.loads(self._path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("audit log is malformed") from exc
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != {"schema_version", "events"}
+            or not _exact_int(payload.get("schema_version"), _AUDIT_SCHEMA_VERSION)
+            or not isinstance(payload.get("events"), list)
+        ):
+            raise ValueError("audit log is malformed")
+        events = [_validated_audit_event(event) for event in payload["events"]]
+        return {"schema_version": _AUDIT_SCHEMA_VERSION, "events": events}
+
+
+class AuditedSplitAccess:
+    """The sole supported boundary for split CSV reads during stage execution."""
+
+    def __init__(
+        self,
+        paths: PreparedSplitPaths,
+        *,
+        stage: str,
+        job_id: str,
+        audit: AuditLog,
+    ) -> None:
+        if not isinstance(paths, PreparedSplitPaths):
+            raise TypeError("paths must be PreparedSplitPaths")
+        _audit_text(stage, "stage")
+        _safe_identifier(job_id, "job_id")
+        if not isinstance(audit, AuditLog):
+            raise TypeError("audit must be an AuditLog")
+        self._paths = paths
+        self._stage = stage
+        self._job_id = job_id
+        self._audit = audit
+
+    def load_train_validation(self):
+        """Load fresh train/validation feature matrices and target arrays only."""
+        X_train, y_train = _load_split_csv(
+            self._paths.train_csv, self._paths.target, self._paths._identities["train_csv"]
+        )
+        X_val, y_val = _load_split_csv(
+            self._paths.val_csv, self._paths.target, self._paths._identities["val_csv"]
+        )
+        return X_train, y_train, X_val, y_val
+
+    def load_test(self, *, reason: object):
+        """Audit first, then permit only one frozen final-evaluation purpose."""
+        normalized_reason = _audit_reason(reason)
+        decision = (
+            "allowed"
+            if (self._stage, normalized_reason) in _ALLOWED_TEST_ACCESS
+            else "denied"
+        )
+        event = self._audit.append_test_access(
+            job_id=self._job_id,
+            stage=self._stage,
+            reason=normalized_reason,
+            decision=decision,
+            dataset_id=self._paths.dataset_id,
+            seed=self._paths.seed,
+        )
+        if event["decision"] == "denied":
+            raise TestAccessViolation(
+                f"test access denied for stage={self._stage!r}, reason={event['reason']!r}"
+            )
+        return _load_split_csv(
+            self._paths.test_csv, self._paths.target, self._paths._identities["test_csv"]
+        )
+
+
+def _audit_text(value: object, context: str) -> str:
+    if type(value) is not str or "\x00" in value:
+        raise ValueError(f"{context} is invalid")
+    return value
+
+
+def _audit_reason(value: object) -> str:
+    if type(value) is not str or not value.strip() or "\x00" in value:
+        return "invalid_reason"
+    return value
+
+
+def _validated_audit_event(value: object) -> dict[str, object]:
+    if not isinstance(value, dict) or not isinstance(value.get("event_type"), str):
+        raise ValueError("event schema is invalid")
+    event_type = value["event_type"]
+    if event_type == "test_access":
+        expected = {
+            "event_id",
+            "event_type",
+            "run_id",
+            "job_id",
+            "stage",
+            "dataset_id",
+            "seed",
+            "reason",
+            "decision",
+            "at",
+        }
+        if set(value) != expected:
+            raise ValueError("test access event schema is invalid")
+        _safe_identifier(value["event_id"], "audit event ID")
+        _safe_identifier(value["run_id"], "audit run_id")
+        _safe_identifier(value["job_id"], "audit job ID")
+        _audit_text(value["stage"], "audit stage")
+        _safe_identifier(value["dataset_id"], "audit dataset ID")
+        _positive_or_zero_int(value["seed"], "audit seed")
+        _audit_text(value["reason"], "audit reason")
+        if value["decision"] not in {"allowed", "denied"}:
+            raise ValueError("test access decision is invalid")
+        _utc_status_timestamp(value["at"], "audit timestamp")
+    elif event_type == "denied_resolution":
+        expected = {
+            "event_id",
+            "event_type",
+            "run_id",
+            "denied_event_id",
+            "resolution",
+            "at",
+        }
+        if set(value) != expected:
+            raise ValueError("denied resolution event schema is invalid")
+        _safe_identifier(value["event_id"], "audit event ID")
+        _safe_identifier(value["run_id"], "audit run_id")
+        _safe_identifier(value["denied_event_id"], "denied audit event ID")
+        resolution = value["resolution"]
+        if not isinstance(resolution, str) or not resolution.strip() or "\x00" in resolution:
+            raise ValueError("denied resolution is invalid")
+        _utc_status_timestamp(value["at"], "audit timestamp")
+    else:
+        raise ValueError("audit event type is invalid")
+    return dict(value)
+
+
+def _split_file_identity(
+    path: Path, context: str, *, allow_missing: bool
+) -> tuple[int, int] | None:
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        if allow_missing:
+            return None
+        raise ValueError(f"{context} split file is missing") from None
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    if path.is_symlink() or (reparse and attributes & reparse) or not stat.S_ISREG(metadata.st_mode):
+        raise ValueError(f"{context} split path must be a regular non-symlink file")
+    return metadata.st_dev, metadata.st_ino
+
+
+def _load_split_csv(
+    path: Path, target: str, expected_identity: tuple[int, int] | None
+):
+    before = _split_file_identity(path, "prepared", allow_missing=False)
+    if expected_identity is None or before != expected_identity:
+        raise ValueError("prepared split file identity changed")
+    flags = os.O_RDONLY
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise ValueError(f"could not open split CSV {path}") from exc
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != expected_identity:
+            raise ValueError("prepared split file identity changed after open")
+        with os.fdopen(descriptor, "r", encoding="utf-8", newline="") as handle:
+            descriptor = -1
+            frame = pd.read_csv(handle)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        raise ValueError(f"could not load split CSV {path}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    if target not in frame.columns:
+        raise ValueError(f"split CSV {path} is missing target column {target!r}")
+    features = frame.drop(columns=[target]).copy(deep=True)
+    targets = frame[target].to_numpy(copy=True)
+    return features, targets
 
 
 def canonical_hash(value: object) -> str:
@@ -1223,6 +1704,23 @@ def assert_stage_complete(
         layout, unique_jobs, expected_manifest_hash=full_manifest_hash
     )
     issues.extend(snapshot_issues)
+    try:
+        audit = AuditLog(layout.audit_path)
+        issues.extend(
+            audit.integrity_issues(
+                expected_run_id=layout.root.name,
+                allowed_job_ids=tuple(
+                    job.job_id for job in jobs if isinstance(job, JobSpec)
+                ),
+                expected_job_authority={
+                    job.job_id: (job.stage, job.dataset_id, job.seed)
+                    for job in jobs
+                    if isinstance(job, JobSpec)
+                },
+            )
+        )
+    except (TypeError, ValueError) as exc:
+        issues.append(f"audit configuration is invalid: {exc}")
 
     complete_ids: list[str] = []
     seen: set[str] = set()
@@ -1264,12 +1762,14 @@ def _validated_status_manifest(manifest: Sequence[JobSpec]) -> tuple[JobSpec, ..
     jobs = tuple(manifest)
     if not jobs or not all(isinstance(job, JobSpec) for job in jobs):
         raise ValueError("status manifest must contain JobSpec entries")
-    _ensure_unique(tuple(job.job_id for job in jobs), "duplicate manifest job IDs")
     for job in jobs:
-        _safe_identifier(job.job_id, "manifest job ID")
-        if job.stage not in _STAGE_ORDER:
+        _safe_builtin_identifier(job.job_id, "manifest job ID")
+        _safe_builtin_identifier(job.dataset_id, "manifest dataset ID")
+        if type(job.stage) is not str or job.stage not in _STAGE_ORDER:
             raise ValueError("manifest job has an unknown stage")
+        _positive_or_zero_int(job.seed, "manifest seed")
         _safe_relative_path(job.output_relpath, "manifest result path")
+    _ensure_unique(tuple(job.job_id for job in jobs), "duplicate manifest job IDs")
     return jobs
 
 
@@ -2113,6 +2613,12 @@ def _safe_identifier(value: object, context: str) -> str:
     ) is None:
         raise ValueError(f"{context} must be a safe dataset ID")
     return identifier
+
+
+def _safe_builtin_identifier(value: object, context: str) -> str:
+    if type(value) is not str:
+        raise ValueError(f"{context} must be a built-in string")
+    return _safe_identifier(value, context)
 
 
 def _dataset_id_tuple(value: object, context: str) -> tuple[str, ...]:
