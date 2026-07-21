@@ -109,6 +109,8 @@ def _binary_roc_auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
 def _ovr_auc(y_true: np.ndarray, y_score: np.ndarray, n_cls: int) -> float:
     if n_cls < 2:
         return 0.5
+    if n_cls == 2:
+        return _binary_roc_auc(y_true, y_score)
     return float(roc_auc_score(y_true, y_score, multi_class="ovr", average="macro"))
 
 

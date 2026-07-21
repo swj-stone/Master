@@ -62,7 +62,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 logging.getLogger("xgboost").setLevel(logging.ERROR)
 # ────────────────────────────────────────────────────────────────────────
 
-from minppi_mofs.voting_game import AccFullCache, compute_v_alpha, make_acc_full_cache  # noqa: E402
+from minppi_mofs.voting_game import AccFullCache, UtilityView, compute_v_alpha, make_acc_full_cache  # noqa: E402
 from minppi_mofs.min_ppi import (  # noqa: E402
     estimate_minppi,
     estimate_minppi_exact,
@@ -81,6 +81,7 @@ __all__ = [
     # voting_game
     "compute_v_alpha",
     "AccFullCache",
+    "UtilityView",
     "make_acc_full_cache",
     # min_ppi
     "estimate_minppi",

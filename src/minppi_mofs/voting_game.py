@@ -11,22 +11,20 @@ where:
 - α ∈ (0, 1] is the utility quota
 - U is a pluggable utility (see ``minppi_mofs.utility``)
 
-Model and utility are **decoupled**: classification always uses XGBoost
-and produces probabilities; the *utility* parameter selects which metric
-is computed from those probabilities.  This makes ISOLET utility ablation
-valid (same model, different metric).
-
-Tasks:
-- ``"binary"``    → default ``utility="roc_auc"``
-- ``"multiclass"`` → default ``utility="ovr_auc"``
-- ``"regression"`` → default ``utility="r2"``
+**Prediction cache (2026-07-21).**  ``AccFullCache`` caches raw predictions
+(probabilities for classification, continuous values for regression), NOT
+scalar utilities.  Multiple ``UtilityView`` instances can read the same
+predictions under different metrics — this is the structural guarantee that
+the ISOLET utility ablation compares metrics on truly identical model outputs.
 
 Usage::
 
-    from minppi_mofs.voting_game import compute_v_alpha, make_acc_full_cache
-    cache = make_acc_full_cache(X_train, X_val, y_train, y_val, seed=42)
-    v = compute_v_alpha({"f0", "f2"}, X_train, X_val, y_train, y_val,
-                         alpha=0.95, acc_cache=cache, seed=42)
+    from minppi_mofs.voting_game import AccFullCache, UtilityView
+
+    cache = AccFullCache(X_train, X_val, y_train, y_val, task="multiclass")
+    view_acc = UtilityView(cache, utility="accuracy", alpha=0.95)
+    view_auc = UtilityView(cache, utility="ovr_auc", alpha=0.95)
+    # Both views share the SAME trained models and predictions.
 """
 
 from __future__ import annotations
@@ -40,7 +38,8 @@ from xgboost import XGBClassifier, XGBRegressor
 
 from minppi_mofs.utility import _ALL_METRICS, compute_utility, is_classification_metric
 
-# ── default utility per task ────────────────────────────────────────────
+_VALID_TASKS = frozenset({"binary", "multiclass", "regression"})
+
 _DEFAULT_UTILITY: dict[str, str] = {
     "binary": "roc_auc",
     "multiclass": "ovr_auc",
@@ -48,27 +47,47 @@ _DEFAULT_UTILITY: dict[str, str] = {
 }
 
 
+def _validate_task_utility(task: str, utility: str) -> None:
+    """Reject impossible (task, utility) pairs before any model is built.
+
+    Raises ValueError with the field name in the message so tests can
+    ``pytest.raises(ValueError, match="task"|"classification-only")``.
+    """
+    if task not in _VALID_TASKS:
+        raise ValueError(
+            f"task must be one of {sorted(_VALID_TASKS)}, got {task!r}"
+        )
+
+    is_cls_metric = is_classification_metric(utility)
+    is_reg_task = (task == "regression")
+
+    if is_reg_task and is_cls_metric:
+        raise ValueError(
+            f"Utility {utility!r} is classification-only; "
+            f"use 'r2' or 'rmse' for task={task!r}."
+        )
+    if (not is_reg_task) and (not is_cls_metric):
+        raise ValueError(
+            f"Utility {utility!r} is regression-only (r2/rmse); "
+            f"cannot be used with classification task={task!r}."
+        )
+
+
 # ---------------------------------------------------------------------------
-# Cached utility evaluation
+# Prediction cache (model → predictions, shared across utility views)
 # ---------------------------------------------------------------------------
 
 
 class AccFullCache:
-    """Cache for full-feature utility and per-subset evaluations.
+    """Trains XGBoost once per coalition and caches the raw predictions.
 
-    Avoids re-evaluating the same coalition across multiple calls — critical
-    because each evaluation requires training an XGBoost model.
+    The cache key is the sorted tuple of feature names.  The cached value
+    is a numpy array: probabilities ``(n_val, n_classes)`` for classification
+    or continuous predictions ``(n_val,)`` for regression.
 
-    **Classification** (binary / multiclass): always uses ``XGBClassifier``
-    and stores probability predictions.  The *utility* parameter selects
-    which metric is computed (``"roc_auc"``, ``"ovr_auc"``, ``"accuracy"``,
-    ``"pr_auc"``).
-
-    **Regression**: uses ``XGBRegressor`` with ``"r2"`` or ``"rmse"``.
-
-    Attributes:
-        acc_full: Utility of the model on all features.
-        threshold: ``alpha * acc_full`` — the winning threshold.
+    Multiple :class:`UtilityView` instances can wrap the same cache and
+    compute different metrics from the identical predictions — this is the
+    structural guarantee for controlled utility-function ablation.
     """
 
     def __init__(
@@ -83,41 +102,27 @@ class AccFullCache:
         utility: Optional[str] = None,
         model_params: Optional[dict] = None,
     ) -> None:
-        """Compute U_full and initialise the subset cache.
-
-        Args:
-            X_train / X_val / y_train / y_val: Data arrays.
-            task: ``"binary"``, ``"multiclass"``, or ``"regression"``.
-            seed: Random seed for XGBoost.
-            utility: Metric identifier (see ``minppi_mofs.utility``).
-                If ``None``, defaults are: ``binary`` → ``"roc_auc"``,
-                ``multiclass`` → ``"ovr_auc"``, ``regression`` → ``"r2"``.
-            model_params: Override for XGBoost params, e.g.
-                ``{"n_estimators": 50, "max_depth": 3}``.
-        """
         self._X_train = X_train
         self._X_val = X_val
         self._y_train = y_train
         self._y_val = y_val
         self._task = task
         self._seed = seed
-        self._cache: dict[tuple[str, ...], float] = {}
 
-        # Resolve utility
+        # ── predictions cache: key → np.ndarray ──────────────────────
+        self._preds: dict[tuple[str, ...], np.ndarray] = {}
+
+        # ── default utility ────────────────────────────────────────────
         if utility is None:
             utility = _DEFAULT_UTILITY.get(task, "roc_auc")
         if utility not in _ALL_METRICS:
             raise ValueError(
                 f"Unknown utility {utility!r}. Choose from {sorted(_ALL_METRICS)}."
             )
-        if task == "regression" and is_classification_metric(utility):
-            raise ValueError(
-                f"Utility {utility!r} is classification-only; "
-                f"use 'r2' or 'rmse' for regression."
-            )
+        _validate_task_utility(task, utility)
         self._utility = utility
 
-        # ── Build model (unified: XGBoost for all classification) ─────
+        # ── model (reused across coalitions) ──────────────────────────
         mp = model_params or {}
         self._model_params = {
             "n_estimators": mp.get("n_estimators", 15),
@@ -133,27 +138,50 @@ class AccFullCache:
             self._model = XGBClassifier(
                 verbosity=0, random_state=seed, **self._model_params,
             )
-        # ─────────────────────────────────────────────────────────────
 
-        # Compute U_full
-        self.acc_full = self._evaluate_subset(set(X_train.columns), _seed_base=seed)
+        # ── compute U_full from default utility ───────────────────────
+        self.acc_full = self.evaluate(set(X_train.columns))
         self.threshold: Optional[float] = None
 
-    def _evaluate_subset(self, S: set[str], *, _seed_base: int = 42) -> float:
-        """Train on *S*, produce predictions, compute utility.
+    # ------------------------------------------------------------------
+    # Core: train once, cache predictions
+    # ------------------------------------------------------------------
 
-        Reuses ``self._model`` — ``.fit()`` replaces internal state.
+    def get_predictions(self, S: set[str], *, _seed_base: int = 42) -> np.ndarray:
+        """Return cached predictions for coalition *S*, training if needed.
+
+        Args:
+            S: Feature subset.
+            _seed_base: Seed offset for the model (ensures determinism).
+
+        Returns:
+            For classification: probability matrix ``(n_val, n_classes)``.
+            For regression: continuous predictions ``(n_val,)``.
         """
         key = tuple(sorted(S))
-        if key in self._cache:
-            return self._cache[key]
+        if key in self._preds:
+            return self._preds[key]
 
-        cols = list(S)
-        # ── empty coalition fallback ─────────────────────────────────
+        cols = sorted(S)
         if len(cols) == 0:
-            val = 0.5 if self._task != "regression" else 0.0
-            self._cache[key] = val
-            return val
+            # empty coalition → training-set class priors (no model trained).
+            # These are valid "predictions" for every metric via the standard
+            # compute_utility path: accuracy → majority-class proportion,
+            # PR-AUC → positive-class prior, OVR AUC / ROC-AUC → 0.5, etc.
+            if self._task == "regression":
+                preds = np.full(len(self._y_val), float(np.mean(self._y_train)))
+            else:
+                cls, cnt = np.unique(self._y_train, return_counts=True)
+                priors = cnt.astype(float) / cnt.sum()
+                n_cls = len(cls)
+                preds = np.tile(priors, (len(self._y_val), 1))
+                # ensure column count matches number of unique classes
+                if preds.shape[1] < max(2, n_cls):
+                    preds = np.full((len(self._y_val), max(2, n_cls)), 0.0, dtype=float)
+                    for i, p in enumerate(priors):
+                        preds[:, i] = p
+            self._preds[key] = preds
+            return preds
 
         Xtr = self._X_train[cols].values
         Xva = self._X_val[cols].values
@@ -163,33 +191,92 @@ class AccFullCache:
             self._model.fit(Xtr, self._y_train)
 
         if self._task == "regression":
-            y_pred = self._model.predict(Xva)
+            preds = self._model.predict(Xva)
         else:
-            y_pred = self._model.predict_proba(Xva)
+            preds = self._model.predict_proba(Xva)
 
-        val = compute_utility(self._y_val, y_pred, metric=self._utility)
-        self._cache[key] = val
-        return val
+        self._preds[key] = preds
+        return preds
 
-    def evaluate(self, S: set[str]) -> float:
-        """Return U(M_S) for coalition *S*."""
-        return self._evaluate_subset(S)
+    def evaluate(self, S: set[str], *, utility: Optional[str] = None) -> float:
+        """Utility of coalition *S* under ``utility`` (or ``self._utility``).
+
+        Reads from the shared prediction cache — no model retraining.
+        """
+        preds = self.get_predictions(S)
+        metric = utility if utility is not None else self._utility
+        return compute_utility(self._y_val, preds, metric=metric)
+
+    # ------------------------------------------------------------------
+    # Threshold / winning (use self._utility)
+    # ------------------------------------------------------------------
 
     def set_threshold(self, alpha: float) -> None:
-        """Set the winning threshold = alpha * Acc_full."""
         self.threshold = self.acc_full * alpha
 
     def is_winning(self, S: set[str]) -> bool:
-        """True iff U(M_S) >= alpha * U_full.
-
-        Raises RuntimeError if ``set_threshold`` hasn't been called.
-        """
         if self.threshold is None:
             raise RuntimeError("Call set_threshold(alpha) before is_winning().")
         return self.evaluate(S) >= self.threshold
 
     def eval_marginal(self, S: set[str], i: str) -> int:
-        """Marginal contribution: v_alpha(S∪{i}) - v_alpha(S) ∈ {-1,0,+1}."""
+        v_before = 1 if self.is_winning(S) else 0
+        v_after = 1 if self.is_winning(S | {i}) else 0
+        return v_after - v_before
+
+
+# ---------------------------------------------------------------------------
+# Utility view — a metric-specific lens on a shared prediction cache
+# ---------------------------------------------------------------------------
+
+
+class UtilityView:
+    """A lightweight metric-specific view of an :class:`AccFullCache`.
+
+    Shares the **same** trained models and cached predictions as the parent
+    cache, but computes :meth:`evaluate`, :meth:`is_winning`, and
+    :meth:`eval_marginal` under a different utility metric.
+
+    This is duck-type compatible with the ``acc_cache`` parameter of every
+    ``estimate_minppi_*`` function.
+
+    Usage::
+
+        cache = AccFullCache(X_tr, X_va, y_tr, y_va)
+        view_acc = UtilityView(cache, utility="accuracy", alpha=0.95)
+        view_auc = UtilityView(cache, utility="ovr_auc",  alpha=0.95)
+        # Both read from cache._preds — models trained exactly once.
+    """
+
+    def __init__(
+        self,
+        cache: AccFullCache,
+        *,
+        utility: str,
+        alpha: float,
+    ) -> None:
+        if utility not in _ALL_METRICS:
+            raise ValueError(
+                f"Unknown utility {utility!r}. Choose from {sorted(_ALL_METRICS)}."
+            )
+        _validate_task_utility(cache._task, utility)
+        self._cache = cache
+        self._utility = utility
+        self.acc_full = cache.evaluate(
+            set(cache._X_train.columns), utility=utility,
+        )
+        self.threshold: float = self.acc_full * alpha
+
+    def evaluate(self, S: set[str]) -> float:
+        return self._cache.evaluate(S, utility=self._utility)
+
+    def set_threshold(self, alpha: float) -> None:
+        self.threshold = self.acc_full * alpha
+
+    def is_winning(self, S: set[str]) -> bool:
+        return self.evaluate(S) >= self.threshold
+
+    def eval_marginal(self, S: set[str], i: str) -> int:
         v_before = 1 if self.is_winning(S) else 0
         v_after = 1 if self.is_winning(S | {i}) else 0
         return v_after - v_before
@@ -211,18 +298,7 @@ def make_acc_full_cache(
     utility: Optional[str] = None,
     model_params: Optional[dict] = None,
 ) -> AccFullCache:
-    """Create an :class:`AccFullCache` with ``U_full`` pre-computed.
-
-    Args:
-        X_train / X_val / y_train / y_val: Data arrays.
-        task: ``"binary"``, ``"multiclass"``, or ``"regression"``.
-        seed: Random seed.
-        utility: Metric override (defaults per *task*).
-        model_params: Optional XGBoost param overrides.
-
-    Returns:
-        Initialised cache.
-    """
+    """Create an :class:`AccFullCache` with ``U_full`` pre-computed."""
     return AccFullCache(
         X_train, X_val, y_train, y_val,
         task=task, seed=seed, utility=utility, model_params=model_params,
@@ -247,10 +323,7 @@ def compute_v_alpha(
     acc_cache: Optional[AccFullCache] = None,
     seed: int = 42,
 ) -> int:
-    """Evaluate the binary winning function v_alpha(S).
-
-    Returns 1 if U(M_S) >= α·U_full, else 0.
-    """
+    """Evaluate the binary winning function v_alpha(S)."""
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
             X_train, X_val, y_train, y_val,
