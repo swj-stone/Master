@@ -232,7 +232,7 @@ Expected: all new configuration tests pass and Ruff reports no errors.
 - Produces: `open_resumed_run(output_root, run_id, protocol, *, project_root)`
 - Produces: `capture_source_fingerprint(project_root, protocol)` and `freeze_run_metadata(layout, protocol, *, project_root)`
 
-- [ ] **Step 1: Write failing run identity tests**
+- [x] **Step 1: Write failing run identity tests**
 
 Cover valid IDs, rejection of separators/whitespace, refusal to overwrite an
 existing run, mandatory run ID for resume, and fingerprint drift:
@@ -253,11 +253,11 @@ def test_resume_rejects_source_drift(tmp_path, protocol):
         )
 ```
 
-- [ ] **Step 2: Confirm RED**
+- [x] **Step 2: Confirm RED**
 
 Run the Task 2 tests and confirm the new symbols are missing.
 
-- [ ] **Step 3: Implement layout and metadata**
+- [x] **Step 3: Implement layout and metadata**
 
 Use this public layout:
 
@@ -282,14 +282,14 @@ Fingerprint `src/**/*.py`, `experiments/**/*.py`, and resolved YAML content.
 Record Git commit and dirty state as metadata, but compare file hashes for
 resume because an intentionally dirty tree is allowed.
 
-- [ ] **Step 4: Freeze metadata atomically**
+- [x] **Step 4: Freeze metadata atomically**
 
 Write `resolved_protocol.yaml`, `environment.json`,
 `source_fingerprint.json`, and copied dataset configs before manifest creation.
 The environment record must include Python, NumPy, pandas, scikit-learn,
 XGBoost, CUDA build information, OS, timezone, and the requested backend.
 
-- [ ] **Step 5: Verify Task 2**
+- [x] **Step 5: Verify Task 2**
 
 Run focused tests, Ruff, and `python -m py_compile` for the protocol module.
 

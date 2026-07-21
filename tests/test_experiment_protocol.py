@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
+import hashlib
+import json
 from pathlib import Path
+import re
 
 import pytest
 import yaml
 
+import minppi_mofs.experiment_protocol as protocol_module
 from minppi_mofs.experiment_protocol import (
     canonical_hash,
+    create_new_run,
+    freeze_run_metadata,
     load_resolved_protocol,
+    open_resumed_run,
 )
 
 
@@ -217,4 +225,434 @@ def test_invalid_protocol_is_rejected(
             seeds=None,
             backend=None,
             smoke=False,
+        )
+
+
+@pytest.fixture
+def resolved_protocol(tmp_path: Path):
+    config_dir = _write_protocol(tmp_path / "protocol_configs")
+    return load_resolved_protocol(
+        config_dir,
+        seeds=(42,),
+        backend="cpu",
+        smoke=True,
+    )
+
+
+def test_create_new_run_builds_canonical_layout(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    layout = create_new_run(
+        tmp_path / "results",
+        "run-1",
+        resolved_protocol,
+    )
+
+    assert layout.root == tmp_path / "results" / "run-1"
+    assert layout.root.is_dir()
+    assert layout.configs_frozen.is_dir()
+    assert layout.raw_metrics.is_dir()
+    assert layout.tables.is_dir()
+    assert layout.figures.is_dir()
+    assert layout.audit_path == layout.root / "protocol_audit.json"
+    assert layout.manifest_path == layout.root / "run_manifest.csv"
+    assert layout.status_path == layout.root / "status.json"
+    assert layout.log_path == layout.root / "output.log"
+
+    with pytest.raises(FileExistsError, match="already exists"):
+        create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+
+
+@pytest.mark.parametrize(
+    "run_id",
+    ["", ".", "..", "has space", "../escape", "a/b", "a\\b"],
+)
+def test_create_new_run_rejects_unsafe_run_ids(
+    tmp_path: Path,
+    resolved_protocol,
+    run_id: str,
+) -> None:
+    with pytest.raises(ValueError, match="run_id"):
+        create_new_run(tmp_path / "results", run_id, resolved_protocol)
+
+
+@pytest.mark.parametrize("run_id", [".", ".."])
+def test_resume_rejects_special_path_run_ids(
+    tmp_path: Path,
+    resolved_protocol,
+    run_id: str,
+) -> None:
+    with pytest.raises(ValueError, match="run_id"):
+        open_resumed_run(
+            tmp_path / "results",
+            run_id,
+            resolved_protocol,
+            project_root=tmp_path,
+        )
+
+
+def test_create_new_run_generates_protocol_bound_id(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    layout = create_new_run(tmp_path / "results", None, resolved_protocol)
+
+    assert re.fullmatch(
+        r"\d{8}T\d{6}Z-[0-9a-f]{10}",
+        layout.root.name,
+    )
+
+
+def _write_project_sources(project_root: Path) -> Path:
+    source = project_root / "src" / "package" / "module.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    experiment = project_root / "experiments" / "runner.py"
+    experiment.parent.mkdir()
+    experiment.write_text("STAGE = 'validate'\n", encoding="utf-8")
+    return source
+
+
+def _refresh_marker_hash(layout, relative_path: str) -> None:
+    artifact = layout.root / relative_path
+    marker_path = layout.root / "metadata_complete.json"
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    marker["artifacts"][relative_path] = hashlib.sha256(
+        artifact.read_bytes()
+    ).hexdigest()
+    marker_path.write_text(json.dumps(marker), encoding="utf-8")
+
+
+def test_freeze_run_metadata_records_protocol_environment_and_sources(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+
+    freeze_run_metadata(
+        layout,
+        resolved_protocol,
+        project_root=project_root,
+    )
+
+    assert (layout.root / "resolved_protocol.yaml").is_file()
+    environment = json.loads(
+        (layout.root / "environment.json").read_text(encoding="utf-8")
+    )
+    fingerprint = json.loads(
+        (layout.root / "source_fingerprint.json").read_text(encoding="utf-8")
+    )
+    assert environment["python"]
+    assert environment["xgboost"]
+    assert environment["backend"] == "cpu"
+    assert {
+        "numpy",
+        "pandas",
+        "scikit_learn",
+        "xgboost_build_info",
+        "cuda_build_info",
+        "cuda_driver",
+        "os",
+        "timezone",
+        "utc_offset",
+    } <= set(environment)
+    assert fingerprint["protocol_hash"]
+    assert set(fingerprint["files"]) == {
+        "experiments/runner.py",
+        "src/package/module.py",
+    }
+    assert (layout.configs_frozen / "icomp2026_pipeline.resolved.yaml").is_file()
+    assert (layout.configs_frozen / "spambase.yaml").is_file()
+    assert (layout.configs_frozen / "abalone.yaml").is_file()
+    assert (layout.root / "metadata_complete.json").is_file()
+
+
+def test_freeze_run_metadata_refuses_to_replace_frozen_metadata(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+
+    with pytest.raises(FileExistsError, match="already frozen"):
+        freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+
+
+def test_failed_metadata_freeze_never_publishes_completion_marker(
+    tmp_path: Path,
+    resolved_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    real_replace = protocol_module.os.replace
+
+    def fail_on_environment(source, destination) -> None:
+        if Path(destination).name == "environment.json":
+            raise OSError("injected metadata write failure")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(protocol_module.os, "replace", fail_on_environment)
+    with pytest.raises(OSError, match="injected"):
+        freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+
+    assert not (layout.root / "metadata_complete.json").exists()
+    with pytest.raises(RuntimeError, match="incomplete"):
+        open_resumed_run(
+            tmp_path / "results",
+            "run-1",
+            resolved_protocol,
+            project_root=project_root,
+        )
+
+
+def test_freeze_run_metadata_rejects_unsafe_dataset_id(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    unsafe_dataset = replace(
+        resolved_protocol.datasets[0],
+        dataset_id="../escape",
+    )
+    unsafe_protocol = replace(
+        resolved_protocol,
+        datasets=(unsafe_dataset,),
+    )
+    layout = create_new_run(tmp_path / "results", "run-1", unsafe_protocol)
+
+    with pytest.raises(ValueError, match="dataset_id"):
+        freeze_run_metadata(
+            layout,
+            unsafe_protocol,
+            project_root=project_root,
+        )
+    assert not (layout.root / "escape.yaml").exists()
+
+
+def test_resume_accepts_unchanged_run(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+
+    resumed = open_resumed_run(
+        tmp_path / "results",
+        "run-1",
+        resolved_protocol,
+        project_root=project_root,
+    )
+
+    assert resumed == layout
+
+
+def test_resume_ignores_informational_git_metadata_changes(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+    fingerprint_path = layout.root / "source_fingerprint.json"
+    fingerprint = json.loads(fingerprint_path.read_text(encoding="utf-8"))
+    fingerprint["git_commit"] = "new-commit-with-identical-sources"
+    fingerprint["git_dirty"] = not bool(fingerprint["git_dirty"])
+    fingerprint_path.write_text(
+        json.dumps(fingerprint),
+        encoding="utf-8",
+    )
+    _refresh_marker_hash(layout, "source_fingerprint.json")
+
+    resumed = open_resumed_run(
+        tmp_path / "results",
+        "run-1",
+        resolved_protocol,
+        project_root=project_root,
+    )
+
+    assert resumed == layout
+
+
+def test_resume_rejects_source_drift(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    project_root = tmp_path / "project"
+    source = _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+    source.write_text("VALUE = 2\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="fingerprint"):
+        open_resumed_run(
+            tmp_path / "results",
+            "run-1",
+            resolved_protocol,
+            project_root=project_root,
+        )
+
+
+def test_resume_rejects_protocol_drift(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+    changed = replace(resolved_protocol, alpha_default=0.90)
+
+    with pytest.raises(RuntimeError, match="protocol"):
+        open_resumed_run(
+            tmp_path / "results",
+            "run-1",
+            changed,
+            project_root=project_root,
+        )
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "delete"),
+    [
+        ("environment.json", True),
+        ("configs_frozen/spambase.yaml", False),
+    ],
+)
+def test_resume_rejects_missing_or_tampered_frozen_metadata(
+    tmp_path: Path,
+    resolved_protocol,
+    relative_path: str,
+    delete: bool,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+    artifact = layout.root / relative_path
+    if delete:
+        artifact.unlink()
+    else:
+        artifact.write_text("tampered: true\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="metadata"):
+        open_resumed_run(
+            tmp_path / "results",
+            "run-1",
+            resolved_protocol,
+            project_root=project_root,
+        )
+
+
+def test_resume_rejects_partially_frozen_metadata(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    (layout.root / "resolved_protocol.yaml").write_text(
+        "protocol_version: incomplete\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="incomplete"):
+        open_resumed_run(
+            tmp_path / "results",
+            "run-1",
+            resolved_protocol,
+            project_root=tmp_path,
+        )
+
+
+def test_resume_rejects_non_mapping_source_fingerprint(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+    fingerprint_path = layout.root / "source_fingerprint.json"
+    fingerprint_path.write_text("[]\n", encoding="utf-8")
+    _refresh_marker_hash(layout, "source_fingerprint.json")
+
+    with pytest.raises(RuntimeError, match="source fingerprint metadata"):
+        open_resumed_run(
+            tmp_path / "results",
+            "run-1",
+            resolved_protocol,
+            project_root=project_root,
+        )
+
+
+def test_resume_requires_existing_run(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        open_resumed_run(
+            tmp_path / "results",
+            "missing",
+            resolved_protocol,
+            project_root=tmp_path,
+        )
+
+
+def test_resume_requires_a_valid_run_id(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    with pytest.raises(ValueError, match="run_id"):
+        open_resumed_run(
+            tmp_path / "results",
+            None,  # type: ignore[arg-type]
+            resolved_protocol,
+            project_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize("dataset_id", [".", "..", "../escape", "C:\\escape"])
+def test_protocol_rejects_unsafe_dataset_ids(
+    tmp_path: Path,
+    dataset_id: str,
+) -> None:
+    global_config = deepcopy(GLOBAL_CONFIG)
+    global_config["datasets"] = [dataset_id]
+    config_dir = _write_protocol(
+        tmp_path / "configs",
+        global_config=global_config,
+    )
+
+    with pytest.raises(ValueError, match="safe dataset ID"):
+        load_resolved_protocol(
+            config_dir,
+            seeds=None,
+            backend=None,
+            smoke=False,
+        )
+
+
+def test_protocol_rejects_unsafe_id_inside_dataset_file(tmp_path: Path) -> None:
+    dataset_configs = deepcopy(DATASET_CONFIGS)
+    dataset_configs["spambase"]["dataset"]["id"] = "../escape"
+    config_dir = _write_protocol(
+        tmp_path / "configs",
+        dataset_configs=dataset_configs,
+    )
+
+    with pytest.raises(ValueError, match="safe dataset ID"):
+        load_resolved_protocol(
+            config_dir,
+            seeds=(42,),
+            backend="cpu",
+            smoke=True,
         )
