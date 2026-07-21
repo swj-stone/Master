@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 from copy import deepcopy
 from dataclasses import FrozenInstanceError, replace
 import hashlib
@@ -15,6 +16,7 @@ import yaml
 import minppi_mofs.experiment_protocol as protocol_module
 from minppi_mofs.experiment_protocol import (
     IncompleteRunError,
+    ManifestStore,
     ResultRecord,
     StatusStore,
     assert_stage_complete,
@@ -25,6 +27,7 @@ from minppi_mofs.experiment_protocol import (
     freeze_run_metadata,
     load_resolved_protocol,
     open_resumed_run,
+    read_data_manifest,
     read_result_record,
 )
 
@@ -1697,3 +1700,204 @@ def test_entry_returns_a_deep_copy_and_completeness_aggregates_simultaneous_defe
 
     assert jobs[0].job_id in str(raised.value)
     assert jobs[1].job_id in str(raised.value)
+
+
+def test_manifest_store_persists_and_reloads_exact_ordered_authority(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "manifest-run", resolved_protocol)
+    validate = build_job_manifest(resolved_protocol, stages=("validate",))
+    preprocess = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    store = ManifestStore(layout.manifest_path)
+
+    assert store.initialize(validate) == validate
+    assert store.append(preprocess) == validate + preprocess
+    assert ManifestStore(layout.manifest_path).load() == validate + preprocess
+    assert layout.manifest_path.read_text(encoding="utf-8").splitlines()[0] == (
+        "sequence,job_id,protocol_hash,stage,dataset_id,seed,method,parameters_json,"
+        "depends_on_json,output_relpath"
+    )
+
+
+def test_manifest_store_rejects_replacement_reordering_and_repeated_stage_chunk(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    path = tmp_path / "run_manifest.csv"
+    validate = build_job_manifest(resolved_protocol, stages=("validate",))
+    preprocess = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    store = ManifestStore(path)
+    store.initialize(validate)
+
+    with pytest.raises(FileExistsError):
+        store.initialize(validate)
+    with pytest.raises(ValueError, match="order|stage|append"):
+        store.append(preprocess + build_job_manifest(resolved_protocol, stages=("summarize",)))
+    store.append(preprocess)
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="stage|append"):
+        store.append(preprocess)
+    assert path.read_bytes() == before
+
+
+def test_manifest_store_rejects_foreign_hash_duplicate_ids_and_malformed_csv(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    path = tmp_path / "run_manifest.csv"
+    validate = build_job_manifest(resolved_protocol, stages=("validate",))
+    preprocess = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    store = ManifestStore(path)
+    store.initialize(validate)
+    with pytest.raises(ValueError, match="protocol"):
+        store.append((replace(preprocess[0], protocol_hash="f" * 64),))
+    with pytest.raises(ValueError, match="duplicate"):
+        ManifestStore(tmp_path / "duplicate.csv").initialize((validate[0], validate[0]))
+
+    path.write_text(
+        "job_id,protocol_hash,stage,dataset_id,seed,method,parameters_json,"
+        "depends_on_json,output_relpath\n"
+        f"{validate[0].job_id},{validate[0].protocol_hash},validate,__run__,0,method,"
+        '"[]","[]",../escape.json\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="manifest"):
+        store.load()
+
+
+def test_manifest_store_rejects_edited_identity_and_reordered_persisted_rows(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    jobs = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    identity_path = tmp_path / "edited.csv"
+    ManifestStore(identity_path).initialize(jobs)
+    identity_path.write_text(
+        identity_path.read_text(encoding="utf-8").replace(
+            ",prepare_split,", ",changed_method,", 1
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="canonical|identity|job ID"):
+        ManifestStore(identity_path).load()
+
+    order_path = tmp_path / "reordered.csv"
+    ManifestStore(order_path).initialize(jobs)
+    lines = order_path.read_text(encoding="utf-8").splitlines()
+    lines[1], lines[2] = lines[2], lines[1]
+    order_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="sequence|order"):
+        ManifestStore(order_path).load()
+
+
+def test_status_store_extends_exact_prefix_without_rebinding_old_stage_document(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "extend-run", resolved_protocol)
+    validate = build_job_manifest(resolved_protocol, stages=("validate",))
+    preprocess = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    manifest = validate + preprocess
+    manifests = ManifestStore(layout.manifest_path)
+    manifests.initialize(validate)
+    status = StatusStore(layout, validate)
+    status.start(validate[0].job_id)
+    old_stage_path = layout.root / "validate" / "status.json"
+    old_stage_bytes = old_stage_path.read_bytes()
+
+    manifests.append(preprocess)
+    extended = StatusStore(layout, manifest)
+
+    assert extended.entry(validate[0].job_id)["attempt"] == 1
+    assert extended.entry(preprocess[0].job_id)["state"] == "pending"
+    assert old_stage_path.read_bytes() == old_stage_bytes
+    root = json.loads(layout.status_path.read_text(encoding="utf-8"))
+    validate_doc = json.loads(old_stage_path.read_text(encoding="utf-8"))
+    assert root["manifest_hash"] != validate_doc["manifest_hash"]
+
+
+def test_status_store_recovers_manifest_before_status_extension_and_partial_suffix(
+    tmp_path: Path, resolved_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout = create_new_run(tmp_path / "results", "recover-extension", resolved_protocol)
+    validate = build_job_manifest(resolved_protocol, stages=("validate",))
+    preprocess = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    manifests = ManifestStore(layout.manifest_path)
+    manifests.initialize(validate)
+    StatusStore(layout, validate)
+    manifests.append(preprocess)
+    real_write = protocol_module.atomic_write_json
+
+    def fail_root(path: Path, value: object) -> None:
+        if Path(path) == layout.status_path:
+            raise OSError("interrupted root extension")
+        real_write(path, value)
+
+    monkeypatch.setattr(protocol_module, "atomic_write_json", fail_root)
+    with pytest.raises(OSError, match="interrupted"):
+        StatusStore(layout, validate + preprocess)
+    monkeypatch.setattr(protocol_module, "atomic_write_json", real_write)
+
+    recovered = StatusStore(layout, validate + preprocess)
+    assert recovered.entry(validate[0].job_id)["attempt"] == 0
+    assert recovered.entry(preprocess[0].job_id)["state"] == "pending"
+
+
+def test_status_store_rejects_nonprefix_extension_and_changed_frozen_stage(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "bad-extension", resolved_protocol)
+    validate = build_job_manifest(resolved_protocol, stages=("validate",))
+    preprocess = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    manifests = ManifestStore(layout.manifest_path)
+    manifests.initialize(validate)
+    StatusStore(layout, validate)
+
+    with pytest.raises(ValueError, match="prefix|manifest"):
+        StatusStore(layout, preprocess)
+    manifests.append(preprocess)
+    changed = (replace(validate[0], method="changed"),) + preprocess
+    with pytest.raises(ValueError, match="prefix|manifest"):
+        StatusStore(layout, changed)
+
+
+def test_status_store_rejects_unpublished_extension_suffix(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "unpublished-extension", resolved_protocol)
+    validate = build_job_manifest(resolved_protocol, stages=("validate",))
+    preprocess = build_job_manifest(resolved_protocol, stages=("preprocess",))
+    ManifestStore(layout.manifest_path).initialize(validate)
+    StatusStore(layout, validate)
+
+    with pytest.raises(ValueError, match="durable|published|manifest"):
+        StatusStore(layout, validate + preprocess)
+
+    assert ManifestStore(layout.manifest_path).load() == validate
+    assert not (layout.root / "preprocess" / "status.json").exists()
+
+
+def test_read_data_manifest_reads_only_strict_manifest_fields(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    path = tmp_path / "data_manifest.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=("dataset_id", "seed", "selected_feature_count"),
+        )
+        writer.writeheader()
+        writer.writerows(
+            {"dataset_id": dataset.dataset_id, "seed": seed, "selected_feature_count": 7}
+            for dataset in resolved_protocol.datasets
+            for seed in resolved_protocol.seeds
+        )
+
+    rows = read_data_manifest(path, resolved_protocol)
+
+    assert build_job_manifest(
+        resolved_protocol, stages=("estimator",), data_manifest=rows
+    )
+    path.write_text(
+        "dataset_id,seed,selected_feature_count,prepared_path\n"
+        "spambase,42,7,../prepared.csv\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="data_manifest"):
+        read_data_manifest(path, resolved_protocol)

@@ -4,23 +4,40 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import FrozenInstanceError
+import subprocess
+import sys
+from dataclasses import FrozenInstanceError, asdict, replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
 import minppi_mofs.experiment_protocol as protocol_module
+import experiments.icomp2026_stages as stage_module
 from minppi_mofs.experiment_protocol import (
     AuditLog,
     AuditedSplitAccess,
     IncompleteRunError,
     JobSpec,
+    ManifestStore,
     PreparedSplitPaths,
     RunLayout,
+    ResultRecord,
+    StatusStore,
     TestAccessViolation as _TestAccessViolation,
     assert_stage_complete,
     atomic_write_json,
+    build_job_manifest,
+    create_new_run,
+    load_resolved_protocol,
+)
+from experiments.icomp2026_stages import StageContext, execute_stage
+from experiments.run_icomp2026_pipeline import (
+    STAGE_ORDER,
+    PipelineRunner,
+    build_parser,
+    main,
 )
 
 
@@ -648,3 +665,549 @@ def test_integrity_rejects_foreign_and_duplicate_resolution_events(tmp_path: Pat
     assert any("foreign run" in issue for issue in issues)
     assert any("foreign denied" in issue for issue in issues)
     assert any("duplicate denied resolution" in issue for issue in issues)
+
+
+@pytest.fixture
+def smoke_protocol():
+    return load_resolved_protocol(
+        Path(__file__).parents[1] / "configs",
+        seeds=None,
+        backend=None,
+        smoke=True,
+    )
+
+
+def _result(job: JobSpec) -> ResultRecord:
+    now = datetime.now(timezone.utc).isoformat()
+    return ResultRecord(
+        job_id=job.job_id,
+        protocol_hash=job.protocol_hash,
+        stage=job.stage,
+        dataset_id=job.dataset_id,
+        seed=job.seed,
+        method=job.method,
+        metrics={"score": 1.0},
+        artifacts={},
+        started_at=now,
+        finished_at=now,
+    )
+
+
+def _contexts(protocol, layout, manifest, status):
+    audit = AuditLog.from_manifest(layout.audit_path, manifest)
+    return tuple(StageContext(protocol, layout, job, status, audit) for job in manifest)
+
+
+def _complete_jobs(layout, status, jobs) -> None:
+    for job in jobs:
+        atomic_write_json(layout.root / job.output_relpath, asdict(_result(job)))
+        status.start(job.job_id)
+        status.succeed(job.job_id)
+
+
+def _write_data_manifest(layout, protocol) -> None:
+    rows = ["dataset_id,seed,selected_feature_count"]
+    rows.extend(
+        f"{dataset.dataset_id},{seed},7"
+        for dataset in protocol.datasets
+        for seed in protocol.seeds
+    )
+    (layout.root / "data_manifest.csv").write_text(
+        "\n".join(rows) + "\n", encoding="utf-8"
+    )
+
+
+def test_stage_context_is_frozen_single_job_value(tmp_path: Path, smoke_protocol) -> None:
+    layout = create_new_run(tmp_path / "results", "context-run", smoke_protocol)
+    manifest = build_job_manifest(smoke_protocol, stages=("validate",))
+    status = StatusStore(layout, manifest)
+    context = _contexts(smoke_protocol, layout, manifest, status)[0]
+
+    with pytest.raises(FrozenInstanceError):
+        context.job = manifest[0]  # type: ignore[misc]
+
+
+def test_execute_stage_continues_independent_jobs_after_failure(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "independent-run", smoke_protocol)
+    validate = build_job_manifest(smoke_protocol, stages=("validate",))
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    manifest = validate + preprocess
+    status = StatusStore(layout, manifest)
+    _complete_jobs(layout, status, validate)
+    seen: list[str] = []
+
+    def executor(context: StageContext) -> ResultRecord:
+        seen.append(context.job.job_id)
+        if context.job == preprocess[0]:
+            raise RuntimeError("expected failure")
+        return _result(context.job)
+
+    summary = execute_stage(
+        "preprocess",
+        context=_contexts(smoke_protocol, layout, manifest, status),
+        executors={"preprocess": executor},
+    )
+
+    assert tuple(seen) == tuple(job.job_id for job in preprocess)
+    assert summary.exit_code == 1
+    assert summary.failed_job_ids == (preprocess[0].job_id,)
+    assert status.entry(preprocess[0].job_id)["state"] == "failed"
+    assert all(status.entry(job.job_id)["state"] == "success" for job in preprocess[1:])
+
+
+def test_execute_stage_skips_valid_success_on_resume(tmp_path: Path, smoke_protocol) -> None:
+    layout = create_new_run(tmp_path / "results", "resume-stage", smoke_protocol)
+    validate = build_job_manifest(smoke_protocol, stages=("validate",))
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    manifest = validate + preprocess
+    status = StatusStore(layout, manifest)
+    _complete_jobs(layout, status, validate + preprocess[:1])
+    seen: list[str] = []
+
+    summary = execute_stage(
+        "preprocess",
+        context=_contexts(smoke_protocol, layout, manifest, status),
+        executors={"preprocess": lambda context: seen.append(context.job.job_id) or _result(context.job)},
+    )
+
+    assert preprocess[0].job_id not in seen
+    assert summary.skipped_job_ids == (preprocess[0].job_id,)
+    assert summary.exit_code == 0
+
+
+def test_execute_stage_enforces_stage_and_job_dependencies(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "dependencies-run", smoke_protocol)
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    removal = build_job_manifest(smoke_protocol, stages=("removal",))
+    manifest = preprocess + removal
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(smoke_protocol, layout, manifest, status)
+
+    blocked = execute_stage(
+        "removal", context=contexts, executors={"removal": lambda context: _result(context.job)}
+    )
+    assert blocked.exit_code == 1
+    assert blocked.dependency_issues
+    assert all(status.entry(job.job_id)["state"] == "pending" for job in removal)
+
+    _complete_jobs(layout, status, preprocess)
+
+    def executor(context: StageContext) -> ResultRecord:
+        if context.job == removal[0]:
+            raise RuntimeError("plan failed")
+        return _result(context.job)
+
+    summary = execute_stage("removal", context=contexts, executors={"removal": executor})
+    first_dataset_dependents = tuple(
+        job for job in removal if removal[0].job_id in job.depends_on
+    )
+    assert summary.exit_code == 1
+    assert all(status.entry(job.job_id)["state"] == "pending" for job in first_dataset_dependents)
+    assert any(status.entry(job.job_id)["state"] == "success" for job in removal if job not in first_dataset_dependents and job != removal[0])
+
+
+def test_missing_executor_is_failure_and_stop_limit_counts_successful_writes(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "missing-executor", smoke_protocol)
+    validate = build_job_manifest(smoke_protocol, stages=("validate",))
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    manifest = validate + preprocess
+    status = StatusStore(layout, manifest)
+    _complete_jobs(layout, status, validate)
+    contexts = _contexts(smoke_protocol, layout, manifest, status)
+    missing = execute_stage("preprocess", context=contexts, executors={})
+    assert missing.exit_code == 1
+    assert all(status.entry(job.job_id)["state"] == "failed" for job in preprocess)
+
+    retry = execute_stage(
+        "preprocess",
+        context=contexts,
+        executors={"preprocess": lambda context: _result(context.job)},
+        stop_after_jobs=1,
+    )
+    assert retry.exit_code == 75
+    assert len(retry.succeeded_job_ids) == 1
+    assert sum((layout.root / job.output_relpath).exists() for job in preprocess) == 1
+
+
+def test_execute_stage_rejects_context_job_changed_from_status_authority(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "forged-context", smoke_protocol)
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    removal = build_job_manifest(smoke_protocol, stages=("removal",))
+    manifest = preprocess + removal
+    status = StatusStore(layout, manifest)
+    _complete_jobs(layout, status, preprocess)
+    contexts = list(_contexts(smoke_protocol, layout, manifest, status))
+    dependent_index = next(
+        index for index, item in enumerate(contexts) if item.job.depends_on
+    )
+    contexts[dependent_index] = StageContext(
+        smoke_protocol,
+        layout,
+        replace(contexts[dependent_index].job, depends_on=()),
+        status,
+        contexts[dependent_index].audit,
+    )
+
+    with pytest.raises(ValueError, match="authority|manifest"):
+        execute_stage(
+            "removal",
+            context=tuple(contexts),
+            executors={"removal": lambda context: _result(context.job)},
+        )
+
+
+@pytest.mark.parametrize("foreign", ["protocol", "layout"])
+def test_execute_stage_rejects_foreign_context_service_authority(
+    tmp_path: Path, smoke_protocol, foreign: str
+) -> None:
+    layout = create_new_run(tmp_path / "results", "authority-run", smoke_protocol)
+    manifest = build_job_manifest(smoke_protocol, stages=("validate",))
+    status = StatusStore(layout, manifest)
+    protocol = (
+        replace(smoke_protocol, backend="cuda")
+        if foreign == "protocol"
+        else smoke_protocol
+    )
+    context_layout = (
+        create_new_run(tmp_path / "results", "foreign-run", smoke_protocol)
+        if foreign == "layout"
+        else layout
+    )
+    audit = AuditLog.from_manifest(context_layout.audit_path, manifest)
+    contexts = tuple(
+        StageContext(protocol, context_layout, job, status, audit) for job in manifest
+    )
+
+    with pytest.raises(ValueError, match="protocol|layout|authority"):
+        execute_stage(
+            "validate",
+            context=contexts,
+            executors={"validate": lambda context: _result(context.job)},
+        )
+    assert status.entry(manifest[0].job_id)["state"] == "pending"
+
+
+def test_execute_stage_reopens_after_root_write_failure_and_continues(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout = create_new_run(tmp_path / "results", "root-recovery", smoke_protocol)
+    validate = build_job_manifest(smoke_protocol, stages=("validate",))
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    manifest = validate + preprocess
+    status = StatusStore(layout, manifest)
+    _complete_jobs(layout, status, validate)
+    real_write = protocol_module.atomic_write_json
+    root_writes = 0
+
+    def fail_one_root_write(path: Path, value: object) -> None:
+        nonlocal root_writes
+        if Path(path) == layout.status_path:
+            root_writes += 1
+            if root_writes == 2:
+                raise OSError("root write failed once")
+        real_write(path, value)
+
+    monkeypatch.setattr(protocol_module, "atomic_write_json", fail_one_root_write)
+    summary = execute_stage(
+        "preprocess",
+        context=_contexts(smoke_protocol, layout, manifest, status),
+        executors={"preprocess": lambda context: _result(context.job)},
+    )
+
+    assert summary.exit_code == 0
+    reopened = StatusStore(layout, manifest)
+    assert all(reopened.entry(job.job_id)["state"] == "success" for job in preprocess)
+
+
+def test_cli_declares_exact_stages_and_resume_requires_run_id() -> None:
+    parser = build_parser()
+    stage_action = next(action for action in parser._actions if action.dest == "stage")
+    assert tuple(stage_action.choices) == ("all",) + STAGE_ORDER
+
+    with pytest.raises(SystemExit) as raised:
+        main(["--stage", "validate", "--resume"])
+    assert raised.value.code == 2
+
+
+def test_cli_help_works_as_a_direct_script_without_model_imports() -> None:
+    script = Path(__file__).parents[1] / "experiments" / "run_icomp2026_pipeline.py"
+    completed = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=Path(__file__).parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "--stage" in completed.stdout
+    assert "xgboost" not in completed.stderr.lower()
+
+
+def test_pipeline_all_dispatches_exact_dependency_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    runner = object.__new__(PipelineRunner)
+    seen: list[str] = []
+    monkeypatch.setattr(runner, "execute", lambda stage: seen.append(stage))
+
+    assert runner.run("all") == 0
+    assert tuple(seen) == STAGE_ORDER
+
+
+def test_selected_alpha_preflights_and_appends_missing_canonical_chunks(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "alpha-first", smoke_protocol)
+    validate = build_job_manifest(smoke_protocol, stages=("validate",))
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    manifests = ManifestStore(layout.manifest_path)
+    manifests.initialize(validate)
+    manifests.append(preprocess)
+    status = StatusStore(layout, validate + preprocess)
+    _complete_jobs(layout, status, validate + preprocess)
+    _write_data_manifest(layout, smoke_protocol)
+
+    runner = PipelineRunner(
+        smoke_protocol,
+        layout,
+        executors={"alpha": lambda context: _result(context.job)},
+    )
+    assert runner.run("alpha") == 0
+
+    extended = manifests.load()
+    assert tuple(dict.fromkeys(job.stage for job in extended)) == (
+        "validate", "preprocess", "estimator", "removal", "alpha"
+    )
+    reopened = StatusStore(layout, extended)
+    assert all(
+        reopened.entry(job.job_id)["state"] == "pending"
+        for job in extended
+        if job.stage in {"estimator", "removal"}
+    )
+
+
+def test_stage_preflight_rejection_does_not_partially_append_manifest(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "no-partial", smoke_protocol)
+    validate = build_job_manifest(smoke_protocol, stages=("validate",))
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    manifests = ManifestStore(layout.manifest_path)
+    manifests.initialize(validate)
+    manifests.append(preprocess)
+    status = StatusStore(layout, validate + preprocess)
+    _complete_jobs(layout, status, validate + preprocess)
+    _write_data_manifest(layout, smoke_protocol)
+    before = layout.manifest_path.read_bytes()
+
+    assert PipelineRunner(smoke_protocol, layout).run("nsga2") == 1
+
+    assert layout.manifest_path.read_bytes() == before
+    assert not (layout.root / "estimator" / "status.json").exists()
+    assert not (layout.root / "removal" / "status.json").exists()
+
+
+def test_cli_consumes_extensible_stage_executor_registry(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        stage_module,
+        "STAGE_EXECUTORS",
+        {"validate": lambda context: _result(context.job)},
+        raising=False,
+    )
+    output_root = tmp_path / "results"
+
+    assert main(
+        [
+            "--stage", "validate",
+            "--config-dir", str(Path(__file__).parents[1] / "configs"),
+            "--output-root", str(output_root),
+            "--run-id", "registry-run",
+            "--smoke",
+        ]
+    ) == 0
+
+
+def test_public_stop_limit_rejects_formal_engine_and_runner(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    formal = replace(smoke_protocol, run_kind="formal")
+    layout = create_new_run(tmp_path / "results", "formal-engine", formal)
+    manifest = build_job_manifest(formal, stages=("validate",))
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(formal, layout, manifest, status)
+
+    with pytest.raises(ValueError, match="smoke"):
+        execute_stage(
+            "validate",
+            context=contexts,
+            executors={"validate": lambda context: _result(context.job)},
+            stop_after_jobs=1,
+        )
+    with pytest.raises(ValueError, match="smoke"):
+        PipelineRunner(formal, layout, stop_after_jobs=1)
+
+
+@pytest.mark.parametrize(
+    "invalid_limit",
+    [
+        pytest.param(0, id="zero"),
+        pytest.param(-1, id="negative"),
+        pytest.param(True, id="bool"),
+    ],
+)
+def test_pipeline_runner_rejects_nonpositive_or_bool_stop_before_mutation(
+    tmp_path: Path, smoke_protocol, invalid_limit: object
+) -> None:
+    layout = create_new_run(tmp_path / "results", "invalid-stop", smoke_protocol)
+
+    with pytest.raises(ValueError, match="positive integer"):
+        PipelineRunner(
+            smoke_protocol,
+            layout,
+            stop_after_jobs=invalid_limit,  # type: ignore[arg-type]
+        )
+
+    assert not layout.manifest_path.exists()
+    assert not layout.status_path.exists()
+
+
+def test_runner_without_new_run_authority_rejects_missing_manifest_without_recreation(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "missing-resume-manifest", smoke_protocol)
+    validate = build_job_manifest(smoke_protocol, stages=("validate",))
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    manifest = validate + preprocess
+    ManifestStore(layout.manifest_path).initialize(manifest)
+    StatusStore(layout, manifest)
+    root_status_before = layout.status_path.read_bytes()
+    stage_status_before = {
+        stage: (layout.root / stage / "status.json").read_bytes()
+        for stage in ("validate", "preprocess")
+    }
+    layout.manifest_path.unlink()
+
+    runner = PipelineRunner(smoke_protocol, layout)
+    with pytest.raises(RuntimeError, match="manifest.*missing|missing.*manifest"):
+        runner.run("validate")
+
+    assert not layout.manifest_path.exists()
+    assert layout.status_path.read_bytes() == root_status_before
+    assert {
+        stage: (layout.root / stage / "status.json").read_bytes()
+        for stage in ("validate", "preprocess")
+    } == stage_status_before
+
+
+def test_explicit_manifest_initialization_rejects_existing_status_before_write(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "status-before-manifest", smoke_protocol)
+    validate = build_job_manifest(smoke_protocol, stages=("validate",))
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    StatusStore(layout, validate + preprocess)
+    root_before = layout.status_path.read_bytes()
+    stages_before = {
+        stage: (layout.root / stage / "status.json").read_bytes()
+        for stage in ("validate", "preprocess")
+    }
+
+    runner = PipelineRunner(
+        smoke_protocol, layout, allow_manifest_initialize=True
+    )
+    with pytest.raises(RuntimeError, match="status|initialization"):
+        runner.run("validate")
+
+    assert not layout.manifest_path.exists()
+    assert layout.status_path.read_bytes() == root_before
+    assert {
+        stage: (layout.root / stage / "status.json").read_bytes()
+        for stage in ("validate", "preprocess")
+    } == stages_before
+
+
+def test_manifest_initialization_authority_is_single_use_after_publication(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "single-use-authority", smoke_protocol)
+    runner = PipelineRunner(
+        smoke_protocol, layout, allow_manifest_initialize=True
+    )
+    assert runner.run("validate") == 1
+    assert layout.manifest_path.exists()
+    layout.manifest_path.unlink()
+    layout.status_path.unlink()
+    (layout.root / "validate" / "status.json").unlink()
+
+    with pytest.raises(RuntimeError, match="initialization authority|manifest.*missing"):
+        runner.run("validate")
+
+    assert not layout.manifest_path.exists()
+
+
+def test_cli_rejects_stop_limit_in_formal_mode_before_creating_run(tmp_path: Path) -> None:
+    output_root = tmp_path / "results"
+    with pytest.raises(SystemExit) as raised:
+        main(
+            [
+                "--stage", "validate",
+                "--config-dir", str(Path(__file__).parents[1] / "configs"),
+                "--output-root", str(output_root),
+                "--run-id", "formal-stop",
+                "--stop-after-jobs", "1",
+            ]
+        )
+    assert raised.value.code == 2
+    assert not output_root.exists()
+
+
+def test_cli_lifecycle_is_append_logged_and_never_replaces_process_streams_or_cwd(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "results"
+    arguments = [
+        "--stage", "validate",
+        "--config-dir", str(Path(__file__).parents[1] / "configs"),
+        "--output-root", str(output_root),
+        "--run-id", "cli-run",
+        "--smoke",
+    ]
+    cwd = Path.cwd()
+    stdout = sys.stdout
+    stderr = sys.stderr
+
+    assert main(arguments) == 1
+
+    run_root = output_root / "cli-run"
+    first_log = (run_root / "output.log").read_bytes()
+    assert Path.cwd() == cwd
+    assert sys.stdout is stdout
+    assert sys.stderr is stderr
+    assert main(arguments + ["--resume"]) == 1
+    assert (run_root / "output.log").read_bytes().startswith(first_log)
+    assert len((run_root / "output.log").read_bytes()) > len(first_log)
+
+
+def test_all_with_missing_validate_executor_does_not_freeze_dependent_stage_jobs(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "results"
+    assert main(
+        [
+            "--stage", "all",
+            "--config-dir", str(Path(__file__).parents[1] / "configs"),
+            "--output-root", str(output_root),
+            "--run-id", "blocked-all",
+            "--smoke",
+        ]
+    ) == 1
+    manifest = ManifestStore(output_root / "blocked-all" / "run_manifest.csv").load()
+    assert {job.stage for job in manifest} == {"validate"}

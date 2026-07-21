@@ -9,6 +9,7 @@ and rejects ambiguous or misspelled settings before a run can start.
 from __future__ import annotations
 
 import hashlib
+import csv
 import json
 import os
 import platform
@@ -707,6 +708,13 @@ def canonical_hash(value: object) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def resolved_protocol_hash(protocol: ResolvedProtocol) -> str:
+    """Return the canonical identity of one resolved protocol."""
+    if not isinstance(protocol, ResolvedProtocol):
+        raise TypeError("protocol must be a ResolvedProtocol")
+    return _protocol_hash(protocol)
+
+
 def create_new_run(
     output_root: Path,
     run_id: str | None,
@@ -1274,6 +1282,167 @@ def atomic_write_json(path: Path, value: object) -> None:
     _atomic_write_json(Path(path), value)
 
 
+class ManifestStore:
+    """Atomically persist and append the ordered manifest authority."""
+
+    _FIELDS = (
+        "sequence",
+        "job_id",
+        "protocol_hash",
+        "stage",
+        "dataset_id",
+        "seed",
+        "method",
+        "parameters_json",
+        "depends_on_json",
+        "output_relpath",
+    )
+
+    def __init__(self, path: Path) -> None:
+        self._path = Path(path)
+        if not self._path.name:
+            raise ValueError("manifest path is invalid")
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def initialize(self, manifest: Sequence[JobSpec]) -> tuple[JobSpec, ...]:
+        """Create a new manifest without replacing an existing authority."""
+        jobs = _validated_manifest_authority(manifest)
+        if self._path.exists():
+            raise FileExistsError(f"manifest already exists: {self._path}")
+        _atomic_write_text(self._path, self._csv_text(jobs))
+        return jobs
+
+    def load(self) -> tuple[JobSpec, ...]:
+        """Strictly reload the exact persisted order."""
+        try:
+            with self._path.open("r", encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle, strict=True)
+                if tuple(reader.fieldnames or ()) != self._FIELDS:
+                    raise ValueError("manifest CSV header is invalid")
+                rows = list(reader)
+        except (OSError, UnicodeDecodeError, csv.Error) as exc:
+            raise ValueError("manifest CSV is malformed") from exc
+        jobs: list[JobSpec] = []
+        try:
+            for index, row in enumerate(rows):
+                if None in row or set(row) != set(self._FIELDS):
+                    raise ValueError(f"manifest row {index} has an invalid schema")
+                if row["sequence"] != str(index):
+                    raise ValueError("manifest row sequence does not preserve order")
+                seed_text = row["seed"]
+                if not re.fullmatch(r"0|[1-9][0-9]*", seed_text):
+                    raise ValueError(f"manifest row {index} seed is invalid")
+                parameters = json.loads(row["parameters_json"])
+                dependencies = json.loads(row["depends_on_json"])
+                if not isinstance(parameters, dict) or not isinstance(dependencies, list):
+                    raise ValueError(f"manifest row {index} JSON fields are invalid")
+                jobs.append(
+                    JobSpec(
+                        job_id=row["job_id"],
+                        protocol_hash=row["protocol_hash"],
+                        stage=row["stage"],
+                        dataset_id=row["dataset_id"],
+                        seed=int(seed_text),
+                        method=row["method"],
+                        parameters=parameters,
+                        depends_on=tuple(dependencies),
+                        output_relpath=row["output_relpath"],
+                    )
+                )
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise ValueError(f"manifest CSV is malformed: {exc}") from exc
+        return _validated_manifest_authority(jobs)
+
+    def append(self, jobs: Sequence[JobSpec]) -> tuple[JobSpec, ...]:
+        """Atomically append contiguous previously unfrozen stage chunks."""
+        existing = self.load()
+        supplied = _validated_status_manifest(jobs)
+        if any(job.protocol_hash != existing[0].protocol_hash for job in supplied):
+            raise ValueError("manifest append has a foreign protocol hash")
+        suffix = _validated_manifest_authority(supplied)
+        suffix_stages = tuple(dict.fromkeys(job.stage for job in suffix))
+        existing_stages = tuple(dict.fromkeys(job.stage for job in existing))
+        expected_indices = tuple(
+            range(
+                _STAGE_ORDER.index(existing_stages[-1]) + 1,
+                _STAGE_ORDER.index(existing_stages[-1]) + 1 + len(suffix_stages),
+            )
+        )
+        actual_indices = tuple(_STAGE_ORDER.index(stage) for stage in suffix_stages)
+        if actual_indices != expected_indices:
+            raise ValueError(
+                "manifest append must contain contiguous canonical stage chunks"
+            )
+        combined = _validated_manifest_authority(existing + suffix)
+        _atomic_write_text(self._path, self._csv_text(combined))
+        return combined
+
+    def _csv_text(self, jobs: Sequence[JobSpec]) -> str:
+        from io import StringIO
+
+        output = StringIO(newline="")
+        writer = csv.DictWriter(output, fieldnames=self._FIELDS, lineterminator="\n")
+        writer.writeheader()
+        for sequence, job in enumerate(jobs):
+            writer.writerow(
+                {
+                    "sequence": sequence,
+                    "job_id": job.job_id,
+                    "protocol_hash": job.protocol_hash,
+                    "stage": job.stage,
+                    "dataset_id": job.dataset_id,
+                    "seed": job.seed,
+                    "method": job.method,
+                    "parameters_json": json.dumps(
+                        job.parameters, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ),
+                    "depends_on_json": json.dumps(
+                        list(job.depends_on), separators=(",", ":"), ensure_ascii=False,
+                    ),
+                    "output_relpath": job.output_relpath,
+                }
+            )
+        return output.getvalue()
+
+
+def read_data_manifest(
+    path: Path, protocol: ResolvedProtocol
+) -> tuple[dict[str, object], ...]:
+    """Read only the strict fields needed to derive data-dependent jobs."""
+    fields = ("dataset_id", "seed", "selected_feature_count")
+    try:
+        with Path(path).open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle, strict=True)
+            if tuple(reader.fieldnames or ()) != fields:
+                raise ValueError("data_manifest CSV header is invalid")
+            raw_rows = list(reader)
+    except (OSError, UnicodeDecodeError, csv.Error) as exc:
+        raise ValueError("data_manifest CSV is malformed") from exc
+    rows: list[dict[str, object]] = []
+    for index, row in enumerate(raw_rows):
+        if None in row or set(row) != set(fields):
+            raise ValueError(f"data_manifest[{index}] has an invalid schema")
+        seed_text = row["seed"]
+        count_text = row["selected_feature_count"]
+        if not re.fullmatch(r"0|[1-9][0-9]*", seed_text) or not re.fullmatch(
+            r"[1-9][0-9]*", count_text
+        ):
+            raise ValueError(f"data_manifest[{index}] has an invalid integer field")
+        rows.append(
+            {
+                "dataset_id": row["dataset_id"],
+                "seed": int(seed_text),
+                "selected_feature_count": int(count_text),
+            }
+        )
+    _selected_feature_counts(protocol, rows)
+    return tuple(rows)
+
+
 def read_result_record(path: Path, expected_job: JobSpec) -> ResultRecord:
     """Read one result record only if it exactly matches its manifest job."""
     try:
@@ -1337,40 +1506,80 @@ class StatusStore:
         self._manifest_hash = _status_manifest_hash(self._manifest)
         supplied_skips = _validated_approved_skips(approved_skips, self._by_id)
         self._usable = True
-        stage_exists = tuple(self._stage_path(stage).exists() for stage in self._stages)
-        if not layout.status_path.exists() and not any(stage_exists):
+        stage_exists = {stage: self._stage_path(stage).exists() for stage in self._stages}
+        if not layout.status_path.exists() and not any(stage_exists.values()):
             self._approved_skips = MappingProxyType(dict(supplied_skips))
             self._entries = {
                 job.job_id: self._new_entry(job) for job in self._manifest
             }
             self._persist_all()
         elif not layout.status_path.exists():
-            if not all(stage_exists):
+            if not all(stage_exists.values()):
                 raise ValueError("partial status initialization has missing stage status")
-            self._entries, persisted_skips = self._load_stage_entries()
+            self._entries, persisted_skips = self._load_stage_entries(self._stages)
             if approved_skips is not None and supplied_skips != persisted_skips:
                 raise ValueError("approved skips do not match persisted status")
             self._approved_skips = MappingProxyType(dict(persisted_skips))
             self._persist_root()
         else:
-            if not all(stage_exists):
-                raise ValueError("partial status initialization has missing stage status")
             root = _read_status_json(layout.status_path, "root status")
-            persisted_skips = self._validate_root(root)
-            if approved_skips is not None and supplied_skips != persisted_skips:
-                raise ValueError("approved skips do not match persisted status")
-            self._approved_skips = MappingProxyType(dict(persisted_skips))
-            self._entries, stage_skips = self._load_stage_entries()
-            if stage_skips != persisted_skips:
-                raise ValueError("root and stage approved skips do not match")
-            if root["stages"] != self._aggregate():
-                self._persist_root()
+            if not isinstance(root, dict) or set(root) != {
+                "schema_version", "manifest_hash", "approved_skips", "stages"
+            }:
+                raise ValueError("root status has an invalid schema")
+            if not _exact_int(root["schema_version"], self._SCHEMA_VERSION):
+                raise ValueError("root status schema version is invalid")
+            if not isinstance(root["manifest_hash"], str) or not root["manifest_hash"]:
+                raise ValueError("root status manifest hash is invalid")
+            if root["manifest_hash"] == self._manifest_hash:
+                if not all(stage_exists.values()):
+                    raise ValueError("partial status initialization has missing stage status")
+                persisted_skips = self._validate_root(root, self._manifest)
+                if approved_skips is not None and supplied_skips != persisted_skips:
+                    raise ValueError("approved skips do not match persisted status")
+                self._approved_skips = MappingProxyType(dict(persisted_skips))
+                self._entries, stage_skips = self._load_stage_entries(self._stages)
+                if stage_skips != persisted_skips:
+                    raise ValueError("root and stage approved skips do not match")
+                if root["stages"] != self._aggregate():
+                    self._persist_root()
+            else:
+                try:
+                    durable_manifest = ManifestStore(layout.manifest_path).load()
+                except ValueError as exc:
+                    raise ValueError(
+                        "status extension requires a valid durable manifest"
+                    ) from exc
+                if durable_manifest != self._manifest:
+                    raise ValueError(
+                        "status extension must equal the published durable manifest"
+                    )
+                self._extend_from_root(root, supplied_skips, approved_skips is not None)
 
     def entry(self, job_id: str) -> dict[str, object]:
         """Return an isolated copy of one current entry."""
         self._require_usable()
         job = self._job(job_id)
         return deepcopy(self._entries[job.job_id])
+
+    @property
+    def manifest(self) -> tuple[JobSpec, ...]:
+        """Return an isolated ordered copy of the bound manifest authority."""
+        self._require_usable()
+        return deepcopy(self._manifest)
+
+    @property
+    def layout(self) -> RunLayout:
+        """Return the canonical run layout bound to this store."""
+        return self._layout
+
+    @property
+    def protocol_hash(self) -> str:
+        """Return the single protocol identity bound by all manifest jobs."""
+        hashes = {job.protocol_hash for job in self._manifest}
+        if len(hashes) != 1:
+            raise ValueError("status manifest contains foreign protocol hashes")
+        return next(iter(hashes))
 
     def decide(self, job_id: str) -> ResumeDecision:
         """Return whether a job may be skipped, validating prior success."""
@@ -1568,21 +1777,20 @@ class StatusStore:
         self._persist_root()
 
     def _persist_stage(self, stage: str) -> None:
+        stage_manifest = self._stage_manifest(stage)
         jobs = {
             job.job_id: self._entries[job.job_id]
-            for job in self._manifest
-            if job.stage == stage
+            for job in stage_manifest
         }
         atomic_write_json(
             self._stage_path(stage),
             {
                 "schema_version": self._SCHEMA_VERSION,
-                "manifest_hash": self._manifest_hash,
+                "manifest_hash": _status_manifest_hash(stage_manifest),
                 "stage": stage,
                 "approved_skips": {
                     job.job_id: self._approved_skips[job.job_id]
-                    for job in self._manifest
-                    if job.stage == stage and job.job_id in self._approved_skips
+                    for job in stage_manifest if job.job_id in self._approved_skips
                 },
                 "jobs": jobs,
             },
@@ -1599,17 +1807,22 @@ class StatusStore:
             },
         )
 
-    def _validate_root(self, root: object) -> dict[str, str]:
+    def _validate_root(
+        self, root: object, manifest: Sequence[JobSpec]
+    ) -> dict[str, str]:
+        jobs = tuple(manifest)
+        by_id = {job.job_id: job for job in jobs}
+        stages = tuple(dict.fromkeys(job.stage for job in jobs))
         if not isinstance(root, dict) or set(root) != {
             "schema_version", "manifest_hash", "approved_skips", "stages"
         }:
             raise ValueError("root status has an invalid schema")
         if not _exact_int(root["schema_version"], self._SCHEMA_VERSION):
             raise ValueError("root status schema version is invalid")
-        if root["manifest_hash"] != self._manifest_hash:
+        if root["manifest_hash"] != _status_manifest_hash(jobs):
             raise ValueError("status manifest does not match the supplied manifest")
-        persisted_skips = _validated_approved_skips(root["approved_skips"], self._by_id)
-        if not isinstance(root["stages"], dict) or set(root["stages"]) != set(self._stages):
+        persisted_skips = _validated_approved_skips(root["approved_skips"], by_id)
+        if not isinstance(root["stages"], dict) or set(root["stages"]) != set(stages):
             raise ValueError("root status has foreign or missing stages")
         for stage, counts in root["stages"].items():
             _validate_stage_counts(counts, stage)
@@ -1625,21 +1838,22 @@ class StatusStore:
             for stage in self._stages
         }
 
-    def _load_stage_entries(self) -> tuple[dict[str, dict[str, object]], dict[str, str]]:
+    def _load_stage_entries(
+        self, stages: Sequence[str]
+    ) -> tuple[dict[str, dict[str, object]], dict[str, str]]:
         entries: dict[str, dict[str, object]] = {}
         approvals: dict[str, str] = {}
-        for stage in self._stages:
+        for stage in stages:
             payload = _read_status_json(self._stage_path(stage), f"{stage} status")
-            expected_ids = {
-                job.job_id for job in self._manifest if job.stage == stage
-            }
+            stage_manifest = self._stage_manifest(stage)
+            expected_ids = {job.job_id for job in stage_manifest}
             if not isinstance(payload, dict) or set(payload) != {
                 "schema_version", "manifest_hash", "stage", "approved_skips", "jobs"
             }:
                 raise ValueError(f"{stage} status has an invalid schema")
             if (
                 not _exact_int(payload["schema_version"], self._SCHEMA_VERSION)
-                or payload["manifest_hash"] != self._manifest_hash
+                or payload["manifest_hash"] != _status_manifest_hash(stage_manifest)
                 or payload["stage"] != stage
                 or not isinstance(payload["approved_skips"], dict)
                 or not isinstance(payload["jobs"], dict)
@@ -1659,6 +1873,67 @@ class StatusStore:
                 if entry["state"] == "skipped" and approvals.get(job_id) != entry["skip_reason"]:
                     raise ValueError("skipped stage status does not match approval")
         return entries, approvals
+
+    def _extend_from_root(
+        self,
+        root: object,
+        supplied_skips: Mapping[str, str],
+        skips_were_supplied: bool,
+    ) -> None:
+        if not isinstance(root, dict) or not isinstance(root.get("manifest_hash"), str):
+            raise ValueError("root status has an invalid schema")
+        prefix: tuple[JobSpec, ...] | None = None
+        prefix_stages: tuple[str, ...] = ()
+        for index, stage in enumerate(self._stages[:-1], start=1):
+            candidate_stages = self._stages[:index]
+            candidate = tuple(
+                job for job in self._manifest if job.stage in candidate_stages
+            )
+            if _status_manifest_hash(candidate) == root["manifest_hash"]:
+                prefix = candidate
+                prefix_stages = candidate_stages
+                break
+        if prefix is None:
+            raise ValueError("status manifest is not an exact persisted manifest prefix")
+        persisted_skips = self._validate_root(root, prefix)
+        if skips_were_supplied and {
+            job_id: supplied_skips[job_id]
+            for job_id in persisted_skips
+            if job_id in supplied_skips
+        } != persisted_skips:
+            raise ValueError("approved skips do not match persisted status")
+        approvals = dict(persisted_skips)
+        approvals.update(supplied_skips)
+        self._approved_skips = MappingProxyType(approvals)
+        self._entries, stage_skips = self._load_stage_entries(prefix_stages)
+        if stage_skips != persisted_skips:
+            raise ValueError("root and stage approved skips do not match")
+        for stage in self._stages[len(prefix_stages):]:
+            if self._stage_path(stage).exists():
+                suffix_entries, suffix_skips = self._load_stage_entries((stage,))
+                for entry in suffix_entries.values():
+                    if entry["state"] != "pending" or entry["attempt"] != 0:
+                        raise ValueError("appended stage status is not an unstarted suffix")
+                expected_skips = {
+                    job_id: reason
+                    for job_id, reason in approvals.items()
+                    if self._by_id[job_id].stage == stage
+                }
+                if suffix_skips != expected_skips:
+                    raise ValueError("appended stage approved skips do not match")
+                self._entries.update(suffix_entries)
+            else:
+                self._entries.update(
+                    {
+                        job.job_id: self._new_entry(job)
+                        for job in self._stage_manifest(stage)
+                    }
+                )
+                self._persist_stage(stage)
+        self._persist_root()
+
+    def _stage_manifest(self, stage: str) -> tuple[JobSpec, ...]:
+        return tuple(job for job in self._manifest if job.stage == stage)
 
     def _stage_path(self, stage: str) -> Path:
         return self._layout.root / stage / "status.json"
@@ -1770,6 +2045,71 @@ def _validated_status_manifest(manifest: Sequence[JobSpec]) -> tuple[JobSpec, ..
         _positive_or_zero_int(job.seed, "manifest seed")
         _safe_relative_path(job.output_relpath, "manifest result path")
     _ensure_unique(tuple(job.job_id for job in jobs), "duplicate manifest job IDs")
+    return jobs
+
+
+def _validated_manifest_authority(
+    manifest: Sequence[JobSpec],
+) -> tuple[JobSpec, ...]:
+    jobs = _validated_status_manifest(manifest)
+    protocol_hashes: set[str] = set()
+    output_paths: list[str] = []
+    prior_ids: set[str] = set()
+    prior_stage_index = -1
+    closed_stages: set[str] = set()
+    active_stage: str | None = None
+    for job in jobs:
+        if type(job.protocol_hash) is not str or not re.fullmatch(
+            r"[0-9a-f]{64}", job.protocol_hash
+        ):
+            raise ValueError("manifest protocol hash is invalid")
+        protocol_hashes.add(job.protocol_hash)
+        if type(job.method) is not str or not job.method or "\x00" in job.method:
+            raise ValueError("manifest method is invalid")
+        if type(job.parameters) is not dict:
+            raise ValueError("manifest parameters must be a mapping")
+        try:
+            canonical_parameters = json.loads(
+                json.dumps(job.parameters, allow_nan=False)
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("manifest parameters are not finite JSON") from exc
+        if canonical_parameters != job.parameters:
+            raise ValueError("manifest parameters are not canonical JSON")
+        if type(job.depends_on) is not tuple or not all(
+            type(dependency) is str and dependency for dependency in job.depends_on
+        ):
+            raise ValueError("manifest dependencies are invalid")
+        if len(set(job.depends_on)) != len(job.depends_on) or job.job_id in job.depends_on:
+            raise ValueError("manifest dependencies contain duplicates or a cycle")
+        if not set(job.depends_on).issubset(prior_ids):
+            raise ValueError("manifest dependencies must reference prior jobs")
+        identity = {
+            "protocol_hash": job.protocol_hash,
+            "stage": job.stage,
+            "dataset_id": job.dataset_id,
+            "seed": job.seed,
+            "method": job.method,
+            "parameters": job.parameters,
+            "depends_on": job.depends_on,
+        }
+        if canonical_hash(identity) != job.job_id:
+            raise ValueError("manifest job ID does not match its canonical identity")
+        if job.output_relpath != f"raw_metrics/{job.stage}/{job.job_id}.json":
+            raise ValueError("manifest result path is not canonical for its job")
+        output_paths.append(job.output_relpath)
+        stage_index = _STAGE_ORDER.index(job.stage)
+        if job.stage != active_stage:
+            if active_stage is not None:
+                closed_stages.add(active_stage)
+            if job.stage in closed_stages or stage_index <= prior_stage_index:
+                raise ValueError("manifest contains repeated or out-of-order stage chunks")
+            active_stage = job.stage
+            prior_stage_index = stage_index
+        prior_ids.add(job.job_id)
+    if len(protocol_hashes) != 1:
+        raise ValueError("manifest contains foreign protocol hashes")
+    _ensure_unique(tuple(output_paths), "duplicate manifest result paths")
     return jobs
 
 
@@ -2037,7 +2377,8 @@ def _read_completion_snapshot(
             continue
         try:
             payload = _read_status_json(path, f"{stage} status")
-            expected_ids = {job.job_id for job in valid_jobs if job.stage == stage}
+            stage_manifest = tuple(job for job in valid_jobs if job.stage == stage)
+            expected_ids = {job.job_id for job in stage_manifest}
             if not isinstance(payload, dict) or set(payload) != {
                 "schema_version", "manifest_hash", "stage", "approved_skips", "jobs"
             }:
@@ -2045,11 +2386,7 @@ def _read_completion_snapshot(
             if (
                 not _exact_int(payload["schema_version"], StatusStore._SCHEMA_VERSION)
                 or not isinstance(payload["manifest_hash"], str)
-                or (manifest_hash is not None and payload["manifest_hash"] != manifest_hash)
-                or (
-                    expected_manifest_hash is not None
-                    and payload["manifest_hash"] != expected_manifest_hash
-                )
+                or payload["manifest_hash"] != _status_manifest_hash(stage_manifest)
                 or payload["stage"] != stage
                 or not isinstance(payload["jobs"], dict)
                 or set(payload["jobs"]) != expected_ids

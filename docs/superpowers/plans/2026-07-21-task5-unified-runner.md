@@ -551,7 +551,7 @@ assertions only.
 - Produces CLI `main(argv: Sequence[str] | None = None) -> int`
 - Consumes: protocol, layout, manifest, status store, audited data access
 
-- [ ] **Step 1: Write failing CLI and stage-order tests**
+- [x] **Step 1: Write failing CLI and stage-order tests**
 
 Assert all declared choices, `--resume` requiring `--run-id`, smoke overrides,
 one-GPU sequential execution, smoke-only `--stop-after-jobs`, and the exact
@@ -575,11 +575,11 @@ Test that independent jobs continue after one failure, the stage returns
 nonzero, completed jobs are skipped on resume, and dependent stages do not run
 after incomplete prerequisites.
 
-- [ ] **Step 2: Confirm RED**
+- [x] **Step 2: Confirm RED**
 
 Run CLI/engine tests; expect import failures for both new experiment modules.
 
-- [ ] **Step 3: Implement the stage contract**
+- [x] **Step 3: Implement the stage contract**
 
 ```python
 @dataclass(frozen=True)
@@ -615,14 +615,14 @@ dependent job pending when its prerequisite failed so a later resume can run it.
 In smoke mode, `--stop-after-jobs N` exits with code 75 after exactly `N`
 successful atomic writes.  Reject this option in formal mode.
 
-- [ ] **Step 4: Implement CLI lifecycle**
+- [x] **Step 4: Implement CLI lifecycle**
 
 Parse arguments, resolve/freeze configuration for a new run or verify a resume,
 initialize append-mode logging, build the manifest, dispatch the selected
 stage(s), and return `0` only when requested work is complete.  Do not change
 the process working directory and do not redirect global stdout/stderr objects.
 
-- [ ] **Step 5: Verify Task 6**
+- [x] **Step 5: Verify Task 6**
 
 Run CLI tests, `--help`, Ruff, and compilation.  `--help` must work without
 loading datasets or XGBoost models.
