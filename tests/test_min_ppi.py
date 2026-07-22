@@ -17,12 +17,16 @@ Run::
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
+
 import numpy as np
 import pandas as pd
 import pytest
 from sklearn.model_selection import train_test_split
 
 from minppi_mofs.min_ppi import (
+    AlgorithmBPerturbationSchedule,
+    AlgorithmBPerturbationTrial,
     estimate_minppi,
     estimate_minppi_exact,
     estimate_minppi_hybrid,
@@ -30,6 +34,8 @@ from minppi_mofs.min_ppi import (
     estimate_minppi_random_mc,
     estimate_minppi_mi_guided,
     make_shared_coalition_plan,
+    make_algorithm_b_perturbation_schedule,
+    algorithm_b_schedule_digest,
     minppi_stats,
 )
 from minppi_mofs.voting_game import make_acc_full_cache
@@ -392,6 +398,154 @@ class TestAlgorithmB:
         assert len(minppi) == 5
         for val in minppi.values():
             assert val in {-1, 0, +1}
+
+    def test_perturbation_schedule_is_immutable_guidance_independent_and_validated(
+        self, small_data
+    ) -> None:
+        X_train, X_val, y_train, y_val = small_data
+        features = tuple(X_train.columns)
+        first = make_algorithm_b_perturbation_schedule(
+            features, K_adv=3, seed=42
+        )
+        second = make_algorithm_b_perturbation_schedule(
+            features, K_adv=3, seed=42
+        )
+
+        assert isinstance(first, AlgorithmBPerturbationSchedule)
+        assert first == second
+        assert algorithm_b_schedule_digest(first) == algorithm_b_schedule_digest(second)
+        assert first.features == features
+        assert len(first.trials) == len(features)
+        assert all(len(trials) == 3 for trials in first.trials)
+        with pytest.raises(FrozenInstanceError):
+            first.seed = 7
+
+        class RecordingCache:
+            def __init__(self) -> None:
+                self.calls: list[tuple[tuple[str, ...], str]] = []
+
+            def set_threshold(self, alpha: float) -> None:
+                pass
+
+            def eval_marginal(self, coalition: set[str], feature: str) -> int:
+                self.calls.append((tuple(sorted(coalition)), feature))
+                return 0
+
+        random_cache = RecordingCache()
+        guided_cache = RecordingCache()
+        estimate_minppi_mi_correlation_guided(
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            K_adv=3,
+            perturbation_schedule=first,
+            correlation_neighbors=None,
+            mi_scores=None,
+            acc_cache=random_cache,
+            seed=42,
+        )
+        estimate_minppi_mi_correlation_guided(
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            K_adv=3,
+            perturbation_schedule=first,
+            correlation_neighbors={feature: [features[(index + 1) % len(features)]] for index, feature in enumerate(features)},
+            mi_scores={feature: float(len(features) - index) for index, feature in enumerate(features)},
+            acc_cache=guided_cache,
+            seed=42,
+        )
+
+        assert len(random_cache.calls) == len(guided_cache.calls) == 3 * len(features)
+        assert random_cache.calls != guided_cache.calls
+
+        foreign = make_algorithm_b_perturbation_schedule(
+            tuple(reversed(features)), K_adv=3, seed=42
+        )
+        with pytest.raises(ValueError, match="schedule|feature"):
+            estimate_minppi_mi_correlation_guided(
+                X_train,
+                X_val,
+                y_train,
+                y_val,
+                K_adv=3,
+                perturbation_schedule=foreign,
+                acc_cache=RecordingCache(),
+                seed=42,
+            )
+
+    def test_perturbation_schedule_rejects_nested_mutability_and_bool_draws(
+        self, small_data
+    ) -> None:
+        X_train, _, _, _ = small_data
+        features = tuple(X_train.columns)
+        schedule = make_algorithm_b_perturbation_schedule(
+            features, K_adv=2, seed=42
+        )
+        trial = schedule.trials[0][0]
+
+        with pytest.raises(TypeError):
+            trial.removal_draws[0] = 0.9
+        with pytest.raises(ValueError, match="tuple|immutable"):
+            AlgorithmBPerturbationTrial(
+                removal_draws=list(trial.removal_draws),
+                add_count=trial.add_count,
+                add_order=trial.add_order,
+            )
+        with pytest.raises(ValueError, match="tuple|immutable"):
+            AlgorithmBPerturbationTrial(
+                removal_draws=trial.removal_draws,
+                add_count=trial.add_count,
+                add_order=list(trial.add_order),
+            )
+        with pytest.raises(ValueError, match="draw|numeric"):
+            AlgorithmBPerturbationTrial(
+                removal_draws=(False, *trial.removal_draws[1:]),
+                add_count=trial.add_count,
+                add_order=trial.add_order,
+            )
+        with pytest.raises(ValueError, match="tuple|immutable"):
+            AlgorithmBPerturbationSchedule(
+                features=list(schedule.features),
+                seed=schedule.seed,
+                K_adv=schedule.K_adv,
+                seed_orders=schedule.seed_orders,
+                trials=schedule.trials,
+            )
+        with pytest.raises(ValueError, match="tuple|immutable"):
+            AlgorithmBPerturbationSchedule(
+                features=schedule.features,
+                seed=schedule.seed,
+                K_adv=schedule.K_adv,
+                seed_orders=(list(schedule.seed_orders[0]), *schedule.seed_orders[1:]),
+                trials=schedule.trials,
+            )
+        with pytest.raises(ValueError, match="tuple|immutable"):
+            AlgorithmBPerturbationSchedule(
+                features=schedule.features,
+                seed=schedule.seed,
+                K_adv=schedule.K_adv,
+                seed_orders=schedule.seed_orders,
+                trials=(list(schedule.trials[0]), *schedule.trials[1:]),
+            )
+
+    def test_schedule_digest_rejects_structurally_invalid_schedule(
+        self, small_data
+    ) -> None:
+        X_train, _, _, _ = small_data
+        schedule = make_algorithm_b_perturbation_schedule(
+            tuple(X_train.columns), K_adv=2, seed=42
+        )
+        object.__setattr__(
+            schedule,
+            "seed_orders",
+            (list(schedule.seed_orders[0]), *schedule.seed_orders[1:]),
+        )
+
+        with pytest.raises(ValueError, match="schedule|tuple|immutable"):
+            algorithm_b_schedule_digest(schedule)
 
     def test_legacy_estimator_warns(self, small_data, acc_cache) -> None:
         X_tr, X_val, y_tr, y_val = small_data

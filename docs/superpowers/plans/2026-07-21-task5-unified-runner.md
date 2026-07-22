@@ -705,13 +705,13 @@ formal result run.
 - Produces: `run_estimator_job(context)`, `run_ablation_job(context)`
 - Consumes: exact, random MC, canonical Algorithm B, hybrid, `UtilityView`
 
-- [ ] **Step 1: Write fit-accounting tests**
+- [x] **Step 1: Write fit-accounting tests**
 
 Assert that empty-coalition priors do not increment fits, a new nonempty
 coalition increments once, a cache hit does not increment, and two utility
 views share the same count.
 
-- [ ] **Step 2: Implement public counters**
+- [x] **Step 2: Implement public counters**
 
 Initialize `_model_fit_count = 0`; increment immediately after each successful
 nonempty model fit.  Expose read-only properties:
@@ -729,7 +729,7 @@ def coalition_count(self) -> int:
 Also allow frozen `device` and `tree_method` keys in `model_params`; do not
 silently discard backend configuration.
 
-- [ ] **Step 3: Write estimator job tests with tiny data**
+- [x] **Step 3: Write estimator job tests with tiny data**
 
 For 5 features, compare exact/A/B/hybrid outputs against exact and assert
 `harmful_precision`, `harmful_recall`, `harmful_f1`, `score_agreement`,
@@ -737,7 +737,7 @@ For 5 features, compare exact/A/B/hybrid outputs against exact and assert
 exact threshold, assert exact is absent by manifest rule rather than reported as
 zero.
 
-- [ ] **Step 4: Implement estimator jobs**
+- [x] **Step 4: Implement estimator jobs**
 
 Build one `AccFullCache` per method/budget using train/validation only.  For
 Algorithm B, build canonical MI/correlation guidance with explicit task.  Use
@@ -745,14 +745,14 @@ Algorithm B, build canonical MI/correlation guidance with explicit task.  Use
 record actual coalition/model-fit counts so efficiency comparisons use real
 cost.  Compare to exact only when an exact record exists.
 
-- [ ] **Step 5: Implement frozen ablations**
+- [x] **Step 5: Implement frozen ablations**
 
 Use a shared cache plus two `UtilityView` objects for ISOLET accuracy versus OVR
 AUC.  For guidance ablation, run random, MI-only, correlation-only, and combined
 guidance with identical budgets and coalition plans.  Dispatcher ablation uses
 exact only below the feature threshold.  No ablation opens test data.
 
-- [ ] **Step 6: Verify Task 8**
+- [x] **Step 6: Verify Task 8**
 
 Run voting-game, MinPPI, utility, integration, and new stage tests.  Confirm no
 deprecated guidance warning appears in canonical stage execution.

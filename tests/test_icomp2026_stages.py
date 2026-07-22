@@ -8,6 +8,7 @@ import hashlib
 import os
 import subprocess
 import sys
+import warnings
 from dataclasses import FrozenInstanceError, asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +19,9 @@ import pytest
 
 import minppi_mofs.experiment_protocol as protocol_module
 import minppi_mofs.data_protocol as data_protocol_module
+import minppi_mofs.min_ppi as min_ppi_module
+import minppi_mofs.shapg_integration as guidance_module
+import minppi_mofs.voting_game as voting_game_module
 import experiments.icomp2026_stages as stage_module
 from minppi_mofs.experiment_protocol import (
     AuditLog,
@@ -720,6 +724,36 @@ def _write_data_manifest(layout, protocol) -> None:
         for seed in protocol.seeds:
             job = jobs[(dataset.dataset_id, seed)]
             prefix = f"preprocess/{dataset.dataset_id}/s{seed}"
+            if dataset.task == "regression":
+                label_summaries = {
+                    "train": {"count": 6, "max": 3.0, "mean": 1.5, "min": 0.0, "std": 1.0},
+                    "val": {"count": 2, "max": 2.0, "mean": 1.5, "min": 1.0, "std": 0.5},
+                    "test": {"count": 2, "max": 2.0, "mean": 1.5, "min": 1.0, "std": 0.5},
+                }
+            else:
+                label_summaries = {
+                    "train": {
+                        "classes": [
+                            {"count": 3, "label": 0},
+                            {"count": 3, "label": 1},
+                        ],
+                        "count": 6,
+                    },
+                    "val": {
+                        "classes": [
+                            {"count": 1, "label": 0},
+                            {"count": 1, "label": 1},
+                        ],
+                        "count": 2,
+                    },
+                    "test": {
+                        "classes": [
+                            {"count": 1, "label": 0},
+                            {"count": 1, "label": 1},
+                        ],
+                        "count": 2,
+                    },
+                }
             upsert_data_manifest(
                 layout.root / "data_manifest.csv",
                 protocol,
@@ -750,9 +784,15 @@ def _write_data_manifest(layout, protocol) -> None:
                     "train_file_sha256": "5" * 64,
                     "val_file_sha256": "6" * 64,
                     "test_file_sha256": "7" * 64,
-                    "train_label_summary_json": '{"count":6}',
-                    "val_label_summary_json": '{"count":2}',
-                    "test_label_summary_json": '{"count":2}',
+                    "train_label_summary_json": json.dumps(
+                        label_summaries["train"], sort_keys=True, separators=(",", ":")
+                    ),
+                    "val_label_summary_json": json.dumps(
+                        label_summaries["val"], sort_keys=True, separators=(",", ":")
+                    ),
+                    "test_label_summary_json": json.dumps(
+                        label_summaries["test"], sort_keys=True, separators=(",", ":")
+                    ),
                     "transform_metadata_json": '{"scaler_mean":[0.0]}',
                 },
             )
@@ -814,7 +854,9 @@ def test_real_validate_stage_writes_structured_checks_and_requires_raw_cache(
     assert result.metrics["checks_passed"] is True
     assert checks["backend"] == "cpu"
     assert checks["raw_datasets"] == ["spambase", "abalone"]
-    assert checks["registered_stages"] == ["preprocess", "validate"]
+    assert checks["registered_stages"] == [
+        "ablation", "estimator", "preprocess", "validate"
+    ]
     assert all(path.exists() for path in raw_paths.values())
 
     raw_paths["spambase"].unlink()
@@ -1107,6 +1149,8 @@ def test_real_stage_registry_is_exact_and_direct_cli_help_remains_safe() -> None
     assert stage_module.STAGE_EXECUTORS == {
         "validate": stage_module.run_validate_job,
         "preprocess": stage_module.run_preprocess_job,
+        "estimator": stage_module.run_estimator_job,
+        "ablation": stage_module.run_ablation_job,
     }
     completed = subprocess.run(
         [
@@ -1185,6 +1229,1138 @@ def _publication_context(tmp_path: Path, smoke_protocol, run_id: str):
         if item.job.stage == "preprocess" and item.job.dataset_id == "spambase"
     )
     return layout, preprocess
+
+
+def _prepared_estimator_context(tmp_path: Path, smoke_protocol, run_id: str):
+    protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    protocol = replace(protocol, datasets=(protocol.datasets[0],))
+    layout = create_new_run(tmp_path / "results", run_id, protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    manifest = (
+        build_job_manifest(protocol, stages=("validate",))
+        + build_job_manifest(protocol, stages=("preprocess",))
+        + build_job_manifest(
+            protocol,
+            stages=("estimator",),
+            data_manifest=(
+                {
+                    "dataset_id": "spambase",
+                    "seed": 42,
+                    "selected_feature_count": 2,
+                },
+            ),
+        )
+    )
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    original_executors = dict(stage_module.STAGE_EXECUTORS)
+    stage_module.STAGE_EXECUTORS["estimator"] = lambda item: _result(item.job)
+    try:
+        stage_module.run_validate_job(
+            next(item for item in contexts if item.job.stage == "validate")
+        )
+    finally:
+        stage_module.STAGE_EXECUTORS.clear()
+        stage_module.STAGE_EXECUTORS.update(original_executors)
+    stage_module.run_preprocess_job(
+        next(item for item in contexts if item.job.stage == "preprocess")
+    )
+    return layout, next(item for item in contexts if item.job.stage == "estimator")
+
+
+def test_prepared_data_loader_verifies_rich_manifest_without_touching_test(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, context = _prepared_estimator_context(tmp_path, smoke_protocol, "prepared")
+    test_path = layout.root / "preprocess" / "spambase" / "s42" / "test.csv"
+    original_open = Path.open
+    original_read_bytes = Path.read_bytes
+    original_stat = Path.stat
+
+    def guard_open(path: Path, *args, **kwargs):
+        if Path(path) == test_path:
+            raise AssertionError("estimator opened test.csv")
+        return original_open(path, *args, **kwargs)
+
+    def guard_read_bytes(path: Path) -> bytes:
+        if Path(path) == test_path:
+            raise AssertionError("estimator read test.csv")
+        return original_read_bytes(path)
+
+    def guard_stat(path: Path, *args, **kwargs):
+        if Path(path) == test_path:
+            raise AssertionError("estimator statted test.csv")
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guard_open)
+    monkeypatch.setattr(Path, "read_bytes", guard_read_bytes)
+    monkeypatch.setattr(Path, "stat", guard_stat)
+    X_train, y_train, X_val, y_val, row = stage_module._load_prepared_train_validation(
+        context
+    )
+
+    assert list(X_train) == list(X_val) == json.loads(row["selected_features_json"])
+    assert len(X_train) == row["train_row_count"]
+    assert len(X_val) == row["val_row_count"]
+    assert len(y_train) == len(X_train)
+    assert len(y_val) == len(X_val)
+
+
+def test_prepared_data_loader_fails_closed_on_hash_or_schema_drift(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout, context = _prepared_estimator_context(tmp_path, smoke_protocol, "drift")
+    train_path = layout.root / "preprocess" / "spambase" / "s42" / "train.csv"
+    original = train_path.read_bytes()
+    train_path.write_bytes(original + b"\n")
+    with pytest.raises(ValueError, match="SHA-256|hash|drift"):
+        stage_module._load_prepared_train_validation(context)
+
+    train_path.write_bytes(original)
+    frame = pd.read_csv(train_path)
+    frame = frame[[frame.columns[1], frame.columns[0], frame.columns[-1]]]
+    frame.to_csv(train_path, index=False, lineterminator="\n")
+    manifest_path = layout.root / "data_manifest.csv"
+    text = manifest_path.read_text(encoding="utf-8")
+    old_hash = hashlib.sha256(original).hexdigest()
+    new_hash = hashlib.sha256(train_path.read_bytes()).hexdigest()
+    manifest_path.write_text(text.replace(old_hash, new_hash), encoding="utf-8")
+    with pytest.raises(ValueError, match="feature|column|order"):
+        stage_module._load_prepared_train_validation(context)
+
+
+def _prepared_loader_case(
+    tmp_path: Path,
+    context: StageContext,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    task: str,
+    train_labels: list[float | int],
+    val_labels: list[float | int],
+    summary_override: tuple[str, dict[str, object]] | None = None,
+):
+    prefix = Path("preprocess") / context.job.dataset_id / f"s{context.job.seed}"
+    directory = context.layout.root / prefix
+    directory.mkdir(parents=True, exist_ok=True)
+    columns = ["f0", "f1"]
+    train = pd.DataFrame(
+        {"f0": np.arange(len(train_labels), dtype=float), "f1": 1.0, "target": train_labels}
+    )
+    val = pd.DataFrame(
+        {"f0": np.arange(len(val_labels), dtype=float), "f1": 2.0, "target": val_labels}
+    )
+    payloads = {
+        "train": train.to_csv(index=False, lineterminator="\n").encode("utf-8"),
+        "val": val.to_csv(index=False, lineterminator="\n").encode("utf-8"),
+    }
+    for partition, payload in payloads.items():
+        (directory / f"{partition}.csv").write_bytes(payload)
+    summaries = {
+        "train": stage_module._label_summary(np.asarray(train_labels), task),
+        "val": stage_module._label_summary(np.asarray(val_labels), task),
+    }
+    if summary_override is not None:
+        summaries[summary_override[0]] = summary_override[1]
+    row = {
+        "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed,
+        "task": task,
+        "target": "target",
+        "selected_features_json": json.dumps(columns, separators=(",", ":")),
+        "train_relpath": (prefix / "train.csv").as_posix(),
+        "val_relpath": (prefix / "val.csv").as_posix(),
+        "train_file_sha256": hashlib.sha256(payloads["train"]).hexdigest(),
+        "val_file_sha256": hashlib.sha256(payloads["val"]).hexdigest(),
+        "train_row_count": len(train),
+        "val_row_count": len(val),
+        "train_label_summary_json": json.dumps(summaries["train"], sort_keys=True, separators=(",", ":")),
+        "val_label_summary_json": json.dumps(summaries["val"], sort_keys=True, separators=(",", ":")),
+    }
+    monkeypatch.setattr(stage_module, "read_rich_data_manifest", lambda *args: (row,))
+    return directory / "test.csv"
+
+
+@pytest.mark.parametrize(
+    ("task", "train_labels", "val_labels", "message"),
+    [
+        ("binary", [0, 0, 0, 0], [0, 0], "binary|class"),
+        ("binary", [2, 3, 2, 3], [2, 3], "binary|0.*1|class"),
+        ("multiclass", [1, 2, 1, 2], [1, 2], "multiclass|zero|contiguous"),
+        ("multiclass", [0, 2, 0, 2], [0, 2], "multiclass|contiguous"),
+        ("multiclass", [0, 1, 0, 1], [2, 2], "validation|unseen|subset"),
+    ],
+)
+def test_prepared_loader_rejects_invalid_classification_label_shape_before_model_work(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    task: str,
+    train_labels: list[int],
+    val_labels: list[int],
+    message: str,
+) -> None:
+    _, _, _, contexts, _ = _tiny_estimator_setup(tmp_path, smoke_protocol)
+    context = contexts[0]
+    _prepared_loader_case(
+        tmp_path,
+        context,
+        monkeypatch,
+        task=task,
+        train_labels=train_labels,
+        val_labels=val_labels,
+    )
+
+    with pytest.raises(ValueError, match=message):
+        stage_module._load_prepared_train_validation(context)
+
+
+def test_prepared_loader_recomputes_summary_with_regression_roundtrip_tolerance_and_no_test_access(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, _, _, contexts, _ = _tiny_estimator_setup(tmp_path, smoke_protocol)
+    context = contexts[0]
+    test_path = _prepared_loader_case(
+        tmp_path,
+        context,
+        monkeypatch,
+        task="regression",
+        train_labels=[0.1, 0.2, 0.3, 0.4],
+        val_labels=[0.15, 0.35],
+    )
+    original_open = Path.open
+    original_read_bytes = Path.read_bytes
+    original_stat = Path.stat
+
+    def guard_open(path: Path, *args, **kwargs):
+        if Path(path) == test_path:
+            raise AssertionError("prepared loader opened test.csv")
+        return original_open(path, *args, **kwargs)
+
+    def guard_read_bytes(path: Path) -> bytes:
+        if Path(path) == test_path:
+            raise AssertionError("prepared loader read test.csv")
+        return original_read_bytes(path)
+
+    def guard_stat(path: Path, *args, **kwargs):
+        if Path(path) == test_path:
+            raise AssertionError("prepared loader statted test.csv")
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guard_open)
+    monkeypatch.setattr(Path, "read_bytes", guard_read_bytes)
+    monkeypatch.setattr(Path, "stat", guard_stat)
+    stage_module._load_prepared_train_validation(context)
+
+
+def test_prepared_loader_rejects_train_or_validation_summary_mismatch(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, _, _, contexts, _ = _tiny_estimator_setup(tmp_path, smoke_protocol)
+    context = contexts[0]
+    _prepared_loader_case(
+        tmp_path,
+        context,
+        monkeypatch,
+        task="binary",
+        train_labels=[0, 1, 0, 1],
+        val_labels=[0, 1],
+        summary_override=(
+            "val", {"classes": [{"count": 2, "label": 0}], "count": 2}
+        ),
+    )
+
+    with pytest.raises(ValueError, match="summary|manifest"):
+        stage_module._load_prepared_train_validation(context)
+
+
+def _tiny_estimator_setup(tmp_path: Path, smoke_protocol, *, exact_max_features=20):
+    dataset = replace(smoke_protocol.datasets[0], max_features=5)
+    protocol = replace(
+        smoke_protocol,
+        datasets=(dataset,),
+        exact_max_features=exact_max_features,
+        model_params={
+            "n_estimators": 1,
+            "max_depth": 1,
+            "learning_rate": 0.3,
+            "n_jobs": 1,
+        },
+    )
+    projection = (
+        {"dataset_id": dataset.dataset_id, "seed": 42, "selected_feature_count": 5},
+    )
+    manifest = build_job_manifest(
+        protocol, stages=("estimator",), data_manifest=projection
+    )
+    layout = create_new_run(tmp_path / "results", f"est-{exact_max_features}", protocol)
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    rng = np.random.default_rng(108)
+    X = pd.DataFrame(rng.normal(size=(36, 5)), columns=[f"f{i}" for i in range(5)])
+    y = (X["f0"] + 0.4 * X["f1"] > 0).astype(int).to_numpy()
+    prepared = (X.iloc[:24].copy(), y[:24], X.iloc[24:].copy(), y[24:])
+    row = {"selected_features_json": json.dumps(list(X.columns))}
+    return protocol, layout, status, contexts, (*prepared, row)
+
+
+def test_tiny_estimator_jobs_write_costs_and_exact_agreement(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, layout, status, contexts, prepared = _tiny_estimator_setup(
+        tmp_path, smoke_protocol
+    )
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    by_method = {item.job.method: item for item in contexts}
+    records: dict[str, ResultRecord] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for method in ("exact", "random_mc", "mi_correlation_guided", "hybrid"):
+            context = by_method[method]
+            record = stage_module.run_estimator_job(context)
+            records[method] = record
+            atomic_write_json(layout.root / context.job.output_relpath, asdict(record))
+            status.start(context.job.job_id)
+            status.succeed(context.job.job_id)
+
+    assert not any("deprecated" in str(item.message).lower() for item in caught)
+    agreement = {
+        "harmful_precision", "harmful_recall", "harmful_f1", "score_agreement"
+    }
+    for method, record in records.items():
+        assert agreement <= set(record.metrics)
+        assert all(0.0 <= float(record.metrics[key]) <= 1.0 for key in agreement)
+        assert record.metrics["budget"] == 2
+        assert int(record.metrics["model_fit_count"]) >= 1
+        assert int(record.metrics["coalition_count"]) >= 1
+        assert float(record.metrics["runtime_s"]) >= 0.0
+        path = layout.root / record.artifacts["scores"]
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        assert path == (
+            layout.root
+            / f"estimator/spambase/s42/{method}/b2/scores.json"
+        )
+        assert payload["method"] == method
+        assert payload["budget"] == 2
+        assert [item["feature"] for item in payload["scores"]] == [f"f{i}" for i in range(5)]
+        assert all(item["score"] in {-1, 0, 1} for item in payload["scores"])
+        assert payload["model_fit_count"] == record.metrics["model_fit_count"]
+        assert payload["coalition_count"] == record.metrics["coalition_count"]
+        if method == "exact":
+            accepted = stage_module._read_score_artifact(
+                path,
+                expected_job=by_method[method].job,
+                budget=2,
+                expected_features=tuple(f"f{index}" for index in range(5)),
+            )
+            assert tuple(accepted) == tuple(f"f{index}" for index in range(5))
+            assert payload["coalition_count"] == payload["model_fit_count"] + 1
+    assert all(records["exact"].metrics[key] == 1.0 for key in agreement)
+    assert all(records["hybrid"].metrics[key] == 1.0 for key in agreement)
+
+
+def test_estimator_omits_agreement_when_manifest_has_no_exact_job(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, _, _, contexts, prepared = _tiny_estimator_setup(
+        tmp_path, smoke_protocol, exact_max_features=4
+    )
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    context = next(item for item in contexts if item.job.method == "random_mc")
+
+    record = stage_module.run_estimator_job(context)
+
+    assert not {
+        "harmful_precision", "harmful_recall", "harmful_f1", "score_agreement"
+    }.intersection(record.metrics)
+
+
+def _tiny_ablation_setup(tmp_path: Path, smoke_protocol):
+    dataset = replace(
+        smoke_protocol.datasets[0],
+        dataset_id="isolet",
+        display_name="Tiny ISOLET",
+        task="multiclass",
+        utility="ovr_auc",
+        max_features=4,
+    )
+    protocol = replace(
+        smoke_protocol,
+        datasets=(dataset,),
+        model_params={
+            "n_estimators": 1,
+            "max_depth": 1,
+            "learning_rate": 0.3,
+            "n_jobs": 1,
+        },
+    )
+    manifest = build_job_manifest(
+        protocol,
+        stages=("ablation",),
+        data_manifest=(
+            {"dataset_id": "isolet", "seed": 42, "selected_feature_count": 4},
+        ),
+    )
+    layout = create_new_run(tmp_path / "results", "utility-pair", protocol)
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    rng = np.random.default_rng(56)
+    X = pd.DataFrame(rng.normal(size=(45, 4)), columns=[f"f{i}" for i in range(4)])
+    y = np.tile(np.arange(3), 15)
+    prepared = (X.iloc[:30].copy(), y[:30], X.iloc[30:].copy(), y[30:])
+    row = {"selected_features_json": json.dumps(list(X.columns))}
+    return layout, contexts, (*prepared, row)
+
+
+def test_utility_ablation_publishes_and_reuses_one_shared_cache_pair(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, contexts, prepared = _tiny_ablation_setup(tmp_path, smoke_protocol)
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "read_rich_data_manifest",
+        lambda *args: (
+            {
+                "dataset_id": "isolet",
+                "seed": 42,
+                "selected_features_json": '["f0","f1","f2","f3"]',
+            },
+        ),
+    )
+    constructed: list[voting_game_module.AccFullCache] = []
+    real_cache = voting_game_module.AccFullCache
+
+    class CountingCache(real_cache):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            constructed.append(self)
+
+    monkeypatch.setattr(voting_game_module, "AccFullCache", CountingCache)
+    utility_contexts = {
+        item.job.parameters["value"]: item
+        for item in contexts
+        if item.job.method == "utility"
+    }
+
+    accuracy = stage_module.run_ablation_job(utility_contexts["accuracy"])
+    paired_path = layout.root / accuracy.artifacts["paired_scores"]
+    before = paired_path.read_bytes()
+    auc = stage_module.run_ablation_job(utility_contexts["ovr_auc"])
+
+    assert len(constructed) == 1
+    assert paired_path == (
+        layout.root / "ablation/isolet/s42/utility/paired/b2/scores.json"
+    )
+    assert paired_path.read_bytes() == before
+    assert accuracy.metrics["shared_group_id"] == auc.metrics["shared_group_id"]
+    assert accuracy.metrics["shared_group_model_fit_count"] == auc.metrics[
+        "shared_group_model_fit_count"
+    ]
+    assert accuracy.metrics["shared_group_coalition_count"] == auc.metrics[
+        "shared_group_coalition_count"
+    ]
+    payload = json.loads(before)
+    assert set(payload["scores"]) == {"accuracy", "ovr_auc"}
+    assert payload["secondary_model_fit_delta"] == 0
+    assert payload["secondary_coalition_delta"] == 0
+    assert payload["shared_group_model_fit_count"] == accuracy.metrics[
+        "shared_group_model_fit_count"
+    ]
+    assert payload["shared_group_coalition_count"] == accuracy.metrics[
+        "shared_group_coalition_count"
+    ]
+
+
+def test_utility_ablation_reuse_rejects_manifest_feature_order_conflict(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, contexts, prepared = _tiny_ablation_setup(tmp_path, smoke_protocol)
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "read_rich_data_manifest",
+        lambda *args: (
+            {
+                "dataset_id": "isolet",
+                "seed": 42,
+                "selected_features_json": '["f0","f1","f2","f3"]',
+            },
+        ),
+    )
+    utility_contexts = {
+        item.job.parameters["value"]: item
+        for item in contexts
+        if item.job.method == "utility"
+    }
+    first = stage_module.run_ablation_job(utility_contexts["accuracy"])
+    path = layout.root / first.artifacts["paired_scores"]
+    document = json.loads(path.read_text(encoding="utf-8"))
+    for metric in ("accuracy", "ovr_auc"):
+        document["scores"][metric][0]["feature"] = "forged"
+    atomic_write_json(path, document)
+
+    with pytest.raises(ValueError, match="feature|manifest|identity"):
+        stage_module.run_ablation_job(utility_contexts["ovr_auc"])
+
+
+def test_guidance_ablation_maps_components_with_equal_budget_seed_and_schedule(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, contexts, prepared = _tiny_ablation_setup(tmp_path, smoke_protocol)
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    mi = {f"f{i}": float(4 - i) for i in range(4)}
+    neighbors = {f"f{i}": [f"f{(i + 1) % 4}"] for i in range(4)}
+    monkeypatch.setattr(
+        guidance_module, "compute_mi_guidance_signal", lambda *args, **kwargs: mi
+    )
+    monkeypatch.setattr(
+        guidance_module, "get_correlation_neighbors", lambda *args, **kwargs: neighbors
+    )
+    monkeypatch.setattr(
+        guidance_module,
+        "build_mi_correlation_guidance",
+        lambda *args, **kwargs: (mi, neighbors),
+    )
+    calls: list[dict[str, object]] = []
+
+    def fake_algorithm_b(*args, **kwargs):
+        calls.append(kwargs)
+        value = (
+            1
+            if kwargs["mi_scores"] is None and kwargs["correlation_neighbors"] is None
+            else 0
+            if kwargs["correlation_neighbors"] is None
+            else -1
+        )
+        return {feature: value for feature in kwargs["X_train"].columns}
+
+    monkeypatch.setattr(
+        min_ppi_module, "estimate_minppi_mi_correlation_guided", fake_algorithm_b
+    )
+    guidance_contexts = [item for item in contexts if item.job.method == "guidance"]
+    records = [stage_module.run_ablation_job(item) for item in guidance_contexts]
+
+    expected = {
+        "random": (None, None),
+        "mi": (mi, None),
+        "correlation": (None, neighbors),
+        "mi_correlation": (mi, neighbors),
+    }
+    by_value = {item.job.parameters["value"]: item for item in guidance_contexts}
+    schedule_digests: set[str] = set()
+    schedules: list[object] = []
+    for call, record in zip(calls, records, strict=True):
+        value = record.metrics["value"]
+        assert (call["mi_scores"], call["correlation_neighbors"]) == expected[value]
+        assert call["K_adv"] == record.metrics["budget"] == 2
+        assert call["seed"] == by_value[value].job.seed == 42
+        schedules.append(call["perturbation_schedule"])
+        payload = json.loads(
+            (layout.root / record.artifacts["scores"]).read_text(encoding="utf-8")
+        )
+        assert payload["value"] == value
+        assert payload["budget"] == 2
+        assert payload["schedule_seed"] == 42
+        schedule_digests.add(payload["schedule_digest"])
+        assert payload["method"] == "mi_correlation_guided"
+        assert payload["model_fit_count"] >= 1
+        assert payload["coalition_count"] >= 1
+    assert len(schedule_digests) == 1
+    assert all(schedule == schedules[0] for schedule in schedules)
+
+
+def test_estimator_artifact_is_identical_across_python_hash_seeds(tmp_path: Path) -> None:
+    script = r'''
+import json
+import sys
+from dataclasses import replace
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+import experiments.icomp2026_stages as stages
+from experiments.icomp2026_stages import StageContext
+from minppi_mofs.experiment_protocol import (
+    AuditLog, StatusStore, build_job_manifest, create_new_run, load_resolved_protocol,
+)
+
+root = Path(sys.argv[1])
+protocol = load_resolved_protocol(
+    Path("configs"), seeds=(42,), backend="cpu", smoke=True
+)
+dataset = replace(protocol.datasets[0], max_features=8)
+protocol = replace(
+    protocol,
+    datasets=(dataset,),
+    estimator_methods=("mi_correlation_guided",),
+    estimator_budgets=(3,),
+    model_params={"n_estimators": 1, "max_depth": 1, "learning_rate": 0.3, "n_jobs": 1},
+)
+manifest = build_job_manifest(
+    protocol,
+    stages=("estimator",),
+    data_manifest=({"dataset_id": dataset.dataset_id, "seed": 42, "selected_feature_count": 8},),
+)
+layout = create_new_run(root, "hash-stable", protocol)
+status = StatusStore(layout, manifest)
+context = StageContext(
+    protocol, layout, manifest[0], status,
+    AuditLog.from_manifest(layout.audit_path, manifest),
+)
+values = np.arange(32 * 8, dtype=float).reshape(32, 8)
+X = pd.DataFrame(values, columns=[f"f{i}" for i in range(8)])
+y = np.tile([0, 1], 16)
+row = {"selected_features_json": json.dumps(list(X.columns))}
+stages._load_prepared_train_validation = lambda context: (
+    X.iloc[:24].copy(), y[:24], X.iloc[24:].copy(), y[24:], row
+)
+record = stages.run_estimator_job(context)
+document = json.loads((layout.root / record.artifacts["scores"]).read_text(encoding="utf-8"))
+print(json.dumps({
+    "scores": document["scores"],
+    "model_fit_count": document["model_fit_count"],
+    "coalition_count": document["coalition_count"],
+    "schedule_digest": document["schedule_digest"],
+}, sort_keys=True))
+'''
+    outputs = []
+    for hash_seed in ("1", "2"):
+        environment = os.environ.copy()
+        environment["PYTHONHASHSEED"] = hash_seed
+        completed = subprocess.run(
+            [sys.executable, "-c", script, str(tmp_path / f"h{hash_seed}")],
+            cwd=Path(__file__).parents[1],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stderr
+        outputs.append(json.loads(completed.stdout.strip().splitlines()[-1]))
+
+    assert outputs[0] == outputs[1]
+
+
+def test_dispatcher_ablation_maps_direct_estimators_and_exact_is_manifest_gated(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, contexts, prepared = _tiny_ablation_setup(tmp_path, smoke_protocol)
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    def fake(name: str, score: int):
+        def run(*args, **kwargs):
+            calls.append((name, kwargs))
+            return {feature: score for feature in kwargs["X_train"].columns}
+        return run
+
+    monkeypatch.setattr(min_ppi_module, "estimate_minppi_exact", fake("exact", 1))
+    monkeypatch.setattr(min_ppi_module, "estimate_minppi_random_mc", fake("random_mc", 0))
+    monkeypatch.setattr(
+        min_ppi_module,
+        "estimate_minppi_mi_correlation_guided",
+        fake("mi_correlation_guided", -1),
+    )
+    monkeypatch.setattr(min_ppi_module, "estimate_minppi_hybrid", fake("hybrid", 0))
+    monkeypatch.setattr(
+        guidance_module,
+        "build_mi_correlation_guidance",
+        lambda *args, **kwargs: ({"f0": 1.0}, {"f0": ["f1"]}),
+    )
+    dispatcher_contexts = [item for item in contexts if item.job.method == "dispatcher"]
+    records = [stage_module.run_ablation_job(item) for item in dispatcher_contexts]
+
+    assert [name for name, _ in calls] == [
+        item.job.parameters["value"] for item in dispatcher_contexts
+    ]
+    for (name, call), record in zip(calls, records, strict=True):
+        assert record.metrics["value"] == name
+        assert record.metrics["budget"] == 2
+        if name == "random_mc":
+            assert call["K"] == 2
+        elif name == "mi_correlation_guided":
+            assert call["K_adv"] == 2
+        elif name == "hybrid":
+            assert call["K"] == call["K_adv"] == 2
+        payload = json.loads(
+            (layout.root / record.artifacts["scores"]).read_text(encoding="utf-8")
+        )
+        assert payload["value"] == name
+
+    exact_context = next(
+        item
+        for item in dispatcher_contexts
+        if item.job.parameters["value"] == "exact"
+    )
+    protocol = replace(exact_context.protocol, exact_max_features=3)
+    manifest = build_job_manifest(
+        protocol,
+        stages=("ablation",),
+        data_manifest=(
+            {"dataset_id": "isolet", "seed": 42, "selected_feature_count": 4},
+        ),
+    )
+    assert not any(
+        job.method == "dispatcher" and job.parameters["value"] == "exact"
+        for job in manifest
+    )
+    gated_layout = create_new_run(tmp_path / "results", "exact-gated", protocol)
+    gated_status = StatusStore(gated_layout, manifest)
+    forged = StageContext(
+        protocol,
+        gated_layout,
+        replace(exact_context.job, protocol_hash=manifest[0].protocol_hash),
+        gated_status,
+        AuditLog.from_manifest(gated_layout.audit_path, manifest),
+    )
+    with pytest.raises(ValueError, match="manifest|exact"):
+        stage_module.run_ablation_job(forged)
+
+
+def test_estimator_artifact_retry_is_identical_and_conflict_is_rejected(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, layout, _, contexts, prepared = _tiny_estimator_setup(
+        tmp_path, smoke_protocol, exact_max_features=4
+    )
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    context = next(item for item in contexts if item.job.method == "random_mc")
+    first = stage_module.run_estimator_job(context)
+    path = layout.root / first.artifacts["scores"]
+    frozen = path.read_bytes()
+
+    second = stage_module.run_estimator_job(context)
+    assert second.artifacts == first.artifacts
+    assert path.read_bytes() == frozen
+
+    conflict = json.loads(frozen)
+    conflict["scores"][0]["score"] = -1 if conflict["scores"][0]["score"] != -1 else 1
+    atomic_write_json(path, conflict)
+    conflicting_bytes = path.read_bytes()
+    with pytest.raises(RuntimeError, match="conflict|frozen|identical"):
+        stage_module.run_estimator_job(context)
+    assert path.read_bytes() == conflicting_bytes
+
+
+def _run_artifact_publish_processes(
+    destination: Path, documents: tuple[dict[str, object], dict[str, object]]
+) -> list[subprocess.CompletedProcess[str]]:
+    script = """
+import json
+import sys
+from pathlib import Path
+import experiments.icomp2026_stages as stages
+
+destination = Path(sys.argv[1]).resolve()
+document = json.loads(sys.argv[2])
+original_exists = Path.exists
+
+def hide_destination(self):
+    if self.resolve() == destination:
+        return False
+    return original_exists(self)
+
+Path.exists = hide_destination
+try:
+    stages._publish_idempotent_json(
+        destination, document, context="process-race artifact"
+    )
+except Exception as exc:
+    print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+    raise SystemExit(4)
+"""
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-c", script, str(destination), json.dumps(document)],
+            cwd=Path(__file__).parents[1],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for document in documents
+    ]
+    return [
+        subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+        for process in processes
+        for stdout, stderr in [process.communicate(timeout=30)]
+    ]
+
+
+def test_artifact_publication_process_race_reuses_identical_content(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "race" / "scores.json"
+    document = {"scores": [1, 0, -1], "seed": 42}
+
+    completed = _run_artifact_publish_processes(
+        destination, (document, document.copy())
+    )
+
+    assert [item.returncode for item in completed] == [0, 0]
+    assert json.loads(destination.read_text(encoding="utf-8")) == document
+    assert not list(destination.parent.glob(".*.tmp"))
+
+
+def test_artifact_publication_process_race_rejects_conflicting_content(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "race" / "scores.json"
+    documents = ({"winner": "first"}, {"winner": "second"})
+
+    completed = _run_artifact_publish_processes(destination, documents)
+
+    assert sorted(item.returncode for item in completed) == [0, 4]
+    conflict = next(item for item in completed if item.returncode == 4)
+    assert "RuntimeError" in conflict.stderr
+    assert json.loads(destination.read_text(encoding="utf-8")) in documents
+    assert not list(destination.parent.glob(".*.tmp"))
+
+
+@pytest.mark.parametrize(
+    ("model_fit_count", "coalition_count"),
+    [
+        (True, 2),
+        (-1, 0),
+        (0, 0),
+        (1, 1),
+        (2, 1),
+        (1, 3),
+    ],
+)
+def test_exact_score_artifact_rejects_invalid_cost_types_values_and_relationships(
+    tmp_path: Path,
+    smoke_protocol,
+    model_fit_count: object,
+    coalition_count: object,
+) -> None:
+    _, layout, _, contexts, _ = _tiny_estimator_setup(tmp_path, smoke_protocol)
+    exact = next(item.job for item in contexts if item.job.method == "exact")
+    path = layout.root / "exact-cost.json"
+    atomic_write_json(
+        path,
+        {
+            "protocol_hash": exact.protocol_hash,
+            "job_id": exact.job_id,
+            "dataset_id": exact.dataset_id,
+            "seed": exact.seed,
+            "method": exact.method,
+            "budget": exact.parameters["budget"],
+            "scores": [
+                {"feature": f"f{index}", "score": 0} for index in range(5)
+            ],
+            "model_fit_count": model_fit_count,
+            "coalition_count": coalition_count,
+        },
+    )
+
+    with pytest.raises(ValueError, match="cost|fit|coalition|counter"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=exact,
+            budget=int(exact.parameters["budget"]),
+            expected_features=tuple(f"f{index}" for index in range(5)),
+        )
+
+
+@pytest.mark.parametrize("score", [True, False])
+def test_exact_score_artifact_rejects_boolean_scores(
+    tmp_path: Path, smoke_protocol, score: bool
+) -> None:
+    _, layout, _, contexts, _ = _tiny_estimator_setup(tmp_path, smoke_protocol)
+    exact = next(item.job for item in contexts if item.job.method == "exact")
+    path = layout.root / "exact-bool-score.json"
+    atomic_write_json(
+        path,
+        {
+            "protocol_hash": exact.protocol_hash,
+            "job_id": exact.job_id,
+            "dataset_id": exact.dataset_id,
+            "seed": exact.seed,
+            "method": exact.method,
+            "budget": exact.parameters["budget"],
+            "scores": [
+                {"feature": f"f{index}", "score": score if index == 0 else 0}
+                for index in range(5)
+            ],
+            "model_fit_count": 1,
+            "coalition_count": 2,
+        },
+    )
+
+    with pytest.raises(ValueError, match="score|integer|boolean"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=exact,
+            budget=2,
+            expected_features=tuple(f"f{index}" for index in range(5)),
+        )
+
+
+def test_exact_score_artifact_rejects_duplicate_feature_before_overwrite(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    _, layout, _, contexts, _ = _tiny_estimator_setup(tmp_path, smoke_protocol)
+    exact = next(item.job for item in contexts if item.job.method == "exact")
+    path = layout.root / "exact-duplicate-feature.json"
+    scores = [
+        {"feature": "f0", "score": -1},
+        {"feature": "f0", "score": 1},
+        *[
+            {"feature": f"f{index}", "score": 0}
+            for index in range(1, 5)
+        ],
+    ]
+    atomic_write_json(
+        path,
+        {
+            "protocol_hash": exact.protocol_hash,
+            "job_id": exact.job_id,
+            "dataset_id": exact.dataset_id,
+            "seed": exact.seed,
+            "method": exact.method,
+            "budget": exact.parameters["budget"],
+            "scores": scores,
+            "model_fit_count": 1,
+            "coalition_count": 2,
+        },
+    )
+
+    with pytest.raises(ValueError, match="duplicate|feature|score"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=exact,
+            budget=2,
+            expected_features=tuple(f"f{index}" for index in range(5)),
+        )
+
+
+@pytest.mark.parametrize("mutation", ["duplicate_key", "noncanonical", "nonfinite"])
+def test_exact_score_reader_rejects_noncanonical_or_malformed_json(
+    tmp_path: Path, smoke_protocol, mutation: str
+) -> None:
+    _, layout, _, contexts, _ = _tiny_estimator_setup(tmp_path, smoke_protocol)
+    exact = next(item.job for item in contexts if item.job.method == "exact")
+    path = layout.root / "exact-strict-json.json"
+    document = {
+        "protocol_hash": exact.protocol_hash,
+        "job_id": exact.job_id,
+        "dataset_id": exact.dataset_id,
+        "seed": exact.seed,
+        "method": exact.method,
+        "budget": exact.parameters["budget"],
+        "scores": [
+            {"feature": f"f{index}", "score": 0} for index in range(5)
+        ],
+        "model_fit_count": 1,
+        "coalition_count": 2,
+    }
+    atomic_write_json(path, document)
+    canonical = path.read_text(encoding="utf-8")
+    if mutation == "duplicate_key":
+        path.write_text(
+            canonical.replace('  "seed": 42\n', '  "seed": 42,\n  "seed": 42\n'),
+            encoding="utf-8",
+            newline="\n",
+        )
+    elif mutation == "noncanonical":
+        path.write_text(json.dumps(document), encoding="utf-8", newline="\n")
+    else:
+        path.write_text(
+            canonical.replace('  "seed": 42\n', '  "seed": NaN\n'),
+            encoding="utf-8",
+            newline="\n",
+        )
+
+    with pytest.raises(ValueError, match="malformed|canonical|JSON"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=exact,
+            budget=2,
+            expected_features=tuple(f"f{index}" for index in range(5)),
+        )
+
+
+def _published_utility_pair_for_reader_test(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+):
+    layout, contexts, prepared = _tiny_ablation_setup(tmp_path, smoke_protocol)
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "read_rich_data_manifest",
+        lambda *args: (
+            {
+                "dataset_id": "isolet",
+                "seed": 42,
+                "selected_features_json": '["f0","f1","f2","f3"]',
+            },
+        ),
+    )
+    utility_contexts = {
+        item.job.parameters["value"]: item
+        for item in contexts
+        if item.job.method == "utility"
+    }
+    record = stage_module.run_ablation_job(utility_contexts["accuracy"])
+    return layout.root / record.artifacts["paired_scores"], utility_contexts
+
+
+@pytest.mark.parametrize("score", [True, False])
+def test_utility_paired_reader_rejects_boolean_scores_before_refit(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    score: bool,
+) -> None:
+    path, contexts = _published_utility_pair_for_reader_test(
+        tmp_path, smoke_protocol, monkeypatch
+    )
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["scores"]["accuracy"][0]["score"] = score
+    atomic_write_json(path, document)
+
+    class RejectCacheConstruction:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("paired artifact validation attempted to refit")
+
+    monkeypatch.setattr(voting_game_module, "AccFullCache", RejectCacheConstruction)
+    with pytest.raises(ValueError, match="score|integer|boolean"):
+        stage_module.run_ablation_job(contexts["ovr_auc"])
+
+
+@pytest.mark.parametrize("mutation", ["duplicate_key", "noncanonical"])
+def test_utility_paired_reader_rejects_noncanonical_json_before_refit(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    path, contexts = _published_utility_pair_for_reader_test(
+        tmp_path, smoke_protocol, monkeypatch
+    )
+    canonical = path.read_text(encoding="utf-8")
+    if mutation == "duplicate_key":
+        path.write_text(
+            canonical.replace('  "seed": 42,\n', '  "seed": 42,\n  "seed": 42,\n'),
+            encoding="utf-8",
+            newline="\n",
+        )
+    else:
+        document = json.loads(canonical)
+        path.write_text(json.dumps(document), encoding="utf-8", newline="\n")
+
+    class RejectCacheConstruction:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("paired artifact validation attempted to refit")
+
+    monkeypatch.setattr(voting_game_module, "AccFullCache", RejectCacheConstruction)
+    with pytest.raises(ValueError, match="malformed|canonical|JSON"):
+        stage_module.run_ablation_job(contexts["ovr_auc"])
+
+
+@pytest.mark.parametrize(
+    ("field", "mutate"),
+    [
+        ("plan_step_count", lambda value: value + 1),
+        ("shared_group_model_fit_count", lambda value: value - 1),
+        ("shared_group_coalition_count", lambda value: value + 1),
+        ("secondary_model_fit_delta", lambda value: value + 1),
+        ("secondary_coalition_delta", lambda value: value + 1),
+    ],
+)
+def test_utility_paired_reuse_rejects_each_derived_plan_or_cost_field_before_refit(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    mutate,
+) -> None:
+    layout, contexts, prepared = _tiny_ablation_setup(tmp_path, smoke_protocol)
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    rich_row = {
+        "dataset_id": "isolet",
+        "seed": 42,
+        "selected_features_json": '["f0","f1","f2","f3"]',
+    }
+    monkeypatch.setattr(
+        stage_module, "read_rich_data_manifest", lambda *args: (rich_row,)
+    )
+    utility_contexts = {
+        item.job.parameters["value"]: item
+        for item in contexts
+        if item.job.method == "utility"
+    }
+    first = stage_module.run_ablation_job(utility_contexts["accuracy"])
+    path = layout.root / first.artifacts["paired_scores"]
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document[field] = mutate(document[field])
+    atomic_write_json(path, document)
+
+    class RejectCacheConstruction:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("paired artifact validation attempted to refit")
+
+    monkeypatch.setattr(
+        voting_game_module, "AccFullCache", RejectCacheConstruction
+    )
+    with pytest.raises(ValueError, match="plan|cost|cache|fit|coalition"):
+        stage_module.run_ablation_job(utility_contexts["ovr_auc"])
+
+
+def test_estimator_artifact_link_failure_leaves_no_partial_publication(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, layout, _, contexts, prepared = _tiny_estimator_setup(
+        tmp_path, smoke_protocol, exact_max_features=4
+    )
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    context = next(item for item in contexts if item.job.method == "random_mc")
+    destination = layout.root / "estimator/spambase/s42/random_mc/b2/scores.json"
+    real_link = protocol_module.os.link
+
+    def fail_score_link(source: Path, target: Path) -> None:
+        if Path(target) == destination:
+            raise OSError("injected score link")
+        real_link(source, target)
+
+    monkeypatch.setattr(protocol_module.os, "link", fail_score_link)
+    with pytest.raises(OSError, match="score link"):
+        stage_module.run_estimator_job(context)
+
+    assert not destination.exists()
+    assert not list(destination.parent.glob(".*.tmp"))
+
+
+def test_task8_registry_contains_only_completed_stage_handlers() -> None:
+    assert stage_module.STAGE_EXECUTORS == {
+        "validate": stage_module.run_validate_job,
+        "preprocess": stage_module.run_preprocess_job,
+        "estimator": stage_module.run_estimator_job,
+        "ablation": stage_module.run_ablation_job,
+    }
 
 
 def _tree_bytes(path: Path) -> dict[str, bytes]:
@@ -1886,7 +3062,7 @@ def test_cli_lifecycle_is_append_logged_and_never_replaces_process_streams_or_cw
     assert len((run_root / "output.log").read_bytes()) > len(first_log)
 
 
-def test_all_stops_before_stages_depending_on_unregistered_future_executors(
+def test_all_runs_estimator_then_stops_before_unregistered_future_executors(
     tmp_path: Path,
 ) -> None:
     output_root = tmp_path / "results"
@@ -1909,7 +3085,12 @@ def test_all_stops_before_stages_depending_on_unregistered_future_executors(
         if job.stage in {"validate", "preprocess"}
     )
     assert all(
+        (output_root / "blocked-all" / job.output_relpath).is_file()
+        for job in manifest
+        if job.stage == "estimator"
+    )
+    assert all(
         not (output_root / "blocked-all" / job.output_relpath).exists()
         for job in manifest
-        if job.stage in {"estimator", "removal", "alpha"}
+        if job.stage in {"removal", "alpha"}
     )

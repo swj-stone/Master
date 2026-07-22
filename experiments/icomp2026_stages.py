@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,10 @@ from minppi_mofs.experiment_protocol import (
     assert_stage_complete,
     atomic_write_json,
     preflight_data_manifest,
+    publish_json_exclusive,
+    read_canonical_json,
+    read_rich_data_manifest,
+    read_result_record,
     resolved_protocol_hash,
     upsert_data_manifest,
 )
@@ -311,7 +316,7 @@ def run_validate_job(context: StageContext) -> ResultRecord:
         "environment": environment,
         "raw_datasets": raw_datasets,
         "raw_authority": raw_authority,
-        "registered_stages": sorted(required_executors),
+        "registered_stages": sorted(STAGE_EXECUTORS),
         "run_directory_writable": True,
     }
     checks_relpath = "validate/validation_checks.json"
@@ -511,6 +516,884 @@ def run_preprocess_job(context: StageContext) -> ResultRecord:
         started_at=started_at,
         finished_at=_timestamp(),
     )
+
+
+def _load_prepared_train_validation(context: StageContext):
+    """Load verified prepared train/validation partitions without test access."""
+    from io import BytesIO
+
+    import numpy as np
+    import pandas as pd
+
+    rows = read_rich_data_manifest(
+        context.layout.root / "data_manifest.csv", context.protocol
+    )
+    row = next(
+        (
+            item
+            for item in rows
+            if item["dataset_id"] == context.job.dataset_id
+            and item["seed"] == context.job.seed
+        ),
+        None,
+    )
+    if row is None:
+        raise ValueError("prepared data manifest has no row for this job")
+    selected = json.loads(str(row["selected_features_json"]))
+    expected_columns = [*selected, row["target"]]
+    loaded: list[tuple[pd.DataFrame, np.ndarray]] = []
+    for partition in ("train", "val"):
+        path = context.layout.root / str(row[f"{partition}_relpath"])
+        try:
+            payload = path.read_bytes()
+        except OSError as exc:
+            raise ValueError(f"prepared {partition} CSV is missing") from exc
+        digest = hashlib.sha256(payload).hexdigest()
+        if digest != row[f"{partition}_file_sha256"]:
+            raise ValueError(f"prepared {partition} CSV SHA-256 drift")
+        try:
+            frame = pd.read_csv(BytesIO(payload))
+        except (UnicodeDecodeError, ValueError, pd.errors.ParserError) as exc:
+            raise ValueError(f"prepared {partition} CSV is malformed") from exc
+        if list(frame.columns) != expected_columns:
+            raise ValueError(f"prepared {partition} feature column order is invalid")
+        if len(frame) != row[f"{partition}_row_count"]:
+            raise ValueError(f"prepared {partition} row count drift")
+        if frame.columns.duplicated().any():
+            raise ValueError(f"prepared {partition} columns are duplicated")
+        try:
+            numeric = frame.apply(pd.to_numeric, errors="raise")
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"prepared {partition} data must be numeric") from exc
+        if not np.isfinite(numeric.to_numpy(dtype=float)).all():
+            raise ValueError(f"prepared {partition} data must be finite")
+        features = numeric[selected].astype(float)
+        target = numeric[str(row["target"])].to_numpy()
+        if row["task"] != "regression":
+            if not np.equal(target, np.floor(target)).all():
+                raise ValueError(f"prepared {partition} target must use integer labels")
+            target = target.astype(int)
+        else:
+            target = target.astype(float)
+        loaded.append((features, target))
+    (X_train, y_train), (X_val, y_val) = loaded
+    for partition, target in (("train", y_train), ("val", y_val)):
+        expected_summary = json.loads(str(row[f"{partition}_label_summary_json"]))
+        actual_summary = _label_summary(target, str(row["task"]))
+        if not _label_summaries_match(
+            actual_summary, expected_summary, task=str(row["task"])
+        ):
+            raise ValueError(
+                f"prepared {partition} label summary conflicts with manifest"
+            )
+    if row["task"] in {"binary", "multiclass"}:
+        train_classes = tuple(int(value) for value in np.unique(y_train))
+        val_classes = set(int(value) for value in np.unique(y_val))
+        if row["task"] == "binary":
+            if train_classes != (0, 1):
+                raise ValueError("prepared binary train classes must be exactly {0,1}")
+        elif len(train_classes) < 2 or train_classes != tuple(
+            range(len(train_classes))
+        ):
+            raise ValueError(
+                "prepared multiclass train classes must be zero-based contiguous labels"
+            )
+        if not val_classes.issubset(train_classes):
+            raise ValueError(
+                "prepared validation labels contain an unseen class outside train"
+            )
+    return X_train, y_train, X_val, y_val, row
+
+
+def _label_summaries_match(
+    actual: Mapping[str, object], expected: object, *, task: str
+) -> bool:
+    """Compare frozen summaries, tolerating only CSV float round-trip noise."""
+    if not isinstance(expected, dict) or set(actual) != set(expected):
+        return False
+    if task != "regression":
+        return actual == expected
+    if actual["count"] != expected["count"]:
+        return False
+    return all(
+        isinstance(expected[field], (int, float))
+        and not isinstance(expected[field], bool)
+        and __import__("math").isclose(
+            float(actual[field]),
+            float(expected[field]),
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        )
+        for field in ("max", "mean", "min", "std")
+    )
+
+
+def run_estimator_job(context: StageContext) -> ResultRecord:
+    """Run one manifest-authorized MinPPI estimator on train/validation only."""
+    import math
+
+    from minppi_mofs.min_ppi import (
+        algorithm_b_schedule_digest,
+        estimate_minppi_exact,
+        estimate_minppi_hybrid,
+        estimate_minppi_mi_correlation_guided,
+        estimate_minppi_random_mc,
+        make_algorithm_b_perturbation_schedule,
+    )
+    from minppi_mofs.shapg_integration import build_mi_correlation_guidance
+    from minppi_mofs.voting_game import AccFullCache
+
+    started_at = _timestamp()
+    runtime_start = time.perf_counter()
+    if context.job.stage != "estimator":
+        raise ValueError("estimator executor requires an estimator manifest job")
+    if context.job not in context.status.manifest:
+        raise ValueError("estimator job is outside the frozen status manifest")
+    dataset = next(
+        (item for item in context.protocol.datasets if item.dataset_id == context.job.dataset_id),
+        None,
+    )
+    if dataset is None:
+        raise ValueError("estimator job has an unknown dataset")
+    expected_parameter_keys = {"task", "utility", "budget"}
+    if set(context.job.parameters) != expected_parameter_keys:
+        raise ValueError("estimator job parameters have an invalid schema")
+    if (
+        context.job.parameters["task"] != dataset.task
+        or context.job.parameters["utility"] != dataset.utility
+    ):
+        raise ValueError("estimator job parameters do not match dataset authority")
+    budget = context.job.parameters["budget"]
+    if isinstance(budget, bool) or not isinstance(budget, int) or budget < 1:
+        raise ValueError("estimator budget must be a positive integer")
+    if budget not in context.protocol.estimator_budgets:
+        raise ValueError("estimator budget is outside protocol authority")
+    method = context.job.method
+    if method not in {"exact", "random_mc", "mi_correlation_guided", "hybrid"}:
+        raise ValueError("estimator method is not canonical")
+
+    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
+    mi_scores = None
+    correlation_neighbors = None
+    perturbation_schedule = None
+    schedule_digest = None
+    if method in {"mi_correlation_guided", "hybrid"}:
+        perturbation_schedule = make_algorithm_b_perturbation_schedule(
+            tuple(X_train.columns), K_adv=budget, seed=context.job.seed
+        )
+        schedule_digest = algorithm_b_schedule_digest(perturbation_schedule)
+        mi_scores, correlation_neighbors = build_mi_correlation_guidance(
+            X_train,
+            y_train,
+            task=dataset.task,
+            seed=context.job.seed,
+        )
+    model_params = dict(context.protocol.model_params)
+    model_params["tree_method"] = "hist"
+    model_params["device"] = "cuda" if context.protocol.backend == "cuda" else "cpu"
+    cache = AccFullCache(
+        X_train,
+        X_val,
+        y_train,
+        y_val,
+        task=dataset.task,
+        utility=dataset.utility,
+        seed=context.job.seed,
+        model_params=model_params,
+    )
+    common = {
+        "X_train": X_train,
+        "X_val": X_val,
+        "y_train": y_train,
+        "y_val": y_val,
+        "alpha": context.protocol.alpha_default,
+        "task": dataset.task,
+        "utility": dataset.utility,
+        "acc_cache": cache,
+        "seed": context.job.seed,
+    }
+    if method == "exact":
+        scores = estimate_minppi_exact(**common)
+    elif method == "random_mc":
+        scores = estimate_minppi_random_mc(K=budget, **common)
+    elif method == "mi_correlation_guided":
+        scores = estimate_minppi_mi_correlation_guided(
+            K_adv=budget,
+            mi_scores=mi_scores,
+            correlation_neighbors=correlation_neighbors,
+            perturbation_schedule=perturbation_schedule,
+            **common,
+        )
+    else:
+        scores = estimate_minppi_hybrid(
+            K=budget,
+            K_adv=budget,
+            mi_scores=mi_scores,
+            correlation_neighbors=correlation_neighbors,
+            perturbation_schedule=perturbation_schedule,
+            **common,
+        )
+    runtime_s = time.perf_counter() - runtime_start
+    if not math.isfinite(runtime_s) or runtime_s < 0:
+        raise RuntimeError("estimator runtime is invalid")
+    ordered_scores = [
+        {"feature": feature, "score": int(scores[feature])}
+        for feature in X_train.columns
+    ]
+    score_relpath = (
+        f"estimator/{dataset.dataset_id}/s{context.job.seed}/"
+        f"{method}/b{budget}/scores.json"
+    )
+    score_document = {
+        "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id,
+        "dataset_id": dataset.dataset_id,
+        "seed": context.job.seed,
+        "method": method,
+        "budget": budget,
+        "scores": ordered_scores,
+        "model_fit_count": cache.model_fit_count,
+        "coalition_count": cache.coalition_count,
+    }
+    if schedule_digest is not None:
+        score_document["schedule_digest"] = schedule_digest
+    _publish_idempotent_json(
+        context.layout.root / score_relpath,
+        score_document,
+        context="estimator score artifact",
+    )
+    metrics: dict[str, float | int | str | bool | None] = {
+        "budget": budget,
+        "model_fit_count": cache.model_fit_count,
+        "coalition_count": cache.coalition_count,
+        "runtime_s": runtime_s,
+    }
+    exact_scores = scores if method == "exact" else _completed_exact_scores(
+        context, budget=budget, expected_features=tuple(X_train.columns)
+    )
+    if exact_scores is not None:
+        metrics.update(_agreement_metrics(scores, exact_scores))
+    return ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage=context.job.stage,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        method=context.job.method,
+        metrics=metrics,
+        artifacts={"scores": score_relpath},
+        started_at=started_at,
+        finished_at=_timestamp(),
+    )
+
+
+def _completed_exact_scores(
+    context: StageContext, *, budget: int, expected_features: tuple[str, ...]
+) -> dict[str, int] | None:
+    exact_job = next(
+        (
+            job
+            for job in context.status.manifest
+            if job.stage == "estimator"
+            and job.dataset_id == context.job.dataset_id
+            and job.seed == context.job.seed
+            and job.method == "exact"
+            and job.parameters.get("budget") == budget
+        ),
+        None,
+    )
+    if exact_job is None or context.status.entry(exact_job.job_id)["state"] != "success":
+        return None
+    record = read_result_record(context.layout.root / exact_job.output_relpath, exact_job)
+    if set(record.artifacts) != {"scores"}:
+        raise ValueError("exact result record has invalid score artifacts")
+    expected_relpath = (
+        f"estimator/{exact_job.dataset_id}/s{exact_job.seed}/"
+        f"exact/b{budget}/scores.json"
+    )
+    if record.artifacts["scores"] != expected_relpath:
+        raise ValueError("exact result score artifact path is invalid")
+    return _read_score_artifact(
+        context.layout.root / expected_relpath,
+        expected_job=exact_job,
+        budget=budget,
+        expected_features=expected_features,
+    )
+
+
+def _read_score_artifact(
+    path: Path,
+    *,
+    expected_job: JobSpec,
+    budget: int,
+    expected_features: tuple[str, ...],
+) -> dict[str, int]:
+    try:
+        document = read_canonical_json(path, context="estimator score artifact")
+    except ValueError as exc:
+        raise ValueError(
+            "estimator score artifact is missing, malformed, or noncanonical JSON"
+        ) from exc
+    expected_keys = {
+        "protocol_hash", "job_id", "dataset_id", "seed", "method", "budget",
+        "scores", "model_fit_count", "coalition_count",
+    }
+    if not isinstance(document, dict) or set(document) != expected_keys:
+        raise ValueError("estimator score artifact schema is invalid")
+    for field in ("protocol_hash", "job_id", "dataset_id", "seed", "method"):
+        if document[field] != getattr(expected_job, field):
+            raise ValueError(f"estimator score artifact {field} is invalid")
+    if document["budget"] != budget or not isinstance(document["scores"], list):
+        raise ValueError("estimator score artifact budget or scores are invalid")
+    normalized: dict[str, int] = {}
+    for item in document["scores"]:
+        score = item.get("score") if isinstance(item, dict) else None
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"feature", "score"}
+            or not isinstance(item["feature"], str)
+            or isinstance(score, bool)
+            or not isinstance(score, int)
+            or score not in {-1, 0, 1}
+        ):
+            raise ValueError("estimator score artifact scores are invalid")
+        feature = item["feature"]
+        if feature in normalized:
+            raise ValueError("estimator score artifact features are duplicated")
+        normalized[feature] = score
+    if (
+        len(document["scores"]) != len(expected_features)
+        or tuple(normalized) != expected_features
+    ):
+        raise ValueError("estimator score artifact feature order is invalid")
+    model_fit_count = document["model_fit_count"]
+    coalition_count = document["coalition_count"]
+    if (
+        isinstance(model_fit_count, bool)
+        or not isinstance(model_fit_count, int)
+        or model_fit_count < 1
+        or isinstance(coalition_count, bool)
+        or not isinstance(coalition_count, int)
+        or coalition_count < model_fit_count
+        or coalition_count > model_fit_count + 1
+        or (
+            expected_job.method == "exact"
+            and coalition_count != model_fit_count + 1
+        )
+    ):
+        raise ValueError("estimator score artifact cost counters are invalid")
+    return normalized
+
+
+def _agreement_metrics(
+    predicted: Mapping[str, int], truth: Mapping[str, int]
+) -> dict[str, float]:
+    if tuple(predicted) != tuple(truth):
+        raise ValueError("estimator scores cannot be compared across different features")
+    predicted_harmful = {feature for feature, score in predicted.items() if score == -1}
+    true_harmful = {feature for feature, score in truth.items() if score == -1}
+    overlap = len(predicted_harmful & true_harmful)
+    if not predicted_harmful:
+        precision = 1.0 if not true_harmful else 0.0
+    else:
+        precision = overlap / len(predicted_harmful)
+    recall = 1.0 if not true_harmful else overlap / len(true_harmful)
+    f1 = 0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
+    agreement = sum(
+        predicted[feature] == truth[feature] for feature in predicted
+    ) / len(predicted)
+    return {
+        "harmful_precision": precision,
+        "harmful_recall": recall,
+        "harmful_f1": f1,
+        "score_agreement": agreement,
+    }
+
+
+def run_ablation_job(context: StageContext) -> ResultRecord:
+    """Run one frozen ablation value from the manifest."""
+    if context.job.stage != "ablation":
+        raise ValueError("ablation executor requires an ablation manifest job")
+    if context.job not in context.status.manifest:
+        raise ValueError("ablation job is outside the frozen status manifest")
+    if set(context.job.parameters) != {"task", "utility", "axis", "value"}:
+        raise ValueError("ablation job parameters have an invalid schema")
+    if context.job.method != context.job.parameters["axis"]:
+        raise ValueError("ablation axis does not match manifest method")
+    if context.job.parameters["axis"] == "utility":
+        return _run_utility_ablation(context)
+    if context.job.parameters["axis"] == "guidance":
+        return _run_guidance_ablation(context)
+    if context.job.parameters["axis"] == "dispatcher":
+        return _run_dispatcher_ablation(context)
+    raise ValueError("ablation axis is not frozen in the protocol")
+
+
+def _run_utility_ablation(context: StageContext) -> ResultRecord:
+    from minppi_mofs.min_ppi import (
+        estimate_minppi_random_mc,
+        make_shared_coalition_plan,
+    )
+    from minppi_mofs.voting_game import AccFullCache, UtilityView
+
+    started_at = _timestamp()
+    if context.job.dataset_id != "isolet":
+        raise ValueError("utility ablation is restricted to ISOLET")
+    value = context.job.parameters["value"]
+    if value not in {"accuracy", "ovr_auc"}:
+        raise ValueError("utility ablation value is not frozen")
+    budget = max(context.protocol.estimator_budgets)
+    group_id = f"utility:{context.job.dataset_id}:s{context.job.seed}:b{budget}"
+    relpath = (
+        f"ablation/{context.job.dataset_id}/s{context.job.seed}/"
+        f"utility/paired/b{budget}/scores.json"
+    )
+    path = context.layout.root / relpath
+    if path.exists():
+        document = _read_utility_pair_artifact(context, path, budget, group_id)
+    else:
+        X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
+        plan = make_shared_coalition_plan(
+            tuple(X_train.columns), K=budget, per_coalition=5, seed=context.job.seed
+        )
+        model_params = dict(context.protocol.model_params)
+        model_params["tree_method"] = "hist"
+        model_params["device"] = (
+            "cuda" if context.protocol.backend == "cuda" else "cpu"
+        )
+        cache = AccFullCache(
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            task="multiclass",
+            utility="accuracy",
+            seed=context.job.seed,
+            model_params=model_params,
+        )
+        views = {
+            metric: UtilityView(
+                cache, utility=metric, alpha=context.protocol.alpha_default
+            )
+            for metric in ("accuracy", "ovr_auc")
+        }
+        scores: dict[str, list[dict[str, object]]] = {}
+        primary = estimate_minppi_random_mc(
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            alpha=context.protocol.alpha_default,
+            task="multiclass",
+            K=budget,
+            shared_coalitions=True,
+            shared_plan=plan,
+            utility="accuracy",
+            acc_cache=views["accuracy"],
+            seed=context.job.seed,
+        )
+        before_secondary = (cache.model_fit_count, cache.coalition_count)
+        secondary = estimate_minppi_random_mc(
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            alpha=context.protocol.alpha_default,
+            task="multiclass",
+            K=budget,
+            shared_coalitions=True,
+            shared_plan=plan,
+            utility="ovr_auc",
+            acc_cache=views["ovr_auc"],
+            seed=context.job.seed,
+        )
+        scores["accuracy"] = [
+            {"feature": feature, "score": int(primary[feature])}
+            for feature in X_train.columns
+        ]
+        scores["ovr_auc"] = [
+            {"feature": feature, "score": int(secondary[feature])}
+            for feature in X_train.columns
+        ]
+        document = {
+            "protocol_hash": context.job.protocol_hash,
+            "dataset_id": context.job.dataset_id,
+            "seed": context.job.seed,
+            "axis": "utility",
+            "budget": budget,
+            "shared_group_id": group_id,
+            "scores": scores,
+            "plan_step_count": len(plan),
+            "shared_group_model_fit_count": cache.model_fit_count,
+            "shared_group_coalition_count": cache.coalition_count,
+            "secondary_model_fit_delta": cache.model_fit_count - before_secondary[0],
+            "secondary_coalition_delta": cache.coalition_count - before_secondary[1],
+        }
+        _publish_idempotent_json(path, document, context="utility paired artifact")
+        document = _read_utility_pair_artifact(context, path, budget, group_id)
+    return ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage=context.job.stage,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        method=context.job.method,
+        metrics={
+            "axis": "utility",
+            "value": str(value),
+            "budget": budget,
+            "shared_group_id": group_id,
+            "shared_group_model_fit_count": int(
+                document["shared_group_model_fit_count"]
+            ),
+            "shared_group_coalition_count": int(
+                document["shared_group_coalition_count"]
+            ),
+        },
+        artifacts={"paired_scores": relpath},
+        started_at=started_at,
+        finished_at=_timestamp(),
+    )
+
+
+def _read_utility_pair_artifact(
+    context: StageContext, path: Path, budget: int, group_id: str
+) -> dict[str, object]:
+    try:
+        document = read_canonical_json(path, context="utility paired artifact")
+    except ValueError as exc:
+        raise ValueError(
+            "utility paired artifact is missing, malformed, or noncanonical JSON"
+        ) from exc
+    expected_keys = {
+        "protocol_hash", "dataset_id", "seed", "axis", "budget",
+        "shared_group_id", "scores", "plan_step_count",
+        "shared_group_model_fit_count", "shared_group_coalition_count",
+        "secondary_model_fit_delta", "secondary_coalition_delta",
+    }
+    if not isinstance(document, dict) or set(document) != expected_keys:
+        raise ValueError("utility paired artifact schema is invalid")
+    identity = {
+        "protocol_hash": context.job.protocol_hash,
+        "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed,
+        "axis": "utility",
+        "budget": budget,
+        "shared_group_id": group_id,
+    }
+    if any(document[field] != expected for field, expected in identity.items()):
+        raise ValueError("utility paired artifact identity conflicts with this job")
+    scores = document["scores"]
+    if not isinstance(scores, dict) or set(scores) != {"accuracy", "ovr_auc"}:
+        raise ValueError("utility paired artifact scores are invalid")
+    feature_orders: list[tuple[str, ...]] = []
+    for metric in ("accuracy", "ovr_auc"):
+        entries = scores[metric]
+        if not isinstance(entries, list):
+            raise ValueError("utility paired artifact scores are invalid")
+        features: list[str] = []
+        for entry in entries:
+            score = entry.get("score") if isinstance(entry, dict) else None
+            if (
+                not isinstance(entry, dict)
+                or set(entry) != {"feature", "score"}
+                or not isinstance(entry["feature"], str)
+                or isinstance(score, bool)
+                or not isinstance(score, int)
+                or score not in {-1, 0, 1}
+            ):
+                raise ValueError("utility paired artifact scores are invalid")
+            features.append(entry["feature"])
+        if len(features) != len(set(features)):
+            raise ValueError("utility paired artifact features are duplicated")
+        feature_orders.append(tuple(features))
+    if feature_orders[0] != feature_orders[1]:
+        raise ValueError("utility paired artifact feature order differs by metric")
+    manifest_rows = read_rich_data_manifest(
+        context.layout.root / "data_manifest.csv", context.protocol
+    )
+    manifest_row = next(
+        (
+            row
+            for row in manifest_rows
+            if row["dataset_id"] == context.job.dataset_id
+            and row["seed"] == context.job.seed
+        ),
+        None,
+    )
+    if manifest_row is None:
+        raise ValueError("utility paired artifact has no rich manifest authority")
+    expected_features = tuple(
+        json.loads(str(manifest_row["selected_features_json"]))
+    )
+    if feature_orders[0] != expected_features:
+        raise ValueError("utility paired artifact feature order conflicts with manifest")
+    for field in (
+        "plan_step_count", "shared_group_model_fit_count",
+        "shared_group_coalition_count", "secondary_model_fit_delta",
+        "secondary_coalition_delta",
+    ):
+        if (
+            isinstance(document[field], bool)
+            or not isinstance(document[field], int)
+            or document[field] < 0
+        ):
+            raise ValueError("utility paired artifact costs are invalid")
+    if document["secondary_model_fit_delta"] != 0 or document[
+        "secondary_coalition_delta"
+    ] != 0:
+        raise ValueError("utility paired artifact did not reuse the shared cache")
+
+    from minppi_mofs.min_ppi import make_shared_coalition_plan
+
+    plan = make_shared_coalition_plan(
+        expected_features, K=budget, per_coalition=5, seed=context.job.seed
+    )
+    coalition_keys = {frozenset(expected_features)}
+    for coalition, evaluated in plan:
+        coalition_keys.add(coalition)
+        coalition_keys.update(coalition | {feature} for feature in evaluated)
+    expected_costs = {
+        "plan_step_count": len(plan),
+        "shared_group_model_fit_count": sum(bool(key) for key in coalition_keys),
+        "shared_group_coalition_count": len(coalition_keys),
+    }
+    if any(document[field] != expected for field, expected in expected_costs.items()):
+        raise ValueError("utility paired artifact plan or shared-cache costs are invalid")
+    return document
+
+
+def _run_guidance_ablation(context: StageContext) -> ResultRecord:
+    from minppi_mofs.min_ppi import (
+        algorithm_b_schedule_digest,
+        estimate_minppi_mi_correlation_guided,
+        make_algorithm_b_perturbation_schedule,
+    )
+    from minppi_mofs.shapg_integration import (
+        build_mi_correlation_guidance,
+        compute_mi_guidance_signal,
+        get_correlation_neighbors,
+    )
+
+    started_at = _timestamp()
+    value = context.job.parameters["value"]
+    allowed = {"random", "mi", "correlation", "mi_correlation"}
+    if value not in allowed:
+        raise ValueError("guidance ablation value is not frozen")
+    budget = max(context.protocol.estimator_budgets)
+    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
+    schedule = make_algorithm_b_perturbation_schedule(
+        tuple(X_train.columns), K_adv=budget, seed=context.job.seed
+    )
+    schedule_digest = algorithm_b_schedule_digest(schedule)
+    task = str(context.job.parameters["task"])
+    mi_scores = None
+    correlation_neighbors = None
+    if value == "mi":
+        mi_scores = compute_mi_guidance_signal(
+            X_train, y_train, task=task, seed=context.job.seed
+        )
+    elif value == "correlation":
+        correlation_neighbors = get_correlation_neighbors(
+            X_train, seed=context.job.seed
+        )
+    elif value == "mi_correlation":
+        mi_scores, correlation_neighbors = build_mi_correlation_guidance(
+            X_train, y_train, task=task, seed=context.job.seed
+        )
+    cache = _make_job_cache(context, X_train, X_val, y_train, y_val)
+    scores = estimate_minppi_mi_correlation_guided(
+        X_train=X_train,
+        X_val=X_val,
+        y_train=y_train,
+        y_val=y_val,
+        alpha=context.protocol.alpha_default,
+        task=task,
+        utility=str(context.job.parameters["utility"]),
+        K_adv=budget,
+        mi_scores=mi_scores,
+        correlation_neighbors=correlation_neighbors,
+        perturbation_schedule=schedule,
+        acc_cache=cache,
+        seed=context.job.seed,
+    )
+    return _publish_single_ablation(
+        context,
+        started_at=started_at,
+        value=str(value),
+        estimator_method="mi_correlation_guided",
+        budget=budget,
+        scores=scores,
+        cache=cache,
+        schedule_digest=schedule_digest,
+    )
+
+
+def _run_dispatcher_ablation(context: StageContext) -> ResultRecord:
+    from minppi_mofs.min_ppi import (
+        algorithm_b_schedule_digest,
+        estimate_minppi_exact,
+        estimate_minppi_hybrid,
+        estimate_minppi_mi_correlation_guided,
+        estimate_minppi_random_mc,
+        make_algorithm_b_perturbation_schedule,
+    )
+    from minppi_mofs.shapg_integration import build_mi_correlation_guidance
+
+    started_at = _timestamp()
+    value = context.job.parameters["value"]
+    allowed = {"exact", "random_mc", "mi_correlation_guided", "hybrid"}
+    if value not in allowed:
+        raise ValueError("dispatcher ablation value is not frozen")
+    if value == "exact" and not any(
+        job == context.job
+        and job.stage == "ablation"
+        and job.method == "dispatcher"
+        and job.parameters.get("value") == "exact"
+        for job in context.status.manifest
+    ):
+        raise ValueError("exact dispatcher job is absent from the manifest")
+    budget = max(context.protocol.estimator_budgets)
+    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
+    task = str(context.job.parameters["task"])
+    utility = str(context.job.parameters["utility"])
+    cache = _make_job_cache(context, X_train, X_val, y_train, y_val)
+    common = {
+        "X_train": X_train,
+        "X_val": X_val,
+        "y_train": y_train,
+        "y_val": y_val,
+        "alpha": context.protocol.alpha_default,
+        "task": task,
+        "utility": utility,
+        "acc_cache": cache,
+        "seed": context.job.seed,
+    }
+    schedule_digest = None
+    if value == "exact":
+        scores = estimate_minppi_exact(**common)
+    elif value == "random_mc":
+        scores = estimate_minppi_random_mc(K=budget, **common)
+    else:
+        schedule = make_algorithm_b_perturbation_schedule(
+            tuple(X_train.columns), K_adv=budget, seed=context.job.seed
+        )
+        schedule_digest = algorithm_b_schedule_digest(schedule)
+        mi_scores, correlation_neighbors = build_mi_correlation_guidance(
+            X_train, y_train, task=task, seed=context.job.seed
+        )
+        if value == "mi_correlation_guided":
+            scores = estimate_minppi_mi_correlation_guided(
+                K_adv=budget,
+                mi_scores=mi_scores,
+                correlation_neighbors=correlation_neighbors,
+                perturbation_schedule=schedule,
+                **common,
+            )
+        else:
+            scores = estimate_minppi_hybrid(
+                K=budget,
+                K_adv=budget,
+                mi_scores=mi_scores,
+                correlation_neighbors=correlation_neighbors,
+                perturbation_schedule=schedule,
+                **common,
+            )
+    return _publish_single_ablation(
+        context,
+        started_at=started_at,
+        value=str(value),
+        estimator_method=str(value),
+        budget=budget,
+        scores=scores,
+        cache=cache,
+        schedule_digest=schedule_digest,
+    )
+
+
+def _make_job_cache(context: StageContext, X_train, X_val, y_train, y_val):
+    from minppi_mofs.voting_game import AccFullCache
+
+    model_params = dict(context.protocol.model_params)
+    model_params["tree_method"] = "hist"
+    model_params["device"] = "cuda" if context.protocol.backend == "cuda" else "cpu"
+    return AccFullCache(
+        X_train,
+        X_val,
+        y_train,
+        y_val,
+        task=str(context.job.parameters["task"]),
+        utility=str(context.job.parameters["utility"]),
+        seed=context.job.seed,
+        model_params=model_params,
+    )
+
+
+def _publish_single_ablation(
+    context: StageContext,
+    *,
+    started_at: str,
+    value: str,
+    estimator_method: str,
+    budget: int,
+    scores: Mapping[str, int],
+    cache: object,
+    schedule_digest: str | None = None,
+) -> ResultRecord:
+    axis = str(context.job.parameters["axis"])
+    relpath = (
+        f"ablation/{context.job.dataset_id}/s{context.job.seed}/"
+        f"{axis}/{value}/b{budget}/scores.json"
+    )
+    document = {
+        "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id,
+        "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed,
+        "axis": axis,
+        "value": value,
+        "method": estimator_method,
+        "budget": budget,
+        "schedule_seed": context.job.seed,
+        "scores": [
+            {"feature": feature, "score": int(score)}
+            for feature, score in scores.items()
+        ],
+        "model_fit_count": cache.model_fit_count,
+        "coalition_count": cache.coalition_count,
+    }
+    if schedule_digest is not None:
+        document["schedule_digest"] = schedule_digest
+    _publish_idempotent_json(
+        context.layout.root / relpath,
+        document,
+        context=f"{axis} ablation artifact",
+    )
+    return ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage=context.job.stage,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        method=context.job.method,
+        metrics={
+            "axis": axis,
+            "value": value,
+            "budget": budget,
+            "model_fit_count": cache.model_fit_count,
+            "coalition_count": cache.coalition_count,
+        },
+        artifacts={"scores": relpath},
+        started_at=started_at,
+        finished_at=_timestamp(),
+    )
+
+
+def _publish_idempotent_json(
+    path: Path, document: Mapping[str, object], *, context: str
+) -> None:
+    """Publish JSON atomically; identical retries reuse and conflicts fail closed."""
+    publish_json_exclusive(path, document, context=context)
 
 
 def _coerce_target(series: object, task: str):
@@ -833,5 +1716,10 @@ def _timestamp() -> str:
 
 
 STAGE_EXECUTORS.update(
-    {"validate": run_validate_job, "preprocess": run_preprocess_job}
+    {
+        "validate": run_validate_job,
+        "preprocess": run_preprocess_job,
+        "estimator": run_estimator_job,
+        "ablation": run_ablation_job,
+    }
 )

@@ -22,6 +22,7 @@ from sklearn.model_selection import train_test_split
 
 from minppi_mofs.voting_game import (
     AccFullCache,
+    UtilityView,
     classify_minppi,
     compute_v_alpha,
     make_acc_full_cache,
@@ -128,6 +129,68 @@ class TestAccFullCache:
         )
         with pytest.raises(RuntimeError, match="set_threshold"):
             empty_cache.is_winning({"f_signal"})
+
+    def test_public_cost_counters_track_only_successful_nonempty_fits(
+        self, toy_data
+    ) -> None:
+        X_tr, X_val, y_tr, y_val = toy_data
+        cache = AccFullCache(X_tr, X_val, y_tr, y_val, seed=42)
+
+        assert cache.model_fit_count == 1
+        assert cache.coalition_count == 1
+        cache.evaluate(set())
+        assert cache.model_fit_count == 1
+        assert cache.coalition_count == 2
+
+        cache.evaluate({"f_signal"})
+        assert cache.model_fit_count == 2
+        assert cache.coalition_count == 3
+        cache.evaluate({"f_signal"})
+        assert cache.model_fit_count == 2
+        assert cache.coalition_count == 3
+        with pytest.raises(AttributeError):
+            cache.model_fit_count = 99
+
+    def test_utility_views_report_the_same_shared_cost_counters(self, toy_data) -> None:
+        X_tr, X_val, y_tr, y_val = toy_data
+        cache = AccFullCache(
+            X_tr, X_val, y_tr, y_val, task="binary", utility="accuracy", seed=42
+        )
+        accuracy = UtilityView(cache, utility="accuracy", alpha=0.95)
+        auc = UtilityView(cache, utility="roc_auc", alpha=0.95)
+
+        accuracy.evaluate({"f_signal"})
+        before = (accuracy.model_fit_count, accuracy.coalition_count)
+        auc.evaluate({"f_signal"})
+
+        assert before == (2, 2)
+        assert (auc.model_fit_count, auc.coalition_count) == before
+
+    def test_frozen_backend_parameters_are_forwarded_and_unknown_keys_fail_closed(
+        self, toy_data
+    ) -> None:
+        X_tr, X_val, y_tr, y_val = toy_data
+        cache = AccFullCache(
+            X_tr,
+            X_val,
+            y_tr,
+            y_val,
+            seed=42,
+            model_params={"device": "cpu", "tree_method": "hist"},
+        )
+
+        params = cache._model.get_params()
+        assert params["device"] == "cpu"
+        assert params["tree_method"] == "hist"
+        with pytest.raises(ValueError, match="model_params|unknown"):
+            AccFullCache(
+                X_tr,
+                X_val,
+                y_tr,
+                y_val,
+                seed=42,
+                model_params={"predictor": "cpu_predictor"},
+            )
 
 
 # ---------------------------------------------------------------------------

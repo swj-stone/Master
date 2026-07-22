@@ -111,6 +111,7 @@ class AccFullCache:
 
         # ── predictions cache: key → np.ndarray ──────────────────────
         self._preds: dict[tuple[str, ...], np.ndarray] = {}
+        self._model_fit_count = 0
 
         # ── default utility ────────────────────────────────────────────
         if utility is None:
@@ -124,12 +125,24 @@ class AccFullCache:
 
         # ── model (reused across coalitions) ──────────────────────────
         mp = model_params or {}
+        allowed_model_params = {
+            "n_estimators", "max_depth", "learning_rate", "n_jobs",
+            "device", "tree_method",
+        }
+        unknown_model_params = set(mp) - allowed_model_params
+        if unknown_model_params:
+            raise ValueError(
+                f"unknown model_params keys: {sorted(unknown_model_params)}"
+            )
         self._model_params = {
             "n_estimators": mp.get("n_estimators", 15),
             "max_depth": mp.get("max_depth", 2),
             "learning_rate": mp.get("learning_rate", 0.3),
             "n_jobs": mp.get("n_jobs", 1),
         }
+        for backend_key in ("device", "tree_method"):
+            if backend_key in mp:
+                self._model_params[backend_key] = mp[backend_key]
         if task == "regression":
             self._model = XGBRegressor(
                 verbosity=0, random_state=seed, **self._model_params,
@@ -189,6 +202,7 @@ class AccFullCache:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             self._model.fit(Xtr, self._y_train)
+        self._model_fit_count += 1
 
         if self._task == "regression":
             preds = self._model.predict(Xva)
@@ -197,6 +211,16 @@ class AccFullCache:
 
         self._preds[key] = preds
         return preds
+
+    @property
+    def model_fit_count(self) -> int:
+        """Number of successful nonempty coalition model fits."""
+        return self._model_fit_count
+
+    @property
+    def coalition_count(self) -> int:
+        """Number of distinct coalition prediction entries in the cache."""
+        return len(self._preds)
 
     def evaluate(self, S: set[str], *, utility: Optional[str] = None) -> float:
         """Utility of coalition *S* under ``utility`` (or ``self._utility``).
@@ -274,6 +298,14 @@ class UtilityView:
 
     def evaluate(self, S: set[str]) -> float:
         return self._cache.evaluate(S, utility=self._utility)
+
+    @property
+    def model_fit_count(self) -> int:
+        return self._cache.model_fit_count
+
+    @property
+    def coalition_count(self) -> int:
+        return self._cache.coalition_count
 
     def set_threshold(self, alpha: float) -> None:
         self.threshold = self.acc_full * alpha

@@ -27,7 +27,9 @@ from minppi_mofs.experiment_protocol import (
     freeze_run_metadata,
     load_resolved_protocol,
     open_resumed_run,
+    publish_json_exclusive,
     read_data_manifest,
+    read_rich_data_manifest,
     read_result_record,
     resolved_protocol_hash,
     upsert_data_manifest,
@@ -280,6 +282,18 @@ def _data_manifest_row(
         if item.dataset_id == dataset_id and item.seed == seed
     )
     prefix = f"preprocess/{dataset_id}/s{seed}"
+    if dataset.task == "regression":
+        summaries = {
+            "train": {"count": 6, "max": 5.0, "mean": 2.5, "min": 0.0, "std": 1.707825127659933},
+            "val": {"count": 2, "max": 7.0, "mean": 6.5, "min": 6.0, "std": 0.5},
+            "test": {"count": 2, "max": 9.0, "mean": 8.5, "min": 8.0, "std": 0.5},
+        }
+    else:
+        summaries = {
+            "train": {"classes": [{"count": 3, "label": 0}, {"count": 3, "label": 1}], "count": 6},
+            "val": {"classes": [{"count": 1, "label": 0}, {"count": 1, "label": 1}], "count": 2},
+            "test": {"classes": [{"count": 1, "label": 0}, {"count": 1, "label": 1}], "count": 2},
+        }
     return {
         "protocol_hash": resolved_protocol_hash(protocol),
         "job_id": job.job_id,
@@ -305,9 +319,9 @@ def _data_manifest_row(
         "train_file_sha256": "5" * 64,
         "val_file_sha256": "6" * 64,
         "test_file_sha256": "7" * 64,
-        "train_label_summary_json": '{"count":6}',
-        "val_label_summary_json": '{"count":2}',
-        "test_label_summary_json": '{"count":2}',
+        "train_label_summary_json": json.dumps(summaries["train"], sort_keys=True, separators=(",", ":")),
+        "val_label_summary_json": json.dumps(summaries["val"], sort_keys=True, separators=(",", ":")),
+        "test_label_summary_json": json.dumps(summaries["test"], sort_keys=True, separators=(",", ":")),
         "transform_metadata_json": '{"scaler_mean":[0.0,1.0]}',
     }
 
@@ -337,6 +351,11 @@ def test_data_manifest_partial_upsert_is_canonical_idempotent_and_complete_read_
         {"dataset_id": "abalone", "seed": 42, "selected_feature_count": 2},
     )
 
+    rich = read_rich_data_manifest(path, resolved_protocol)
+    assert rich == (spambase, abalone)
+    rich[0]["dataset_id"] = "mutated"
+    assert read_rich_data_manifest(path, resolved_protocol)[0]["dataset_id"] == "spambase"
+
 
 def test_data_manifest_rejects_conflict_and_malformed_rich_fields_without_mutation(
     tmp_path: Path, resolved_protocol
@@ -362,6 +381,135 @@ def test_data_manifest_rejects_conflict_and_malformed_rich_fields_without_mutati
     with pytest.raises(ValueError, match="JSON|finite|canonical"):
         upsert_data_manifest(path, resolved_protocol, malformed)
     assert path.read_bytes() == frozen
+
+
+@pytest.mark.parametrize(
+    ("dataset_id", "field", "summary"),
+    [
+        ("spambase", "train_label_summary_json", {"count": 6}),
+        ("spambase", "train_label_summary_json", {"classes": [{"count": 6, "label": True}], "count": 6}),
+        ("spambase", "train_label_summary_json", {"classes": [{"count": 5, "label": 0}], "count": 6}),
+        ("abalone", "train_label_summary_json", {"count": 6, "max": 5.0, "mean": 2.5, "min": 0.0}),
+        ("abalone", "train_label_summary_json", {"count": True, "max": 5.0, "mean": 2.5, "min": 0.0, "std": 1.0}),
+        ("abalone", "train_label_summary_json", {"count": 6, "max": float("inf"), "mean": 2.5, "min": 0.0, "std": 1.0}),
+    ],
+)
+def test_rich_manifest_rejects_invalid_task_specific_label_summary(
+    tmp_path: Path, resolved_protocol, dataset_id: str, field: str, summary: object
+) -> None:
+    row = _data_manifest_row(resolved_protocol, dataset_id)
+    row[field] = json.dumps(summary, sort_keys=True, separators=(",", ":"))
+
+    with pytest.raises(ValueError, match="label_summary|summary|finite|canonical"):
+        upsert_data_manifest(tmp_path / "data_manifest.csv", resolved_protocol, row)
+
+
+def _multiclass_protocol(protocol):
+    return replace(
+        protocol,
+        datasets=tuple(
+            replace(dataset, task="multiclass", utility="ovr_auc")
+            if dataset.dataset_id == "spambase"
+            else dataset
+            for dataset in protocol.datasets
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "summary"),
+    [
+        (
+            "test_label_summary_json",
+            {"classes": [{"count": 2, "label": 2}], "count": 2},
+        ),
+        (
+            "train_label_summary_json",
+            {"classes": [{"count": 6, "label": 0}], "count": 6},
+        ),
+    ],
+)
+def test_binary_manifest_rejects_cross_partition_or_invalid_train_classes(
+    tmp_path: Path,
+    resolved_protocol,
+    field: str,
+    summary: dict[str, object],
+) -> None:
+    row = _data_manifest_row(resolved_protocol, "spambase")
+    row[field] = json.dumps(summary, sort_keys=True, separators=(",", ":"))
+
+    with pytest.raises(ValueError, match="binary|class|label|train|partition"):
+        upsert_data_manifest(
+            tmp_path / "data_manifest.csv", resolved_protocol, row
+        )
+
+
+@pytest.mark.parametrize("partition", ["val", "test"])
+def test_multiclass_manifest_rejects_unseen_partition_class(
+    tmp_path: Path, resolved_protocol, partition: str
+) -> None:
+    protocol = _multiclass_protocol(resolved_protocol)
+    row = _data_manifest_row(protocol, "spambase")
+    row[f"{partition}_label_summary_json"] = json.dumps(
+        {"classes": [{"count": 2, "label": 2}], "count": 2},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    with pytest.raises(ValueError, match="multiclass|class|label|train|partition"):
+        upsert_data_manifest(tmp_path / "data_manifest.csv", protocol, row)
+
+
+def test_multiclass_manifest_rejects_noncontiguous_train_classes(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    protocol = _multiclass_protocol(resolved_protocol)
+    row = _data_manifest_row(protocol, "spambase")
+    row["train_label_summary_json"] = json.dumps(
+        {
+            "classes": [
+                {"count": 3, "label": 0},
+                {"count": 3, "label": 2},
+            ],
+            "count": 6,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    with pytest.raises(ValueError, match="multiclass|class|label|train"):
+        upsert_data_manifest(tmp_path / "data_manifest.csv", protocol, row)
+
+
+def test_multiclass_manifest_allows_val_and_test_to_omit_train_classes(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    protocol = _multiclass_protocol(resolved_protocol)
+    row = _data_manifest_row(protocol, "spambase")
+    summaries = {
+        "train": {
+            "classes": [
+                {"count": 2, "label": 0},
+                {"count": 2, "label": 1},
+                {"count": 2, "label": 2},
+            ],
+            "count": 6,
+        },
+        "val": {"classes": [{"count": 2, "label": 1}], "count": 2},
+        "test": {
+            "classes": [
+                {"count": 1, "label": 0},
+                {"count": 1, "label": 2},
+            ],
+            "count": 2,
+        },
+    }
+    for partition, summary in summaries.items():
+        row[f"{partition}_label_summary_json"] = json.dumps(
+            summary, sort_keys=True, separators=(",", ":")
+        )
+
+    upsert_data_manifest(tmp_path / "data_manifest.csv", protocol, row)
 
 
 def test_data_manifest_atomic_upsert_preserves_previous_file_on_replace_failure(
@@ -392,6 +540,9 @@ def test_data_manifest_partial_upsert_rejects_cross_seed_raw_authority_drift(
         raw_file_sha256="a" * 64,
         raw_row_count=11,
         train_row_count=7,
+        train_label_summary_json=(
+            '{"classes":[{"count":4,"label":0},{"count":3,"label":1}],"count":7}'
+        ),
     )
     upsert_data_manifest(path, protocol, first)
     frozen = path.read_bytes()
@@ -1336,6 +1487,110 @@ def test_atomic_write_json_cleans_temporary_file_when_replace_fails(
 def test_atomic_write_json_rejects_nonfinite_values(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         atomic_write_json(tmp_path / "record.json", {"metric": float("inf")})
+
+
+@pytest.mark.parametrize(
+    ("existing", "candidate"),
+    [
+        (b'{\n  "value": true\n}\n', {"value": 1}),
+        (b'{\n  "value": false\n}\n', {"value": 0}),
+    ],
+)
+def test_publish_json_exclusive_identity_is_bool_int_type_sensitive(
+    tmp_path: Path, existing: bytes, candidate: object
+) -> None:
+    destination = tmp_path / "artifact.json"
+    destination.write_bytes(existing)
+
+    with pytest.raises(RuntimeError, match="conflict"):
+        publish_json_exclusive(destination, candidate, context="strict artifact")
+
+    assert destination.read_bytes() == existing
+    assert not tuple(tmp_path.glob(".artifact.json.*.tmp"))
+
+
+@pytest.mark.parametrize(
+    "existing",
+    [
+        b'{"value":0,"value":1}\n',
+        b'{"value":NaN}\n',
+        b'{"value":Infinity}\n',
+        b'{"value":-Infinity}\n',
+        b'{ "value": 1 }\n',
+        b"not-json\n",
+    ],
+)
+def test_publish_json_exclusive_rejects_malformed_or_noncanonical_existing_json(
+    tmp_path: Path, existing: bytes
+) -> None:
+    destination = tmp_path / "artifact.json"
+    destination.write_bytes(existing)
+
+    with pytest.raises(RuntimeError, match="malformed"):
+        publish_json_exclusive(
+            destination, {"value": 1}, context="strict artifact"
+        )
+
+    assert destination.read_bytes() == existing
+    assert not tuple(tmp_path.glob(".artifact.json.*.tmp"))
+
+
+def test_publish_json_exclusive_reuses_only_canonical_identical_bytes(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "artifact.json"
+    canonical = b'{\n  "value": 1\n}\n'
+    destination.write_bytes(canonical)
+
+    publish_json_exclusive(destination, {"value": 1}, context="strict artifact")
+
+    assert destination.read_bytes() == canonical
+    assert not tuple(tmp_path.glob(".artifact.json.*.tmp"))
+
+
+def test_publish_json_exclusive_rejects_existing_symlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "target.json"
+    target.write_bytes(b'{\n  "value": 1\n}\n')
+    destination = tmp_path / "artifact.json"
+    destination.write_bytes(target.read_bytes())
+    real_is_symlink = Path.is_symlink
+
+    def report_destination_symlink(path: Path) -> bool:
+        return path == destination or real_is_symlink(path)
+
+    monkeypatch.setattr(Path, "is_symlink", report_destination_symlink)
+
+    with pytest.raises(RuntimeError, match="regular file"):
+        publish_json_exclusive(
+            destination, {"value": 1}, context="strict artifact"
+        )
+
+    assert target.read_bytes() == b'{\n  "value": 1\n}\n'
+    assert destination.read_bytes() == target.read_bytes()
+    assert not tuple(tmp_path.glob(".artifact.json.*.tmp"))
+
+
+def test_read_canonical_json_accepts_only_strict_canonical_bytes(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "artifact.json"
+    atomic_write_json(destination, {"score": 1, "valid": True})
+
+    assert protocol_module.read_canonical_json(
+        destination, context="strict reader artifact"
+    ) == {"score": 1, "valid": True}
+
+    destination.write_text(
+        '{"score":1,"score":1,"valid":true}\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    with pytest.raises(ValueError, match="canonical|duplicate|malformed|JSON"):
+        protocol_module.read_canonical_json(
+            destination, context="strict reader artifact"
+        )
 
 
 def _status_fixture(tmp_path: Path, resolved_protocol):

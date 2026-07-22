@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import csv
 import json
+import math
 import os
 import platform
 import re
@@ -1305,6 +1306,77 @@ def atomic_write_json(path: Path, value: object) -> None:
     _atomic_write_json(Path(path), value)
 
 
+def read_canonical_json(
+    path: Path, *, context: str = "JSON artifact"
+) -> object:
+    """Read strict finite JSON whose bytes exactly match canonical encoding."""
+    source = Path(path)
+    if source.is_symlink():
+        raise ValueError(f"{context} is not a regular file")
+    try:
+        payload = source.read_bytes()
+        parsed = _strict_json_loads(payload.decode("utf-8"))
+        canonical = _json_text(parsed).encode("utf-8")
+    except (OSError, UnicodeDecodeError, TypeError, ValueError) as exc:
+        raise ValueError(f"{context} is malformed canonical JSON") from exc
+    if payload != canonical:
+        raise ValueError(f"{context} is not canonical JSON")
+    return parsed
+
+
+def publish_json_exclusive(
+    path: Path, value: object, *, context: str = "JSON artifact"
+) -> None:
+    """Publish canonical JSON once, reusing identical concurrent publications."""
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    text = _json_text(value)
+    temporary = destination.with_name(
+        f".{destination.name}.{uuid4().hex}.tmp"
+    )
+    try:
+        with temporary.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, destination)
+        except FileExistsError:
+            if destination.is_symlink():
+                raise RuntimeError(f"frozen {context} is not a regular file")
+            try:
+                existing = read_canonical_json(destination, context=context)
+            except ValueError as exc:
+                raise RuntimeError(f"frozen {context} is malformed") from exc
+            if _json_text(existing) != text:
+                raise RuntimeError(
+                    f"frozen {context} conflicts with recomputed content"
+                )
+        else:
+            _sync_parent_directory(destination.parent)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _strict_json_loads(value: str) -> object:
+    def reject_constant(constant: str) -> object:
+        raise ValueError(f"non-finite JSON constant {constant}")
+
+    def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, item in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON object key {key!r}")
+            result[key] = item
+        return result
+
+    return json.loads(
+        value,
+        parse_constant=reject_constant,
+        object_pairs_hook=unique_object,
+    )
+
+
 class ManifestStore:
     """Atomically persist and append the ordered manifest authority."""
 
@@ -1448,6 +1520,17 @@ def read_data_manifest(
         }
         for row in rows
     )
+
+
+def read_rich_data_manifest(
+    path: Path, protocol: ResolvedProtocol
+) -> tuple[dict[str, object], ...]:
+    """Validate and return isolated complete rich data-manifest rows."""
+    rows = _read_data_manifest_rows(Path(path), protocol)
+    expected = _data_manifest_scope(protocol)
+    if tuple((row["dataset_id"], row["seed"]) for row in rows) != expected:
+        raise ValueError("data_manifest does not match the complete protocol scope")
+    return tuple(dict(row) for row in rows)
 
 
 def upsert_data_manifest(
@@ -1607,14 +1690,111 @@ def _validate_data_manifest_row(
         or len(set(selected)) != len(selected)
     ):
         raise ValueError("data_manifest selected_features_json is invalid")
-    for field in (
-        "train_label_summary_json", "val_label_summary_json",
-        "test_label_summary_json", "transform_metadata_json",
-    ):
+    partition_labels: dict[str, tuple[int, ...]] = {}
+    for partition in ("train", "val", "test"):
+        field = f"{partition}_label_summary_json"
         value = _canonical_manifest_json(row[field], field)
-        if not isinstance(value, dict):
-            raise ValueError(f"data_manifest {field} must encode a JSON object")
+        labels = _validate_manifest_label_summary(
+            value,
+            task=dataset.task,
+            expected_count=int(row[f"{partition}_row_count"]),
+            field=field,
+        )
+        if labels is not None:
+            partition_labels[partition] = labels
+    if dataset.task == "binary":
+        allowed = {0, 1}
+        if set(partition_labels["train"]) != allowed or any(
+            not set(partition_labels[partition]).issubset(allowed)
+            for partition in ("val", "test")
+        ):
+            raise ValueError(
+                "data_manifest binary train/classes must use exactly labels {0,1}"
+            )
+    elif dataset.task == "multiclass":
+        train_labels = partition_labels["train"]
+        if len(train_labels) < 2 or train_labels != tuple(range(len(train_labels))):
+            raise ValueError(
+                "data_manifest multiclass train labels must be zero-based contiguous"
+            )
+        train_set = set(train_labels)
+        if any(
+            not set(partition_labels[partition]).issubset(train_set)
+            for partition in ("val", "test")
+        ):
+            raise ValueError(
+                "data_manifest multiclass partition labels must be seen in train"
+            )
+    transform = _canonical_manifest_json(
+        row["transform_metadata_json"], "transform_metadata_json"
+    )
+    if not isinstance(transform, dict):
+        raise ValueError(
+            "data_manifest transform_metadata_json must encode a JSON object"
+        )
     return {field: row[field] for field in _DATA_MANIFEST_FIELDS}
+
+
+def _validate_manifest_label_summary(
+    value: object, *, task: str, expected_count: int, field: str
+) -> tuple[int, ...] | None:
+    context = f"data_manifest {field} label_summary"
+    if not isinstance(value, dict):
+        raise ValueError(f"{context} must encode a JSON object")
+    count = value.get("count")
+    if (
+        isinstance(count, bool)
+        or not isinstance(count, int)
+        or count != expected_count
+        or count < 1
+    ):
+        raise ValueError(f"{context} count is invalid")
+    if task == "regression":
+        if set(value) != {"count", "max", "mean", "min", "std"}:
+            raise ValueError(f"{context} regression schema is invalid")
+        numbers: dict[str, float] = {}
+        for key in ("max", "mean", "min", "std"):
+            item = value[key]
+            if (
+                isinstance(item, bool)
+                or not isinstance(item, (int, float))
+                or not math.isfinite(float(item))
+            ):
+                raise ValueError(f"{context} {key} must be finite")
+            numbers[key] = float(item)
+        if (
+            numbers["min"] > numbers["mean"]
+            or numbers["mean"] > numbers["max"]
+            or numbers["std"] < 0
+        ):
+            raise ValueError(f"{context} regression values are invalid")
+        return None
+    if set(value) != {"classes", "count"} or not isinstance(value["classes"], list):
+        raise ValueError(f"{context} classification schema is invalid")
+    classes = value["classes"]
+    labels: list[int] = []
+    total = 0
+    if not classes:
+        raise ValueError(f"{context} classes must not be empty")
+    for entry in classes:
+        if not isinstance(entry, dict) or set(entry) != {"count", "label"}:
+            raise ValueError(f"{context} class entry is invalid")
+        class_count = entry["count"]
+        label = entry["label"]
+        if (
+            isinstance(class_count, bool)
+            or not isinstance(class_count, int)
+            or class_count < 1
+            or isinstance(label, bool)
+            or not isinstance(label, int)
+            or label < 0
+        ):
+            raise ValueError(f"{context} class entry is invalid")
+        labels.append(label)
+        total += class_count
+    if labels != sorted(set(labels)) or total != count:
+        raise ValueError(f"{context} classes or counts are invalid")
+    return tuple(labels)
 
 
 def _canonical_manifest_json(value: object, field: str) -> object:

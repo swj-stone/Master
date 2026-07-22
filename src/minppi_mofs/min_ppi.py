@@ -26,8 +26,11 @@ Usage::
 
 from __future__ import annotations
 
+import hashlib
 import itertools
+import json
 import warnings
+from dataclasses import asdict, dataclass
 from typing import Optional, Sequence
 
 import numpy as np
@@ -38,6 +41,193 @@ from minppi_mofs.voting_game import AccFullCache, make_acc_full_cache
 
 SharedCoalitionStep = tuple[frozenset[str], tuple[str, ...]]
 SharedCoalitionPlan = tuple[SharedCoalitionStep, ...]
+
+
+@dataclass(frozen=True)
+class AlgorithmBPerturbationTrial:
+    """Guidance-independent random inputs for one feature/trial pair."""
+
+    removal_draws: tuple[float, ...]
+    add_count: int
+    add_order: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.removal_draws) is not tuple:
+            raise ValueError("Algorithm B removal draws must be an immutable tuple")
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not np.isfinite(value)
+            or value < 0
+            or value >= 1
+            for value in self.removal_draws
+        ):
+            raise ValueError("Algorithm B removal draws must be finite numeric values")
+        if (
+            isinstance(self.add_count, bool)
+            or not isinstance(self.add_count, int)
+            or self.add_count < 0
+        ):
+            raise ValueError("Algorithm B add count must be a non-negative integer")
+        if type(self.add_order) is not tuple or not all(
+            isinstance(feature, str) for feature in self.add_order
+        ):
+            raise ValueError("Algorithm B add order must be an immutable string tuple")
+
+
+@dataclass(frozen=True)
+class AlgorithmBPerturbationSchedule:
+    """Immutable Algorithm B stochastic schedule bound to ordered features."""
+
+    features: tuple[str, ...]
+    seed: int
+    K_adv: int
+    seed_orders: tuple[tuple[str, ...], ...]
+    trials: tuple[tuple[AlgorithmBPerturbationTrial, ...], ...]
+
+    def __post_init__(self) -> None:
+        _validate_algorithm_b_perturbation_schedule(
+            self, self.features, self.K_adv, self.seed
+        )
+
+
+def make_algorithm_b_perturbation_schedule(
+    features: Sequence[str], *, K_adv: int, seed: int
+) -> AlgorithmBPerturbationSchedule:
+    """Pre-generate every Algorithm B random input without guidance state."""
+    feature_order = tuple(features)
+    if not feature_order or len(set(feature_order)) != len(feature_order):
+        raise ValueError("Algorithm B schedule features must be nonempty and unique")
+    if isinstance(K_adv, bool) or not isinstance(K_adv, int) or K_adv < 0:
+        raise ValueError("Algorithm B schedule K_adv must be a non-negative integer")
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        raise ValueError("Algorithm B schedule seed must be a non-negative integer")
+    rng = np.random.default_rng(seed)
+    seed_orders: list[tuple[str, ...]] = []
+    feature_trials: list[tuple[AlgorithmBPerturbationTrial, ...]] = []
+    for feature in feature_order:
+        others = tuple(candidate for candidate in feature_order if candidate != feature)
+        seed_orders.append(tuple(rng.permutation(others).tolist()))
+        trials: list[AlgorithmBPerturbationTrial] = []
+        for _ in range(K_adv):
+            trials.append(
+                AlgorithmBPerturbationTrial(
+                    removal_draws=tuple(float(value) for value in rng.random(len(feature_order))),
+                    add_count=int(rng.integers(0, min(5, len(others)) + 1)),
+                    add_order=tuple(rng.permutation(others).tolist()),
+                )
+            )
+        feature_trials.append(tuple(trials))
+    schedule = AlgorithmBPerturbationSchedule(
+        features=feature_order,
+        seed=seed,
+        K_adv=K_adv,
+        seed_orders=tuple(seed_orders),
+        trials=tuple(feature_trials),
+    )
+    _validate_algorithm_b_perturbation_schedule(schedule, feature_order, K_adv, seed)
+    return schedule
+
+
+def algorithm_b_schedule_digest(schedule: AlgorithmBPerturbationSchedule) -> str:
+    """Return the canonical SHA-256 identity of an immutable schedule."""
+    if not isinstance(schedule, AlgorithmBPerturbationSchedule):
+        raise TypeError("Algorithm B schedule must be AlgorithmBPerturbationSchedule")
+    _validate_algorithm_b_perturbation_schedule(
+        schedule, schedule.features, schedule.K_adv, schedule.seed
+    )
+    payload = json.dumps(
+        asdict(schedule), sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _validate_algorithm_b_perturbation_schedule(
+    schedule: AlgorithmBPerturbationSchedule,
+    features: Sequence[str],
+    K_adv: int,
+    seed: int,
+) -> None:
+    if not isinstance(schedule, AlgorithmBPerturbationSchedule):
+        raise ValueError("Algorithm B perturbation schedule has an invalid type")
+    if (
+        type(schedule.features) is not tuple
+        or not schedule.features
+        or not all(isinstance(feature, str) for feature in schedule.features)
+        or len(set(schedule.features)) != len(schedule.features)
+        or isinstance(schedule.K_adv, bool)
+        or not isinstance(schedule.K_adv, int)
+        or schedule.K_adv < 0
+        or isinstance(schedule.seed, bool)
+        or not isinstance(schedule.seed, int)
+        or schedule.seed < 0
+        or type(schedule.seed_orders) is not tuple
+        or type(schedule.trials) is not tuple
+    ):
+        raise ValueError("Algorithm B perturbation schedule must be deeply immutable")
+    feature_order = tuple(features)
+    if (
+        not feature_order
+        or not all(isinstance(feature, str) for feature in feature_order)
+        or len(set(feature_order)) != len(feature_order)
+        or isinstance(K_adv, bool)
+        or not isinstance(K_adv, int)
+        or K_adv < 0
+        or isinstance(seed, bool)
+        or not isinstance(seed, int)
+        or seed < 0
+    ):
+        raise ValueError("Algorithm B perturbation schedule authority is invalid")
+    if (
+        schedule.features != feature_order
+        or schedule.K_adv != K_adv
+        or schedule.seed != seed
+        or len(schedule.seed_orders) != len(feature_order)
+        or len(schedule.trials) != len(feature_order)
+    ):
+        raise ValueError("Algorithm B perturbation schedule identity is invalid")
+    for index, feature in enumerate(feature_order):
+        others = tuple(candidate for candidate in feature_order if candidate != feature)
+        seed_order = schedule.seed_orders[index]
+        if (
+            type(seed_order) is not tuple
+            or not all(isinstance(candidate, str) for candidate in seed_order)
+            or set(seed_order) != set(others)
+            or len(seed_order) != len(others)
+        ):
+            raise ValueError(
+                "Algorithm B perturbation schedule seed order must be an immutable tuple"
+            )
+        trials = schedule.trials[index]
+        if type(trials) is not tuple or len(trials) != K_adv:
+            raise ValueError(
+                "Algorithm B perturbation schedule trials must be an immutable tuple"
+            )
+        for trial in trials:
+            if (
+                not isinstance(trial, AlgorithmBPerturbationTrial)
+                or type(trial.removal_draws) is not tuple
+                or len(trial.removal_draws) != len(feature_order)
+                or any(
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or not np.isfinite(value)
+                    or value < 0
+                    or value >= 1
+                    for value in trial.removal_draws
+                )
+                or isinstance(trial.add_count, bool)
+                or not isinstance(trial.add_count, int)
+                or trial.add_count < 0
+                or trial.add_count > min(5, len(others))
+                or type(trial.add_order) is not tuple
+                or not all(
+                    isinstance(candidate, str) for candidate in trial.add_order
+                )
+                or len(trial.add_order) != len(others)
+                or set(trial.add_order) != set(others)
+            ):
+                raise ValueError("Algorithm B perturbation schedule trial is invalid")
 
 
 def make_shared_coalition_plan(
@@ -170,10 +360,8 @@ def estimate_minppi_exact(
         print(f"  Exact MinPPI: {n} features, enumerating 2^{n - 1} per feature")
 
     minppi: dict[str, int] = {}
-    all_features = set(features)
-
     for i, feat in enumerate(features):
-        others = list(all_features - {feat})
+        others = [candidate for candidate in features if candidate != feat]
         best_marg = 1  # init to max possible
         for r in range(len(others) + 1):
             for S_combo in itertools.combinations(others, r):
@@ -262,7 +450,6 @@ def estimate_minppi_random_mc(
     """
     features = list(X_train.columns)
     n = len(features)
-    all_features = set(features)
     if shared_plan is not None and not shared_coalitions:
         raise ValueError("shared_plan requires shared_coalitions=True")
     if shared_coalitions:
@@ -328,7 +515,7 @@ def estimate_minppi_random_mc(
         print(f"  Algorithm A (random MC): K={K}, {n} features", flush=True)
 
     for idx, feat in enumerate(features):
-        others = list(all_features - {feat})
+        others = [candidate for candidate in features if candidate != feat]
         best_marg = 1
         n_others = len(others)
 
@@ -371,6 +558,7 @@ def estimate_minppi_mi_correlation_guided(
     K_adv: int = 30,
     correlation_neighbors: Optional[dict[str, list[str]]] = None,
     mi_scores: Optional[dict[str, float]] = None,
+    perturbation_schedule: Optional[AlgorithmBPerturbationSchedule] = None,
     utility: Optional[str] = None,
     acc_cache: Optional[AccFullCache] = None,
     seed: int = 42,
@@ -409,7 +597,6 @@ def estimate_minppi_mi_correlation_guided(
     Returns:
         Dict ``{feature_name: minppi}`` (values ∈ {-1, 0, +1}).
     """
-    rng = np.random.default_rng(seed)
     if acc_cache is None:
         acc_cache = make_acc_full_cache(
             X_train, X_val, y_train, y_val,
@@ -419,12 +606,22 @@ def estimate_minppi_mi_correlation_guided(
 
     features = list(X_train.columns)
     n = len(features)
-    all_features = set(features)
+    if perturbation_schedule is None:
+        perturbation_schedule = make_algorithm_b_perturbation_schedule(
+            features, K_adv=K_adv, seed=seed
+        )
+    _validate_algorithm_b_perturbation_schedule(
+        perturbation_schedule, features, K_adv, seed
+    )
     minppi: dict[str, int] = {}
 
     # Build seed coalition: top features by MI score (or uniform)
     if mi_scores is not None:
-        top_order = sorted(mi_scores.items(), key=lambda kv: kv[1], reverse=True)
+        feature_rank = {feature: index for index, feature in enumerate(features)}
+        top_order = sorted(
+            ((feature, score) for feature, score in mi_scores.items() if feature in feature_rank),
+            key=lambda item: (-item[1], feature_rank[item[0]]),
+        )
         top_half = [f for f, _ in top_order[: max(1, n // 2)]]
     else:
         top_half = list(features)
@@ -446,7 +643,11 @@ def estimate_minppi_mi_correlation_guided(
 
         # Build seed context: include correlated neighbors when available
         if correlation_neighbors and feat in correlation_neighbors:
-            correlated = correlation_neighbors.get(feat, [])
+            correlated = [
+                candidate
+                for candidate in correlation_neighbors.get(feat, [])
+                if candidate in features and candidate != feat
+            ]
             # Build S_seed: features correlated with feat + top-scored features
             seed_core = set(correlated[: min(10, len(correlated))])
             # Pad to a reasonable coalition size with top features
@@ -460,26 +661,30 @@ def estimate_minppi_mi_correlation_guided(
             # Fallback: random baseline coalition biased toward top features
             seed_size = min(20, n // 3)
             # Prefer top-ranked features
-            top_pool = top_half[: max(seed_size * 2, len(top_half))]
+            top_pool = set(top_half[: max(seed_size * 2, len(top_half))])
             seed = set(
-                rng.choice(
-                    top_pool, size=min(seed_size, len(top_pool)), replace=False
-                ).tolist()
+                candidate
+                for candidate in perturbation_schedule.seed_orders[idx]
+                if candidate in top_pool
             )
+            seed = set(list(candidate for candidate in perturbation_schedule.seed_orders[idx] if candidate in seed)[:seed_size])
 
         # Adversarial search
-        for _ in range(K_adv):
+        for trial in perturbation_schedule.trials[idx]:
             # Perturb seed: randomly flip features, biased toward keeping
             # correlated neighbors
             S = seed.copy()
-            for f in list(S):
-                if rng.random() < 0.3:  # remove some features
+            for f, removal_draw in zip(features, trial.removal_draws, strict=True):
+                if f in S and removal_draw < 0.3:
                     S.discard(f)
             # Add some features from outside
-            outside = list(all_features - S - {feat})
+            outside = [
+                candidate
+                for candidate in trial.add_order
+                if candidate not in S and candidate != feat
+            ]
             if outside:
-                n_add = min(rng.integers(0, min(5, len(outside)) + 1), len(outside))
-                S.update(rng.choice(outside, size=n_add, replace=False).tolist())
+                S.update(outside[: min(trial.add_count, len(outside))])
 
             marg = acc_cache.eval_marginal(S, feat)
             if marg < best_marg:
@@ -583,6 +788,7 @@ def estimate_minppi_hybrid(
     shared_coalitions: bool = False,
     correlation_neighbors: Optional[dict[str, list[str]]] = None,
     mi_scores: Optional[dict[str, float]] = None,
+    perturbation_schedule: Optional[AlgorithmBPerturbationSchedule] = None,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
     utility: Optional[str] = None,
@@ -659,6 +865,7 @@ def estimate_minppi_hybrid(
             X_train, X_val, y_train, y_val,
             alpha=alpha, task=task, utility=utility, K_adv=K_adv,
             correlation_neighbors=correlation_neighbors, mi_scores=mi_scores,
+            perturbation_schedule=perturbation_schedule,
             acc_cache=acc_cache, seed=seed, verbose=verbose,
         )
 
@@ -679,6 +886,7 @@ def estimate_minppi_hybrid(
             X_train, X_val, y_train, y_val,
             alpha=alpha, task=task, utility=utility, K_adv=K_adv,
             correlation_neighbors=correlation_neighbors, mi_scores=mi_scores,
+            perturbation_schedule=perturbation_schedule,
             acc_cache=acc_cache, seed=seed, verbose=False,
         )
 
@@ -714,6 +922,7 @@ def estimate_minppi(
     shared_coalitions: bool = False,
     correlation_neighbors: Optional[dict[str, list[str]]] = None,
     mi_scores: Optional[dict[str, float]] = None,
+    perturbation_schedule: Optional[AlgorithmBPerturbationSchedule] = None,
     shapg_neighbors: Optional[dict[str, list[str]]] = None,
     shapg_scores: Optional[dict[str, float]] = None,
     utility: Optional[str] = None,
@@ -816,6 +1025,7 @@ def estimate_minppi(
             K_adv=K_adv,
             correlation_neighbors=correlation_neighbors,
             mi_scores=mi_scores,
+            perturbation_schedule=perturbation_schedule,
             **common,
         )  # type: ignore[call-arg]
     return fn(
@@ -824,6 +1034,7 @@ def estimate_minppi(
         shared_coalitions=shared_coalitions,
         correlation_neighbors=correlation_neighbors,
         mi_scores=mi_scores,
+        perturbation_schedule=perturbation_schedule,
         **common,
     )  # type: ignore[call-arg]
 

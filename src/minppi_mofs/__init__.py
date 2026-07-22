@@ -64,6 +64,8 @@ logging.getLogger("xgboost").setLevel(logging.ERROR)
 
 from minppi_mofs.voting_game import AccFullCache, UtilityView, compute_v_alpha, make_acc_full_cache  # noqa: E402
 from minppi_mofs.min_ppi import (  # noqa: E402
+    AlgorithmBPerturbationSchedule,
+    AlgorithmBPerturbationTrial,
     SharedCoalitionPlan,
     SharedCoalitionStep,
     estimate_minppi,
@@ -73,6 +75,8 @@ from minppi_mofs.min_ppi import (  # noqa: E402
     estimate_minppi_random_mc,
     estimate_minppi_mi_guided,
     make_shared_coalition_plan,
+    make_algorithm_b_perturbation_schedule,
+    algorithm_b_schedule_digest,
 )
 from minppi_mofs.shapg_integration import (  # noqa: E402
     build_guidance_from_data,
@@ -97,6 +101,8 @@ __all__ = [
     # min_ppi
     "SharedCoalitionPlan",
     "SharedCoalitionStep",
+    "AlgorithmBPerturbationSchedule",
+    "AlgorithmBPerturbationTrial",
     "estimate_minppi",
     "estimate_minppi_exact",
     "estimate_minppi_random_mc",
@@ -104,6 +110,8 @@ __all__ = [
     "estimate_minppi_mi_guided",
     "estimate_minppi_hybrid",
     "make_shared_coalition_plan",
+    "make_algorithm_b_perturbation_schedule",
+    "algorithm_b_schedule_digest",
     # MI-correlation guidance
     "compute_mi_guidance_signal",
     "get_correlation_neighbors",
