@@ -773,13 +773,13 @@ deprecated guidance warning appears in canonical stage execution.
 - Produces: `run_removal_job(context)`, `run_alpha_job(context)`
 - Consumes: MinPPI and SHAP/MinShap/Banzhaf ranking baselines
 
-- [ ] **Step 1: Write same-model prediction tests**
+- [x] **Step 1: Write same-model prediction tests**
 
 Monkeypatch XGBoost and assert binary/multiclass both call `XGBClassifier`,
 regression calls `XGBRegressor`, classification returns probabilities, and
 metrics are computed only by `compute_utility` from those predictions.
 
-- [ ] **Step 2: Implement the canonical final-evaluation helper**
+- [x] **Step 2: Implement the canonical final-evaluation helper**
 
 ```python
 def evaluate_fixed_subset(
@@ -818,14 +818,14 @@ Extend `compute_shap_topk_importance`, `compute_minshap_importance`, and
 configuration and backend instead of hard-coded CPU defaults.  Add propagation
 assertions to the same-model tests.
 
-- [ ] **Step 3: Write matched-removal tests**
+- [x] **Step 3: Write matched-removal tests**
 
 Use a fixed harmful set of size `k=2`; assert SHAP, MinShap, Banzhaf, and every
 random control remove exactly two features, full removes zero, 0-harmful remains
 a valid record, and test data is accessed once with reason
 `final_removal_evaluation` only after all subsets are frozen.
 
-- [ ] **Step 4: Implement matched removal**
+- [x] **Step 4: Implement matched removal**
 
 Compute MinPPI on train/validation.  Rank controls from training data only.
 Create 30 deterministic random matched sets in formal mode and the frozen smoke
@@ -836,7 +836,7 @@ Return raw per-control utility, `delta_utility`, compression, selection time,
 evaluation time, and model-fit counts; do not average random trials inside a
 method record.
 
-- [ ] **Step 5: Write and implement alpha-sweep tests**
+- [x] **Step 5: Write and implement alpha-sweep tests**
 
 Assert the complete frozen grid is run, no test-based argmax is computed, each
 feature set is fixed by the alpha `selection_plan`, and each alpha result has
@@ -844,7 +844,7 @@ one audited read using `final_alpha_grid_evaluation`.  Output contains harmful
 count, compression, validation/test utility, preservation, runtime, and
 feature-set hash per alpha.
 
-- [ ] **Step 6: Verify Task 9**
+- [x] **Step 6: Verify Task 9**
 
 Run removal/alpha stage tests plus the full utility suite.  Search the new stage
 module for direct reads of `test.csv`; only `AuditedSplitAccess` may contain

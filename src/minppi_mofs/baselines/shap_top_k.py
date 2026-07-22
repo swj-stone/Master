@@ -19,9 +19,14 @@ Run (stand-alone)::
 
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping
+import warnings
+
 import numpy as np
 import pandas as pd
-from xgboost import XGBClassifier, XGBRegressor
+
+from minppi_mofs.baselines._coalition_utility import default_utility
+from minppi_mofs.modeling import make_model
 
 
 def compute_shap_topk_importance(
@@ -31,6 +36,10 @@ def compute_shap_topk_importance(
     task: str = "binary",
     seed: int = 42,
     verbose: bool = False,
+    utility: str | None = None,
+    model_params: Mapping[str, object] | None = None,
+    backend: str = "cpu",
+    diagnostics: MutableMapping[str, int] | None = None,
 ) -> dict[str, float]:
     """Compute SHAP-based feature importance.
 
@@ -52,25 +61,29 @@ def compute_shap_topk_importance(
     safe_map = {c: f"f{i}" for i, c in enumerate(X.columns)}
     X_safe = X.rename(columns=safe_map)
 
-    if task == "regression":
-        model = XGBRegressor(
-            n_estimators=100,
-            max_depth=4,
-            learning_rate=0.1,
-            verbosity=0,
-            random_state=seed,
-        )
-    else:
-        model = XGBClassifier(
-            n_estimators=100,
-            max_depth=4,
-            learning_rate=0.1,
-            verbosity=0,
-            random_state=seed,
-        )
+    selected_utility = utility or default_utility(task)
+    valid_utilities = (
+        {"r2", "rmse"}
+        if task == "regression"
+        else {"roc_auc", "ovr_auc", "accuracy", "pr_auc"}
+    )
+    if selected_utility not in valid_utilities:
+        raise ValueError("utility is invalid for the requested task")
+    model = make_model(
+        task=task,
+        model_params=model_params
+        or {"n_estimators": 100, "max_depth": 4, "learning_rate": 0.1},
+        backend=backend,
+        seed=seed,
+    )
     model.fit(X_safe, y)
+    if diagnostics is not None:
+        diagnostics["model_fit_count"] = 1
+        diagnostics["coalition_count"] = 1
 
-    import shap
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", PendingDeprecationWarning)
+        import shap
 
     explainer = shap.TreeExplainer(model)
     shap_vals = explainer.shap_values(X_safe)
@@ -95,8 +108,10 @@ def compute_shap_topk_importance(
     if verbose:
         print("  Mean |SHAP| extracted via TreeExplainer", flush=True)
 
-    result = dict(zip(X.columns, vals.astype(float)))
-    return dict(sorted(result.items(), key=lambda kv: kv[1], reverse=True))
+    result = dict(zip(X.columns, vals.astype(float), strict=True))
+    if tuple(result) != tuple(X.columns) or not all(np.isfinite(list(result.values()))):
+        raise ValueError("SHAP returned incomplete or non-finite scores")
+    return result
 
 
 def rank_features(scores: dict[str, float]) -> list[tuple[str, float]]:

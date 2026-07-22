@@ -9,6 +9,7 @@ and rejects ambiguous or misspelled settings before a run can start.
 from __future__ import annotations
 
 import hashlib
+import io
 import csv
 import json
 import math
@@ -581,7 +582,7 @@ class AuditedSplitAccess:
         )
         return X_train, y_train, X_val, y_val
 
-    def load_test(self, *, reason: object):
+    def load_test(self, *, reason: object, expected_sha256: str | None = None):
         """Audit first, then permit only one frozen final-evaluation purpose."""
         normalized_reason = _audit_reason(reason)
         decision = (
@@ -602,7 +603,10 @@ class AuditedSplitAccess:
                 f"test access denied for stage={self._stage!r}, reason={event['reason']!r}"
             )
         return _load_split_csv(
-            self._paths.test_csv, self._paths.target, self._paths._identities["test_csv"]
+            self._paths.test_csv,
+            self._paths.target,
+            self._paths._identities["test_csv"],
+            expected_sha256=expected_sha256,
         )
 
 
@@ -687,7 +691,11 @@ def _split_file_identity(
 
 
 def _load_split_csv(
-    path: Path, target: str, expected_identity: tuple[int, int] | None
+    path: Path,
+    target: str,
+    expected_identity: tuple[int, int] | None,
+    *,
+    expected_sha256: str | None = None,
 ):
     before = _split_file_identity(path, "prepared", allow_missing=False)
     if expected_identity is None or before != expected_identity:
@@ -705,14 +713,25 @@ def _load_split_csv(
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != expected_identity:
             raise ValueError("prepared split file identity changed after open")
-        with os.fdopen(descriptor, "r", encoding="utf-8", newline="") as handle:
+        with os.fdopen(descriptor, "rb") as handle:
             descriptor = -1
-            frame = pd.read_csv(handle)
-    except (OSError, UnicodeDecodeError, ValueError) as exc:
+            payload = handle.read()
+    except OSError as exc:
         raise ValueError(f"could not load split CSV {path}") from exc
     finally:
         if descriptor >= 0:
             os.close(descriptor)
+    if expected_sha256 is not None and (
+        not isinstance(expected_sha256, str)
+        or len(expected_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in expected_sha256)
+        or hashlib.sha256(payload).hexdigest() != expected_sha256
+    ):
+        raise ValueError("prepared split file SHA-256 changed")
+    try:
+        frame = pd.read_csv(io.BytesIO(payload))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ValueError(f"could not load split CSV {path}") from exc
     if target not in frame.columns:
         raise ValueError(f"split CSV {path} is missing target column {target!r}")
     features = frame.drop(columns=[target]).copy(deep=True)

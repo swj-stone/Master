@@ -108,6 +108,8 @@ class PipelineRunner:
         stages = STAGE_ORDER if requested_stage == "all" else (requested_stage,)
         exit_code = 0
         for stage in stages:
+            if requested_stage == "all" and stage not in self.executors:
+                return 1
             outcome = self.execute(stage)
             if outcome is None:
                 continue

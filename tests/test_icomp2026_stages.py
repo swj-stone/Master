@@ -118,6 +118,30 @@ def test_frozen_test_access_pairs_return_test_arrays_and_append_allowed_event(
     assert event["seed"] == prepared_paths.seed
 
 
+def test_audited_test_access_validates_manifest_sha_during_its_single_read(
+    tmp_path: Path, prepared_paths: PreparedSplitPaths
+) -> None:
+    audit = _authorized_audit(
+        tmp_path / "run-sha" / "protocol_audit.json",
+        prepared_paths,
+        job_id="job-removal-sha",
+        stage="removal",
+    )
+    access = AuditedSplitAccess(
+        prepared_paths, stage="removal", job_id="job-removal-sha", audit=audit
+    )
+    digest = hashlib.sha256(prepared_paths.test_csv.read_bytes()).hexdigest()
+    X_test, y_test = access.load_test(
+        reason="final_removal_evaluation", expected_sha256=digest
+    )
+    assert len(X_test) == len(y_test) == 2
+
+    with pytest.raises(ValueError, match="SHA-256"):
+        access.load_test(
+            reason="final_removal_evaluation", expected_sha256="0" * 64
+        )
+
+
 @pytest.mark.parametrize(
     ("stage", "reason"),
     [
@@ -855,7 +879,7 @@ def test_real_validate_stage_writes_structured_checks_and_requires_raw_cache(
     assert checks["backend"] == "cpu"
     assert checks["raw_datasets"] == ["spambase", "abalone"]
     assert checks["registered_stages"] == [
-        "ablation", "estimator", "preprocess", "validate"
+        "ablation", "alpha", "estimator", "preprocess", "removal", "validate"
     ]
     assert all(path.exists() for path in raw_paths.values())
 
@@ -1150,6 +1174,8 @@ def test_real_stage_registry_is_exact_and_direct_cli_help_remains_safe() -> None
         "validate": stage_module.run_validate_job,
         "preprocess": stage_module.run_preprocess_job,
         "estimator": stage_module.run_estimator_job,
+        "removal": stage_module.run_removal_job,
+        "alpha": stage_module.run_alpha_job,
         "ablation": stage_module.run_ablation_job,
     }
     completed = subprocess.run(
@@ -2354,13 +2380,821 @@ def test_estimator_artifact_link_failure_leaves_no_partial_publication(
     assert not list(destination.parent.glob(".*.tmp"))
 
 
-def test_task8_registry_contains_only_completed_stage_handlers() -> None:
+def test_task9_registry_contains_only_completed_stage_handlers() -> None:
     assert stage_module.STAGE_EXECUTORS == {
         "validate": stage_module.run_validate_job,
         "preprocess": stage_module.run_preprocess_job,
         "estimator": stage_module.run_estimator_job,
+        "removal": stage_module.run_removal_job,
+        "alpha": stage_module.run_alpha_job,
         "ablation": stage_module.run_ablation_job,
     }
+
+
+class _Task9FakeCache:
+    def __init__(self, features: tuple[str, ...]) -> None:
+        self._coalitions = {tuple(sorted(features))}
+        self._model_fit_count = 1
+
+    @property
+    def model_fit_count(self) -> int:
+        return self._model_fit_count
+
+    @property
+    def coalition_count(self) -> int:
+        return len(self._coalitions)
+
+    def evaluate(self, features: set[str]) -> float:
+        key = tuple(sorted(features))
+        if key not in self._coalitions:
+            self._coalitions.add(key)
+            self._model_fit_count += bool(key)
+        return 0.7 + 0.01 * len(features)
+
+
+def _task9_contexts(tmp_path: Path, protocol, stage: str):
+    layout = create_new_run(tmp_path / "results", f"task9-{stage}", protocol)
+    manifest = build_job_manifest(protocol, stages=(stage,))
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    return layout, manifest, contexts
+
+
+def _patch_task9_selection(
+    monkeypatch: pytest.MonkeyPatch, *, harmful_by_alpha: bool = False
+) -> tuple[pd.DataFrame, np.ndarray, pd.DataFrame, np.ndarray, dict[str, int]]:
+    X_train = pd.DataFrame(
+        {name: np.arange(12, dtype=float) + index for index, name in enumerate(("f0", "f1", "f2", "f3"))}
+    )
+    y_train = np.array([0, 1] * 6)
+    X_val = X_train.iloc[:4].reset_index(drop=True)
+    y_val = y_train[:4]
+    calls = {"loader": 0, "guidance": 0, "schedule": 0, "hybrid": 0}
+
+    def loader(context):
+        calls["loader"] += 1
+        return X_train, y_train, X_val, y_val, {"test_must_not_be_touched": True}
+
+    def guidance(*args, **kwargs):
+        calls["guidance"] += 1
+        return ({name: float(i) for i, name in enumerate(X_train)}, {name: [] for name in X_train})
+
+    def schedule(*args, **kwargs):
+        calls["schedule"] += 1
+        return object()
+
+    def hybrid(*args, **kwargs):
+        calls["hybrid"] += 1
+        if harmful_by_alpha and kwargs["alpha"] < 0.9:
+            removed = {"f0"}
+        elif harmful_by_alpha:
+            removed = {"f1", "f3"}
+        else:
+            removed = {"f1", "f3"}
+        return {name: (-1 if name in removed else 0) for name in X_train}
+
+    monkeypatch.setattr(stage_module, "_load_prepared_train_validation", loader)
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_manifest_row",
+        lambda context: {
+            "dataset_id": context.job.dataset_id,
+            "seed": context.job.seed,
+            "task": context.job.parameters["task"],
+            "selected_features_json": json.dumps(list(X_train.columns)),
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "_make_job_cache",
+        lambda context, X_train, *args, **kwargs: _Task9FakeCache(
+            tuple(X_train.columns)
+        ),
+    )
+    monkeypatch.setattr(guidance_module, "build_mi_correlation_guidance", guidance)
+    monkeypatch.setattr(min_ppi_module, "make_algorithm_b_perturbation_schedule", schedule)
+    monkeypatch.setattr(min_ppi_module, "estimate_minppi_hybrid", hybrid)
+    return X_train, y_train, X_val, y_val, calls
+
+
+@pytest.mark.parametrize("harmful", [True, False])
+def test_removal_plan_freezes_complete_matched_scope_without_test_access(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    harmful: bool,
+) -> None:
+    layout, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "removal")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    X_train, _, _, _, calls = _patch_task9_selection(monkeypatch)
+    from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
+
+    if not harmful:
+        monkeypatch.setattr(
+            min_ppi_module,
+            "estimate_minppi_hybrid",
+            lambda *args, **kwargs: {name: 0 for name in X_train},
+        )
+    monkeypatch.setattr(
+        shap_top_k,
+        "compute_shap_topk_importance",
+        lambda *args, diagnostics, **kwargs: diagnostics.update(model_fit_count=1, coalition_count=1)
+        or {"f0": 4.0, "f1": 1.0, "f2": 3.0, "f3": 2.0},
+    )
+    monkeypatch.setattr(
+        min_shap,
+        "compute_minshap_importance",
+        lambda *args, diagnostics, **kwargs: diagnostics.update(model_fit_count=2, coalition_count=3)
+        or {"f0": 1.0, "f1": 4.0, "f2": 2.0, "f3": 3.0},
+    )
+    monkeypatch.setattr(
+        banzhaf_fs,
+        "compute_banzhaf_importance",
+        lambda *args, diagnostics, **kwargs: diagnostics.update(model_fit_count=3, coalition_count=4)
+        or {"f0": 2.0, "f1": 3.0, "f2": 4.0, "f3": 1.0},
+    )
+
+    record = stage_module.run_removal_job(plan_context)
+    document = json.loads((layout.root / record.artifacts["selection_plan"]).read_text(encoding="utf-8"))
+    expected_k = 2 if harmful else 0
+    assert document["k"] == expected_k
+    assert [item["method"] for item in document["methods"]] == list(stage_module._REMOVAL_METHODS)
+    for method in document["methods"]:
+        expected_trials = smoke_protocol.removal["random_repeats"] if method["method"] == "random_matched" else 1
+        assert len(method["trials"]) == expected_trials
+        for trial in method["trials"]:
+            assert len(trial["removed_features"]) == (0 if method["method"] == "full" else expected_k)
+    assert calls["loader"] == 1
+    assert calls["guidance"] == 1
+    assert calls["schedule"] == 1
+    methods_by_name = {item["method"]: item for item in document["methods"]}
+    for method in stage_module._REMOVAL_METHODS:
+        assert record.metrics[f"{method}_selection_model_fit_count"] == methods_by_name[method]["model_fit_count"]
+        assert record.metrics[f"{method}_selection_coalition_count"] == methods_by_name[method]["coalition_count"]
+        assert record.metrics[f"{method}_selection_time_s"] >= 0.0
+
+    monkeypatch.setattr(
+        stage_module,
+        "_load_prepared_train_validation",
+        lambda context: (_ for _ in ()).throw(AssertionError("retry refit selection")),
+    )
+    retry = stage_module.run_removal_job(plan_context)
+    assert retry.metrics["selection_model_fit_count"] == record.metrics["selection_model_fit_count"]
+
+    plan_path = layout.root / record.artifacts["selection_plan"]
+    malformed = json.loads(plan_path.read_text(encoding="utf-8"))
+    malformed["methods"][0]["trials"][0]["retained_hash"] = "0" * 64
+    atomic_write_json(plan_path, malformed)
+    with pytest.raises(ValueError, match="hash|plan|selection"):
+        stage_module.run_removal_job(plan_context)
+
+
+def test_alpha_plan_freezes_complete_grid_with_one_shared_cache_and_setup(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "alpha")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    _, _, _, _, calls = _patch_task9_selection(monkeypatch, harmful_by_alpha=True)
+
+    record = stage_module.run_alpha_job(plan_context)
+    document = json.loads((layout.root / record.artifacts["selection_plan"]).read_text(encoding="utf-8"))
+    assert [item["alpha"] for item in document["entries"]] == list(smoke_protocol.alpha_grid)
+    assert len({item["alpha_token"] for item in document["entries"]}) == len(smoke_protocol.alpha_grid)
+    assert calls == {
+        "loader": 1,
+        "guidance": 1,
+        "schedule": 1,
+        "hybrid": len(smoke_protocol.alpha_grid),
+    }
+    assert not any("recommend" in key or "argmax" in key for key in document)
+    assert document["initial_model_fit_count"] == 1
+    assert document["initial_coalition_count"] == 1
+    assert document["selection_model_fit_count"] == 1 + sum(
+        entry["model_fit_count"] for entry in document["entries"]
+    )
+    assert document["selection_coalition_count"] == 1 + sum(
+        entry["coalition_count"] for entry in document["entries"]
+    )
+    for entry in document["entries"]:
+        assert [item["feature"] for item in entry["scores"]] == document["features"]
+        assert entry["model_fit_count"] <= entry["coalition_count"]
+        assert record.metrics[f"{entry['alpha_token']}_selection_time_s"] >= 0.0
+
+    monkeypatch.setattr(
+        stage_module,
+        "_load_prepared_train_validation",
+        lambda context: (_ for _ in ()).throw(AssertionError("retry refit selection")),
+    )
+    retry = stage_module.run_alpha_job(plan_context)
+    assert retry.metrics["selection_model_fit_count"] == record.metrics["selection_model_fit_count"]
+
+    plan_path = layout.root / record.artifacts["selection_plan"]
+    malformed = json.loads(plan_path.read_text(encoding="utf-8"))
+    malformed["entries"].pop()
+    atomic_write_json(plan_path, malformed)
+    with pytest.raises(ValueError, match="grid|plan|selection"):
+        stage_module.run_alpha_job(plan_context)
+
+
+def _mark_task9_plan_success(context: StageContext, record: ResultRecord) -> None:
+    atomic_write_json(context.layout.root / context.job.output_relpath, asdict(record))
+    context.status.start(context.job.job_id)
+    context.status.succeed(context.job.job_id)
+
+
+def _task9_evaluation_loader(features: tuple[str, ...]):
+    X_train = pd.DataFrame(
+        {feature: np.arange(8, dtype=float) + index for index, feature in enumerate(features)}
+    )
+    y_train = np.array([0, 1] * 4)
+    X_val = X_train.iloc[:4].reset_index(drop=True)
+    y_val = y_train[:4]
+    row = {
+        "selected_features_json": json.dumps(list(features)),
+        "task": "binary",
+    }
+    return X_train, y_train, X_val, y_val, row
+
+
+def test_random_removal_evaluation_reads_test_once_emits_raw_trials_and_reuses_retry(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "removal")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    _patch_task9_selection(monkeypatch)
+    from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
+
+    scores = {"f0": 4.0, "f1": 1.0, "f2": 3.0, "f3": 2.0}
+    for module, name in (
+        (shap_top_k, "compute_shap_topk_importance"),
+        (min_shap, "compute_minshap_importance"),
+        (banzhaf_fs, "compute_banzhaf_importance"),
+    ):
+        monkeypatch.setattr(
+            module,
+            name,
+            lambda *args, diagnostics, **kwargs: diagnostics.update(model_fit_count=1, coalition_count=1)
+            or scores,
+        )
+    plan_record = stage_module.run_removal_job(plan_context)
+    _mark_task9_plan_success(plan_context, plan_record)
+    random_context = next(item for item in contexts if item.job.method == "random_matched")
+    prepared = _task9_evaluation_loader(("f0", "f1", "f2", "f3"))
+    monkeypatch.setattr(stage_module, "_load_prepared_train_validation", lambda context: prepared)
+    test_reads: list[str] = []
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda context, row, *, reason: test_reads.append(reason)
+        or (prepared[0].iloc[:4].reset_index(drop=True), prepared[1][:4]),
+    )
+    evaluated: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda *args, **kwargs: evaluated.append(tuple(args[4])) or (0.5 + 0.1 * len(args[4])),
+    )
+
+    record = stage_module.run_removal_job(random_context)
+    document = json.loads((layout.root / record.artifacts["results"]).read_text(encoding="utf-8"))
+    assert test_reads == ["final_removal_evaluation"]
+    assert len(document["rows"]) == smoke_protocol.removal["random_repeats"]
+    assert all(row["k"] == 2 and len(row["removed_features"]) == 2 for row in document["rows"])
+    assert not any(token in document for token in ("mean", "median", "best", "recommendation"))
+    assert len(evaluated) == len(set(evaluated))
+    planned_method = next(
+        item for item in json.loads(
+            (layout.root / plan_record.artifacts["selection_plan"]).read_text(encoding="utf-8")
+        )["methods"]
+        if item["method"] == "random_matched"
+    )
+    assert document["selection_model_fit_count"] == planned_method["model_fit_count"]
+    assert document["selection_coalition_count"] == planned_method["coalition_count"]
+    assert document["selection_time_s"] == plan_record.metrics["random_matched_selection_time_s"]
+
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("retry read test")),
+    )
+    retry = stage_module.run_removal_job(random_context)
+    assert retry.metrics == record.metrics
+
+    result_path = layout.root / record.artifacts["results"]
+    original = json.loads(result_path.read_text(encoding="utf-8"))
+
+    def mutate_subset(payload):
+        payload["rows"][0]["removed_features"] = ["f0"]
+
+    def mutate_top_evaluation_count(payload):
+        payload["evaluation_model_fit_count"] += 1
+
+    def mutate_row_evaluation_count(payload):
+        payload["rows"][0]["evaluation_model_fit_count"] += 1
+
+    def mutate_row_runtime(payload):
+        payload["rows"][0]["evaluation_time_s"] += 1.0
+
+    def mutate_shared_full_utility(payload):
+        payload["rows"][-1]["full_utility"] += 0.1
+        payload["rows"][-1]["delta_utility"] -= 0.1
+
+    def mutate_coherent_selection_count(payload):
+        payload["selection_model_fit_count"] += 1
+        for result_row in payload["rows"]:
+            result_row["selection_model_fit_count"] += 1
+
+    def mutate_coherent_selection_runtime(payload):
+        payload["selection_time_s"] += 1.0
+        for result_row in payload["rows"]:
+            result_row["selection_time_s"] += 1.0
+
+    for mutation in (
+        mutate_subset,
+        mutate_top_evaluation_count,
+        mutate_row_evaluation_count,
+        mutate_row_runtime,
+        mutate_shared_full_utility,
+        mutate_coherent_selection_count,
+        mutate_coherent_selection_runtime,
+    ):
+        payload = json.loads(json.dumps(original))
+        mutation(payload)
+        atomic_write_json(result_path, payload)
+        with pytest.raises(ValueError, match="subset|reuse|row|removal|counter|time"):
+            stage_module.run_removal_job(random_context)
+    atomic_write_json(result_path, original)
+
+
+@pytest.mark.parametrize("method", stage_module._REMOVAL_METHODS)
+@pytest.mark.parametrize("harmful", [False, True])
+def test_every_removal_method_preserves_exact_job_totals_for_k0_and_k2(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+    harmful: bool,
+) -> None:
+    layout, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "removal")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    X_train, _, _, _, _ = _patch_task9_selection(monkeypatch)
+    from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
+
+    if not harmful:
+        monkeypatch.setattr(
+            min_ppi_module,
+            "estimate_minppi_hybrid",
+            lambda *args, **kwargs: {name: 0 for name in X_train},
+        )
+    baseline_scores = {"f0": 4.0, "f1": 1.0, "f2": 3.0, "f3": 2.0}
+    for module, name in (
+        (shap_top_k, "compute_shap_topk_importance"),
+        (min_shap, "compute_minshap_importance"),
+        (banzhaf_fs, "compute_banzhaf_importance"),
+    ):
+        monkeypatch.setattr(
+            module,
+            name,
+            lambda *args, diagnostics, **kwargs: diagnostics.update(
+                model_fit_count=2, coalition_count=3
+            )
+            or baseline_scores,
+        )
+    plan_record = stage_module.run_removal_job(plan_context)
+    _mark_task9_plan_success(plan_context, plan_record)
+    eval_context = next(item for item in contexts if item.job.method == method)
+    prepared = _task9_evaluation_loader(("f0", "f1", "f2", "f3"))
+    monkeypatch.setattr(stage_module, "_load_prepared_train_validation", lambda context: prepared)
+    test_reasons: list[str] = []
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda context, row, *, reason: test_reasons.append(reason)
+        or (prepared[0].iloc[:4].reset_index(drop=True), prepared[1][:4]),
+    )
+    evaluated: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda *args, **kwargs: evaluated.append(tuple(args[4]))
+        or (0.5 + 0.05 * len(args[4])),
+    )
+
+    record = stage_module.run_removal_job(eval_context)
+    document = json.loads(
+        (layout.root / record.artifacts["results"]).read_text(encoding="utf-8")
+    )
+    plan = json.loads(
+        (layout.root / plan_record.artifacts["selection_plan"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    method_plan = next(item for item in plan["methods"] if item["method"] == method)
+    expected_subsets = {
+        tuple(plan["features"]),
+        *(tuple(item["retained_features"]) for item in method_plan["trials"]),
+    }
+    expected_fits = sum(bool(features) for features in expected_subsets)
+    assert test_reasons == ["final_removal_evaluation"]
+    assert document["k"] == (2 if harmful else 0)
+    assert document["evaluation_model_fit_count"] == expected_fits
+    assert len(evaluated) == expected_fits
+    assert document["selection_model_fit_count"] == method_plan["model_fit_count"]
+    assert document["selection_coalition_count"] == method_plan["coalition_count"]
+    if method in {"full", "random_matched"}:
+        assert document["selection_model_fit_count"] == 0
+        assert document["selection_coalition_count"] == 0
+    for result_row in document["rows"]:
+        for field in (
+            "selection_time_s",
+            "evaluation_time_s",
+            "selection_model_fit_count",
+            "selection_coalition_count",
+            "evaluation_model_fit_count",
+        ):
+            assert result_row[field] == document[field]
+        assert result_row["full_utility"] == document["rows"][0]["full_utility"]
+
+
+def test_removal_stage_uses_real_audited_test_accessor_exactly_once(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    protocol = replace(protocol, datasets=(protocol.datasets[0],))
+    layout = create_new_run(tmp_path / "results", "task9-real-audit", protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    manifest = (
+        build_job_manifest(protocol, stages=("validate",))
+        + build_job_manifest(protocol, stages=("preprocess",))
+        + build_job_manifest(
+            protocol,
+            stages=("removal",),
+            data_manifest=(
+                {
+                    "dataset_id": "spambase",
+                    "seed": 42,
+                    "selected_feature_count": 2,
+                },
+            ),
+        )
+    )
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    stage_module.run_validate_job(
+        next(item for item in contexts if item.job.stage == "validate")
+    )
+    stage_module.run_preprocess_job(
+        next(item for item in contexts if item.job.stage == "preprocess")
+    )
+    plan_context = next(
+        item
+        for item in contexts
+        if item.job.stage == "removal" and item.job.method == "selection_plan"
+    )
+    from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
+
+    monkeypatch.setattr(
+        stage_module,
+        "_make_job_cache",
+        lambda context, X_train, *args, **kwargs: _Task9FakeCache(
+            tuple(X_train.columns)
+        ),
+    )
+    monkeypatch.setattr(
+        guidance_module,
+        "build_mi_correlation_guidance",
+        lambda X, *args, **kwargs: (
+            {feature: 0.0 for feature in X.columns},
+            {feature: [] for feature in X.columns},
+        ),
+    )
+    monkeypatch.setattr(
+        min_ppi_module,
+        "make_algorithm_b_perturbation_schedule",
+        lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        min_ppi_module,
+        "estimate_minppi_hybrid",
+        lambda X_train, **kwargs: {feature: 0 for feature in X_train.columns},
+    )
+    for module, name in (
+        (shap_top_k, "compute_shap_topk_importance"),
+        (min_shap, "compute_minshap_importance"),
+        (banzhaf_fs, "compute_banzhaf_importance"),
+    ):
+        monkeypatch.setattr(
+            module,
+            name,
+            lambda X, *args, diagnostics, **kwargs: diagnostics.update(
+                model_fit_count=1, coalition_count=1
+            )
+            or {feature: float(index) for index, feature in enumerate(X.columns)},
+        )
+    plan_record = stage_module.run_removal_job(plan_context)
+    _mark_task9_plan_success(plan_context, plan_record)
+    eval_context = next(
+        item
+        for item in contexts
+        if item.job.stage == "removal" and item.job.method == "full"
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda *args, **kwargs: 0.75,
+    )
+
+    stage_module.run_removal_job(eval_context)
+
+    events = eval_context.audit.read_events()
+    assert len(events) == 1
+    assert events[0]["decision"] == "allowed"
+    assert events[0]["stage"] == "removal"
+    assert events[0]["job_id"] == eval_context.job.job_id
+    assert events[0]["reason"] == "final_removal_evaluation"
+
+
+def test_alpha_evaluation_reads_test_once_and_reuses_exact_frozen_entry(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "alpha")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    _patch_task9_selection(monkeypatch, harmful_by_alpha=True)
+    plan_record = stage_module.run_alpha_job(plan_context)
+    _mark_task9_plan_success(plan_context, plan_record)
+    eval_context = next(item for item in contexts if item.job.method == "alpha_evaluation")
+    prepared = _task9_evaluation_loader(("f0", "f1", "f2", "f3"))
+    monkeypatch.setattr(stage_module, "_load_prepared_train_validation", lambda context: prepared)
+    test_reads: list[str] = []
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda context, row, *, reason: test_reads.append(reason)
+        or (prepared[0].iloc[:4].reset_index(drop=True), prepared[1][:4]),
+    )
+    evaluated: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda *args, **kwargs: evaluated.append(tuple(args[4])) or (0.9 if len(args[4]) == 4 else 0.72),
+    )
+
+    record = stage_module.run_alpha_job(eval_context)
+    document = json.loads((layout.root / record.artifacts["results"]).read_text(encoding="utf-8"))
+    plan = json.loads((layout.root / plan_record.artifacts["selection_plan"]).read_text(encoding="utf-8"))
+    frozen = next(item for item in plan["entries"] if item["alpha"] == eval_context.job.parameters["alpha"])
+    assert test_reads == ["final_alpha_grid_evaluation"]
+    assert document["retained_features"] == frozen["retained_features"]
+    assert document["removed_features"] == frozen["removed_features"]
+    assert document["retained_hash"] == frozen["retained_hash"]
+    assert document["preservation"] == document["test_utility"] / document["full_test_utility"]
+    assert len(evaluated) == len(set(evaluated))
+    assert not any("argmax" in key or "recommend" in key for key in document)
+    assert document["selection_time_s"] == plan_record.metrics[
+        f"{frozen['alpha_token']}_selection_time_s"
+    ]
+    assert document["selection_model_fit_count"] == frozen["model_fit_count"]
+    assert document["selection_coalition_count"] == frozen["coalition_count"]
+
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("retry read test")),
+    )
+    retry = stage_module.run_alpha_job(eval_context)
+    assert retry.metrics == record.metrics
+
+    result_path = layout.root / record.artifacts["results"]
+    original = json.loads(result_path.read_text(encoding="utf-8"))
+
+    def mutate_selection_time(payload):
+        payload["selection_time_s"] += 1.0
+
+    def mutate_selection_fits(payload):
+        payload["selection_model_fit_count"] += 1
+
+    def mutate_selection_coalitions(payload):
+        payload["selection_coalition_count"] += 1
+
+    def mutate_evaluation_fits(payload):
+        payload["evaluation_model_fit_count"] += 1
+
+    def mutate_negative_evaluation_time(payload):
+        payload["evaluation_time_s"] = -1.0
+
+    for mutation in (
+        mutate_selection_time,
+        mutate_selection_fits,
+        mutate_selection_coalitions,
+        mutate_evaluation_fits,
+        mutate_negative_evaluation_time,
+    ):
+        payload = dict(original)
+        mutation(payload)
+        atomic_write_json(result_path, payload)
+        with pytest.raises(ValueError, match="alpha|counter|selection|time"):
+            stage_module.run_alpha_job(eval_context)
+    atomic_write_json(result_path, original)
+
+
+def test_alpha_evaluation_rejects_unsuccessful_plan_before_test_access_or_fit(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "alpha")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    _patch_task9_selection(monkeypatch, harmful_by_alpha=True)
+    stage_module.run_alpha_job(plan_context)
+    eval_context = next(item for item in contexts if item.job.method == "alpha_evaluation")
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("test accessed before plan success")),
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("model fit before plan success")),
+    )
+    with pytest.raises(ValueError, match="dependency|successful"):
+        stage_module.run_alpha_job(eval_context)
+
+
+def test_removal_plan_rejects_coherent_feature_universe_conflict_before_refit(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "removal")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    _patch_task9_selection(monkeypatch)
+    from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
+
+    baseline = {"f0": 0.0, "f1": 1.0, "f2": 2.0, "f3": 3.0}
+    for module, name in (
+        (shap_top_k, "compute_shap_topk_importance"),
+        (min_shap, "compute_minshap_importance"),
+        (banzhaf_fs, "compute_banzhaf_importance"),
+    ):
+        monkeypatch.setattr(
+            module,
+            name,
+            lambda *args, diagnostics, **kwargs: diagnostics.update(
+                model_fit_count=1, coalition_count=1
+            )
+            or baseline,
+        )
+    record = stage_module.run_removal_job(plan_context)
+    path = layout.root / record.artifacts["selection_plan"]
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["features"][0] = "g0"
+    for score_group in document["scores"]:
+        score_group["values"][0]["feature"] = "g0"
+    for method in document["methods"]:
+        for row in method["trials"]:
+            row["retained_features"] = [
+                "g0" if feature == "f0" else feature
+                for feature in row["retained_features"]
+            ]
+            row["removed_features"] = [
+                "g0" if feature == "f0" else feature
+                for feature in row["removed_features"]
+            ]
+            row["retained_hash"] = stage_module._task9_feature_hash(
+                row["retained_features"]
+            )
+    atomic_write_json(path, document)
+    monkeypatch.setattr(
+        stage_module,
+        "_load_prepared_train_validation",
+        lambda context: (_ for _ in ()).throw(AssertionError("conflict refit")),
+    )
+    with pytest.raises(ValueError, match="manifest|feature|authority"):
+        stage_module.run_removal_job(plan_context)
+
+
+def test_alpha_plan_rejects_coherent_harmful_set_conflict_with_frozen_scores(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "alpha")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    _patch_task9_selection(monkeypatch, harmful_by_alpha=True)
+    record = stage_module.run_alpha_job(plan_context)
+    path = layout.root / record.artifacts["selection_plan"]
+    document = json.loads(path.read_text(encoding="utf-8"))
+    entry = document["entries"][0]
+    replacement = next(
+        feature
+        for feature in document["features"]
+        if feature not in entry["removed_features"]
+    )
+    entry["removed_features"] = [replacement]
+    entry["retained_features"] = [
+        feature for feature in document["features"] if feature != replacement
+    ]
+    entry["retained_hash"] = stage_module._task9_feature_hash(
+        entry["retained_features"]
+    )
+    entry["harmful_count"] = 1
+    entry["compression"] = 1 / len(document["features"])
+    atomic_write_json(path, document)
+    monkeypatch.setattr(
+        stage_module,
+        "_load_prepared_train_validation",
+        lambda context: (_ for _ in ()).throw(AssertionError("conflict refit")),
+    )
+
+    with pytest.raises(ValueError, match="harmful|score|plan"):
+        stage_module.run_alpha_job(plan_context)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["wrong_path", "missing_metric", "string_runtime", "negative_count", "counter_drift"],
+)
+def test_alpha_plan_result_record_fails_closed_before_test_read_or_fit(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    _, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "alpha")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    _patch_task9_selection(monkeypatch, harmful_by_alpha=True)
+    record = stage_module.run_alpha_job(plan_context)
+    _mark_task9_plan_success(plan_context, record)
+    path = plan_context.layout.root / plan_context.job.output_relpath
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if mutation == "wrong_path":
+        payload["artifacts"] = {"selection_plan": "alpha/foreign/selection_plan.json"}
+    elif mutation == "missing_metric":
+        payload["metrics"].pop(next(iter(payload["metrics"])))
+    elif mutation == "string_runtime":
+        payload["metrics"]["selection_time_s"] = "fast"
+    elif mutation == "negative_count":
+        payload["metrics"]["selection_model_fit_count"] = -1
+    else:
+        payload["metrics"]["selection_model_fit_count"] += 1
+    atomic_write_json(path, payload)
+    eval_context = next(item for item in contexts if item.job.method == "alpha_evaluation")
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("bad plan read test")),
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("bad plan fit")),
+    )
+    with pytest.raises(ValueError, match="plan|selection|metric|artifact|counter"):
+        stage_module.run_alpha_job(eval_context)
+
+
+@pytest.mark.parametrize("tampered_counter", ["model_fit_count", "coalition_count"])
+def test_alpha_plan_rejects_coordinated_entry_aggregate_and_record_counter_tampering(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    tampered_counter: str,
+) -> None:
+    layout, _, contexts = _task9_contexts(tmp_path, smoke_protocol, "alpha")
+    plan_context = next(item for item in contexts if item.job.method == "selection_plan")
+    _patch_task9_selection(monkeypatch, harmful_by_alpha=True)
+    record = stage_module.run_alpha_job(plan_context)
+    _mark_task9_plan_success(plan_context, record)
+    plan_path = layout.root / record.artifacts["selection_plan"]
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    entry = next(
+        item
+        for item in plan["entries"]
+        if item["model_fit_count"] == item["coalition_count"] == 1
+    )
+    delta = 1 if tampered_counter == "model_fit_count" else -1
+    entry[tampered_counter] += delta
+    aggregate = f"selection_{tampered_counter}"
+    plan[aggregate] += delta
+    atomic_write_json(plan_path, plan)
+    record_path = layout.root / plan_context.job.output_relpath
+    result_record = json.loads(record_path.read_text(encoding="utf-8"))
+    result_record["metrics"][aggregate] += delta
+    atomic_write_json(record_path, result_record)
+    eval_context = next(item for item in contexts if item.job.method == "alpha_evaluation")
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("coordinated counter tamper read test")
+        ),
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("coordinated counter tamper fit")
+        ),
+    )
+
+    with pytest.raises(ValueError, match="alpha|counter|cost|plan"):
+        stage_module.run_alpha_job(eval_context)
 
 
 def _tree_bytes(path: Path) -> dict[str, bytes]:
@@ -2819,11 +3653,32 @@ def test_cli_help_works_as_a_direct_script_without_model_imports() -> None:
 
 def test_pipeline_all_dispatches_exact_dependency_order(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = object.__new__(PipelineRunner)
+    runner.executors = {stage: lambda context: _result(context.job) for stage in STAGE_ORDER}
     seen: list[str] = []
     monkeypatch.setattr(runner, "execute", lambda stage: seen.append(stage))
 
     assert runner.run("all") == 0
     assert tuple(seen) == STAGE_ORDER
+
+
+def test_pipeline_all_advances_through_alpha_then_stops_at_unregistered_nsga2(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = object.__new__(PipelineRunner)
+    runner.executors = dict(stage_module.STAGE_EXECUTORS)
+    seen: list[str] = []
+
+    def execute(stage: str):
+        seen.append(stage)
+        if stage not in runner.executors:
+            return stage_module.StageRunSummary(
+                stage=stage, dependency_issues=("executor is not registered",)
+            )
+        return stage_module.StageRunSummary(stage=stage)
+
+    monkeypatch.setattr(runner, "execute", execute)
+    assert runner.run("all") == 1
+    assert tuple(seen) == ("validate", "preprocess", "estimator", "removal", "alpha")
 
 
 def test_selected_alpha_preflights_and_appends_missing_canonical_chunks(
@@ -3062,35 +3917,18 @@ def test_cli_lifecycle_is_append_logged_and_never_replaces_process_streams_or_cw
     assert len((run_root / "output.log").read_bytes()) > len(first_log)
 
 
-def test_all_runs_estimator_then_stops_before_unregistered_future_executors(
-    tmp_path: Path,
+def test_all_runs_through_alpha_then_stops_before_unregistered_future_executors(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    output_root = tmp_path / "results"
-    assert main(
-        [
-            "--stage", "all",
-            "--config-dir", str(Path(__file__).parents[1] / "configs"),
-            "--output-root", str(output_root),
-            "--run-id", "blocked-all",
-            "--smoke",
-        ]
-    ) == 1
-    manifest = ManifestStore(output_root / "blocked-all" / "run_manifest.csv").load()
-    stages = {job.stage for job in manifest}
-    assert {"validate", "preprocess", "estimator", "removal", "alpha"} <= stages
-    assert "nsga2" not in stages
-    assert all(
-        (output_root / "blocked-all" / job.output_relpath).is_file()
-        for job in manifest
-        if job.stage in {"validate", "preprocess"}
+    runner = object.__new__(PipelineRunner)
+    runner.executors = dict(stage_module.STAGE_EXECUTORS)
+    seen: list[str] = []
+    monkeypatch.setattr(
+        runner,
+        "execute",
+        lambda stage: seen.append(stage) or stage_module.StageRunSummary(stage=stage),
     )
-    assert all(
-        (output_root / "blocked-all" / job.output_relpath).is_file()
-        for job in manifest
-        if job.stage == "estimator"
-    )
-    assert all(
-        not (output_root / "blocked-all" / job.output_relpath).exists()
-        for job in manifest
-        if job.stage in {"removal", "alpha"}
-    )
+
+    assert runner.run("all") == 1
+    assert tuple(seen) == ("validate", "preprocess", "estimator", "removal", "alpha")
+    assert "nsga2" not in seen

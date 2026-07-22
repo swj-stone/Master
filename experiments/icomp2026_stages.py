@@ -31,6 +31,7 @@ from minppi_mofs.experiment_protocol import (
     resolved_protocol_hash,
     upsert_data_manifest,
 )
+from minppi_mofs.modeling import evaluate_fixed_subset, fit_predict as fit_predict
 
 
 STAGE_DEPENDENCIES: Mapping[str, tuple[str, ...]] = {
@@ -1715,11 +1716,1290 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="microseconds")
 
 
+_REMOVAL_METHODS = (
+    "full",
+    "minppi",
+    "shap_bottom",
+    "minshap_bottom",
+    "banzhaf_bottom",
+    "random_matched",
+)
+
+
+def _task9_authority(context: StageContext, *, stage: str) -> object:
+    if context.job.stage != stage:
+        raise ValueError(f"{stage} executor requires a {stage} manifest job")
+    if context.job not in context.status.manifest:
+        raise ValueError(f"{stage} job is outside the frozen status manifest")
+    dataset = next(
+        (
+            item
+            for item in context.protocol.datasets
+            if item.dataset_id == context.job.dataset_id
+        ),
+        None,
+    )
+    if dataset is None:
+        raise ValueError(f"{stage} job has an unknown dataset")
+    if context.job.protocol_hash != resolved_protocol_hash(context.protocol):
+        raise ValueError(f"{stage} job protocol hash conflicts with authority")
+    return dataset
+
+
+def _task9_manifest_row(context: StageContext) -> dict[str, object]:
+    """Return rich prepared-data authority without touching split files."""
+    rows = read_rich_data_manifest(
+        context.layout.root / "data_manifest.csv", context.protocol
+    )
+    matches = tuple(
+        row
+        for row in rows
+        if row["dataset_id"] == context.job.dataset_id
+        and row["seed"] == context.job.seed
+    )
+    if len(matches) != 1:
+        raise ValueError("Task 9 rich manifest authority is missing or duplicated")
+    row = matches[0]
+    dataset = next(
+        item
+        for item in context.protocol.datasets
+        if item.dataset_id == context.job.dataset_id
+    )
+    if row["task"] != dataset.task:
+        raise ValueError("Task 9 rich manifest task conflicts with dataset authority")
+    return row
+
+
+def _task9_feature_hash(features: Sequence[str]) -> str:
+    payload = json.dumps(
+        list(features), ensure_ascii=False, allow_nan=False, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _task9_subset_row(
+    features: tuple[str, ...], removed: Sequence[str], *, trial: int | None = None,
+    rng_seed: int | None = None,
+) -> dict[str, object]:
+    removed_set = set(removed)
+    ordered_removed = [feature for feature in features if feature in removed_set]
+    retained = [feature for feature in features if feature not in removed_set]
+    return {
+        "trial": trial,
+        "rng_seed": rng_seed,
+        "retained_features": retained,
+        "removed_features": ordered_removed,
+        "retained_hash": _task9_feature_hash(retained),
+    }
+
+
+def _task9_validate_subset(
+    value: object,
+    *,
+    features: tuple[str, ...],
+    expected_removed_count: int,
+    random_trial: bool,
+) -> dict[str, object]:
+    expected = {
+        "trial", "rng_seed", "retained_features", "removed_features", "retained_hash"
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError("selection subset schema is invalid")
+    retained = value["retained_features"]
+    removed = value["removed_features"]
+    if (
+        not isinstance(retained, list)
+        or not isinstance(removed, list)
+        or len(set(retained)) != len(retained)
+        or len(set(removed)) != len(removed)
+        or any(not isinstance(item, str) for item in retained + removed)
+    ):
+        raise ValueError("selection subset features are invalid")
+    if len(removed) != expected_removed_count:
+        raise ValueError("selection subset removal count is invalid")
+    removed_set = set(removed)
+    if retained != [feature for feature in features if feature not in removed_set]:
+        raise ValueError("selection retained order or complement is invalid")
+    if removed != [feature for feature in features if feature in removed_set]:
+        raise ValueError("selection removed order is invalid")
+    if set(retained).union(removed) != set(features):
+        raise ValueError("selection subset does not cover the frozen features")
+    if value["retained_hash"] != _task9_feature_hash(retained):
+        raise ValueError("selection retained feature hash is invalid")
+    trial = value["trial"]
+    rng_seed = value["rng_seed"]
+    if random_trial:
+        if (
+            isinstance(trial, bool)
+            or not isinstance(trial, int)
+            or trial < 0
+            or isinstance(rng_seed, bool)
+            or not isinstance(rng_seed, int)
+            or rng_seed < 0
+        ):
+            raise ValueError("random selection trial identity is invalid")
+    elif trial is not None or rng_seed is not None:
+        raise ValueError("non-random selection has random trial metadata")
+    return value
+
+
+def _task9_scores(scores: Mapping[str, object], features: tuple[str, ...]) -> list[dict[str, object]]:
+    import math
+
+    if tuple(scores) != features or set(scores) != set(features):
+        raise ValueError("selection scores do not match frozen feature order")
+    ordered = []
+    for feature in features:
+        score = scores[feature]
+        if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(float(score)):
+            raise ValueError("selection scores must be finite numbers")
+        ordered.append({"feature": feature, "score": float(score)})
+    return ordered
+
+
+def _task9_manifest_plan(context: StageContext, *, stage: str) -> JobSpec:
+    matches = tuple(
+        job
+        for job in context.status.manifest
+        if job.stage == stage
+        and job.dataset_id == context.job.dataset_id
+        and job.seed == context.job.seed
+        and job.method == "selection_plan"
+    )
+    if len(matches) != 1:
+        raise ValueError(f"{stage} manifest must contain exactly one selection plan")
+    return matches[0]
+
+
+def _validate_removal_scope(context: StageContext) -> None:
+    if tuple(context.protocol.removal.get("controls", ())) != _REMOVAL_METHODS:
+        raise ValueError("removal controls are not the canonical complete method set")
+    jobs = tuple(
+        job
+        for job in context.status.manifest
+        if job.stage == "removal"
+        and job.dataset_id == context.job.dataset_id
+        and job.seed == context.job.seed
+    )
+    if tuple(job.method for job in jobs) != ("selection_plan", *_REMOVAL_METHODS):
+        raise ValueError("removal manifest scope is incomplete or out of order")
+    plan = jobs[0]
+    if any(job.depends_on != (plan.job_id,) for job in jobs[1:]):
+        raise ValueError("removal dependencies do not reference the frozen plan")
+
+
+def _removal_plan_relpath(context: StageContext) -> str:
+    return f"removal/{context.job.dataset_id}/s{context.job.seed}/selection_plan.json"
+
+
+def _validate_removal_plan(context: StageContext, document: object) -> dict[str, object]:
+    import numpy as np
+
+    expected_keys = {
+        "schema_version", "protocol_hash", "job_id", "dataset_id", "seed",
+        "task", "utility", "alpha", "budget", "features", "k", "methods",
+        "scores", "selection_model_fit_count", "selection_coalition_count",
+    }
+    if not isinstance(document, dict) or set(document) != expected_keys:
+        raise ValueError("removal selection plan schema is invalid")
+    dataset = _task9_authority(context, stage="removal")
+    if (
+        document["schema_version"] != 1
+        or document["protocol_hash"] != context.job.protocol_hash
+        or document["job_id"] != _task9_manifest_plan(context, stage="removal").job_id
+        or document["dataset_id"] != context.job.dataset_id
+        or document["seed"] != context.job.seed
+        or document["task"] != dataset.task
+        or document["utility"] != dataset.utility
+        or document["alpha"] != context.protocol.alpha_default
+        or document["budget"] != max(context.protocol.estimator_budgets)
+    ):
+        raise ValueError("removal selection plan identity is invalid")
+    features_value = document["features"]
+    if not isinstance(features_value, list) or len(set(features_value)) != len(features_value) or any(
+        not isinstance(feature, str) for feature in features_value
+    ):
+        raise ValueError("removal plan features are invalid")
+    features = tuple(features_value)
+    manifest_row = _task9_manifest_row(context)
+    manifest_features = tuple(
+        json.loads(str(manifest_row["selected_features_json"]))
+    )
+    if features != manifest_features:
+        raise ValueError("removal plan features conflict with rich manifest authority")
+    k = document["k"]
+    if isinstance(k, bool) or not isinstance(k, int) or not 0 <= k <= len(features):
+        raise ValueError("removal plan k is invalid")
+    methods = document["methods"]
+    if not isinstance(methods, list) or [item.get("method") if isinstance(item, dict) else None for item in methods] != list(_REMOVAL_METHODS):
+        raise ValueError("removal plan methods are incomplete or out of order")
+    repeats = context.protocol.removal["random_repeats"]
+    minppi_removed: list[str] | None = None
+    for item in methods:
+        if (
+            not isinstance(item, dict)
+            or set(item)
+            != {"method", "trials", "model_fit_count", "coalition_count"}
+            or not isinstance(item["trials"], list)
+        ):
+            raise ValueError("removal plan method schema is invalid")
+        method = item["method"]
+        for field in ("model_fit_count", "coalition_count"):
+            if (
+                isinstance(item[field], bool)
+                or not isinstance(item[field], int)
+                or item[field] < 0
+            ):
+                raise ValueError("removal method cost counters are invalid")
+        if method in {"full", "random_matched"} and (
+            item["model_fit_count"] != 0 or item["coalition_count"] != 0
+        ):
+            raise ValueError("non-model removal method has selection costs")
+        expected_trials = repeats if method == "random_matched" else 1
+        if len(item["trials"]) != expected_trials:
+            raise ValueError("removal plan trial count is invalid")
+        expected_removed = 0 if method == "full" else k
+        for trial_index, row in enumerate(item["trials"]):
+            checked = _task9_validate_subset(
+                row, features=features, expected_removed_count=expected_removed,
+                random_trial=method == "random_matched",
+            )
+            if method == "random_matched" and checked["trial"] != trial_index:
+                raise ValueError("random removal trials are not complete and ordered")
+        if method == "minppi":
+            minppi_removed = item["trials"][0]["removed_features"]
+    score_groups = document["scores"]
+    if not isinstance(score_groups, list) or [item.get("method") if isinstance(item, dict) else None for item in score_groups] != ["minppi", "shap_bottom", "minshap_bottom", "banzhaf_bottom"]:
+        raise ValueError("removal plan score groups are invalid")
+    for group in score_groups:
+        if set(group) != {"method", "values"} or not isinstance(group["values"], list):
+            raise ValueError("removal plan scores schema is invalid")
+        if [item.get("feature") if isinstance(item, dict) else None for item in group["values"]] != list(features):
+            raise ValueError("removal plan score feature order is invalid")
+        if any(
+            not isinstance(item.get("score"), (int, float))
+            or isinstance(item.get("score"), bool)
+            or not __import__("math").isfinite(float(item["score"]))
+            for item in group["values"]
+        ):
+            raise ValueError("removal plan scores must be finite")
+    minppi_values = {item["feature"]: item["score"] for item in score_groups[0]["values"]}
+    expected_harmful = [feature for feature in features if minppi_values[feature] == -1]
+    if len(expected_harmful) != k or expected_harmful != minppi_removed:
+        raise ValueError("removal plan harmful set conflicts with MinPPI scores")
+    methods_by_name = {item["method"]: item for item in methods}
+    feature_index = {feature: position for position, feature in enumerate(features)}
+    for group in score_groups[1:]:
+        scores = {item["feature"]: item["score"] for item in group["values"]}
+        expected_removed = sorted(
+            features,
+            key=lambda feature: (float(scores[feature]), feature_index[feature]),
+        )[:k]
+        actual_removed = methods_by_name[group["method"]]["trials"][0][
+            "removed_features"
+        ]
+        if actual_removed != [
+            feature for feature in features if feature in set(expected_removed)
+        ]:
+            raise ValueError("removal control subset conflicts with its frozen scores")
+    for trial, row in enumerate(methods_by_name["random_matched"]["trials"]):
+        expected_seed = int(
+            np.random.SeedSequence([context.job.seed, trial]).generate_state(1)[0]
+        )
+        sampled = np.random.default_rng(expected_seed).choice(
+            features, size=k, replace=False
+        ).tolist()
+        expected_removed = [feature for feature in features if feature in set(sampled)]
+        if row["rng_seed"] != expected_seed or row["removed_features"] != expected_removed:
+            raise ValueError("random removal trial conflicts with its deterministic seed")
+    for field in ("selection_model_fit_count", "selection_coalition_count"):
+        if isinstance(document[field], bool) or not isinstance(document[field], int) or document[field] < 0:
+            raise ValueError("removal plan cost counters are invalid")
+    if document["selection_model_fit_count"] != sum(
+        item["model_fit_count"] for item in methods
+    ) or document["selection_coalition_count"] != sum(
+        item["coalition_count"] for item in methods
+    ):
+        raise ValueError("removal aggregate costs conflict with method costs")
+    return document
+
+
+def _read_removal_plan(context: StageContext) -> dict[str, object]:
+    path = context.layout.root / _removal_plan_relpath(context)
+    return _validate_removal_plan(
+        context, read_canonical_json(path, context="removal selection plan")
+    )
+
+
+def _selection_record(
+    context: StageContext,
+    *,
+    started_at: str,
+    relpath: str,
+    metrics: Mapping[str, float | int],
+) -> ResultRecord:
+    return ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage=context.job.stage,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        method=context.job.method,
+        metrics=dict(metrics),
+        artifacts={"selection_plan": relpath},
+        started_at=started_at,
+        finished_at=_timestamp(),
+    )
+
+
+def _removal_selection_metrics(
+    document: Mapping[str, object], times: Mapping[str, float]
+) -> dict[str, float | int]:
+    methods = {item["method"]: item for item in document["methods"]}
+    metrics: dict[str, float | int] = {
+        "selection_time_s": sum(float(times[method]) for method in _REMOVAL_METHODS),
+        "selection_model_fit_count": int(document["selection_model_fit_count"]),
+        "selection_coalition_count": int(document["selection_coalition_count"]),
+    }
+    for method in _REMOVAL_METHODS:
+        metrics[f"{method}_selection_time_s"] = float(times[method])
+        metrics[f"{method}_selection_model_fit_count"] = int(
+            methods[method]["model_fit_count"]
+        )
+        metrics[f"{method}_selection_coalition_count"] = int(
+            methods[method]["coalition_count"]
+        )
+    return metrics
+
+
+def _alpha_selection_metrics(
+    document: Mapping[str, object], times: Mapping[str, float]
+) -> dict[str, float | int]:
+    return {
+        "selection_time_s": sum(float(value) for value in times.values()),
+        "selection_model_fit_count": int(document["selection_model_fit_count"]),
+        "selection_coalition_count": int(document["selection_coalition_count"]),
+        **{
+            f"{entry['alpha_token']}_selection_time_s": float(
+                times[str(entry["alpha_token"])]
+            )
+            for entry in document["entries"]
+        },
+    }
+
+
+def _run_removal_plan(context: StageContext) -> ResultRecord:
+    import numpy as np
+
+    from minppi_mofs.baselines.banzhaf_fs import compute_banzhaf_importance
+    from minppi_mofs.baselines.min_shap import compute_minshap_importance
+    from minppi_mofs.baselines.shap_top_k import compute_shap_topk_importance
+    from minppi_mofs.min_ppi import (
+        estimate_minppi_hybrid,
+        make_algorithm_b_perturbation_schedule,
+    )
+    from minppi_mofs.shapg_integration import build_mi_correlation_guidance
+
+    started_at = _timestamp()
+    relpath = _removal_plan_relpath(context)
+    path = context.layout.root / relpath
+    if path.exists():
+        document = _read_removal_plan(context)
+        return _selection_record(
+            context,
+            started_at=started_at,
+            relpath=relpath,
+            metrics=_removal_selection_metrics(
+                document, {method: 0.0 for method in _REMOVAL_METHODS}
+            ),
+        )
+    dataset = _task9_authority(context, stage="removal")
+    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
+    features = tuple(X_train.columns)
+    budget = max(context.protocol.estimator_budgets)
+    selection_times = {method: 0.0 for method in _REMOVAL_METHODS}
+    minppi_started = time.perf_counter()
+    schedule = make_algorithm_b_perturbation_schedule(
+        features, K_adv=budget, seed=context.job.seed
+    )
+    mi_scores, neighbors = build_mi_correlation_guidance(
+        X_train, y_train, task=dataset.task, seed=context.job.seed
+    )
+    cache = _make_job_cache(context, X_train, X_val, y_train, y_val)
+    minppi = estimate_minppi_hybrid(
+        X_train=X_train, X_val=X_val, y_train=y_train, y_val=y_val,
+        alpha=context.protocol.alpha_default, task=dataset.task,
+        utility=dataset.utility, K=budget, K_adv=budget,
+        mi_scores=mi_scores, correlation_neighbors=neighbors,
+        perturbation_schedule=schedule, acc_cache=cache, seed=context.job.seed,
+    )
+    ordered_minppi = _task9_scores(minppi, features)
+    harmful = [feature for feature in features if float(minppi[feature]) == -1.0]
+    k = len(harmful)
+    selection_times["minppi"] = time.perf_counter() - minppi_started
+    diagnostics: dict[str, dict[str, int]] = {}
+    baseline_values: dict[str, Mapping[str, float]] = {}
+    baseline_calls = (
+        ("shap_bottom", compute_shap_topk_importance, {}),
+        ("minshap_bottom", compute_minshap_importance, {"n_coalitions": budget, "per_coalition": 5}),
+        ("banzhaf_bottom", compute_banzhaf_importance, {"n_coalitions": budget, "per_coalition": 5}),
+    )
+    for method, function, extra in baseline_calls:
+        diag: dict[str, int] = {}
+        baseline_started = time.perf_counter()
+        scores = function(
+            X_train,
+            y_train,
+            task=dataset.task,
+            utility=dataset.utility,
+            model_params=context.protocol.model_params,
+            backend=context.protocol.backend,
+            seed=context.job.seed,
+            diagnostics=diag,
+            **extra,
+        )
+        selection_times[method] = time.perf_counter() - baseline_started
+        _task9_scores(scores, features)
+        diagnostics[method] = diag
+        baseline_values[method] = scores
+    methods: list[dict[str, object]] = []
+    index = {feature: position for position, feature in enumerate(features)}
+    for method in _REMOVAL_METHODS:
+        if method == "full":
+            trials = [_task9_subset_row(features, ())]
+        elif method == "minppi":
+            trials = [_task9_subset_row(features, harmful)]
+        elif method == "random_matched":
+            random_started = time.perf_counter()
+            trials = []
+            for trial in range(int(context.protocol.removal["random_repeats"])):
+                rng_seed = int(
+                    np.random.SeedSequence([context.job.seed, trial]).generate_state(1)[0]
+                )
+                removed = np.random.default_rng(rng_seed).choice(
+                    features, size=k, replace=False
+                ).tolist()
+                trials.append(
+                    _task9_subset_row(
+                        features, removed, trial=trial, rng_seed=rng_seed
+                    )
+                )
+            selection_times[method] = time.perf_counter() - random_started
+        else:
+            scores = baseline_values[method]
+            removed = sorted(
+                features, key=lambda feature: (float(scores[feature]), index[feature])
+            )[:k]
+            trials = [_task9_subset_row(features, removed)]
+        if method == "minppi":
+            model_fit_count = int(cache.model_fit_count)
+            coalition_count = int(cache.coalition_count)
+        elif method in diagnostics:
+            model_fit_count = int(diagnostics[method].get("model_fit_count", 0))
+            coalition_count = int(diagnostics[method].get("coalition_count", 0))
+        else:
+            model_fit_count = coalition_count = 0
+        methods.append(
+            {
+                "method": method,
+                "trials": trials,
+                "model_fit_count": model_fit_count,
+                "coalition_count": coalition_count,
+            }
+        )
+    baseline_fit_count = sum(
+        item.get("model_fit_count", 0) for item in diagnostics.values()
+    )
+    baseline_coalitions = sum(
+        item.get("coalition_count", 0) for item in diagnostics.values()
+    )
+    document = {
+        "schema_version": 1,
+        "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id,
+        "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed,
+        "task": dataset.task,
+        "utility": dataset.utility,
+        "alpha": context.protocol.alpha_default,
+        "budget": budget,
+        "features": list(features),
+        "k": k,
+        "methods": methods,
+        "scores": [
+            {"method": "minppi", "values": ordered_minppi},
+            *[
+                {"method": method, "values": _task9_scores(baseline_values[method], features)}
+                for method in ("shap_bottom", "minshap_bottom", "banzhaf_bottom")
+            ],
+        ],
+        "selection_model_fit_count": int(cache.model_fit_count + baseline_fit_count),
+        "selection_coalition_count": int(cache.coalition_count + baseline_coalitions),
+    }
+    _validate_removal_plan(context, document)
+    _publish_idempotent_json(path, document, context="removal selection plan")
+    return _selection_record(
+        context,
+        started_at=started_at,
+        relpath=relpath,
+        metrics=_removal_selection_metrics(document, selection_times),
+    )
+
+
+def _task9_plan_result(context: StageContext, *, stage: str) -> ResultRecord:
+    import math
+
+    plan = _task9_manifest_plan(context, stage=stage)
+    if context.job.depends_on != (plan.job_id,):
+        raise ValueError(f"{stage} job dependency does not match its selection plan")
+    entry = context.status.entry(plan.job_id)
+    if entry["state"] != "success":
+        raise ValueError(f"{stage} selection plan dependency is not successful")
+    record = read_result_record(context.layout.root / plan.output_relpath, plan)
+    canonical_relpath = (
+        _removal_plan_relpath(context)
+        if stage == "removal"
+        else _alpha_plan_relpath(context)
+    )
+    if record.artifacts != {"selection_plan": canonical_relpath}:
+        raise ValueError(f"{stage} selection plan ResultRecord artifact is invalid")
+    document = (
+        _read_removal_plan(context) if stage == "removal" else _read_alpha_plan(context)
+    )
+    if stage == "removal":
+        expected_keys = {
+            "selection_time_s",
+            "selection_model_fit_count",
+            "selection_coalition_count",
+            *(
+                f"{method}_{suffix}"
+                for method in _REMOVAL_METHODS
+                for suffix in (
+                    "selection_time_s",
+                    "selection_model_fit_count",
+                    "selection_coalition_count",
+                )
+            ),
+        }
+    else:
+        expected_keys = {
+            "selection_time_s",
+            "selection_model_fit_count",
+            "selection_coalition_count",
+            *(
+                f"{item['alpha_token']}_selection_time_s"
+                for item in document["entries"]
+            ),
+        }
+    if set(record.metrics) != expected_keys:
+        raise ValueError(f"{stage} selection plan ResultRecord metric schema is invalid")
+    for key, value in record.metrics.items():
+        if key.endswith("_time_s"):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or value < 0
+            ):
+                raise ValueError(f"{stage} selection runtime metric is invalid")
+        elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"{stage} selection counter metric is invalid")
+    if (
+        record.metrics["selection_model_fit_count"]
+        != document["selection_model_fit_count"]
+        or record.metrics["selection_coalition_count"]
+        != document["selection_coalition_count"]
+    ):
+        raise ValueError(f"{stage} selection aggregate counters conflict with plan")
+    if stage == "removal":
+        methods = {item["method"]: item for item in document["methods"]}
+        for method in _REMOVAL_METHODS:
+            if (
+                record.metrics[f"{method}_selection_model_fit_count"]
+                != methods[method]["model_fit_count"]
+                or record.metrics[f"{method}_selection_coalition_count"]
+                != methods[method]["coalition_count"]
+            ):
+                raise ValueError("removal selection method counters conflict with plan")
+        expected_time = sum(
+            float(record.metrics[f"{method}_selection_time_s"])
+            for method in _REMOVAL_METHODS
+        )
+    else:
+        expected_time = sum(
+            float(record.metrics[f"{item['alpha_token']}_selection_time_s"])
+            for item in document["entries"]
+        )
+    if record.metrics["selection_time_s"] != expected_time:
+        raise ValueError(f"{stage} aggregate selection runtime is invalid")
+    return record
+
+
+def _task9_load_test(
+    context: StageContext,
+    row: Mapping[str, object],
+    *,
+    reason: str,
+):
+    import numpy as np
+
+    from minppi_mofs.experiment_protocol import AuditedSplitAccess, PreparedSplitPaths
+
+    paths = PreparedSplitPaths(
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        target=str(row["target"]),
+        train_csv=context.layout.root / str(row["train_relpath"]),
+        val_csv=context.layout.root / str(row["val_relpath"]),
+        test_csv=context.layout.root / str(row["test_relpath"]),
+    )
+    access = AuditedSplitAccess(
+        paths, stage=context.job.stage, job_id=context.job.job_id, audit=context.audit
+    )
+    X_test, y_test = access.load_test(
+        reason=reason, expected_sha256=str(row["test_file_sha256"])
+    )
+    expected_features = json.loads(str(row["selected_features_json"]))
+    if list(X_test.columns) != expected_features or len(X_test) != row["test_row_count"]:
+        raise ValueError("audited test partition conflicts with manifest shape")
+    if not np.isfinite(X_test.to_numpy(dtype=float)).all() or not np.isfinite(y_test).all():
+        raise ValueError("audited test partition must be finite numeric data")
+    expected_summary = json.loads(str(row["test_label_summary_json"]))
+    actual_summary = _label_summary(y_test, str(row["task"]))
+    if not _label_summaries_match(actual_summary, expected_summary, task=str(row["task"])):
+        raise ValueError("audited test label summary conflicts with manifest")
+    if str(row["task"]) != "regression":
+        classes = np.unique(y_test)
+        if not np.equal(classes, np.floor(classes)).all() or any(
+            int(value) < 0 for value in classes
+        ):
+            raise ValueError("audited classification test labels are invalid")
+        train_summary = json.loads(str(row["train_label_summary_json"]))
+        train_classes = {
+            int(item["label"]) for item in train_summary.get("classes", ())
+        }
+        if not set(int(value) for value in classes).issubset(train_classes):
+            raise ValueError("audited test labels exceed training class authority")
+    return X_test, y_test
+
+
+def _task9_result_existing(
+    context: StageContext, relpath: str, *, validator: Callable[[StageContext, object], dict[str, object]]
+) -> dict[str, object] | None:
+    path = context.layout.root / relpath
+    if not path.exists():
+        return None
+    return validator(
+        context, read_canonical_json(path, context=f"{context.job.stage} result artifact")
+    )
+
+
+def _removal_result_relpath(context: StageContext) -> str:
+    return (
+        f"removal/{context.job.dataset_id}/s{context.job.seed}/"
+        f"{context.job.method}/results.json"
+    )
+
+
+def _validate_removal_result(context: StageContext, value: object) -> dict[str, object]:
+    expected = {
+        "schema_version", "protocol_hash", "job_id", "dataset_id", "seed",
+        "method", "k", "rows", "selection_time_s", "evaluation_time_s",
+        "selection_model_fit_count", "selection_coalition_count",
+        "evaluation_model_fit_count",
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError("removal result artifact schema is invalid")
+    if (
+        value["schema_version"] != 1
+        or value["protocol_hash"] != context.job.protocol_hash
+        or value["job_id"] != context.job.job_id
+        or value["dataset_id"] != context.job.dataset_id
+        or value["seed"] != context.job.seed
+        or value["method"] != context.job.method
+    ):
+        raise ValueError("removal result artifact identity is invalid")
+    plan = _read_removal_plan(context)
+    if value["k"] != plan["k"]:
+        raise ValueError("removal result k conflicts with selection plan")
+    method_plan = next(item for item in plan["methods"] if item["method"] == context.job.method)
+    plan_record = _task9_plan_result(context, stage="removal")
+    expected_selection_time = float(
+        plan_record.metrics[f"{context.job.method}_selection_time_s"]
+    )
+    expected_evaluation_fits = sum(
+        bool(features)
+        for features in {
+            tuple(plan["features"]),
+            *(tuple(item["retained_features"]) for item in method_plan["trials"]),
+        }
+    )
+    if (
+        value["selection_time_s"] != expected_selection_time
+        or value["selection_model_fit_count"] != method_plan["model_fit_count"]
+        or value["selection_coalition_count"] != method_plan["coalition_count"]
+        or value["evaluation_model_fit_count"] != expected_evaluation_fits
+    ):
+        raise ValueError("removal result counters or selection time are not exact")
+    rows = value["rows"]
+    if not isinstance(rows, list) or len(rows) != len(method_plan["trials"]):
+        raise ValueError("removal result raw rows are incomplete")
+    required_row = {
+        "trial", "retained_features", "removed_features", "retained_hash", "k",
+        "full_utility", "selected_utility", "delta_utility", "compression",
+        "selection_time_s", "evaluation_time_s", "selection_model_fit_count",
+        "selection_coalition_count", "evaluation_model_fit_count",
+    }
+    for result_row, planned in zip(rows, method_plan["trials"], strict=True):
+        if not isinstance(result_row, dict) or set(result_row) != required_row:
+            raise ValueError("removal raw row schema is invalid")
+        for field in ("trial", "retained_features", "removed_features", "retained_hash"):
+            if result_row[field] != planned[field]:
+                raise ValueError("removal result did not reuse the frozen subset")
+        if result_row["k"] != plan["k"]:
+            raise ValueError("removal raw row k is invalid")
+        expected_compression = plan["k"] / len(plan["features"]) if plan["features"] else 0.0
+        if result_row["compression"] != expected_compression:
+            raise ValueError("removal result compression is invalid")
+        numeric = (
+            "full_utility", "selected_utility", "delta_utility", "compression",
+            "selection_time_s", "evaluation_time_s",
+        )
+        if any(
+            isinstance(result_row[field], bool)
+            or not isinstance(result_row[field], (int, float))
+            or not __import__("math").isfinite(float(result_row[field]))
+            for field in numeric
+        ):
+            raise ValueError("removal raw metrics must be finite")
+        if result_row["delta_utility"] != result_row["selected_utility"] - result_row["full_utility"]:
+            raise ValueError("removal utility delta is invalid")
+        for field in (
+            "selection_time_s", "evaluation_time_s", "selection_model_fit_count",
+            "selection_coalition_count", "evaluation_model_fit_count",
+        ):
+            if result_row[field] != value[field]:
+                raise ValueError("removal row counters or runtimes conflict with job totals")
+    for field in ("selection_time_s", "evaluation_time_s"):
+        if isinstance(value[field], bool) or not isinstance(value[field], (int, float)) or not __import__("math").isfinite(float(value[field])) or value[field] < 0:
+            raise ValueError("removal runtime is invalid")
+    for field in (
+        "selection_model_fit_count", "selection_coalition_count",
+        "evaluation_model_fit_count",
+    ):
+        if isinstance(value[field], bool) or not isinstance(value[field], int) or value[field] < 0:
+            raise ValueError("removal fit count is invalid")
+    if len({row["full_utility"] for row in rows}) != 1:
+        raise ValueError("removal rows do not share one cached full utility")
+    return value
+
+
+def _result_record_from_artifact(
+    context: StageContext, *, started_at: str, relpath: str, document: Mapping[str, object]
+) -> ResultRecord:
+    return ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage=context.job.stage,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        method=context.job.method,
+        metrics={
+            key: value
+            for key, value in document.items()
+            if key in {
+                "k", "harmful_count", "selection_time_s", "evaluation_time_s",
+                "selection_model_fit_count", "selection_coalition_count",
+                "evaluation_model_fit_count",
+            }
+        },
+        artifacts={"results": relpath},
+        started_at=started_at,
+        finished_at=_timestamp(),
+    )
+
+
+def _run_removal_evaluation(context: StageContext) -> ResultRecord:
+    import numpy as np
+    import pandas as pd
+
+    started_at = _timestamp()
+    relpath = _removal_result_relpath(context)
+    plan_record = _task9_plan_result(context, stage="removal")
+    existing = _task9_result_existing(context, relpath, validator=_validate_removal_result)
+    if existing is not None:
+        return _result_record_from_artifact(
+            context, started_at=started_at, relpath=relpath, document=existing
+        )
+    plan = _read_removal_plan(context)
+    X_train, y_train, X_val, y_val, row = _load_prepared_train_validation(context)
+    X_test, y_test = _task9_load_test(
+        context, row, reason="final_removal_evaluation"
+    )
+    X_train_val = pd.concat([X_train, X_val], ignore_index=True)
+    y_train_val = np.concatenate([y_train, y_val])
+    dataset = _task9_authority(context, stage="removal")
+    method_plan = next(item for item in plan["methods"] if item["method"] == context.job.method)
+    evaluation_started = time.perf_counter()
+    utility_cache: dict[tuple[str, ...], float] = {}
+
+    def evaluate(features: Sequence[str]) -> float:
+        key = tuple(features)
+        if key not in utility_cache:
+            utility_cache[key] = evaluate_fixed_subset(
+                X_train_val, y_train_val, X_test, y_test, key,
+                task=dataset.task, utility=dataset.utility,
+                model_params=context.protocol.model_params,
+                backend=context.protocol.backend, seed=context.job.seed,
+            )
+        return utility_cache[key]
+
+    full = evaluate(tuple(plan["features"]))
+    rows = []
+    selection_time = float(
+        plan_record.metrics[f"{context.job.method}_selection_time_s"]
+    )
+    selection_fits = int(method_plan["model_fit_count"])
+    selection_coalitions = int(method_plan["coalition_count"])
+    for planned in method_plan["trials"]:
+        selected = evaluate(tuple(planned["retained_features"]))
+        rows.append(
+            {
+                "trial": planned["trial"],
+                "retained_features": planned["retained_features"],
+                "removed_features": planned["removed_features"],
+                "retained_hash": planned["retained_hash"],
+                "k": plan["k"],
+                "full_utility": full,
+                "selected_utility": selected,
+                "delta_utility": selected - full,
+                "compression": plan["k"] / len(plan["features"]),
+                "selection_time_s": selection_time,
+                "evaluation_time_s": 0.0,
+                "selection_model_fit_count": selection_fits,
+                "selection_coalition_count": selection_coalitions,
+                "evaluation_model_fit_count": sum(bool(key) for key in utility_cache),
+            }
+        )
+    evaluation_time = time.perf_counter() - evaluation_started
+    evaluation_fit_count = sum(bool(key) for key in utility_cache)
+    for raw_row in rows:
+        raw_row["evaluation_time_s"] = evaluation_time
+        raw_row["evaluation_model_fit_count"] = evaluation_fit_count
+    document = {
+        "schema_version": 1,
+        "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id,
+        "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed,
+        "method": context.job.method,
+        "k": plan["k"],
+        "rows": rows,
+        "selection_time_s": selection_time,
+        "evaluation_time_s": evaluation_time,
+        "selection_model_fit_count": selection_fits,
+        "selection_coalition_count": selection_coalitions,
+        "evaluation_model_fit_count": evaluation_fit_count,
+    }
+    _validate_removal_result(context, document)
+    _publish_idempotent_json(
+        context.layout.root / relpath, document, context="removal result artifact"
+    )
+    return _result_record_from_artifact(
+        context, started_at=started_at, relpath=relpath, document=document
+    )
+
+
+def run_removal_job(context: StageContext) -> ResultRecord:
+    """Run one frozen matched-removal plan or final evaluation job."""
+    dataset = _task9_authority(context, stage="removal")
+    _validate_removal_scope(context)
+    expected = {"task", "utility", "random_repeats"} if context.job.method == "selection_plan" else {"task", "utility"}
+    if set(context.job.parameters) != expected or context.job.parameters["task"] != dataset.task or context.job.parameters["utility"] != dataset.utility:
+        raise ValueError("removal job parameters conflict with dataset authority")
+    if context.job.method == "selection_plan":
+        if context.job.parameters["random_repeats"] != context.protocol.removal["random_repeats"]:
+            raise ValueError("removal random repeat count conflicts with protocol")
+        return _run_removal_plan(context)
+    if context.job.method not in _REMOVAL_METHODS:
+        raise ValueError("removal method is not canonical")
+    return _run_removal_evaluation(context)
+
+
+def _alpha_token(alpha: float) -> str:
+    return float(alpha).hex().replace("-", "m").replace("+", "p").replace(".", "d")
+
+
+def _alpha_plan_relpath(context: StageContext) -> str:
+    return f"alpha/{context.job.dataset_id}/s{context.job.seed}/selection_plan.json"
+
+
+def _validate_alpha_scope(context: StageContext) -> None:
+    jobs = tuple(
+        job for job in context.status.manifest
+        if job.stage == "alpha" and job.dataset_id == context.job.dataset_id and job.seed == context.job.seed
+    )
+    if tuple(job.method for job in jobs) != ("selection_plan", *("alpha_evaluation" for _ in context.protocol.alpha_grid)):
+        raise ValueError("alpha manifest scope is incomplete or out of order")
+    if [job.parameters.get("alpha") for job in jobs[1:]] != list(context.protocol.alpha_grid):
+        raise ValueError("alpha manifest grid conflicts with protocol order")
+    if any(job.depends_on != (jobs[0].job_id,) for job in jobs[1:]):
+        raise ValueError("alpha dependencies do not reference the frozen plan")
+
+
+def _validate_alpha_plan(context: StageContext, value: object) -> dict[str, object]:
+    expected = {
+        "schema_version", "protocol_hash", "job_id", "dataset_id", "seed", "task",
+        "utility", "budget", "features", "entries", "selection_model_fit_count",
+        "selection_coalition_count", "initial_model_fit_count",
+        "initial_coalition_count",
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError("alpha selection plan schema is invalid")
+    dataset = _task9_authority(context, stage="alpha")
+    if (
+        value["schema_version"] != 1
+        or value["protocol_hash"] != context.job.protocol_hash
+        or value["job_id"] != _task9_manifest_plan(context, stage="alpha").job_id
+        or value["dataset_id"] != context.job.dataset_id
+        or value["seed"] != context.job.seed
+        or value["task"] != dataset.task
+        or value["utility"] != dataset.utility
+        or value["budget"] != max(context.protocol.estimator_budgets)
+    ):
+        raise ValueError("alpha selection plan identity is invalid")
+    features_value = value["features"]
+    if not isinstance(features_value, list) or len(set(features_value)) != len(features_value) or any(not isinstance(item, str) for item in features_value):
+        raise ValueError("alpha plan features are invalid")
+    features = tuple(features_value)
+    manifest_row = _task9_manifest_row(context)
+    manifest_features = tuple(
+        json.loads(str(manifest_row["selected_features_json"]))
+    )
+    if features != manifest_features:
+        raise ValueError("alpha plan features conflict with rich manifest authority")
+    entries = value["entries"]
+    if not isinstance(entries, list) or [item.get("alpha") if isinstance(item, dict) else None for item in entries] != list(context.protocol.alpha_grid):
+        raise ValueError("alpha selection plan grid is incomplete or out of order")
+    expected_entry = {
+        "alpha", "alpha_token", "harmful_count", "compression", "validation_utility",
+        "retained_features", "removed_features", "retained_hash", "model_fit_count",
+        "coalition_count", "scores",
+    }
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != expected_entry:
+            raise ValueError("alpha plan entry schema is invalid")
+        alpha = entry["alpha"]
+        if entry["alpha_token"] != _alpha_token(alpha):
+            raise ValueError("alpha plan token is invalid")
+        harmful_count = entry["harmful_count"]
+        subset = {
+            "trial": None, "rng_seed": None,
+            "retained_features": entry["retained_features"],
+            "removed_features": entry["removed_features"],
+            "retained_hash": entry["retained_hash"],
+        }
+        _task9_validate_subset(
+            subset, features=features, expected_removed_count=harmful_count,
+            random_trial=False,
+        )
+        scores = entry["scores"]
+        if (
+            not isinstance(scores, list)
+            or [item.get("feature") if isinstance(item, dict) else None for item in scores]
+            != list(features)
+            or any(
+                isinstance(item.get("score"), bool)
+                or not isinstance(item.get("score"), (int, float))
+                or not __import__("math").isfinite(float(item["score"]))
+                for item in scores
+            )
+        ):
+            raise ValueError("alpha plan score evidence is invalid")
+        expected_removed = [
+            item["feature"] for item in scores if float(item["score"]) == -1.0
+        ]
+        if entry["removed_features"] != expected_removed:
+            raise ValueError("alpha harmful set conflicts with frozen scores")
+        if entry["compression"] != harmful_count / len(features):
+            raise ValueError("alpha plan compression is invalid")
+        if not __import__("math").isfinite(float(entry["validation_utility"])):
+            raise ValueError("alpha validation utility is invalid")
+        for field in ("model_fit_count", "coalition_count"):
+            if isinstance(entry[field], bool) or not isinstance(entry[field], int) or entry[field] < 0:
+                raise ValueError("alpha plan cost is invalid")
+        if entry["model_fit_count"] > entry["coalition_count"]:
+            raise ValueError("alpha plan model-fit delta exceeds coalition delta")
+    for field in (
+        "initial_model_fit_count", "initial_coalition_count",
+        "selection_model_fit_count", "selection_coalition_count",
+    ):
+        if isinstance(value[field], bool) or not isinstance(value[field], int) or value[field] < 0:
+            raise ValueError("alpha plan aggregate cost is invalid")
+    if (
+        value["initial_model_fit_count"] != 1
+        or value["initial_coalition_count"] != 1
+    ):
+        raise ValueError("alpha plan initial full-coalition costs are invalid")
+    if value["selection_model_fit_count"] != value["initial_model_fit_count"] + sum(
+        entry["model_fit_count"] for entry in entries
+    ):
+        raise ValueError("alpha plan aggregate model-fit count is invalid")
+    if value["selection_coalition_count"] != value["initial_coalition_count"] + sum(
+        entry["coalition_count"] for entry in entries
+    ):
+        raise ValueError("alpha plan aggregate coalition count is invalid")
+    return value
+
+
+def _read_alpha_plan(context: StageContext) -> dict[str, object]:
+    return _validate_alpha_plan(
+        context,
+        read_canonical_json(
+            context.layout.root / _alpha_plan_relpath(context),
+            context="alpha selection plan",
+        ),
+    )
+
+
+def _run_alpha_plan(context: StageContext) -> ResultRecord:
+    from minppi_mofs.min_ppi import estimate_minppi_hybrid, make_algorithm_b_perturbation_schedule
+    from minppi_mofs.shapg_integration import build_mi_correlation_guidance
+
+    started_at = _timestamp()
+    relpath = _alpha_plan_relpath(context)
+    path = context.layout.root / relpath
+    if path.exists():
+        document = _read_alpha_plan(context)
+        return _selection_record(
+            context,
+            started_at=started_at,
+            relpath=relpath,
+            metrics=_alpha_selection_metrics(
+                document,
+                {str(item["alpha_token"]): 0.0 for item in document["entries"]},
+            ),
+        )
+    dataset = _task9_authority(context, stage="alpha")
+    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
+    features = tuple(X_train.columns)
+    budget = max(context.protocol.estimator_budgets)
+    schedule = make_algorithm_b_perturbation_schedule(features, K_adv=budget, seed=context.job.seed)
+    mi_scores, neighbors = build_mi_correlation_guidance(X_train, y_train, task=dataset.task, seed=context.job.seed)
+    cache = _make_job_cache(context, X_train, X_val, y_train, y_val)
+    initial_model_fit_count = int(cache.model_fit_count)
+    initial_coalition_count = int(cache.coalition_count)
+    entries = []
+    selection_times: dict[str, float] = {}
+    for alpha in context.protocol.alpha_grid:
+        alpha_started = time.perf_counter()
+        before_fits = cache.model_fit_count
+        before_coalitions = cache.coalition_count
+        scores = estimate_minppi_hybrid(
+            X_train=X_train, X_val=X_val, y_train=y_train, y_val=y_val,
+            alpha=alpha, task=dataset.task, utility=dataset.utility, K=budget, K_adv=budget,
+            mi_scores=mi_scores, correlation_neighbors=neighbors,
+            perturbation_schedule=schedule, acc_cache=cache, seed=context.job.seed,
+        )
+        ordered_scores = _task9_scores(scores, features)
+        removed = [feature for feature in features if float(scores[feature]) == -1.0]
+        subset = _task9_subset_row(features, removed)
+        validation_utility = float(cache.evaluate(set(subset["retained_features"])))
+        alpha_token = _alpha_token(alpha)
+        selection_times[alpha_token] = time.perf_counter() - alpha_started
+        entries.append(
+            {
+                "alpha": alpha,
+                "alpha_token": alpha_token,
+                "harmful_count": len(removed),
+                "compression": len(removed) / len(features),
+                "validation_utility": validation_utility,
+                "retained_features": subset["retained_features"],
+                "removed_features": subset["removed_features"],
+                "retained_hash": subset["retained_hash"],
+                "model_fit_count": cache.model_fit_count - before_fits,
+                "coalition_count": cache.coalition_count - before_coalitions,
+                "scores": ordered_scores,
+            }
+        )
+    document = {
+        "schema_version": 1, "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id, "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed, "task": dataset.task, "utility": dataset.utility,
+        "budget": budget, "features": list(features), "entries": entries,
+        "initial_model_fit_count": initial_model_fit_count,
+        "initial_coalition_count": initial_coalition_count,
+        "selection_model_fit_count": cache.model_fit_count,
+        "selection_coalition_count": cache.coalition_count,
+    }
+    _validate_alpha_plan(context, document)
+    _publish_idempotent_json(path, document, context="alpha selection plan")
+    return _selection_record(
+        context,
+        started_at=started_at,
+        relpath=relpath,
+        metrics=_alpha_selection_metrics(document, selection_times),
+    )
+
+
+def _alpha_result_relpath(context: StageContext, alpha: float) -> str:
+    return f"alpha/{context.job.dataset_id}/s{context.job.seed}/{_alpha_token(alpha)}/results.json"
+
+
+def _validate_alpha_result(context: StageContext, value: object) -> dict[str, object]:
+    expected = {
+        "schema_version", "protocol_hash", "job_id", "dataset_id", "seed", "alpha",
+        "alpha_token", "harmful_count", "retained_features", "removed_features",
+        "retained_hash", "compression", "validation_utility", "test_utility",
+        "full_test_utility", "delta_utility", "preservation", "selection_time_s",
+        "evaluation_time_s", "selection_model_fit_count",
+        "selection_coalition_count", "evaluation_model_fit_count",
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError("alpha result artifact schema is invalid")
+    alpha = context.job.parameters["alpha"]
+    if (
+        value["schema_version"] != 1 or value["protocol_hash"] != context.job.protocol_hash
+        or value["job_id"] != context.job.job_id or value["dataset_id"] != context.job.dataset_id
+        or value["seed"] != context.job.seed or value["alpha"] != alpha
+        or value["alpha_token"] != _alpha_token(alpha)
+    ):
+        raise ValueError("alpha result artifact identity is invalid")
+    plan = _read_alpha_plan(context)
+    entry = next((item for item in plan["entries"] if item["alpha"] == alpha), None)
+    if entry is None:
+        raise ValueError("alpha result is outside the frozen plan")
+    plan_record = _task9_plan_result(context, stage="alpha")
+    expected_evaluation_fits = sum(
+        bool(features)
+        for features in {
+            tuple(plan["features"]), tuple(entry["retained_features"])
+        }
+    )
+    if (
+        value["selection_time_s"]
+        != plan_record.metrics[f"{entry['alpha_token']}_selection_time_s"]
+        or value["selection_model_fit_count"] != entry["model_fit_count"]
+        or value["selection_coalition_count"] != entry["coalition_count"]
+        or value["evaluation_model_fit_count"] != expected_evaluation_fits
+    ):
+        raise ValueError("alpha result counters or selection time are not exact")
+    for field in (
+        "harmful_count", "retained_features", "removed_features", "retained_hash",
+        "compression", "validation_utility",
+    ):
+        if value[field] != entry[field]:
+            raise ValueError("alpha result did not reuse the exact frozen plan entry")
+    numeric = (
+        "test_utility", "full_test_utility", "delta_utility", "preservation",
+        "selection_time_s", "evaluation_time_s",
+    )
+    if any(
+        isinstance(value[field], bool) or not isinstance(value[field], (int, float))
+        or not __import__("math").isfinite(float(value[field])) for field in numeric
+    ):
+        raise ValueError("alpha result metrics must be finite")
+    if value["selection_time_s"] < 0 or value["evaluation_time_s"] < 0:
+        raise ValueError("alpha result runtimes must be nonnegative")
+    if value["delta_utility"] != value["test_utility"] - value["full_test_utility"]:
+        raise ValueError("alpha result utility delta is invalid")
+    expected_preservation = value["test_utility"] / value["full_test_utility"] if value["full_test_utility"] > 0 else 1.0
+    if value["preservation"] != expected_preservation:
+        raise ValueError("alpha result preservation is invalid")
+    for field in (
+        "selection_model_fit_count", "selection_coalition_count",
+        "evaluation_model_fit_count",
+    ):
+        if isinstance(value[field], bool) or not isinstance(value[field], int) or value[field] < 0:
+            raise ValueError("alpha result fit count is invalid")
+    return value
+
+
+def _run_alpha_evaluation(context: StageContext) -> ResultRecord:
+    import numpy as np
+    import pandas as pd
+
+    started_at = _timestamp()
+    alpha = float(context.job.parameters["alpha"])
+    relpath = _alpha_result_relpath(context, alpha)
+    plan_record = _task9_plan_result(context, stage="alpha")
+    existing = _task9_result_existing(context, relpath, validator=_validate_alpha_result)
+    if existing is not None:
+        return _result_record_from_artifact(context, started_at=started_at, relpath=relpath, document=existing)
+    plan = _read_alpha_plan(context)
+    entry = next(item for item in plan["entries"] if item["alpha"] == alpha)
+    X_train, y_train, X_val, y_val, row = _load_prepared_train_validation(context)
+    X_test, y_test = _task9_load_test(context, row, reason="final_alpha_grid_evaluation")
+    X_train_val = pd.concat([X_train, X_val], ignore_index=True)
+    y_train_val = np.concatenate([y_train, y_val])
+    dataset = _task9_authority(context, stage="alpha")
+    evaluation_started = time.perf_counter()
+    cache: dict[tuple[str, ...], float] = {}
+
+    def evaluate(features: Sequence[str]) -> float:
+        key = tuple(features)
+        if key not in cache:
+            cache[key] = evaluate_fixed_subset(
+                X_train_val, y_train_val, X_test, y_test, key,
+                task=dataset.task, utility=dataset.utility,
+                model_params=context.protocol.model_params,
+                backend=context.protocol.backend, seed=context.job.seed,
+            )
+        return cache[key]
+
+    full = evaluate(tuple(plan["features"]))
+    selected = evaluate(tuple(entry["retained_features"]))
+    evaluation_time = time.perf_counter() - evaluation_started
+    document = {
+        "schema_version": 1, "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id, "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed, "alpha": alpha, "alpha_token": _alpha_token(alpha),
+        "harmful_count": entry["harmful_count"],
+        "retained_features": entry["retained_features"],
+        "removed_features": entry["removed_features"],
+        "retained_hash": entry["retained_hash"], "compression": entry["compression"],
+        "validation_utility": entry["validation_utility"], "test_utility": selected,
+        "full_test_utility": full, "delta_utility": selected - full,
+        "preservation": selected / full if full > 0 else 1.0,
+        "selection_time_s": float(
+            plan_record.metrics[f"{entry['alpha_token']}_selection_time_s"]
+        ),
+        "evaluation_time_s": evaluation_time,
+        "selection_model_fit_count": int(entry["model_fit_count"]),
+        "selection_coalition_count": int(entry["coalition_count"]),
+        "evaluation_model_fit_count": sum(bool(key) for key in cache),
+    }
+    _validate_alpha_result(context, document)
+    _publish_idempotent_json(context.layout.root / relpath, document, context="alpha result artifact")
+    return _result_record_from_artifact(context, started_at=started_at, relpath=relpath, document=document)
+
+
+def run_alpha_job(context: StageContext) -> ResultRecord:
+    """Run one frozen alpha-grid selection plan or final evaluation job."""
+    dataset = _task9_authority(context, stage="alpha")
+    _validate_alpha_scope(context)
+    expected = {"task", "utility", "alpha_grid"} if context.job.method == "selection_plan" else {"task", "utility", "alpha"}
+    if set(context.job.parameters) != expected or context.job.parameters["task"] != dataset.task or context.job.parameters["utility"] != dataset.utility:
+        raise ValueError("alpha job parameters conflict with dataset authority")
+    if context.job.method == "selection_plan":
+        if context.job.parameters["alpha_grid"] != list(context.protocol.alpha_grid):
+            raise ValueError("alpha plan grid conflicts with protocol")
+        return _run_alpha_plan(context)
+    if context.job.method != "alpha_evaluation":
+        raise ValueError("alpha method is not canonical")
+    alpha = context.job.parameters["alpha"]
+    if isinstance(alpha, bool) or alpha not in context.protocol.alpha_grid or sum(value == alpha for value in context.protocol.alpha_grid) != 1:
+        raise ValueError("alpha evaluation value is not a unique frozen grid member")
+    return _run_alpha_evaluation(context)
+
+
 STAGE_EXECUTORS.update(
     {
         "validate": run_validate_job,
         "preprocess": run_preprocess_job,
         "estimator": run_estimator_job,
+        "removal": run_removal_job,
+        "alpha": run_alpha_job,
         "ablation": run_ablation_job,
     }
 )

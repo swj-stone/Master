@@ -1,165 +1,13 @@
-"""
-Banzhaf feature importance baseline.
-
-Banzhaf for Feature Selection (Karavas et al. 2017, arXiv:1711.04992) frames
-features as voters in a weighted voting game and uses the **Banzhaf power
-index** to rank them.  Unlike the Shapley value (which weights marginal
-contributions by subset-size combinatorics), the Banzhaf index is an
-unweighted average of marginals over all 2^{n-1} coalitions::
-
-    beta_i = (1 / 2^{n-1}) * sum_{S ⊆ N\\{i}} [v(S ∪ {i}) - v(S)]
-
-where  v(S) = AUC(XGBoost(S))  (continuous characteristic function).
-
-The continuous v(·) avoids the alpha-threshold sensitivity of binary v_alpha;
-it also makes the estimator consistent with the MinShap baseline (same v,
-different aggregation operator: mean vs min).
-
-Estimation uses **shared-coalition Monte Carlo**:
-
-1. Sample *M* random coalitions S ⊆ N.
-2. For each S, evaluate v(S) once.
-3. For a random subset of features not in S (up to *per_coalition*), evaluate
-   v(S ∪ {i}) and accumulate the marginal.
-4. Divide each feature's accumulated marginals by its evaluation count.
-
-Usage::
-
-    from minppi_mofs.baselines.banzhaf_fs import compute_banzhaf_importance
-    scores = compute_banzhaf_importance(X_train, y_train)
-
-Run (stand-alone)::
-
-    python src/minppi_mofs/baselines/banzhaf_fs.py
-"""
+"""Banzhaf feature importance with deterministic shared-coalition sampling."""
 
 from __future__ import annotations
 
-import warnings
+from collections.abc import Mapping, MutableMapping
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier, XGBRegressor
 
-
-# ---------------------------------------------------------------------------
-# Cached continuous-AUC characteristic function
-# ---------------------------------------------------------------------------
-
-
-class _CachedAUC:
-    """v(S) = AUC of a shallow XGBoost trained on feature subset S.
-
-    Results are cached by sorted-tuple key.
-    """
-
-    def __init__(
-        self,
-        X: pd.DataFrame,
-        y: np.ndarray,
-        *,
-        seed: int = 42,
-        test_size: float = 0.2,
-        max_samples: int = 5000,
-        task: str = "binary",
-    ) -> None:
-        self._X = X
-        self._y = y
-        self._seed = seed
-        self._test_size = test_size
-        self._max_samples = max_samples
-        self._task = task
-        self._cache: dict[tuple[str, ...], float] = {}
-        # Reusable model
-        if task == "regression":
-            self._model = XGBRegressor(
-                n_estimators=10,
-                max_depth=2,
-                learning_rate=0.3,
-                verbosity=0,
-                random_state=seed,
-            )
-        elif task == "multiclass":
-            self._model = LogisticRegression(
-                max_iter=500,
-                solver="lbfgs",
-                random_state=seed,
-            )
-        else:
-            self._model = XGBClassifier(
-                n_estimators=10,
-                max_depth=2,
-                learning_rate=0.3,
-                verbosity=0,
-                random_state=seed,
-            )
-
-    def __call__(self, S: set[str]) -> float:
-        key = tuple(sorted(S))
-        if key in self._cache:
-            return self._cache[key]
-
-        cols = list(S)
-        if len(cols) == 0:
-            val = 0.0 if self._task == "regression" else 0.5
-        else:
-            X_sub = self._X[cols].values
-            n_rows = X_sub.shape[0]
-            if n_rows > self._max_samples:
-                rng = np.random.default_rng(self._seed + hash(key) % 2**31)
-                idx = rng.choice(n_rows, size=self._max_samples, replace=False)
-                X_sub = X_sub[idx]
-                y_sub = self._y[idx]
-            else:
-                y_sub = self._y
-            try:
-                X_tr, X_te, y_tr, y_te = train_test_split(
-                    X_sub,
-                    y_sub,
-                    test_size=self._test_size,
-                    random_state=self._seed,
-                    stratify=y_sub if self._task != "regression" else None,
-                )
-            except ValueError:
-                X_tr, X_te, y_tr, y_te = train_test_split(
-                    X_sub,
-                    y_sub,
-                    test_size=self._test_size,
-                    random_state=self._seed,
-                )
-            if self._task == "regression":
-                self._model.fit(X_tr, y_tr)
-                y_pred = self._model.predict(X_te)
-                val = float(r2_score(y_te, y_pred))
-                if val < 0.0:
-                    val = 0.0
-            elif self._task == "multiclass":
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    self._model.fit(X_tr, y_tr)
-                val = float(accuracy_score(y_te, self._model.predict(X_te)))
-            else:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    self._model.fit(X_tr, y_tr)
-                y_prob = self._model.predict_proba(X_te)
-                y_test_classes = np.unique(y_te)
-                if len(y_test_classes) < 2:
-                    val = 0.5
-                elif y_prob.shape[1] == 2:
-                    val = float(roc_auc_score(y_te, y_prob[:, 1]))
-                else:
-                    val = float(roc_auc_score(y_te, y_prob, multi_class="ovr"))
-        self._cache[key] = val
-        return val
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+from minppi_mofs.baselines._coalition_utility import CoalitionUtility, default_utility
 
 
 def compute_banzhaf_importance(
@@ -171,116 +19,53 @@ def compute_banzhaf_importance(
     seed: int = 42,
     verbose: bool = False,
     task: str = "binary",
+    utility: str | None = None,
+    model_params: Mapping[str, object] | None = None,
+    backend: str = "cpu",
+    diagnostics: MutableMapping[str, int] | None = None,
 ) -> dict[str, float]:
-    """Compute Banzhaf feature importance via shared-coalition Monte Carlo.
-
-    Uses continuous  v(S) = AUC(XGBoost(S)) → marginals in [−1, 1].
-
-    Args:
-        X: Feature DataFrame.
-        y: Target array.
-        n_coalitions: Number of random coalitions to sample.
-        per_coalition: Max features to test for marginal per coalition.
-        seed: Random seed.
-        verbose: Print progress every 50 coalitions.
-        task: ``"binary"`` for classification (AUC), ``"regression"`` for R^2.
-
-    Returns:
-        Dict ``{feature_name: banzhaf_value}`` sorted descending.
-    """
+    """Return mean utility marginals in original feature order."""
+    if isinstance(n_coalitions, bool) or not isinstance(n_coalitions, int) or n_coalitions < 1:
+        raise ValueError("n_coalitions must be a positive integer")
+    if isinstance(per_coalition, bool) or not isinstance(per_coalition, int) or per_coalition < 1:
+        raise ValueError("per_coalition must be a positive integer")
     rng = np.random.default_rng(seed)
-    features = list(X.columns)
-    n = len(features)
-    all_set = set(features)
-
-    v = _CachedAUC(X, y, seed=seed, task=task)
-    full_auc = v(all_set)
-    if verbose:
-        print(f"  Full-feature AUC: {full_auc:.4f}", flush=True)
-
-    accum = {name: 0.0 for name in features}
-    counts = {name: 0 for name in features}
-
-    for k in range(n_coalitions):
-        if verbose and (k + 1) % 50 == 0:
-            done = sum(1 for c in counts.values() if c > 0)
-            print(
-                f"  Banzhaf: {k + 1}/{n_coalitions}  ({done}/{n} features seen)",
-                flush=True,
-            )
-
-        s_size = rng.integers(0, max(1, n // 3) + 1)
-        S_list = rng.choice(features, size=s_size, replace=False).tolist()
-        S = set(S_list)
-        v_S = v(S)
-
-        outside = list(all_set - S)
+    features = tuple(X.columns)
+    evaluator = CoalitionUtility(
+        X,
+        y,
+        task=task,
+        utility=utility or default_utility(task),
+        model_params=model_params or {"n_estimators": 10, "max_depth": 2, "learning_rate": 0.3},
+        backend=backend,
+        seed=seed,
+        diagnostics=diagnostics,
+    )
+    evaluator(set(features))
+    totals = {feature: 0.0 for feature in features}
+    counts = {feature: 0 for feature in features}
+    for index in range(n_coalitions):
+        size = int(rng.integers(0, max(1, len(features) // 3) + 1))
+        coalition = set(rng.choice(features, size=size, replace=False).tolist())
+        base = evaluator(coalition)
+        outside = [feature for feature in features if feature not in coalition]
         rng.shuffle(outside)
-        test_feats = outside[:per_coalition]
-
-        for feat in test_feats:
-            v_Si = v(S | {feat})
-            accum[feat] += float(v_Si - v_S)
-            counts[feat] += 1
-
-        # Early stop: every feature evaluated at least twice.
-        # With feature reduction (max 200 feats) the coupon-collector
-        # overhead is negligible, and 2 samples give the mean estimator
-        # a reasonable variance reduction.
-        min_eval = 2
-        all_covered = all(c >= min_eval for c in counts.values())
-        if all_covered and k >= 20:
-            if verbose:
-                print(
-                    f"  Early stop at coalition {k + 1}/{n_coalitions} "
-                    f"(every feature has >= {min_eval} evals)",
-                    flush=True,
-                )
+        for feature in outside[:per_coalition]:
+            totals[feature] += evaluator(coalition | {feature}) - base
+            counts[feature] += 1
+        if all(count >= 2 for count in counts.values()) and index >= 20:
             break
-
+    result = {
+        feature: float(totals[feature] / max(counts[feature], 1))
+        for feature in features
+    }
+    if set(result) != set(features) or not all(np.isfinite(list(result.values()))):
+        raise ValueError("Banzhaf returned incomplete or non-finite scores")
     if verbose:
-        min_c = min(counts.values())
-        max_c = max(counts.values())
-        n_pos = sum(1 for a in accum.values() if a > 0)
-        n_neg = sum(1 for a in accum.values() if a < 0)
-        print(
-            f"  Complete: {n}/{n} features  evals/feat: {min_c}-{max_c}  "
-            f"(pos={n_pos}, neg={n_neg})",
-            flush=True,
-        )
-
-    result = {name: accum[name] / max(counts[name], 1) for name in features}
-    return dict(sorted(result.items(), key=lambda kv: kv[1], reverse=True))
+        print(f"  Banzhaf evaluated {len(features)} features", flush=True)
+    return result
 
 
 def rank_features(scores: dict[str, float]) -> list[tuple[str, float]]:
-    """Convert a score dict to a ranked list (highest first)."""
-    return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-
-
-# ---------------------------------------------------------------------------
-# Stand-alone demo
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-
-    def _demo_banner(t: str) -> None:
-        print("\n" + "=" * 72 + "\n" + t + "\n" + "=" * 72)
-
-    _demo_banner("Banzhaf baseline — synthetic demo")
-    rng = np.random.default_rng(42)
-    n_samp = 200
-    X_demo = pd.DataFrame(
-        {
-            "f0": rng.normal(0, 1, n_samp),
-            "f1": rng.normal(0, 1, n_samp),
-            "f2": rng.normal(0, 1, n_samp),
-        }
-    )
-    y_demo = np.where(X_demo["f0"] + 0.1 * X_demo["f1"] > 0, 1, 0)
-
-    scores = compute_banzhaf_importance(X_demo, y_demo, n_coalitions=100, verbose=True)
-    print("Feature ranking:")
-    for feat, val in scores.items():
-        print(f"  {feat}: {val:.6f}")
-    print("\nObservation: f0 should score highest.")
+    """Rank features by descending score, preserving input order for ties."""
+    return sorted(scores.items(), key=lambda item: item[1], reverse=True)
