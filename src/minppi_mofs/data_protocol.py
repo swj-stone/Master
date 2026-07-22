@@ -66,6 +66,9 @@ class DataSplit:
     y_val: np.ndarray
     y_test: np.ndarray
     selected_features: tuple[str, ...]
+    variance_features: tuple[str, ...]
+    scaler_mean: tuple[float, ...]
+    scaler_scale: tuple[float, ...]
     seed: int
 
 
@@ -187,15 +190,14 @@ def prepare_split(
 
     # ── 2. VarianceThreshold (train-only fit, transform all) ───────────
     all_cols = list(X_train.columns)
-    if variance_threshold > 0.0:
-        vt = VarianceThreshold(threshold=variance_threshold)
-        X_tr_vt = vt.fit_transform(X_train[all_cols].values)
-        kept_mask = vt.get_support()
-        vt_cols = [all_cols[i] for i in range(len(all_cols)) if kept_mask[i]]
-        X_train = pd.DataFrame(X_tr_vt, columns=vt_cols, index=X_train.index)
-        X_val = X_val[vt_cols]
-        X_test = X_test[vt_cols]
-        all_cols = vt_cols
+    vt = VarianceThreshold(threshold=variance_threshold)
+    X_tr_vt = vt.fit_transform(X_train[all_cols].values)
+    kept_mask = vt.get_support()
+    vt_cols = [all_cols[i] for i in range(len(all_cols)) if kept_mask[i]]
+    X_train = pd.DataFrame(X_tr_vt, columns=vt_cols, index=X_train.index)
+    X_val = X_val[vt_cols]
+    X_test = X_test[vt_cols]
+    all_cols = vt_cols
 
     # ── 3. Feature selection (train-only MI, same columns for all) ───
     if max_features is not None and max_features < len(all_cols):
@@ -230,5 +232,8 @@ def prepare_split(
         y_val=y_val,
         y_test=y_test,
         selected_features=tuple(top_cols),
+        variance_features=tuple(vt_cols),
+        scaler_mean=tuple(float(value) for value in scaler.mean_),
+        scaler_scale=tuple(float(value) for value in scaler.scale_),
         seed=seed,
     )

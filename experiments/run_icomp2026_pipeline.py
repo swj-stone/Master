@@ -3,11 +3,49 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from minppi_mofs.experiment_protocol import (
+
+_CLI_STAGES = (
+    "validate",
+    "preprocess",
+    "estimator",
+    "removal",
+    "alpha",
+    "nsga2",
+    "ablation",
+    "summarize",
+    "figures",
+)
+
+
+def _standard_library_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Run manifest-authoritative ICOMP 2026 stages sequentially.",
+        allow_abbrev=False,
+    )
+    parser.add_argument("--stage", required=True, choices=("all",) + _CLI_STAGES)
+    parser.add_argument("--config-dir", type=Path, default=Path("configs"))
+    parser.add_argument(
+        "--output-root", type=Path, default=Path("results/icomp2026_rerun")
+    )
+    parser.add_argument("--seeds", type=int, nargs="+")
+    parser.add_argument("--backend", choices=("cpu", "cuda"))
+    parser.add_argument("--run-id")
+    parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--stop-after-jobs", type=int)
+    return parser
+
+
+if __name__ == "__main__" and {"-h", "--help"}.intersection(sys.argv[1:]):
+    _standard_library_parser().parse_args()
+
+
+from minppi_mofs.experiment_protocol import (  # noqa: E402
     AuditLog,
     IncompleteRunError,
     ManifestStore,
@@ -171,21 +209,7 @@ class PipelineRunner:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Run manifest-authoritative ICOMP 2026 stages sequentially."
-    )
-    parser.add_argument("--stage", required=True, choices=("all",) + STAGE_ORDER)
-    parser.add_argument("--config-dir", type=Path, default=Path("configs"))
-    parser.add_argument(
-        "--output-root", type=Path, default=Path("results/icomp2026_rerun")
-    )
-    parser.add_argument("--seeds", type=int, nargs="+")
-    parser.add_argument("--backend", choices=("cpu", "cuda"))
-    parser.add_argument("--run-id")
-    parser.add_argument("--smoke", action="store_true")
-    parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--stop-after-jobs", type=int)
-    return parser
+    return _standard_library_parser()
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -67,6 +67,29 @@ _ALLOWED_TEST_ACCESS = frozenset(
     }
 )
 _AUDIT_SCHEMA_VERSION = 1
+_DATA_MANIFEST_FIELDS = (
+    "protocol_hash", "job_id", "dataset_id", "seed", "task", "utility",
+    "target", "raw_file_sha256", "raw_row_count", "raw_feature_count",
+    "selected_feature_count", "selected_features_json", "train_relpath",
+    "val_relpath", "test_relpath", "train_row_count", "val_row_count",
+    "test_row_count", "train_index_sha256", "val_index_sha256",
+    "test_index_sha256", "train_file_sha256", "val_file_sha256",
+    "test_file_sha256", "train_label_summary_json", "val_label_summary_json",
+    "test_label_summary_json", "transform_metadata_json",
+)
+_DATA_MANIFEST_INTEGER_FIELDS = frozenset(
+    {
+        "seed", "raw_row_count", "raw_feature_count", "selected_feature_count",
+        "train_row_count", "val_row_count", "test_row_count",
+    }
+)
+_DATA_MANIFEST_SHA_FIELDS = frozenset(
+    {
+        "raw_file_sha256", "train_index_sha256", "val_index_sha256",
+        "test_index_sha256", "train_file_sha256", "val_file_sha256",
+        "test_file_sha256",
+    }
+)
 
 _GLOBAL_KEYS = frozenset(
     {
@@ -1412,35 +1435,219 @@ class ManifestStore:
 def read_data_manifest(
     path: Path, protocol: ResolvedProtocol
 ) -> tuple[dict[str, object], ...]:
-    """Read only the strict fields needed to derive data-dependent jobs."""
-    fields = ("dataset_id", "seed", "selected_feature_count")
+    """Validate a complete rich manifest and return its job-expansion projection."""
+    rows = _read_data_manifest_rows(Path(path), protocol)
+    expected = _data_manifest_scope(protocol)
+    if tuple((row["dataset_id"], row["seed"]) for row in rows) != expected:
+        raise ValueError("data_manifest does not match the complete protocol scope")
+    return tuple(
+        {
+            "dataset_id": row["dataset_id"],
+            "seed": row["seed"],
+            "selected_feature_count": row["selected_feature_count"],
+        }
+        for row in rows
+    )
+
+
+def upsert_data_manifest(
+    path: Path, protocol: ResolvedProtocol, row: Mapping[str, object]
+) -> None:
+    """Atomically add one frozen preprocess row to a partial rich manifest."""
+    path = Path(path)
+    action = preflight_data_manifest(path, protocol, row)
+    if action == "identical":
+        return
+    candidate = _validate_data_manifest_row(dict(row), protocol)
+    existing = _read_data_manifest_rows(path, protocol) if path.exists() else ()
+    key = (candidate["dataset_id"], candidate["seed"])
+    by_key = {(item["dataset_id"], item["seed"]): item for item in existing}
+    if key in by_key:
+        if by_key[key] == candidate:
+            return
+        raise ValueError("data_manifest row conflicts with an already-frozen row")
+    by_key[key] = candidate
+    scope = _data_manifest_scope(protocol)
+    ordered = tuple(by_key[item] for item in scope if item in by_key)
+    _validate_data_manifest_raw_authority(ordered)
+    _atomic_write_text(path, _data_manifest_csv_text(ordered))
+
+
+def preflight_data_manifest(
+    path: Path, protocol: ResolvedProtocol, row: Mapping[str, object]
+) -> str:
+    """Validate one candidate without mutating the partial manifest."""
+    path = Path(path)
+    candidate = _validate_data_manifest_row(dict(row), protocol)
+    existing = _read_data_manifest_rows(path, protocol) if path.exists() else ()
+    key = (candidate["dataset_id"], candidate["seed"])
+    by_key = {(item["dataset_id"], item["seed"]): item for item in existing}
+    if key in by_key:
+        if by_key[key] == candidate:
+            return "identical"
+        raise ValueError("data_manifest row conflicts with an already-frozen row")
+    combined = (*existing, candidate)
+    _validate_data_manifest_raw_authority(combined)
+    return "insert"
+
+
+def _read_data_manifest_rows(
+    path: Path, protocol: ResolvedProtocol
+) -> tuple[dict[str, object], ...]:
     try:
         with Path(path).open("r", encoding="utf-8", newline="") as handle:
             reader = csv.DictReader(handle, strict=True)
-            if tuple(reader.fieldnames or ()) != fields:
+            if tuple(reader.fieldnames or ()) != _DATA_MANIFEST_FIELDS:
                 raise ValueError("data_manifest CSV header is invalid")
             raw_rows = list(reader)
     except (OSError, UnicodeDecodeError, csv.Error) as exc:
         raise ValueError("data_manifest CSV is malformed") from exc
     rows: list[dict[str, object]] = []
     for index, row in enumerate(raw_rows):
-        if None in row or set(row) != set(fields):
+        if None in row or set(row) != set(_DATA_MANIFEST_FIELDS):
             raise ValueError(f"data_manifest[{index}] has an invalid schema")
-        seed_text = row["seed"]
-        count_text = row["selected_feature_count"]
-        if not re.fullmatch(r"0|[1-9][0-9]*", seed_text) or not re.fullmatch(
-            r"[1-9][0-9]*", count_text
-        ):
-            raise ValueError(f"data_manifest[{index}] has an invalid integer field")
-        rows.append(
-            {
-                "dataset_id": row["dataset_id"],
-                "seed": int(seed_text),
-                "selected_feature_count": int(count_text),
-            }
-        )
-    _selected_feature_counts(protocol, rows)
+        parsed: dict[str, object] = dict(row)
+        for field in _DATA_MANIFEST_INTEGER_FIELDS:
+            text = row[field]
+            if not re.fullmatch(r"0|[1-9][0-9]*", text):
+                raise ValueError(f"data_manifest[{index}].{field} is invalid")
+            parsed[field] = int(text)
+        rows.append(_validate_data_manifest_row(parsed, protocol))
+    keys = tuple((row["dataset_id"], row["seed"]) for row in rows)
+    if len(set(keys)) != len(keys):
+        raise ValueError("data_manifest contains duplicate dataset/seed rows")
+    _validate_data_manifest_raw_authority(rows)
+    scope = _data_manifest_scope(protocol)
+    if keys != tuple(key for key in scope if key in set(keys)):
+        raise ValueError("data_manifest rows are not in canonical protocol order")
     return tuple(rows)
+
+
+def _validate_data_manifest_raw_authority(
+    rows: Sequence[Mapping[str, object]],
+) -> None:
+    authority: dict[str, tuple[object, object, object]] = {}
+    for row in rows:
+        dataset_id = str(row["dataset_id"])
+        identity = (
+            row["raw_file_sha256"],
+            row["raw_row_count"],
+            row["raw_feature_count"],
+        )
+        frozen = authority.setdefault(dataset_id, identity)
+        if frozen != identity:
+            raise ValueError(
+                "data_manifest raw authority differs across seeds for "
+                f"dataset {dataset_id}"
+            )
+
+
+def _data_manifest_scope(protocol: ResolvedProtocol) -> tuple[tuple[str, int], ...]:
+    return tuple(
+        (dataset.dataset_id, seed)
+        for dataset in protocol.datasets
+        for seed in protocol.seeds
+    )
+
+
+def _validate_data_manifest_row(
+    row: dict[str, object], protocol: ResolvedProtocol
+) -> dict[str, object]:
+    if set(row) != set(_DATA_MANIFEST_FIELDS):
+        raise ValueError("data_manifest row has an invalid schema")
+    dataset_id = row["dataset_id"]
+    seed = row["seed"]
+    if (dataset_id, seed) not in _data_manifest_scope(protocol):
+        raise ValueError("data_manifest row is outside the protocol scope")
+    dataset = next(item for item in protocol.datasets if item.dataset_id == dataset_id)
+    preprocess_job = next(
+        job
+        for job in build_job_manifest(protocol, stages=("preprocess",))
+        if job.dataset_id == dataset_id and job.seed == seed
+    )
+    expected_identity = {
+        "protocol_hash": _protocol_hash(protocol),
+        "job_id": preprocess_job.job_id,
+        "task": dataset.task,
+        "utility": dataset.utility,
+        "target": dataset.target,
+    }
+    for field, expected in expected_identity.items():
+        if row[field] != expected:
+            raise ValueError(f"data_manifest {field} does not match protocol authority")
+    for field in _DATA_MANIFEST_INTEGER_FIELDS:
+        value = row[field]
+        minimum = 0 if field == "seed" else 1
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise ValueError(f"data_manifest {field} is invalid")
+    if row["selected_feature_count"] > row["raw_feature_count"]:
+        raise ValueError("data_manifest selected_feature_count exceeds raw features")
+    if (
+        row["train_row_count"] + row["val_row_count"] + row["test_row_count"]
+        != row["raw_row_count"]
+    ):
+        raise ValueError("data_manifest partition row counts do not match raw_row_count")
+    for field in _DATA_MANIFEST_SHA_FIELDS:
+        if not isinstance(row[field], str) or not re.fullmatch(r"[0-9a-f]{64}", row[field]):
+            raise ValueError(f"data_manifest {field} must be a lowercase SHA-256")
+    prefix = f"preprocess/{dataset_id}/s{seed}"
+    for partition, field in (
+        ("train", "train_relpath"), ("val", "val_relpath"), ("test", "test_relpath")
+    ):
+        expected = f"{prefix}/{partition}.csv"
+        if _safe_relative_path(row[field], f"data_manifest {field}") != expected:
+            raise ValueError(f"data_manifest {field} is not the canonical split path")
+    selected = _canonical_manifest_json(
+        row["selected_features_json"], "selected_features_json"
+    )
+    if (
+        not isinstance(selected, list)
+        or len(selected) != row["selected_feature_count"]
+        or not all(isinstance(item, str) and item for item in selected)
+        or len(set(selected)) != len(selected)
+    ):
+        raise ValueError("data_manifest selected_features_json is invalid")
+    for field in (
+        "train_label_summary_json", "val_label_summary_json",
+        "test_label_summary_json", "transform_metadata_json",
+    ):
+        value = _canonical_manifest_json(row[field], field)
+        if not isinstance(value, dict):
+            raise ValueError(f"data_manifest {field} must encode a JSON object")
+    return {field: row[field] for field in _DATA_MANIFEST_FIELDS}
+
+
+def _canonical_manifest_json(value: object, field: str) -> object:
+    if not isinstance(value, str):
+        raise ValueError(f"data_manifest {field} must be canonical JSON text")
+    try:
+        parsed = json.loads(
+            value,
+            parse_constant=lambda constant: (_ for _ in ()).throw(
+                ValueError(f"non-finite JSON constant {constant}")
+            ),
+        )
+        canonical = json.dumps(
+            parsed, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"data_manifest {field} is not finite canonical JSON") from exc
+    if value != canonical:
+        raise ValueError(f"data_manifest {field} is not canonical JSON")
+    return parsed
+
+
+def _data_manifest_csv_text(rows: Sequence[Mapping[str, object]]) -> str:
+    from io import StringIO
+
+    output = StringIO(newline="")
+    writer = csv.DictWriter(
+        output, fieldnames=_DATA_MANIFEST_FIELDS, lineterminator="\n"
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    return output.getvalue()
 
 
 def read_result_record(path: Path, expected_job: JobSpec) -> ResultRecord:

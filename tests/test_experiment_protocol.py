@@ -29,6 +29,8 @@ from minppi_mofs.experiment_protocol import (
     open_resumed_run,
     read_data_manifest,
     read_result_record,
+    resolved_protocol_hash,
+    upsert_data_manifest,
 )
 
 
@@ -254,6 +256,171 @@ def resolved_protocol(tmp_path: Path):
         backend="cpu",
         smoke=True,
     )
+
+
+_DATA_MANIFEST_FIELDS = (
+    "protocol_hash", "job_id", "dataset_id", "seed", "task", "utility",
+    "target", "raw_file_sha256", "raw_row_count", "raw_feature_count",
+    "selected_feature_count", "selected_features_json", "train_relpath",
+    "val_relpath", "test_relpath", "train_row_count", "val_row_count",
+    "test_row_count", "train_index_sha256", "val_index_sha256",
+    "test_index_sha256", "train_file_sha256", "val_file_sha256",
+    "test_file_sha256", "train_label_summary_json", "val_label_summary_json",
+    "test_label_summary_json", "transform_metadata_json",
+)
+
+
+def _data_manifest_row(
+    protocol, dataset_id: str, seed: int = 42
+) -> dict[str, object]:
+    dataset = next(item for item in protocol.datasets if item.dataset_id == dataset_id)
+    job = next(
+        item
+        for item in build_job_manifest(protocol, stages=("preprocess",))
+        if item.dataset_id == dataset_id and item.seed == seed
+    )
+    prefix = f"preprocess/{dataset_id}/s{seed}"
+    return {
+        "protocol_hash": resolved_protocol_hash(protocol),
+        "job_id": job.job_id,
+        "dataset_id": dataset_id,
+        "seed": seed,
+        "task": dataset.task,
+        "utility": dataset.utility,
+        "target": dataset.target,
+        "raw_file_sha256": "1" * 64,
+        "raw_row_count": 10,
+        "raw_feature_count": 4,
+        "selected_feature_count": 2,
+        "selected_features_json": '["f0","f1"]',
+        "train_relpath": f"{prefix}/train.csv",
+        "val_relpath": f"{prefix}/val.csv",
+        "test_relpath": f"{prefix}/test.csv",
+        "train_row_count": 6,
+        "val_row_count": 2,
+        "test_row_count": 2,
+        "train_index_sha256": "2" * 64,
+        "val_index_sha256": "3" * 64,
+        "test_index_sha256": "4" * 64,
+        "train_file_sha256": "5" * 64,
+        "val_file_sha256": "6" * 64,
+        "test_file_sha256": "7" * 64,
+        "train_label_summary_json": '{"count":6}',
+        "val_label_summary_json": '{"count":2}',
+        "test_label_summary_json": '{"count":2}',
+        "transform_metadata_json": '{"scaler_mean":[0.0,1.0]}',
+    }
+
+
+def test_data_manifest_partial_upsert_is_canonical_idempotent_and_complete_read_projects(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    path = tmp_path / "data_manifest.csv"
+    abalone = _data_manifest_row(resolved_protocol, "abalone")
+    spambase = _data_manifest_row(resolved_protocol, "spambase")
+
+    upsert_data_manifest(path, resolved_protocol, abalone)
+    partial = path.read_bytes()
+    upsert_data_manifest(path, resolved_protocol, abalone)
+    assert path.read_bytes() == partial
+    with pytest.raises(ValueError, match="complete|scope"):
+        read_data_manifest(path, resolved_protocol)
+
+    upsert_data_manifest(path, resolved_protocol, spambase)
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+    assert tuple(reader.fieldnames or ()) == _DATA_MANIFEST_FIELDS
+    assert [row["dataset_id"] for row in rows] == ["spambase", "abalone"]
+    assert read_data_manifest(path, resolved_protocol) == (
+        {"dataset_id": "spambase", "seed": 42, "selected_feature_count": 2},
+        {"dataset_id": "abalone", "seed": 42, "selected_feature_count": 2},
+    )
+
+
+def test_data_manifest_rejects_conflict_and_malformed_rich_fields_without_mutation(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    path = tmp_path / "data_manifest.csv"
+    row = _data_manifest_row(resolved_protocol, "spambase")
+    upsert_data_manifest(path, resolved_protocol, row)
+    frozen = path.read_bytes()
+
+    conflict = dict(row, raw_file_sha256="a" * 64)
+    with pytest.raises(ValueError, match="conflict|frozen"):
+        upsert_data_manifest(path, resolved_protocol, conflict)
+    assert path.read_bytes() == frozen
+
+    malformed = dict(_data_manifest_row(resolved_protocol, "abalone"))
+    malformed["test_relpath"] = "../escape.csv"
+    with pytest.raises(ValueError, match="test_relpath|path"):
+        upsert_data_manifest(path, resolved_protocol, malformed)
+    assert path.read_bytes() == frozen
+
+    malformed = dict(_data_manifest_row(resolved_protocol, "abalone"))
+    malformed["transform_metadata_json"] = '{"bad":NaN}'
+    with pytest.raises(ValueError, match="JSON|finite|canonical"):
+        upsert_data_manifest(path, resolved_protocol, malformed)
+    assert path.read_bytes() == frozen
+
+
+def test_data_manifest_atomic_upsert_preserves_previous_file_on_replace_failure(
+    tmp_path: Path, resolved_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "data_manifest.csv"
+    upsert_data_manifest(path, resolved_protocol, _data_manifest_row(resolved_protocol, "spambase"))
+    frozen = path.read_bytes()
+
+    def fail_replace(source: Path, destination: Path) -> None:
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(protocol_module.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="replace failed"):
+        upsert_data_manifest(path, resolved_protocol, _data_manifest_row(resolved_protocol, "abalone"))
+    assert path.read_bytes() == frozen
+    assert not tuple(tmp_path.glob(f".{path.name}.*.tmp"))
+
+
+def test_data_manifest_partial_upsert_rejects_cross_seed_raw_authority_drift(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    protocol = replace(resolved_protocol, seeds=(42, 123))
+    path = tmp_path / "data_manifest.csv"
+    first = _data_manifest_row(protocol, "spambase", 42)
+    second = dict(
+        _data_manifest_row(protocol, "spambase", 123),
+        raw_file_sha256="a" * 64,
+        raw_row_count=11,
+        train_row_count=7,
+    )
+    upsert_data_manifest(path, protocol, first)
+    frozen = path.read_bytes()
+
+    with pytest.raises(ValueError, match="raw|authority|seed"):
+        upsert_data_manifest(path, protocol, second)
+
+    assert path.read_bytes() == frozen
+
+
+def test_data_manifest_complete_read_rejects_cross_seed_raw_authority_drift(
+    tmp_path: Path, resolved_protocol
+) -> None:
+    protocol = replace(resolved_protocol, seeds=(42, 123))
+    path = tmp_path / "data_manifest.csv"
+    rows = []
+    for dataset in protocol.datasets:
+        for seed in protocol.seeds:
+            row = _data_manifest_row(protocol, dataset.dataset_id, seed)
+            if dataset.dataset_id == "spambase" and seed == 123:
+                row = dict(row, raw_file_sha256="b" * 64)
+            rows.append(row)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_DATA_MANIFEST_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    with pytest.raises(ValueError, match="raw|authority|seed"):
+        read_data_manifest(path, protocol)
 
 
 def test_create_new_run_builds_canonical_layout(
@@ -1873,20 +2040,15 @@ def test_status_store_rejects_unpublished_extension_suffix(
     assert not (layout.root / "preprocess" / "status.json").exists()
 
 
-def test_read_data_manifest_reads_only_strict_manifest_fields(
+def test_read_data_manifest_validates_rich_rows_and_returns_strict_projection(
     tmp_path: Path, resolved_protocol
 ) -> None:
     path = tmp_path / "data_manifest.csv"
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(
-            handle,
-            fieldnames=("dataset_id", "seed", "selected_feature_count"),
-        )
-        writer.writeheader()
-        writer.writerows(
-            {"dataset_id": dataset.dataset_id, "seed": seed, "selected_feature_count": 7}
-            for dataset in resolved_protocol.datasets
-            for seed in resolved_protocol.seeds
+    for dataset in resolved_protocol.datasets:
+        upsert_data_manifest(
+            path,
+            resolved_protocol,
+            _data_manifest_row(resolved_protocol, dataset.dataset_id),
         )
 
     rows = read_data_manifest(path, resolved_protocol)
@@ -1894,10 +2056,6 @@ def test_read_data_manifest_reads_only_strict_manifest_fields(
     assert build_job_manifest(
         resolved_protocol, stages=("estimator",), data_manifest=rows
     )
-    path.write_text(
-        "dataset_id,seed,selected_feature_count,prepared_path\n"
-        "spambase,42,7,../prepared.csv\n",
-        encoding="utf-8",
-    )
+    path.write_text("dataset_id,seed,selected_feature_count\nspambase,42,7\n", encoding="utf-8")
     with pytest.raises(ValueError, match="data_manifest"):
         read_data_manifest(path, resolved_protocol)

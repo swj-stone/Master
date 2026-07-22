@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 import json
+import hashlib
 import os
 import subprocess
 import sys
@@ -11,9 +13,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 import pytest
 
 import minppi_mofs.experiment_protocol as protocol_module
+import minppi_mofs.data_protocol as data_protocol_module
 import experiments.icomp2026_stages as stage_module
 from minppi_mofs.experiment_protocol import (
     AuditLog,
@@ -30,7 +34,9 @@ from minppi_mofs.experiment_protocol import (
     atomic_write_json,
     build_job_manifest,
     create_new_run,
+    freeze_run_metadata,
     load_resolved_protocol,
+    upsert_data_manifest,
 )
 from experiments.icomp2026_stages import StageContext, execute_stage
 from experiments.run_icomp2026_pipeline import (
@@ -706,15 +712,690 @@ def _complete_jobs(layout, status, jobs) -> None:
 
 
 def _write_data_manifest(layout, protocol) -> None:
-    rows = ["dataset_id,seed,selected_feature_count"]
-    rows.extend(
-        f"{dataset.dataset_id},{seed},7"
-        for dataset in protocol.datasets
-        for seed in protocol.seeds
+    jobs = {
+        (job.dataset_id, job.seed): job
+        for job in build_job_manifest(protocol, stages=("preprocess",))
+    }
+    for dataset in protocol.datasets:
+        for seed in protocol.seeds:
+            job = jobs[(dataset.dataset_id, seed)]
+            prefix = f"preprocess/{dataset.dataset_id}/s{seed}"
+            upsert_data_manifest(
+                layout.root / "data_manifest.csv",
+                protocol,
+                {
+                    "protocol_hash": job.protocol_hash,
+                    "job_id": job.job_id,
+                    "dataset_id": dataset.dataset_id,
+                    "seed": seed,
+                    "task": dataset.task,
+                    "utility": dataset.utility,
+                    "target": dataset.target,
+                    "raw_file_sha256": "1" * 64,
+                    "raw_row_count": 10,
+                    "raw_feature_count": 8,
+                    "selected_feature_count": 7,
+                    "selected_features_json": json.dumps(
+                        [f"f{index}" for index in range(7)], separators=(",", ":")
+                    ),
+                    "train_relpath": f"{prefix}/train.csv",
+                    "val_relpath": f"{prefix}/val.csv",
+                    "test_relpath": f"{prefix}/test.csv",
+                    "train_row_count": 6,
+                    "val_row_count": 2,
+                    "test_row_count": 2,
+                    "train_index_sha256": "2" * 64,
+                    "val_index_sha256": "3" * 64,
+                    "test_index_sha256": "4" * 64,
+                    "train_file_sha256": "5" * 64,
+                    "val_file_sha256": "6" * 64,
+                    "test_file_sha256": "7" * 64,
+                    "train_label_summary_json": '{"count":6}',
+                    "val_label_summary_json": '{"count":2}',
+                    "test_label_summary_json": '{"count":2}',
+                    "transform_metadata_json": '{"scaler_mean":[0.0]}',
+                },
+            )
+
+
+def _synthetic_stage_protocol(tmp_path: Path, smoke_protocol):
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    rng = np.random.default_rng(2026)
+    count = 80
+    spambase = pd.DataFrame(
+        {
+            "signal": np.tile([0.0, 1.0], count // 2) + rng.normal(0, 0.05, count),
+            "noise": rng.normal(10, 2, count),
+            "constant": np.full(count, 7.0),
+            "is_spam": np.tile(["ham", "spam"], count // 2),
+        }
     )
-    (layout.root / "data_manifest.csv").write_text(
-        "\n".join(rows) + "\n", encoding="utf-8"
+    abalone = pd.DataFrame(
+        {
+            "length": rng.normal(2, 0.4, count),
+            "weight": rng.normal(5, 1.2, count),
+            "constant": np.full(count, 4.0),
+            "Rings": [str(4.5 + index / 20) for index in range(count)],
+        }
     )
+    raw_paths = {
+        "spambase": raw_dir / "spambase.csv",
+        "abalone": raw_dir / "abalone.csv",
+    }
+    spambase.to_csv(raw_paths["spambase"], index=False)
+    abalone.to_csv(raw_paths["abalone"], index=False)
+    datasets = tuple(
+        replace(
+            dataset,
+            raw_path=raw_paths[dataset.dataset_id],
+            max_features=2,
+            variance_threshold=0.0,
+        )
+        for dataset in smoke_protocol.datasets
+    )
+    return replace(smoke_protocol, datasets=datasets), raw_paths
+
+
+def test_real_validate_stage_writes_structured_checks_and_requires_raw_cache(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    protocol, raw_paths = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    layout = create_new_run(tmp_path / "results", "validate-real", protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    manifest = build_job_manifest(protocol, stages=("validate",))
+    status = StatusStore(layout, manifest)
+    context = _contexts(protocol, layout, manifest, status)[0]
+
+    result = stage_module.run_validate_job(context)
+
+    checks_path = layout.root / result.artifacts["checks"]
+    checks = json.loads(checks_path.read_text(encoding="utf-8"))
+    assert result.metrics["checks_passed"] is True
+    assert checks["backend"] == "cpu"
+    assert checks["raw_datasets"] == ["spambase", "abalone"]
+    assert checks["registered_stages"] == ["preprocess", "validate"]
+    assert all(path.exists() for path in raw_paths.values())
+
+    raw_paths["spambase"].unlink()
+    with pytest.raises(FileNotFoundError, match="spambase|raw"):
+        stage_module.run_validate_job(context)
+
+
+def test_real_validate_stage_rejects_forged_task_utility_pair(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    forged = replace(
+        protocol,
+        datasets=(replace(protocol.datasets[0], utility="r2"), *protocol.datasets[1:]),
+    )
+    layout = create_new_run(tmp_path / "results", "validate-forged", forged)
+    freeze_run_metadata(layout, forged, project_root=Path(__file__).parents[1])
+    manifest = build_job_manifest(forged, stages=("validate",))
+    status = StatusStore(layout, manifest)
+
+    with pytest.raises(ValueError, match="task|utility|compatible"):
+        stage_module.run_validate_job(_contexts(forged, layout, manifest, status)[0])
+
+
+def _validation_context(tmp_path: Path, smoke_protocol, run_id: str, *, backend="cpu"):
+    protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    protocol = replace(protocol, backend=backend)
+    layout = create_new_run(tmp_path / "results", run_id, protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    manifest = build_job_manifest(protocol, stages=("validate",))
+    status = StatusStore(layout, manifest)
+    return layout, _contexts(protocol, layout, manifest, status)[0]
+
+
+@pytest.mark.parametrize(
+    ("package", "value"),
+    [
+        ("python", "unavailable"),
+        ("numpy", " UnAvAiLaBlE "),
+        ("pandas", "UNAVAILABLE"),
+        ("scikit_learn", " unavailable "),
+        ("xgboost", "Unavailable"),
+    ],
+)
+def test_validate_rejects_unavailable_package_versions(
+    tmp_path: Path, smoke_protocol, package: str, value: str
+) -> None:
+    layout, context = _validation_context(tmp_path, smoke_protocol, f"bad-{package}")
+    path = layout.root / "environment.json"
+    environment = json.loads(path.read_text(encoding="utf-8"))
+    environment[package] = value
+    atomic_write_json(path, environment)
+
+    with pytest.raises(ValueError, match="package|version|unavailable"):
+        stage_module.run_validate_job(context)
+
+
+@pytest.mark.parametrize(
+    "build_info",
+    [{}, {"unavailable": "ImportError"}, {"details": {"Unavailable": True}}],
+)
+def test_validate_rejects_empty_or_unavailable_xgboost_build_info(
+    tmp_path: Path, smoke_protocol, build_info: dict[str, object]
+) -> None:
+    layout, context = _validation_context(tmp_path, smoke_protocol, "bad-build")
+    path = layout.root / "environment.json"
+    environment = json.loads(path.read_text(encoding="utf-8"))
+    environment["xgboost_build_info"] = build_info
+    atomic_write_json(path, environment)
+
+    with pytest.raises(ValueError, match="build|unavailable"):
+        stage_module.run_validate_job(context)
+
+
+def test_validate_cuda_requires_frozen_xgboost_cuda_capability_even_with_visible_gpu(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, context = _validation_context(
+        tmp_path, smoke_protocol, "cuda-cpu-build", backend="cuda"
+    )
+    path = layout.root / "environment.json"
+    environment = json.loads(path.read_text(encoding="utf-8"))
+    environment.update(
+        {
+            "python": "3.12.1",
+            "numpy": "2.0.0",
+            "pandas": "2.2.0",
+            "scikit_learn": "1.5.0",
+            "xgboost": "3.0.0",
+            "xgboost_build_info": {"USE_CUDA": False},
+            "cuda_build_info": {},
+            "backend": "cuda",
+        }
+    )
+    atomic_write_json(path, environment)
+    monkeypatch.setattr(stage_module, "_cuda_visibility", lambda backend: "GPU 0")
+
+    with pytest.raises(ValueError, match="CUDA|build|capability"):
+        stage_module.run_validate_job(context)
+
+
+def test_validate_freezes_raw_authority_and_preprocess_rejects_later_raw_drift(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    protocol, raw_paths = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    layout = create_new_run(tmp_path / "results", "raw-drift", protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    manifest = (
+        build_job_manifest(protocol, stages=("validate",))
+        + build_job_manifest(protocol, stages=("preprocess",))
+    )
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    validate_context = next(item for item in contexts if item.job.stage == "validate")
+    preprocess_context = next(
+        item
+        for item in contexts
+        if item.job.stage == "preprocess" and item.job.dataset_id == "spambase"
+    )
+
+    validation = stage_module.run_validate_job(validate_context)
+    checks_path = layout.root / validation.artifacts["checks"]
+    authority_path = layout.root / validation.artifacts["raw_authority"]
+    checks = json.loads(checks_path.read_text(encoding="utf-8"))
+    authority = json.loads(authority_path.read_text(encoding="utf-8"))
+    original = raw_paths["spambase"].read_bytes()
+    assert checks["raw_authority"]["spambase"] == {
+        "byte_count": len(original),
+        "sha256": hashlib.sha256(original).hexdigest(),
+    }
+    assert authority == {
+        "protocol_hash": protocol_module.resolved_protocol_hash(protocol),
+        "datasets": checks["raw_authority"],
+    }
+    authority_before = authority_path.read_bytes()
+    checks_before = checks_path.read_bytes()
+    raw_paths["spambase"].write_bytes(original + b"\n")
+
+    with pytest.raises(RuntimeError, match="raw|drift|authority"):
+        stage_module.run_validate_job(validate_context)
+
+    assert authority_path.read_bytes() == authority_before
+    assert checks_path.read_bytes() == checks_before
+    with pytest.raises(RuntimeError, match="raw|drift|authority"):
+        stage_module.run_preprocess_job(preprocess_context)
+
+    assert not (layout.root / "data_manifest.csv").exists()
+    assert not (layout.root / "preprocess" / "spambase" / "s42").exists()
+
+
+def test_preprocess_uses_independent_raw_authority_not_mutable_checks(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    protocol, raw_paths = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    layout = create_new_run(tmp_path / "results", "forged-checks-authority", protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    manifest = (
+        build_job_manifest(protocol, stages=("validate",))
+        + build_job_manifest(protocol, stages=("preprocess",))
+    )
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    validate_context = next(item for item in contexts if item.job.stage == "validate")
+    preprocess_context = next(
+        item
+        for item in contexts
+        if item.job.stage == "preprocess" and item.job.dataset_id == "spambase"
+    )
+    validation = stage_module.run_validate_job(validate_context)
+
+    raw_paths["spambase"].write_bytes(raw_paths["spambase"].read_bytes() + b"\n")
+    changed = raw_paths["spambase"].read_bytes()
+    checks_path = layout.root / validation.artifacts["checks"]
+    checks = json.loads(checks_path.read_text(encoding="utf-8"))
+    checks["raw_authority"]["spambase"] = {
+        "byte_count": len(changed),
+        "sha256": hashlib.sha256(changed).hexdigest(),
+    }
+    atomic_write_json(checks_path, checks)
+
+    with pytest.raises(RuntimeError, match="raw|drift|authority"):
+        stage_module.run_preprocess_job(preprocess_context)
+
+    assert not (layout.root / "data_manifest.csv").exists()
+    assert not (layout.root / "preprocess" / "spambase" / "s42").exists()
+
+
+def test_validate_retry_reuses_authority_after_checks_write_failure(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    layout, context = _validation_context(
+        tmp_path, smoke_protocol, "authority-before-checks"
+    )
+    authority_path = layout.root / "validate" / "raw_authority.json"
+    checks_path = layout.root / "validate" / "validation_checks.json"
+    real_write = stage_module.atomic_write_json
+
+    def fail_checks(path: Path, value: object) -> None:
+        if Path(path) == checks_path:
+            raise OSError("injected checks write failure")
+        real_write(path, value)
+
+    monkeypatch.setattr(stage_module, "atomic_write_json", fail_checks)
+    with pytest.raises(OSError, match="checks write failure"):
+        stage_module.run_validate_job(context)
+
+    assert authority_path.is_file()
+    authority_before = authority_path.read_bytes()
+    assert not checks_path.exists()
+
+    monkeypatch.setattr(stage_module, "atomic_write_json", real_write)
+    result = stage_module.run_validate_job(context)
+
+    assert authority_path.read_bytes() == authority_before
+    assert result.artifacts == {
+        "checks": "validate/validation_checks.json",
+        "raw_authority": "validate/raw_authority.json",
+    }
+    assert checks_path.is_file()
+
+
+@pytest.mark.parametrize("dataset_id", ["spambase", "abalone"])
+def test_real_preprocess_stage_writes_audited_split_without_reopening_test_csv(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    dataset_id: str,
+) -> None:
+    protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    layout = create_new_run(tmp_path / "results", f"preprocess-{dataset_id}", protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    jobs = (
+        build_job_manifest(protocol, stages=("validate",))
+        + build_job_manifest(protocol, stages=("preprocess",))
+    )
+    status = StatusStore(layout, jobs)
+    contexts = _contexts(protocol, layout, jobs, status)
+    stage_module.run_validate_job(
+        next(item for item in contexts if item.job.stage == "validate")
+    )
+    context = next(
+        item for item in contexts
+        if item.job.dataset_id == dataset_id
+    )
+    test_path = layout.root / f"preprocess/{dataset_id}/s42/test.csv"
+    original_open = Path.open
+
+    def guard_test_reopen(path: Path, *args, **kwargs):
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if Path(path) == test_path and "r" in mode:
+            raise AssertionError("preprocess executor reopened its produced test CSV")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guard_test_reopen)
+    result = stage_module.run_preprocess_job(context)
+    monkeypatch.undo()
+
+    train = pd.read_csv(layout.root / result.artifacts["train"])
+    validation = pd.read_csv(layout.root / result.artifacts["val"])
+    test = pd.read_csv(test_path)
+    metadata = json.loads(
+        (layout.root / result.artifacts["split_metadata"]).read_text(encoding="utf-8")
+    )
+    target = next(item.target for item in protocol.datasets if item.dataset_id == dataset_id)
+    feature_columns = [column for column in train if column != target]
+    assert feature_columns == metadata["selected_features"]
+    assert "constant" not in feature_columns
+    assert np.allclose(train[feature_columns].mean(axis=0), 0.0, atol=1e-12)
+    assert len(train) + len(validation) + len(test) == 80
+    index_sets = [set(metadata[f"{name}_indices"]) for name in ("train", "val", "test")]
+    assert not index_sets[0] & index_sets[1]
+    assert not index_sets[0] & index_sets[2]
+    assert not index_sets[1] & index_sets[2]
+    assert set.union(*index_sets) == set(range(80))
+    with (layout.root / "data_manifest.csv").open(encoding="utf-8", newline="") as handle:
+        rich_row = next(
+            row for row in __import__("csv").DictReader(handle)
+            if row["dataset_id"] == dataset_id
+        )
+    assert int(rich_row["selected_feature_count"]) == len(feature_columns)
+    for name in ("train", "val", "test"):
+        payload = (layout.root / result.artifacts[name]).read_bytes()
+        assert rich_row[f"{name}_file_sha256"] == hashlib.sha256(payload).hexdigest()
+    assert result.metrics["selected_feature_count"] == len(feature_columns)
+
+
+def test_real_stage_registry_is_exact_and_direct_cli_help_remains_safe() -> None:
+    assert stage_module.STAGE_EXECUTORS == {
+        "validate": stage_module.run_validate_job,
+        "preprocess": stage_module.run_preprocess_job,
+    }
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).parents[1] / "experiments" / "run_icomp2026_pipeline.py"),
+            "--help",
+        ],
+        cwd=Path(__file__).parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "--stage" in completed.stdout
+    assert "traceback" not in completed.stderr.lower()
+
+
+def test_direct_cli_help_uses_only_standard_library_before_exit() -> None:
+    script = Path(__file__).parents[1] / "experiments" / "run_icomp2026_pipeline.py"
+    probe = f"""
+import builtins
+import runpy
+import sys
+
+script = {str(script)!r}
+real_import = builtins.__import__
+attempts = []
+
+def guarded_import(name, *args, **kwargs):
+    root = name.split('.')[0]
+    if root in {{'xgboost', 'pandas', 'sklearn'}}:
+        attempts.append(name)
+        raise ImportError('focused-review-blocked-' + root)
+    return real_import(name, *args, **kwargs)
+
+builtins.__import__ = guarded_import
+sys.argv = [script, '--help']
+try:
+    runpy.run_path(script, run_name='__main__')
+except SystemExit as exc:
+    loaded = any(name.split('.')[0] in {{'xgboost', 'pandas', 'sklearn'}} for name in sys.modules)
+    print('HEAVY_ATTEMPTS=' + ','.join(attempts))
+    print('HEAVY_LOADED=' + str(loaded))
+    raise
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=Path(__file__).parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "--stage" in completed.stdout
+    assert "HEAVY_ATTEMPTS=\n" in completed.stdout
+    assert "HEAVY_LOADED=False" in completed.stdout
+
+
+def _publication_context(tmp_path: Path, smoke_protocol, run_id: str):
+    protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    layout = create_new_run(tmp_path / "results", run_id, protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    manifest = (
+        build_job_manifest(protocol, stages=("validate",))
+        + build_job_manifest(protocol, stages=("preprocess",))
+    )
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    stage_module.run_validate_job(
+        next(item for item in contexts if item.job.stage == "validate")
+    )
+    preprocess = next(
+        item
+        for item in contexts
+        if item.job.stage == "preprocess" and item.job.dataset_id == "spambase"
+    )
+    return layout, preprocess
+
+
+def _tree_bytes(path: Path) -> dict[str, bytes]:
+    if not path.exists():
+        return {}
+    return {
+        item.relative_to(path).as_posix(): item.read_bytes()
+        for item in path.rglob("*")
+        if item.is_file()
+    }
+
+
+def test_preprocess_manifest_conflict_does_not_change_published_directory(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, context = _publication_context(tmp_path, smoke_protocol, "conflict-before-write")
+    stage_module.run_preprocess_job(context)
+    final = layout.root / "preprocess" / "spambase" / "s42"
+    before_directory = _tree_bytes(final)
+    before_manifest = (layout.root / "data_manifest.csv").read_bytes()
+    real_prepare = data_protocol_module.prepare_split
+
+    def changed_prepare(*args, **kwargs):
+        split = real_prepare(*args, **kwargs)
+        changed = split.X_train.copy(deep=True)
+        changed.iloc[0, 0] += 1.0
+        return replace(split, X_train=changed)
+
+    monkeypatch.setattr(data_protocol_module, "prepare_split", changed_prepare)
+
+    with pytest.raises(ValueError, match="conflict|frozen"):
+        stage_module.run_preprocess_job(context)
+
+    assert _tree_bytes(final) == before_directory
+    assert (layout.root / "data_manifest.csv").read_bytes() == before_manifest
+
+
+@pytest.mark.parametrize("failure", ["val.csv", "test.csv", "split_metadata.json"])
+def test_preprocess_staging_failure_leaves_no_formal_directory_or_manifest(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    layout, context = _publication_context(tmp_path, smoke_protocol, f"stage-fail-{failure[:3]}")
+    real_bytes = stage_module._atomic_write_bytes
+    real_json = stage_module.atomic_write_json
+
+    def fail_bytes(path: Path, payload: bytes) -> None:
+        if Path(path).name == failure:
+            raise OSError(f"injected {failure}")
+        real_bytes(path, payload)
+
+    def fail_json(path: Path, value: object) -> None:
+        if Path(path).name == failure:
+            raise OSError(f"injected {failure}")
+        real_json(path, value)
+
+    monkeypatch.setattr(stage_module, "_atomic_write_bytes", fail_bytes)
+    monkeypatch.setattr(stage_module, "atomic_write_json", fail_json)
+
+    with pytest.raises(OSError, match="injected"):
+        stage_module.run_preprocess_job(context)
+
+    assert not (layout.root / "preprocess" / "spambase" / "s42").exists()
+    assert not (layout.root / "data_manifest.csv").exists()
+
+
+def test_preprocess_manifest_replace_failure_rolls_back_formal_snapshot(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, context = _publication_context(tmp_path, smoke_protocol, "manifest-fail")
+    real_replace = protocol_module.os.replace
+
+    def fail_manifest_replace(source: Path, destination: Path) -> None:
+        if Path(destination) == layout.root / "data_manifest.csv":
+            raise OSError("injected manifest replace")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(protocol_module.os, "replace", fail_manifest_replace)
+
+    with pytest.raises(OSError, match="manifest replace"):
+        stage_module.run_preprocess_job(context)
+
+    assert not (layout.root / "preprocess" / "spambase" / "s42").exists()
+    assert not (layout.root / "data_manifest.csv").exists()
+
+
+def test_preprocess_identical_retry_does_not_read_test_or_republish(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout, context = _publication_context(tmp_path, smoke_protocol, "retry-idempotent")
+    first = stage_module.run_preprocess_job(context)
+    final = layout.root / "preprocess" / "spambase" / "s42"
+    test_path = final / "test.csv"
+    before = _tree_bytes(final)
+    original_read_bytes = Path.read_bytes
+    original_open = Path.open
+
+    def forbid_write(*args, **kwargs):
+        raise AssertionError("identical retry attempted to republish")
+
+    def guard_read_bytes(path: Path) -> bytes:
+        if Path(path) == test_path:
+            raise AssertionError("identical retry read the formal test CSV")
+        return original_read_bytes(path)
+
+    def guard_open(path: Path, *args, **kwargs):
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if Path(path) == test_path and "r" in mode:
+            raise AssertionError("identical retry opened the formal test CSV")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(stage_module, "_atomic_write_bytes", forbid_write)
+    monkeypatch.setattr(stage_module, "atomic_write_json", forbid_write)
+    monkeypatch.setattr(Path, "read_bytes", guard_read_bytes)
+    monkeypatch.setattr(Path, "open", guard_open)
+    second = stage_module.run_preprocess_job(context)
+    monkeypatch.undo()
+
+    assert second.metrics == first.metrics
+    assert _tree_bytes(final) == before
+
+
+@pytest.mark.parametrize(
+    "artifact", ["train.csv", "val.csv", "split_metadata.json"]
+)
+def test_preprocess_identical_manifest_rejects_tampered_non_test_artifact(
+    tmp_path: Path, smoke_protocol, artifact: str
+) -> None:
+    layout, context = _publication_context(
+        tmp_path, smoke_protocol, f"retry-tampered-{artifact[:3]}"
+    )
+    stage_module.run_preprocess_job(context)
+    final = layout.root / "preprocess" / "spambase" / "s42"
+    artifact_path = final / artifact
+    payload = artifact_path.read_bytes()
+    artifact_path.write_bytes(bytes([payload[0] ^ 1]) + payload[1:])
+    before = _tree_bytes(final)
+
+    with pytest.raises(RuntimeError, match="snapshot|artifact|manifest"):
+        stage_module.run_preprocess_job(context)
+
+    assert _tree_bytes(final) == before
+
+
+@pytest.mark.parametrize("orphan", ["final", "staging"])
+def test_preprocess_without_manifest_fails_closed_on_orphan_snapshot(
+    tmp_path: Path, smoke_protocol, orphan: str
+) -> None:
+    layout, context = _publication_context(tmp_path, smoke_protocol, f"orphan-{orphan}")
+    parent = layout.root / "preprocess" / "spambase"
+    path = parent / ("s42" if orphan == "final" else ".s42.staging")
+    path.mkdir(parents=True)
+    (path / "sentinel.bin").write_bytes(b"orphan")
+    before = _tree_bytes(path)
+
+    with pytest.raises(RuntimeError, match="orphan|staging|manifest|snapshot"):
+        stage_module.run_preprocess_job(context)
+
+    assert _tree_bytes(path) == before
+    assert not (layout.root / "data_manifest.csv").exists()
+
+
+def test_legacy_preprocessors_are_import_safe_raw_cache_only_scripts() -> None:
+    directory = Path(__file__).parents[1] / "experiments" / "preprocess_data"
+    expected = {
+        "preprocess_abalone.py",
+        "preprocess_Credit-Card-Fraud.py",
+        "preprocess_crimedata.py",
+        "preprocess_Gisette.py",
+        "preprocess_ISOLET.py",
+        "preprocess_Madelon.py",
+        "preprocess_Spambase.py",
+    }
+    paths = tuple(sorted(directory.glob("preprocess_*.py")))
+    assert {path.name for path in paths} == expected
+
+    for path in paths:
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        assert "prepare_split" not in source, path.name
+        assert "processed_v2" not in source, path.name
+        assert "SEEDS" not in source, path.name
+        assert not any(
+            isinstance(node, (ast.For, ast.While)) for node in ast.walk(tree)
+        ), path.name
+        csv_writes = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "to_csv"
+        ]
+        assert csv_writes, path.name
+        assert all(
+            call.args
+            and isinstance(call.args[0], ast.Name)
+            and call.args[0].id == "raw_path"
+            for call in csv_writes
+        ), path.name
+        assert any(
+            isinstance(node, ast.If)
+            and isinstance(node.test, ast.Compare)
+            and any(
+                isinstance(comparator, ast.Constant)
+                and comparator.value == "__main__"
+                for comparator in node.test.comparators
+            )
+            for node in ast.walk(tree)
+        ), path.name
 
 
 def test_stage_context_is_frozen_single_job_value(tmp_path: Path, smoke_protocol) -> None:
@@ -934,6 +1615,15 @@ def test_cli_declares_exact_stages_and_resume_requires_run_id() -> None:
 
     with pytest.raises(SystemExit) as raised:
         main(["--stage", "validate", "--resume"])
+    assert raised.value.code == 2
+
+
+def test_cli_does_not_abbreviate_help_option() -> None:
+    parser = build_parser()
+
+    with pytest.raises(SystemExit) as raised:
+        parser.parse_args(["--he"])
+
     assert raised.value.code == 2
 
 
@@ -1184,19 +1874,19 @@ def test_cli_lifecycle_is_append_logged_and_never_replaces_process_streams_or_cw
     stdout = sys.stdout
     stderr = sys.stderr
 
-    assert main(arguments) == 1
+    assert main(arguments) == 0
 
     run_root = output_root / "cli-run"
     first_log = (run_root / "output.log").read_bytes()
     assert Path.cwd() == cwd
     assert sys.stdout is stdout
     assert sys.stderr is stderr
-    assert main(arguments + ["--resume"]) == 1
+    assert main(arguments + ["--resume"]) == 0
     assert (run_root / "output.log").read_bytes().startswith(first_log)
     assert len((run_root / "output.log").read_bytes()) > len(first_log)
 
 
-def test_all_with_missing_validate_executor_does_not_freeze_dependent_stage_jobs(
+def test_all_stops_before_stages_depending_on_unregistered_future_executors(
     tmp_path: Path,
 ) -> None:
     output_root = tmp_path / "results"
@@ -1210,4 +1900,16 @@ def test_all_with_missing_validate_executor_does_not_freeze_dependent_stage_jobs
         ]
     ) == 1
     manifest = ManifestStore(output_root / "blocked-all" / "run_manifest.csv").load()
-    assert {job.stage for job in manifest} == {"validate"}
+    stages = {job.stage for job in manifest}
+    assert {"validate", "preprocess", "estimator", "removal", "alpha"} <= stages
+    assert "nsga2" not in stages
+    assert all(
+        (output_root / "blocked-all" / job.output_relpath).is_file()
+        for job in manifest
+        if job.stage in {"validate", "preprocess"}
+    )
+    assert all(
+        not (output_root / "blocked-all" / job.output_relpath).exists()
+        for job in manifest
+        if job.stage in {"estimator", "removal", "alpha"}
+    )

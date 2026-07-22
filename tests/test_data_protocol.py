@@ -251,6 +251,57 @@ class TestVarianceThresholdFittedOnTrainOnly:
         )
         assert len(split.selected_features) == 5
 
+    def test_vt_zero_still_drops_constant_train_column(self) -> None:
+        rng = np.random.default_rng(630)
+        n = 200
+        X = pd.DataFrame({
+            "varying": rng.normal(0, 1, n),
+            "constant": np.full(n, 9.0),
+        })
+        y = rng.integers(0, 2, n)
+
+        split = prepare_split(
+            X,
+            y,
+            task="binary",
+            seed=630,
+            max_features=None,
+            variance_threshold=0.0,
+            **_DEF,
+        )
+
+        assert split.variance_features == ("varying",)
+        assert split.selected_features == ("varying",)
+
+    def test_split_exposes_immutable_feature_aligned_fitted_metadata(self) -> None:
+        rng = np.random.default_rng(631)
+        n = 200
+        X = pd.DataFrame({
+            "wide": rng.normal(10, 5, n),
+            "narrow": rng.normal(-2, 0.25, n),
+            "constant": np.full(n, 3.0),
+        })
+        y = rng.integers(0, 2, n)
+
+        split = prepare_split(
+            X,
+            y,
+            task="binary",
+            seed=631,
+            max_features=None,
+            variance_threshold=0.0,
+            **_DEF,
+        )
+
+        assert split.variance_features == ("wide", "narrow")
+        assert isinstance(split.scaler_mean, tuple)
+        assert isinstance(split.scaler_scale, tuple)
+        assert len(split.scaler_mean) == len(split.selected_features)
+        assert len(split.scaler_scale) == len(split.selected_features)
+        train_raw = X.loc[split.X_train.index, list(split.selected_features)]
+        assert np.allclose(split.scaler_mean, train_raw.mean(axis=0))
+        assert np.allclose(split.scaler_scale, train_raw.std(axis=0, ddof=0))
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 非法参数必须报错

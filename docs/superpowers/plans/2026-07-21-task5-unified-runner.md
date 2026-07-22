@@ -647,24 +647,24 @@ loading datasets or XGBoost models.
 - Produces: `run_preprocess_job(context) -> ResultRecord`
 - Consumes: cached raw CSV and `prepare_split(X, y, *, task, seed, max_features, train_frac, val_frac, test_frac, variance_threshold)`
 
-- [ ] **Step 1: Write synthetic raw-data stage tests**
+- [x] **Step 1: Write synthetic raw-data stage tests**
 
 Create small binary and regression CSVs in `tmp_path`, execute preprocessing,
 and assert three non-overlapping partitions, train-only standardization,
 selected columns, hashes, row counts, and `data_manifest.csv` entries.  Assert
 that missing raw files fail validation instead of triggering a download.
 
-- [ ] **Step 2: Confirm RED**
+- [x] **Step 2: Confirm RED**
 
 Run only validate/preprocess tests; registered handlers must still be absent.
 
-- [ ] **Step 3: Implement validation without model fitting**
+- [x] **Step 3: Implement validation without model fitting**
 
 Check raw paths, writable run directory, package versions, XGBoost build info,
 CUDA visibility when requested, task/utility compatibility, and that all stage
 methods exist.  Return these checks as structured metrics/artifacts.
 
-- [ ] **Step 4: Implement canonical preprocessing**
+- [x] **Step 4: Implement canonical preprocessing**
 
 Load cached raw CSV, split `X` and target, coerce target from the explicit task,
 call `prepare_split` using the frozen fractions/feature settings, and write:
@@ -678,13 +678,13 @@ preprocess/<dataset_id>/s<seed>/test.csv
 Write each partition atomically.  Add row-index hashes and file SHA-256 values
 to `data_manifest.csv`.  Do not read the produced test CSV again in this stage.
 
-- [ ] **Step 5: Reduce old preprocessors to raw-data preparation only**
+- [x] **Step 5: Reduce old preprocessors to raw-data preparation only**
 
 Remove calls that fit `prepare_split` or write formal processed splits.  They
 may download/clean and cache `data/raw/<dataset>.csv`; the unified runner is the
 only code that creates formal split artifacts.
 
-- [ ] **Step 6: Verify Task 7**
+- [x] **Step 6: Verify Task 7**
 
 Run `tests/test_data_protocol.py`, the new stage tests, Ruff on preprocessing
 scripts, and a CPU smoke preprocessing run using only seed 42.  This is not a
