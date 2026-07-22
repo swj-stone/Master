@@ -866,14 +866,14 @@ that operation.
 - Extends: `nsga2_feature_selection(X_train, y_train, X_val, y_val, *, task, utility, model_params, backend, seed, pop_size, max_gen, p_crossover, p_mutation, ref_point, verbose)`
 - Produces: `run_nsga2_job(context)`
 
-- [ ] **Step 1: Write failing propagation and fairness tests**
+- [x] **Step 1: Write failing propagation and fairness tests**
 
 Assert explicit utility reaches `compute_utility`, backend reaches XGBoost
 parameters, the configured reference point reaches every HV computation, and
 full/filtered variants receive identical population and total evaluation
 budgets.
 
-- [ ] **Step 2: Implement utility/backend propagation**
+- [x] **Step 2: Implement utility/backend propagation**
 
 Keep the model family task-dependent only (classifier versus regressor) and
 compute the chosen higher-is-better utility from predictions.  Convert the
@@ -881,20 +881,20 @@ second objective to `1 - clipped_utility` consistently.  Derive
 `max_gen = evaluations // population - 1` after counting the initial population,
 and reject a budget not divisible into a complete generation schedule.
 
-- [ ] **Step 3: Write final-front audit tests**
+- [x] **Step 3: Write final-front audit tests**
 
 Assert search sees train/validation only, both fronts freeze before test access,
 the one allowed read uses `final_nsga2_front_evaluation`, and every nondominated
 mask is retrained on train+validation before test scoring.
 
-- [ ] **Step 4: Implement full versus prefiltered jobs**
+- [x] **Step 4: Implement full versus prefiltered jobs**
 
 For `minppi_prefilter`, include the MinPPI selection time in total runtime.
 Write validation HV, held-out test HV, front points, selected masks, evaluation
 count, convergence evaluation count, runtime, and dimensional reduction.
 Always use the frozen `(1.1, 1.1)` reference point.
 
-- [ ] **Step 5: Verify Task 10**
+- [x] **Step 5: Verify Task 10**
 
 Run both NSGA-II test files and the new stage tests.  Reconfirm the known
 two-point HV equals `0.28`.

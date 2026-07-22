@@ -3,10 +3,10 @@ NSGA-II Feature Selection baseline.
 
 Standard multi-objective feature selection using NSGA-II with two
 objectives: minimise cardinality ratio (|S|/n) and minimise error
-(1 - AUC).  This module is a **standalone baseline**---it does NOT
-import from or depend on any MinPPI package.  The only connection to
-MinPPI is at the experiment-script level, where MinPPI may optionally
-pre-filter features before data is passed to this module.
+(1 - clipped utility).  The evolutionary search remains independent of the
+MinPPI estimator and voting-game logic, while candidate scoring uses the
+package's canonical modeling boundary.  Experiment stages may optionally
+pre-filter features with an already-frozen MinPPI result.
 
 Usage (standalone)::
 
@@ -30,13 +30,15 @@ from __future__ import annotations
 
 import time
 import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, r2_score, roc_auc_score
 from xgboost import XGBClassifier, XGBRegressor
+
+from minppi_mofs.modeling import evaluate_fixed_subset
 
 
 # ---------------------------------------------------------------------------
@@ -49,8 +51,9 @@ class NSGA2Result:
     """Output of ``nsga2_feature_selection``.
 
     Attributes:
-        pareto_front: List of ``(binary_mask, (card_ratio, 1−AUC))`` tuples.
-        hv: Hypervolume with respect to reference point ``(1.0, 1.0)``.
+        pareto_front: List of
+            ``(binary_mask, (card_ratio, 1 - clipped_utility))`` tuples.
+        hv: Hypervolume with respect to the configured reference point.
         runtime_s: Wall-clock runtime in seconds.
         converged_gen: First generation whose cumulative-best HV reaches
             ≥95% of the final-best HV (post-hoc, 1-indexed).  If no
@@ -79,7 +82,11 @@ def _evaluate_individual(
     y_val: np.ndarray,
     *,
     task: str = "binary",
+    utility: str | None = None,
+    model_params: Mapping[str, object] | None = None,
+    backend: str = "cpu",
     seed: int = 42,
+    cardinality_denominator: int | None = None,
 ) -> tuple[float, float]:
     """Evaluate one candidate solution.
 
@@ -94,47 +101,44 @@ def _evaluate_individual(
         ``(cardinality_ratio, 1 − utility)`` — both minimised.
     """
     n = X_tr.shape[1]
+    denominator = n if cardinality_denominator is None else cardinality_denominator
+    if (
+        isinstance(denominator, bool)
+        or not isinstance(denominator, int)
+        or denominator < max(1, n)
+    ):
+        raise ValueError(
+            "cardinality_denominator must be a positive integer at least as large "
+            "as the search dimension"
+        )
     selected = [X_tr.columns[j] for j in range(n) if mask[j]]
-    if not selected:
-        return 0.0, 1.0
-
-    X_tr_s = X_tr[selected].values
-    X_val_s = X_val[selected].values
-
-    if task == "regression":
-        model = XGBRegressor(
-            n_estimators=100,
-            max_depth=4,
-            learning_rate=0.1,
-            verbosity=0,
-            random_state=seed,
-        )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            model.fit(X_tr_s, y_tr)
-        y_pred = model.predict(X_val_s)
-        val = float(r2_score(y_val, y_pred))
-        if val < 0.0:
-            val = 0.0
-    else:
-        model = XGBClassifier(
-            n_estimators=100,
-            max_depth=4,
-            learning_rate=0.1,
-            verbosity=0,
-            random_state=seed,
-        )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            model.fit(X_tr_s, y_tr)
-        n_cls = len(np.unique(y_val))
-        if n_cls == 2:
-            y_prob = model.predict_proba(X_val_s)
-            val = float(roc_auc_score(y_val, y_prob[:, 1]))
-        else:
-            val = float(accuracy_score(y_val, model.predict(X_val_s)))
-
-    return len(selected) / max(1, n), 1.0 - val
+    chosen_utility = utility or (
+        "r2" if task == "regression" else "accuracy" if task == "multiclass" else "roc_auc"
+    )
+    params = (
+        dict(model_params)
+        if model_params is not None
+        else {
+            "n_estimators": 100,
+            "max_depth": 4,
+            "learning_rate": 0.1,
+            "n_jobs": 1,
+        }
+    )
+    value = evaluate_fixed_subset(
+        X_tr,
+        y_tr,
+        X_val,
+        y_val,
+        selected,
+        task=task,
+        utility=chosen_utility,
+        model_params=params,
+        backend=backend,
+        seed=seed,
+    )
+    clipped = float(np.clip(value, 0.0, 1.0))
+    return len(selected) / denominator, 1.0 - clipped
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +279,9 @@ def nsga2_feature_selection(
     y_val: np.ndarray,
     *,
     task: str = "binary",
+    utility: str | None = None,
+    model_params: Mapping[str, object] | None = None,
+    backend: str = "cpu",
     seed: int = 42,
     pop_size: int = 20,
     max_gen: int = 20,
@@ -282,13 +289,14 @@ def nsga2_feature_selection(
     p_mutation: Optional[float] = None,
     ref_point: tuple[float, float] = (1.0, 1.0),
     verbose: bool = False,
+    cardinality_denominator: int | None = None,
 ) -> NSGA2Result:
     """Run NSGA-II for multi-objective feature selection.
 
     An individual is a binary mask ``m ∈ {0,1}^n`` where ``m[j]=1`` means
     feature *j* is selected.  Two objectives are minimised:
       - ``f₁(m) = |m|₀ / n``  (cardinality ratio)
-      - ``f₂(m) = 1 − AUC``    (error)
+      - ``f₂(m) = 1 − clipped utility``    (error)
 
     Operators: tournament selection (rank+CD), uniform crossover,
     bit-flip mutation.
@@ -310,7 +318,18 @@ def nsga2_feature_selection(
     """
     rng = np.random.default_rng(seed)
     n = X_train.shape[1]
-    p_mut = p_mutation if p_mutation is not None else 1.0 / n
+    denominator = n if cardinality_denominator is None else cardinality_denominator
+    if (
+        isinstance(denominator, bool)
+        or not isinstance(denominator, int)
+        or denominator < max(1, n)
+    ):
+        raise ValueError(
+            "cardinality_denominator must be a positive integer at least as large "
+            "as the search dimension"
+        )
+    p_mut = p_mutation if p_mutation is not None else (1.0 / n if n else 0.0)
+    reference = np.asarray(ref_point, dtype=float)
     t0 = time.perf_counter()
 
     # ── Initialisation ──
@@ -318,7 +337,10 @@ def nsga2_feature_selection(
     fit = np.array(
         [
             _evaluate_individual(
-                pop[i], X_train, y_train, X_val, y_val, task=task, seed=seed
+                pop[i], X_train, y_train, X_val, y_val,
+                task=task, utility=utility, model_params=model_params,
+                backend=backend, seed=seed,
+                cardinality_denominator=denominator,
             )
             for i in range(pop_size)
         ]
@@ -363,7 +385,10 @@ def nsga2_feature_selection(
         off_fit = np.array(
             [
                 _evaluate_individual(
-                    offspring[j], X_train, y_train, X_val, y_val, task=task, seed=seed
+                    offspring[j], X_train, y_train, X_val, y_val,
+                    task=task, utility=utility, model_params=model_params,
+                    backend=backend, seed=seed,
+                    cardinality_denominator=denominator,
                 )
                 for j in range(pop_size)
             ]
@@ -393,7 +418,7 @@ def nsga2_feature_selection(
 
         # HV tracking
         pf_idx = _non_dominated_sort(fit)[0]
-        hv = _compute_hv(fit[pf_idx], np.array(ref_point))
+        hv = _compute_hv(fit[pf_idx], reference)
         hv_history.append(hv)
 
         if verbose and (gen % 5 == 0 or gen == max_gen - 1):
@@ -405,7 +430,7 @@ def nsga2_feature_selection(
     runtime = time.perf_counter() - t0
     converged_gen = _converged_gen(hv_history)
     pf_idx = _non_dominated_sort(fit)[0]
-    hv_final = _compute_hv(fit[pf_idx], np.array(ref_point))
+    hv_final = _compute_hv(fit[pf_idx], reference)
 
     # Build returnable front
     pf_list: list = []

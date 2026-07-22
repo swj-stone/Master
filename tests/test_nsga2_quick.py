@@ -14,9 +14,17 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+import pytest
 
-from minppi_mofs.baselines.nsga2_fs import nsga2_feature_selection, nsga2_ranking
+import minppi_mofs.baselines.nsga2_fs as nsga2_module
+import minppi_mofs.modeling as modeling_module
+from minppi_mofs.baselines.nsga2_fs import (
+    _evaluate_individual,
+    nsga2_feature_selection,
+    nsga2_ranking,
+)
 
 # ── config ──────────────────────────────────────────────────────────
 DATASET: tuple[str, str, str] = ("spambase", "is_spam", "binary")
@@ -26,6 +34,143 @@ MAX_GEN: int = 10
 # ─────────────────────────────────────────────────────────────────────
 
 PROCESSED = Path(__file__).resolve().parent.parent / "data" / "processed"
+
+
+def test_individual_uses_explicit_utility_and_backend_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    constructed: list[dict[str, object]] = []
+    utilities: list[str] = []
+
+    class FakeClassifier:
+        def __init__(self, **kwargs: object) -> None:
+            constructed.append(kwargs)
+
+        def fit(self, X: pd.DataFrame, y: np.ndarray) -> None:
+            assert list(X.columns) == ["f0"]
+
+        def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+            return np.tile([0.25, 0.75], (len(X), 1))
+
+    monkeypatch.setattr(modeling_module, "XGBClassifier", FakeClassifier)
+    monkeypatch.setattr(
+        modeling_module,
+        "compute_utility",
+        lambda y_true, predictions, *, metric: utilities.append(metric) or 0.7,
+    )
+    X_train = pd.DataFrame({"signal": [0.0, 1.0, 0.0, 1.0]})
+    X_val = pd.DataFrame({"signal": [0.0, 1.0]})
+
+    objective = _evaluate_individual(
+        np.array([1]),
+        X_train,
+        np.array([0, 1, 0, 1]),
+        X_val,
+        np.array([0, 1]),
+        task="binary",
+        utility="pr_auc",
+        model_params={
+            "n_estimators": 3,
+            "max_depth": 2,
+            "learning_rate": 0.2,
+            "n_jobs": 1,
+        },
+        backend="cuda",
+        seed=17,
+    )
+
+    assert objective == pytest.approx((1.0, 0.3))
+    assert utilities == ["pr_auc"]
+    assert constructed == [
+        {
+            "n_estimators": 3,
+            "max_depth": 2,
+            "learning_rate": 0.2,
+            "n_jobs": 1,
+            "tree_method": "hist",
+            "device": "cuda",
+            "random_state": 17,
+        }
+    ]
+
+
+def test_individual_selects_regressor_family_only_from_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    constructed: list[dict[str, object]] = []
+    utilities: list[str] = []
+
+    class FakeRegressor:
+        def __init__(self, **kwargs: object) -> None:
+            constructed.append(kwargs)
+
+        def fit(self, X: pd.DataFrame, y: np.ndarray) -> None:
+            assert list(X.columns) == ["f0"]
+
+        def predict(self, X: pd.DataFrame) -> np.ndarray:
+            return np.zeros(len(X))
+
+    monkeypatch.setattr(modeling_module, "XGBRegressor", FakeRegressor)
+    monkeypatch.setattr(
+        modeling_module,
+        "XGBClassifier",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("regression task constructed a classifier")
+        ),
+    )
+    monkeypatch.setattr(
+        modeling_module,
+        "compute_utility",
+        lambda y_true, predictions, *, metric: utilities.append(metric) or 0.6,
+    )
+    X_train = pd.DataFrame({"signal": [0.0, 1.0, 2.0, 3.0]})
+    X_val = pd.DataFrame({"signal": [4.0, 5.0]})
+
+    objective = _evaluate_individual(
+        np.array([1]),
+        X_train,
+        np.array([0.0, 1.0, 2.0, 3.0]),
+        X_val,
+        np.array([4.0, 5.0]),
+        task="regression",
+        utility="rmse",
+        model_params={
+            "n_estimators": 3,
+            "max_depth": 2,
+            "learning_rate": 0.2,
+            "n_jobs": 1,
+        },
+        backend="cpu",
+        seed=17,
+    )
+
+    assert objective == pytest.approx((1.0, 0.4))
+    assert utilities == ["rmse"]
+    assert constructed[0]["device"] == "cpu"
+    assert constructed[0]["random_state"] == 17
+
+
+def test_prefiltered_cardinality_uses_original_feature_denominator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(nsga2_module, "evaluate_fixed_subset", lambda *args, **kwargs: 0.75)
+    X_train = pd.DataFrame({"f0": [0.0, 1.0], "f2": [1.0, 0.0]})
+
+    objective = _evaluate_individual(
+        np.array([1, 0]),
+        X_train,
+        np.array([0, 1]),
+        X_train,
+        np.array([0, 1]),
+        task="binary",
+        utility="roc_auc",
+        model_params={"n_estimators": 1, "max_depth": 1, "learning_rate": 0.3, "n_jobs": 1},
+        backend="cpu",
+        seed=42,
+        cardinality_denominator=4,
+    )
+
+    assert objective == pytest.approx((0.25, 0.25))
 
 
 def main() -> None:

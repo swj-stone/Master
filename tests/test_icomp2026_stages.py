@@ -879,7 +879,7 @@ def test_real_validate_stage_writes_structured_checks_and_requires_raw_cache(
     assert checks["backend"] == "cpu"
     assert checks["raw_datasets"] == ["spambase", "abalone"]
     assert checks["registered_stages"] == [
-        "ablation", "alpha", "estimator", "preprocess", "removal", "validate"
+        "ablation", "alpha", "estimator", "nsga2", "preprocess", "removal", "validate"
     ]
     assert all(path.exists() for path in raw_paths.values())
 
@@ -1176,6 +1176,7 @@ def test_real_stage_registry_is_exact_and_direct_cli_help_remains_safe() -> None
         "estimator": stage_module.run_estimator_job,
         "removal": stage_module.run_removal_job,
         "alpha": stage_module.run_alpha_job,
+        "nsga2": stage_module.run_nsga2_job,
         "ablation": stage_module.run_ablation_job,
     }
     completed = subprocess.run(
@@ -2380,13 +2381,14 @@ def test_estimator_artifact_link_failure_leaves_no_partial_publication(
     assert not list(destination.parent.glob(".*.tmp"))
 
 
-def test_task9_registry_contains_only_completed_stage_handlers() -> None:
+def test_task10_registry_contains_only_completed_stage_handlers() -> None:
     assert stage_module.STAGE_EXECUTORS == {
         "validate": stage_module.run_validate_job,
         "preprocess": stage_module.run_preprocess_job,
         "estimator": stage_module.run_estimator_job,
         "removal": stage_module.run_removal_job,
         "alpha": stage_module.run_alpha_job,
+        "nsga2": stage_module.run_nsga2_job,
         "ablation": stage_module.run_ablation_job,
     }
 
@@ -2601,6 +2603,260 @@ def _mark_task9_plan_success(context: StageContext, record: ResultRecord) -> Non
     atomic_write_json(context.layout.root / context.job.output_relpath, asdict(record))
     context.status.start(context.job.job_id)
     context.status.succeed(context.job.job_id)
+
+
+def _task10_contexts_with_frozen_removal(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    protocol = replace(smoke_protocol, datasets=(smoke_protocol.datasets[0],))
+    layout = create_new_run(tmp_path / "results", "task10-nsga2", protocol)
+    manifest = build_job_manifest(protocol, stages=("removal", "nsga2"))
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    plan_context = next(
+        item
+        for item in contexts
+        if item.job.stage == "removal" and item.job.method == "selection_plan"
+    )
+    _patch_task9_selection(monkeypatch)
+    from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
+
+    scores = {"f0": 4.0, "f1": 1.0, "f2": 3.0, "f3": 2.0}
+    for module, name in (
+        (shap_top_k, "compute_shap_topk_importance"),
+        (min_shap, "compute_minshap_importance"),
+        (banzhaf_fs, "compute_banzhaf_importance"),
+    ):
+        monkeypatch.setattr(
+            module,
+            name,
+            lambda *args, diagnostics, **kwargs: diagnostics.update(
+                model_fit_count=1, coalition_count=1
+            )
+            or scores,
+        )
+    plan_record = stage_module.run_removal_job(plan_context)
+    _mark_task9_plan_success(plan_context, plan_record)
+    nsga_contexts = tuple(item for item in contexts if item.job.stage == "nsga2")
+    return layout, nsga_contexts, plan_record
+
+
+def test_nsga2_jobs_freeze_both_fair_fronts_before_test_and_retrain_every_mask(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from minppi_mofs.baselines.nsga2_fs import NSGA2Result
+
+    layout, contexts, removal_record = _task10_contexts_with_frozen_removal(
+        tmp_path, smoke_protocol, monkeypatch
+    )
+    prepared = _task9_evaluation_loader(("f0", "f1", "f2", "f3"))
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    search_calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
+
+    def search(X_train, y_train, X_val, y_val, **kwargs):
+        search_calls.append((tuple(X_train.columns), kwargs))
+        dimension = X_train.shape[1]
+        small = np.zeros(dimension, dtype=int)
+        large = np.zeros(dimension, dtype=int)
+        if dimension:
+            small[0] = 1
+            large[: min(2, dimension)] = 1
+        denominator = kwargs["cardinality_denominator"]
+        front = [
+            (small, (float(small.sum()) / denominator, 0.4)),
+            (large, (float(large.sum()) / denominator, 0.2)),
+        ]
+        points = np.asarray([item[1] for item in front])
+        return NSGA2Result(
+            pareto_front=front,
+            hv=stage_module._compute_hv(points, np.asarray(kwargs["ref_point"])),
+            runtime_s=1.0 if dimension == 4 else 2.0,
+            converged_gen=1,
+            hv_history=[0.1],
+        )
+
+    monkeypatch.setattr(stage_module, "nsga2_feature_selection", search, raising=False)
+    reads: list[tuple[str, str]] = []
+
+    def load_test(context, row, *, reason):
+        frozen = [
+            layout.root
+            / f"nsga2/{context.job.dataset_id}/s{context.job.seed}/{variant}/validation_front.json"
+            for variant in ("full", "minppi_prefilter")
+        ]
+        assert all(path.exists() for path in frozen)
+        reads.append((context.job.method, reason))
+        return prepared[0].iloc[:4].reset_index(drop=True), prepared[1][:4]
+
+    monkeypatch.setattr(stage_module, "_task9_load_test", load_test)
+    evaluated: list[tuple[int, tuple[str, ...], str, str]] = []
+
+    def evaluate(X_train_val, y_train_val, X_test, y_test, features, **kwargs):
+        evaluated.append(
+            (len(X_train_val), tuple(features), kwargs["utility"], kwargs["backend"])
+        )
+        return 0.55 + 0.1 * len(features)
+
+    monkeypatch.setattr(stage_module, "evaluate_fixed_subset", evaluate)
+    records = [stage_module.run_nsga2_job(context) for context in contexts]
+
+    assert [columns for columns, _ in search_calls] == [
+        ("f0", "f1", "f2", "f3"),
+        ("f0", "f2"),
+    ]
+    for _, kwargs in search_calls:
+        assert kwargs["pop_size"] == 4
+        assert kwargs["max_gen"] == 1
+        assert kwargs["ref_point"] == (1.1, 1.1)
+        assert kwargs["cardinality_denominator"] == 4
+        assert kwargs["utility"] == "roc_auc"
+        assert kwargs["backend"] == "cpu"
+    assert reads == [
+        ("full", "final_nsga2_front_evaluation"),
+        ("minppi_prefilter", "final_nsga2_front_evaluation"),
+    ]
+    assert len(evaluated) == 4
+    assert all(rows == 12 for rows, _, _, _ in evaluated)
+    assert all(utility == "roc_auc" and backend == "cpu" for _, _, utility, backend in evaluated)
+
+    documents = [
+        json.loads((layout.root / record.artifacts["results"]).read_text(encoding="utf-8"))
+        for record in records
+    ]
+    assert [document["evaluation_count"] for document in documents] == [8, 8]
+    assert [document["convergence_evaluation_count"] for document in documents] == [8, 8]
+    assert documents[0]["dimensional_reduction"] == 0.0
+    assert documents[1]["dimensional_reduction"] == 0.5
+    assert documents[0]["minppi_selection_time_s"] == 0.0
+    assert documents[1]["minppi_selection_time_s"] == removal_record.metrics[
+        "minppi_selection_time_s"
+    ]
+    for document in documents:
+        assert document["total_runtime_s"] == (
+            document["minppi_selection_time_s"]
+            + document["search_runtime_s"]
+            + document["evaluation_runtime_s"]
+        )
+        assert document["validation_hv"] >= 0.0
+        assert document["test_hv"] >= 0.0
+        assert len(document["validation_front"]) == len(document["test_front"]) == 2
+
+    monkeypatch.setattr(
+        stage_module,
+        "nsga2_feature_selection",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("retry search")),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("retry test read")),
+    )
+    retries = [stage_module.run_nsga2_job(context) for context in contexts]
+    assert [record.metrics for record in retries] == [record.metrics for record in records]
+
+    front_path = (
+        layout.root
+        / f"nsga2/{contexts[0].job.dataset_id}/s{contexts[0].job.seed}/full/validation_front.json"
+    )
+    original_front = json.loads(front_path.read_text(encoding="utf-8"))
+    malformed_front = json.loads(json.dumps(original_front))
+    malformed_front["schema_version"] = True
+    atomic_write_json(front_path, malformed_front)
+    with pytest.raises(ValueError, match="front|artifact|schema|identity"):
+        stage_module.run_nsga2_job(contexts[0])
+    atomic_write_json(front_path, original_front)
+
+    result_path = layout.root / records[0].artifacts["results"]
+    original_result = json.loads(result_path.read_text(encoding="utf-8"))
+    malformed_result = json.loads(json.dumps(original_result))
+    malformed_result["minppi_selection_time_s"] = False
+    atomic_write_json(result_path, malformed_result)
+    with pytest.raises(ValueError, match="runtime|result|artifact|front"):
+        stage_module.run_nsga2_job(contexts[0])
+    atomic_write_json(result_path, original_result)
+
+
+def test_nsga2_rejects_nondivisible_candidate_budget(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    protocol = replace(
+        smoke_protocol,
+        datasets=(smoke_protocol.datasets[0],),
+        nsga2={**smoke_protocol.nsga2, "evaluations": 10, "population": 4},
+    )
+    layout = create_new_run(tmp_path / "results", "task10-bad-budget", protocol)
+    manifest = build_job_manifest(protocol, stages=("nsga2",))
+    status = StatusStore(layout, manifest)
+    context = _contexts(protocol, layout, manifest, status)[0]
+
+    with pytest.raises(ValueError, match="divisible|budget|generation"):
+        stage_module.run_nsga2_job(context)
+
+
+def test_nsga2_stage_allows_initial_population_only_exact_budget(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from minppi_mofs.baselines.nsga2_fs import NSGA2Result
+
+    protocol = replace(
+        smoke_protocol,
+        nsga2={**smoke_protocol.nsga2, "evaluations": 4, "population": 4},
+    )
+    layout, contexts, _ = _task10_contexts_with_frozen_removal(
+        tmp_path, protocol, monkeypatch
+    )
+    prepared = _task9_evaluation_loader(("f0", "f1", "f2", "f3"))
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    )
+    schedules: list[tuple[int, int]] = []
+
+    def search(X_train, y_train, X_val, y_val, **kwargs):
+        schedules.append((kwargs["pop_size"], kwargs["max_gen"]))
+        mask = np.zeros(X_train.shape[1], dtype=int)
+        if len(mask):
+            mask[0] = 1
+        objectives = (1 / kwargs["cardinality_denominator"], 0.3)
+        return NSGA2Result(
+            pareto_front=[(mask, objectives)],
+            hv=stage_module._compute_hv(
+                np.asarray([objectives]), np.asarray(kwargs["ref_point"])
+            ),
+            runtime_s=0.1,
+            converged_gen=0,
+            hv_history=[],
+        )
+
+    monkeypatch.setattr(stage_module, "nsga2_feature_selection", search)
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda context, row, *, reason: (
+            prepared[0].iloc[:4].reset_index(drop=True),
+            prepared[1][:4],
+        ),
+    )
+    monkeypatch.setattr(
+        stage_module, "evaluate_fixed_subset", lambda *args, **kwargs: 0.7
+    )
+
+    record = stage_module.run_nsga2_job(contexts[0])
+    document = json.loads(
+        (layout.root / record.artifacts["results"]).read_text(encoding="utf-8")
+    )
+
+    assert schedules == [(4, 0), (4, 0)]
+    assert document["evaluation_count"] == 4
+    assert document["convergence_evaluation_count"] == 4
 
 
 def _task9_evaluation_loader(features: tuple[str, ...]):
@@ -3661,7 +3917,7 @@ def test_pipeline_all_dispatches_exact_dependency_order(monkeypatch: pytest.Monk
     assert tuple(seen) == STAGE_ORDER
 
 
-def test_pipeline_all_advances_through_alpha_then_stops_at_unregistered_nsga2(
+def test_pipeline_all_advances_through_nsga2_and_ablation_then_stops_at_summarize(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runner = object.__new__(PipelineRunner)
@@ -3678,7 +3934,9 @@ def test_pipeline_all_advances_through_alpha_then_stops_at_unregistered_nsga2(
 
     monkeypatch.setattr(runner, "execute", execute)
     assert runner.run("all") == 1
-    assert tuple(seen) == ("validate", "preprocess", "estimator", "removal", "alpha")
+    assert tuple(seen) == (
+        "validate", "preprocess", "estimator", "removal", "alpha", "nsga2", "ablation"
+    )
 
 
 def test_selected_alpha_preflights_and_appends_missing_canonical_chunks(
@@ -3917,7 +4175,7 @@ def test_cli_lifecycle_is_append_logged_and_never_replaces_process_streams_or_cw
     assert len((run_root / "output.log").read_bytes()) > len(first_log)
 
 
-def test_all_runs_through_alpha_then_stops_before_unregistered_future_executors(
+def test_all_runs_through_ablation_then_stops_before_unregistered_future_executors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runner = object.__new__(PipelineRunner)
@@ -3930,5 +4188,7 @@ def test_all_runs_through_alpha_then_stops_before_unregistered_future_executors(
     )
 
     assert runner.run("all") == 1
-    assert tuple(seen) == ("validate", "preprocess", "estimator", "removal", "alpha")
-    assert "nsga2" not in seen
+    assert tuple(seen) == (
+        "validate", "preprocess", "estimator", "removal", "alpha", "nsga2", "ablation"
+    )
+    assert "summarize" not in seen

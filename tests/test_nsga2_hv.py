@@ -10,9 +10,15 @@ Run::
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pytest
 
-from minppi_mofs.baselines.nsga2_fs import _compute_hv, _converged_gen
+import minppi_mofs.baselines.nsga2_fs as nsga2_module
+from minppi_mofs.baselines.nsga2_fs import (
+    _compute_hv,
+    _converged_gen,
+    nsga2_feature_selection,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +107,73 @@ def test_hv_many_points_correctness() -> None:
     #   (0.9,0.1): y<0.3→(1-0.9)*(0.3-0.1)=0.1*0.2=0.02, best_y=0.1
     #   total = 0.09+0.21+0.10+0.03+0.02 = 0.45
     assert hv == pytest.approx(0.45)
+
+
+def test_configured_reference_point_reaches_every_hv_computation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    references: list[tuple[float, float]] = []
+    monkeypatch.setattr(
+        nsga2_module,
+        "_evaluate_individual",
+        lambda mask, *args, **kwargs: (float(mask.sum()) / 2.0, 0.4),
+    )
+    monkeypatch.setattr(
+        nsga2_module,
+        "_compute_hv",
+        lambda front, ref: references.append(tuple(ref)) or 0.2,
+    )
+    X = pd.DataFrame({"f0": [0.0, 1.0], "f1": [1.0, 0.0]})
+
+    result = nsga2_feature_selection(
+        X,
+        np.array([0, 1]),
+        X,
+        np.array([0, 1]),
+        task="binary",
+        utility="roc_auc",
+        model_params={"n_estimators": 1, "max_depth": 1, "learning_rate": 0.3, "n_jobs": 1},
+        backend="cpu",
+        seed=42,
+        pop_size=4,
+        max_gen=2,
+        ref_point=(1.1, 1.1),
+    )
+
+    assert result.hv == pytest.approx(0.2)
+    assert references == [(1.1, 1.1)] * 3
+
+
+def test_initial_population_only_is_a_complete_exact_budget_schedule(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evaluations = 0
+
+    def evaluate(mask, *args, **kwargs):
+        nonlocal evaluations
+        evaluations += 1
+        return (float(mask.sum()) / 2.0, 0.5)
+
+    monkeypatch.setattr(nsga2_module, "_evaluate_individual", evaluate)
+    X = pd.DataFrame({"f0": [0.0, 1.0], "f1": [1.0, 0.0]})
+    result = nsga2_feature_selection(
+        X,
+        np.array([0, 1]),
+        X,
+        np.array([0, 1]),
+        task="binary",
+        utility="roc_auc",
+        model_params={"n_estimators": 1, "max_depth": 1, "learning_rate": 0.3, "n_jobs": 1},
+        backend="cpu",
+        seed=42,
+        pop_size=4,
+        max_gen=0,
+        ref_point=(1.1, 1.1),
+    )
+
+    assert evaluations == 4
+    assert result.hv_history == []
+    assert result.converged_gen == 0
 
 
 # ---------------------------------------------------------------------------

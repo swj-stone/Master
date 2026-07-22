@@ -32,6 +32,12 @@ from minppi_mofs.experiment_protocol import (
     upsert_data_manifest,
 )
 from minppi_mofs.modeling import evaluate_fixed_subset, fit_predict as fit_predict
+from minppi_mofs.baselines.nsga2_fs import (
+    _compute_hv,
+    _converged_gen,
+    _non_dominated_sort,
+    nsga2_feature_selection,
+)
 
 
 STAGE_DEPENDENCIES: Mapping[str, tuple[str, ...]] = {
@@ -2993,6 +2999,654 @@ def run_alpha_job(context: StageContext) -> ResultRecord:
     return _run_alpha_evaluation(context)
 
 
+_NSGA2_VARIANTS = ("full", "minppi_prefilter")
+_NSGA2_REF_POINT = (1.1, 1.1)
+
+
+def _nsga2_authority(
+    context: StageContext,
+) -> tuple[object, tuple[JobSpec, ...], int, int, int]:
+    dataset = _task9_authority(context, stage="nsga2")
+    if tuple(context.protocol.nsga2.get("variants", ())) != _NSGA2_VARIANTS:
+        raise ValueError("NSGA-II variants are not the canonical ordered pair")
+    jobs = tuple(
+        job
+        for job in context.status.manifest
+        if job.stage == "nsga2"
+        and job.dataset_id == context.job.dataset_id
+        and job.seed == context.job.seed
+    )
+    if tuple(job.method for job in jobs) != _NSGA2_VARIANTS:
+        raise ValueError("NSGA-II manifest scope is incomplete or out of order")
+    population = context.protocol.nsga2.get("population")
+    evaluations = context.protocol.nsga2.get("evaluations")
+    if (
+        isinstance(population, bool)
+        or not isinstance(population, int)
+        or population < 1
+        or isinstance(evaluations, bool)
+        or not isinstance(evaluations, int)
+        or evaluations < 1
+    ):
+        raise ValueError("NSGA-II population and evaluation budget must be positive integers")
+    if evaluations % population:
+        raise ValueError(
+            "NSGA-II evaluation budget must be divisible by the population size"
+        )
+    max_gen = evaluations // population - 1
+    if max_gen < 0:
+        raise ValueError("NSGA-II budget cannot be smaller than its initial population")
+    expected_parameters = {
+        "task",
+        "utility",
+        "evaluations",
+        "population",
+        "ref_point",
+    }
+    for job in jobs:
+        if (
+            set(job.parameters) != expected_parameters
+            or job.parameters["task"] != dataset.task
+            or job.parameters["utility"] != dataset.utility
+            or job.parameters["evaluations"] != evaluations
+            or job.parameters["population"] != population
+            or job.parameters["ref_point"] != list(_NSGA2_REF_POINT)
+            or job.depends_on
+        ):
+            raise ValueError("NSGA-II job parameters conflict with frozen authority")
+    if tuple(context.protocol.nsga2.get("ref_point", ())) != _NSGA2_REF_POINT:
+        raise ValueError("NSGA-II reference point is not the frozen (1.1, 1.1)")
+    return dataset, jobs, population, evaluations, max_gen
+
+
+def _nsga2_job_context(context: StageContext, job: JobSpec) -> StageContext:
+    return StageContext(
+        context.protocol, context.layout, job, context.status, context.audit
+    )
+
+
+def _nsga2_removal_authority(
+    context: StageContext,
+) -> tuple[dict[str, object], ResultRecord, tuple[str, ...]]:
+    minppi_jobs = tuple(
+        job
+        for job in context.status.manifest
+        if job.stage == "removal"
+        and job.dataset_id == context.job.dataset_id
+        and job.seed == context.job.seed
+        and job.method == "minppi"
+    )
+    if len(minppi_jobs) != 1:
+        raise ValueError("NSGA-II requires the canonical MinPPI removal job")
+    removal_context = _nsga2_job_context(context, minppi_jobs[0])
+    _validate_removal_scope(removal_context)
+    plan = _read_removal_plan(removal_context)
+    plan_record = _task9_plan_result(removal_context, stage="removal")
+    method_plan = next(
+        item for item in plan["methods"] if item["method"] == "minppi"
+    )
+    retained = tuple(method_plan["trials"][0]["retained_features"])
+    return plan, plan_record, retained
+
+
+def _nsga2_front_relpath(context: StageContext, variant: str) -> str:
+    return (
+        f"nsga2/{context.job.dataset_id}/s{context.job.seed}/"
+        f"{variant}/validation_front.json"
+    )
+
+
+def _nsga2_result_relpath(context: StageContext) -> str:
+    return (
+        f"nsga2/{context.job.dataset_id}/s{context.job.seed}/"
+        f"{context.job.method}/results.json"
+    )
+
+
+def _nsga2_search_features(
+    variant: str, original: tuple[str, ...], retained: tuple[str, ...]
+) -> tuple[str, ...]:
+    if variant == "full":
+        return original
+    if variant == "minppi_prefilter":
+        return retained
+    raise ValueError("unknown NSGA-II variant")
+
+
+def _finite_nonnegative(value: object, *, name: str) -> float:
+    import math
+
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        or value < 0
+    ):
+        raise ValueError(f"{name} must be a nonnegative finite number")
+    return float(value)
+
+
+def _exact_nonnegative_int(value: object, expected: int, *, name: str) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 0
+        or value != expected
+    ):
+        raise ValueError(f"{name} is invalid")
+    return value
+
+
+def _validate_nsga2_front_entries(
+    entries: object,
+    *,
+    search_features: tuple[str, ...],
+    denominator: int,
+    objective_name: str,
+) -> list[dict[str, object]]:
+    import math
+
+    if not isinstance(entries, list) or not entries:
+        raise ValueError(f"NSGA-II {objective_name} front must be a nonempty list")
+    expected = {"mask", "selected_features", "objectives"}
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != expected:
+            raise ValueError(f"NSGA-II {objective_name} front entry schema is invalid")
+        mask = entry["mask"]
+        if (
+            not isinstance(mask, list)
+            or len(mask) != len(search_features)
+            or any(isinstance(bit, bool) or not isinstance(bit, int) or bit not in (0, 1) for bit in mask)
+        ):
+            raise ValueError(f"NSGA-II {objective_name} mask is invalid")
+        selected = [
+            feature for feature, bit in zip(search_features, mask, strict=True) if bit
+        ]
+        if entry["selected_features"] != selected:
+            raise ValueError(f"NSGA-II {objective_name} selected features conflict with mask")
+        objectives = entry["objectives"]
+        if (
+            not isinstance(objectives, list)
+            or len(objectives) != 2
+            or any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                for value in objectives
+            )
+        ):
+            raise ValueError(f"NSGA-II {objective_name} objectives are invalid")
+        if objectives[0] != sum(mask) / denominator or not 0.0 <= objectives[1] <= 1.0:
+            raise ValueError(f"NSGA-II {objective_name} objectives conflict with mask or utility")
+    return entries
+
+
+def _validate_nsga2_front_artifact(
+    context: StageContext,
+    value: object,
+    *,
+    variant: str,
+    original_features: tuple[str, ...],
+    retained_features: tuple[str, ...],
+) -> dict[str, object]:
+    import numpy as np
+
+    dataset, jobs, population, evaluations, max_gen = _nsga2_authority(context)
+    job = next(item for item in jobs if item.method == variant)
+    expected = {
+        "schema_version", "protocol_hash", "job_id", "dataset_id", "seed",
+        "variant", "task", "utility", "population", "evaluations", "max_gen",
+        "ref_point", "original_features", "search_features",
+        "cardinality_denominator", "validation_front", "validation_hv",
+        "hv_history", "converged_gen", "convergence_evaluation_count",
+        "search_runtime_s",
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError("NSGA-II validation-front artifact schema is invalid")
+    search_features = _nsga2_search_features(
+        variant, original_features, retained_features
+    )
+    for field, expected_value in (
+        ("schema_version", 1),
+        ("seed", context.job.seed),
+        ("population", population),
+        ("evaluations", evaluations),
+        ("max_gen", max_gen),
+        ("cardinality_denominator", len(original_features)),
+    ):
+        _exact_nonnegative_int(
+            value[field], expected_value, name=f"NSGA-II {field}"
+        )
+    if (
+        value["protocol_hash"] != context.job.protocol_hash
+        or value["job_id"] != job.job_id
+        or value["dataset_id"] != context.job.dataset_id
+        or value["variant"] != variant
+        or value["task"] != dataset.task
+        or value["utility"] != dataset.utility
+        or value["ref_point"] != list(_NSGA2_REF_POINT)
+        or value["original_features"] != list(original_features)
+        or value["search_features"] != list(search_features)
+    ):
+        raise ValueError("NSGA-II validation-front artifact identity is invalid")
+    entries = _validate_nsga2_front_entries(
+        value["validation_front"],
+        search_features=search_features,
+        denominator=len(original_features),
+        objective_name="validation",
+    )
+    points = np.asarray([entry["objectives"] for entry in entries], dtype=float)
+    if set(_non_dominated_sort(points)[0].tolist()) != set(range(len(entries))):
+        raise ValueError("NSGA-II validation front contains a dominated point")
+    expected_hv = _compute_hv(points, np.asarray(_NSGA2_REF_POINT))
+    validation_hv = _finite_nonnegative(
+        value["validation_hv"], name="NSGA-II validation hypervolume"
+    )
+    if validation_hv != expected_hv:
+        raise ValueError("NSGA-II validation hypervolume is invalid")
+    history = value["hv_history"]
+    if (
+        not isinstance(history, list)
+        or len(history) != max_gen
+        or any(_finite_nonnegative(item, name="NSGA-II HV history value") != item for item in history)
+    ):
+        raise ValueError("NSGA-II HV history is invalid")
+    converged_gen = value["converged_gen"]
+    if (
+        isinstance(converged_gen, bool)
+        or not isinstance(converged_gen, int)
+        or converged_gen != _converged_gen(history)
+    ):
+        raise ValueError("NSGA-II convergence generation is invalid")
+    _exact_nonnegative_int(
+        value["convergence_evaluation_count"],
+        population * (converged_gen + 1),
+        name="NSGA-II convergence evaluation count",
+    )
+    _finite_nonnegative(value["search_runtime_s"], name="NSGA-II search runtime")
+    return value
+
+
+def _freeze_nsga2_front(
+    context: StageContext,
+    *,
+    job: JobSpec,
+    original_features: tuple[str, ...],
+    retained_features: tuple[str, ...],
+    X_train: object,
+    y_train: object,
+    X_val: object,
+    y_val: object,
+) -> dict[str, object]:
+    import numpy as np
+
+    variant_context = _nsga2_job_context(context, job)
+    relpath = _nsga2_front_relpath(variant_context, job.method)
+    path = context.layout.root / relpath
+    if path.exists():
+        return _validate_nsga2_front_artifact(
+            variant_context,
+            read_canonical_json(path, context="NSGA-II validation-front artifact"),
+            variant=job.method,
+            original_features=original_features,
+            retained_features=retained_features,
+        )
+    dataset, _, population, evaluations, max_gen = _nsga2_authority(variant_context)
+    search_features = _nsga2_search_features(
+        job.method, original_features, retained_features
+    )
+    result = nsga2_feature_selection(
+        X_train.loc[:, list(search_features)],
+        y_train,
+        X_val.loc[:, list(search_features)],
+        y_val,
+        task=dataset.task,
+        utility=dataset.utility,
+        model_params=context.protocol.model_params,
+        backend=context.protocol.backend,
+        seed=context.job.seed,
+        pop_size=population,
+        max_gen=max_gen,
+        ref_point=_NSGA2_REF_POINT,
+        verbose=False,
+        cardinality_denominator=len(original_features),
+    )
+    entries = []
+    for mask, objectives in result.pareto_front:
+        bits = np.asarray(mask, dtype=int).tolist()
+        selected = [
+            feature
+            for feature, bit in zip(search_features, bits, strict=True)
+            if bit
+        ]
+        entries.append(
+            {
+                "mask": bits,
+                "selected_features": selected,
+                "objectives": [float(objectives[0]), float(objectives[1])],
+            }
+        )
+    document = {
+        "schema_version": 1,
+        "protocol_hash": context.job.protocol_hash,
+        "job_id": job.job_id,
+        "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed,
+        "variant": job.method,
+        "task": dataset.task,
+        "utility": dataset.utility,
+        "population": population,
+        "evaluations": evaluations,
+        "max_gen": max_gen,
+        "ref_point": list(_NSGA2_REF_POINT),
+        "original_features": list(original_features),
+        "search_features": list(search_features),
+        "cardinality_denominator": len(original_features),
+        "validation_front": entries,
+        "validation_hv": float(result.hv),
+        "hv_history": [float(value) for value in result.hv_history],
+        "converged_gen": int(result.converged_gen),
+        "convergence_evaluation_count": population * (result.converged_gen + 1),
+        "search_runtime_s": float(result.runtime_s),
+    }
+    _validate_nsga2_front_artifact(
+        variant_context,
+        document,
+        variant=job.method,
+        original_features=original_features,
+        retained_features=retained_features,
+    )
+    _publish_idempotent_json(path, document, context="NSGA-II validation-front artifact")
+    return document
+
+
+def _ensure_nsga2_fronts(
+    context: StageContext,
+) -> tuple[
+    dict[str, dict[str, object]],
+    tuple[object, object, object, object, Mapping[str, object]],
+    ResultRecord,
+]:
+    _, jobs, _, _, _ = _nsga2_authority(context)
+    plan, removal_record, retained = _nsga2_removal_authority(context)
+    original = tuple(plan["features"])
+    if not original:
+        raise ValueError("NSGA-II requires a nonempty frozen prepared feature set")
+    X_train, y_train, X_val, y_val, row = _load_prepared_train_validation(context)
+    if tuple(X_train.columns) != original or tuple(X_val.columns) != original:
+        raise ValueError("NSGA-II prepared feature order conflicts with removal plan")
+    documents: dict[str, dict[str, object]] = {}
+    for job in jobs:
+        documents[job.method] = _freeze_nsga2_front(
+            context,
+            job=job,
+            original_features=original,
+            retained_features=retained,
+            X_train=X_train,
+            y_train=y_train,
+            X_val=X_val,
+            y_val=y_val,
+        )
+    # Re-read and validate both published fronts before any audited test access.
+    for job in jobs:
+        variant_context = _nsga2_job_context(context, job)
+        documents[job.method] = _validate_nsga2_front_artifact(
+            variant_context,
+            read_canonical_json(
+                context.layout.root / _nsga2_front_relpath(variant_context, job.method),
+                context="NSGA-II validation-front artifact",
+            ),
+            variant=job.method,
+            original_features=original,
+            retained_features=retained,
+        )
+    return documents, (X_train, y_train, X_val, y_val, row), removal_record
+
+
+def _validate_nsga2_result(
+    context: StageContext,
+    value: object,
+    *,
+    front: Mapping[str, object],
+    minppi_selection_time: float,
+) -> dict[str, object]:
+    import numpy as np
+
+    dataset, _, population, evaluations, _ = _nsga2_authority(context)
+    expected = {
+        "schema_version", "protocol_hash", "job_id", "dataset_id", "seed",
+        "variant", "task", "utility", "population", "evaluation_count",
+        "ref_point", "original_dimension", "search_dimension",
+        "dimensional_reduction", "validation_hv", "test_hv",
+        "validation_front", "test_front", "convergence_evaluation_count",
+        "final_front_evaluation_count", "evaluation_model_fit_count",
+        "minppi_selection_time_s", "search_runtime_s", "evaluation_runtime_s",
+        "total_runtime_s",
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError("NSGA-II result artifact schema is invalid")
+    original = tuple(front["original_features"])
+    search = tuple(front["search_features"])
+    expected_selection_time = (
+        minppi_selection_time if context.job.method == "minppi_prefilter" else 0.0
+    )
+    expected_reduction = (len(original) - len(search)) / len(original)
+    expected_integer_fields = {
+        "schema_version": 1,
+        "seed": context.job.seed,
+        "population": population,
+        "evaluation_count": evaluations,
+        "original_dimension": len(original),
+        "search_dimension": len(search),
+        "convergence_evaluation_count": int(front["convergence_evaluation_count"]),
+        "final_front_evaluation_count": len(front["validation_front"]),
+        "evaluation_model_fit_count": sum(
+            bool(entry["selected_features"])
+            for entry in front["validation_front"]
+        ),
+    }
+    for field, expected_value in expected_integer_fields.items():
+        _exact_nonnegative_int(
+            value[field], expected_value, name=f"NSGA-II result {field}"
+        )
+    for field in (
+        "dimensional_reduction",
+        "validation_hv",
+        "test_hv",
+        "minppi_selection_time_s",
+        "search_runtime_s",
+        "evaluation_runtime_s",
+        "total_runtime_s",
+    ):
+        _finite_nonnegative(value[field], name=f"NSGA-II result {field}")
+    if (
+        value["protocol_hash"] != context.job.protocol_hash
+        or value["job_id"] != context.job.job_id
+        or value["dataset_id"] != context.job.dataset_id
+        or value["variant"] != context.job.method
+        or value["task"] != dataset.task
+        or value["utility"] != dataset.utility
+        or value["ref_point"] != list(_NSGA2_REF_POINT)
+        or value["dimensional_reduction"] != expected_reduction
+        or value["validation_hv"] != front["validation_hv"]
+        or value["validation_front"] != front["validation_front"]
+        or value["minppi_selection_time_s"] != expected_selection_time
+        or value["search_runtime_s"] != front["search_runtime_s"]
+    ):
+        raise ValueError("NSGA-II result artifact conflicts with its frozen front")
+    test_entries = _validate_nsga2_front_entries(
+        value["test_front"],
+        search_features=search,
+        denominator=len(original),
+        objective_name="test",
+    )
+    if len(test_entries) != len(front["validation_front"]):
+        raise ValueError("NSGA-II test front is incomplete")
+    for validation_entry, test_entry in zip(
+        front["validation_front"], test_entries, strict=True
+    ):
+        if (
+            test_entry["mask"] != validation_entry["mask"]
+            or test_entry["selected_features"] != validation_entry["selected_features"]
+            or test_entry["objectives"][0] != validation_entry["objectives"][0]
+        ):
+            raise ValueError("NSGA-II test front changed a frozen mask")
+    expected_hv = _compute_hv(
+        np.asarray([entry["objectives"] for entry in test_entries], dtype=float),
+        np.asarray(_NSGA2_REF_POINT),
+    )
+    if value["test_hv"] != expected_hv:
+        raise ValueError("NSGA-II held-out test hypervolume is invalid")
+    evaluation_runtime = _finite_nonnegative(
+        value["evaluation_runtime_s"], name="NSGA-II evaluation runtime"
+    )
+    total_runtime = _finite_nonnegative(
+        value["total_runtime_s"], name="NSGA-II total runtime"
+    )
+    if total_runtime != (
+        expected_selection_time + float(front["search_runtime_s"]) + evaluation_runtime
+    ):
+        raise ValueError("NSGA-II total runtime accounting is invalid")
+    return value
+
+
+def _nsga2_result_record(
+    context: StageContext,
+    *,
+    started_at: str,
+    relpath: str,
+    document: Mapping[str, object],
+) -> ResultRecord:
+    metric_keys = {
+        "population", "evaluation_count", "original_dimension", "search_dimension",
+        "dimensional_reduction", "validation_hv", "test_hv",
+        "convergence_evaluation_count", "final_front_evaluation_count",
+        "evaluation_model_fit_count", "minppi_selection_time_s",
+        "search_runtime_s", "evaluation_runtime_s", "total_runtime_s",
+    }
+    return ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage=context.job.stage,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        method=context.job.method,
+        metrics={key: value for key, value in document.items() if key in metric_keys},
+        artifacts={"results": relpath},
+        started_at=started_at,
+        finished_at=_timestamp(),
+    )
+
+
+def run_nsga2_job(context: StageContext) -> ResultRecord:
+    """Freeze both fair validation fronts, then evaluate this job's front once."""
+    import numpy as np
+    import pandas as pd
+
+    started_at = _timestamp()
+    documents, prepared, removal_record = _ensure_nsga2_fronts(context)
+    front = documents[context.job.method]
+    minppi_selection_time = float(
+        removal_record.metrics["minppi_selection_time_s"]
+    )
+    relpath = _nsga2_result_relpath(context)
+    path = context.layout.root / relpath
+    if path.exists():
+        existing = _validate_nsga2_result(
+            context,
+            read_canonical_json(path, context="NSGA-II result artifact"),
+            front=front,
+            minppi_selection_time=minppi_selection_time,
+        )
+        return _nsga2_result_record(
+            context, started_at=started_at, relpath=relpath, document=existing
+        )
+    X_train, y_train, X_val, y_val, row = prepared
+    X_test, y_test = _task9_load_test(
+        context, row, reason="final_nsga2_front_evaluation"
+    )
+    X_train_val = pd.concat([X_train, X_val], ignore_index=True)
+    y_train_val = np.concatenate([y_train, y_val])
+    dataset, _, population, evaluations, _ = _nsga2_authority(context)
+    evaluation_started = time.perf_counter()
+    test_front = []
+    for entry in front["validation_front"]:
+        utility = evaluate_fixed_subset(
+            X_train_val,
+            y_train_val,
+            X_test,
+            y_test,
+            tuple(entry["selected_features"]),
+            task=dataset.task,
+            utility=dataset.utility,
+            model_params=context.protocol.model_params,
+            backend=context.protocol.backend,
+            seed=context.job.seed,
+        )
+        test_front.append(
+            {
+                "mask": entry["mask"],
+                "selected_features": entry["selected_features"],
+                "objectives": [
+                    entry["objectives"][0],
+                    1.0 - float(np.clip(utility, 0.0, 1.0)),
+                ],
+            }
+        )
+    evaluation_runtime = time.perf_counter() - evaluation_started
+    test_hv = _compute_hv(
+        np.asarray([entry["objectives"] for entry in test_front], dtype=float),
+        np.asarray(_NSGA2_REF_POINT),
+    )
+    original_dimension = len(front["original_features"])
+    search_dimension = len(front["search_features"])
+    selection_time = (
+        minppi_selection_time if context.job.method == "minppi_prefilter" else 0.0
+    )
+    total_runtime = selection_time + float(front["search_runtime_s"]) + evaluation_runtime
+    document = {
+        "schema_version": 1,
+        "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id,
+        "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed,
+        "variant": context.job.method,
+        "task": dataset.task,
+        "utility": dataset.utility,
+        "population": population,
+        "evaluation_count": evaluations,
+        "ref_point": list(_NSGA2_REF_POINT),
+        "original_dimension": original_dimension,
+        "search_dimension": search_dimension,
+        "dimensional_reduction": (
+            original_dimension - search_dimension
+        ) / original_dimension,
+        "validation_hv": front["validation_hv"],
+        "test_hv": float(test_hv),
+        "validation_front": front["validation_front"],
+        "test_front": test_front,
+        "convergence_evaluation_count": front["convergence_evaluation_count"],
+        "final_front_evaluation_count": len(front["validation_front"]),
+        "evaluation_model_fit_count": sum(
+            bool(entry["selected_features"]) for entry in front["validation_front"]
+        ),
+        "minppi_selection_time_s": selection_time,
+        "search_runtime_s": front["search_runtime_s"],
+        "evaluation_runtime_s": evaluation_runtime,
+        "total_runtime_s": total_runtime,
+    }
+    _validate_nsga2_result(
+        context,
+        document,
+        front=front,
+        minppi_selection_time=minppi_selection_time,
+    )
+    _publish_idempotent_json(path, document, context="NSGA-II result artifact")
+    return _nsga2_result_record(
+        context, started_at=started_at, relpath=relpath, document=document
+    )
+
+
 STAGE_EXECUTORS.update(
     {
         "validate": run_validate_job,
@@ -3000,6 +3654,7 @@ STAGE_EXECUTORS.update(
         "estimator": run_estimator_job,
         "removal": run_removal_job,
         "alpha": run_alpha_job,
+        "nsga2": run_nsga2_job,
         "ablation": run_ablation_job,
     }
 )
