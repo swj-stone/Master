@@ -1,288 +1,501 @@
-"""
-Generate 3 high-density composite figures replacing 7 scattered figures.
-
-Data sources (all on disk, no re-runs needed):
-  - results/tables/2026-07-10_12-20-33/main_metrics.csv  → CD + heatmap
-  - results/tables/2026-07-10_16-23-55/pareto_front.csv   → α operating points
-  - results/tables/2026-07-12_08-02-42/mofs_verify.csv    → HV table
-  - results/tables/2026-07-12_08-02-42/mofs_verify_fronts.csv → Pareto scatter points
-  - results/tables/2026-07-12_08-02-42/mofs_verify_history.csv → HV per generation
-
-Run:
-    python -u experiments/make_paper_figures.py
-"""
+"""Read-only deterministic paper figures from Task 11 canonical tables."""
 
 from __future__ import annotations
+
+import re
+from datetime import datetime, timezone
+from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
-PROJECT = Path(__file__).resolve().parent.parent
-OUT = PROJECT / "conference-paper" / "figures"
-OUT.mkdir(parents=True, exist_ok=True)
 
-R_MAIN = "2026-07-10_12-20-33"
-R_PARETO = "2026-07-10_16-23-55"
-R_MOFS = "2026-07-12_08-02-42"
-
-plt.rcParams.update({
-    "font.family": "serif", "font.size": 9,
+_PDF_METADATA = {
+    "Creator": "minppi-mofs Task 11",
+    "Producer": "matplotlib",
+    "CreationDate": datetime(2000, 1, 1, tzinfo=timezone.utc),
+    "ModDate": datetime(2000, 1, 1, tzinfo=timezone.utc),
+}
+_RC = {
+    "font.family": "DejaVu Sans", "font.size": 8,
     "axes.titlesize": 10, "axes.labelsize": 9,
-    "legend.fontsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7,
-})
+    "legend.fontsize": 6, "xtick.labelsize": 7, "ytick.labelsize": 7,
+    "pdf.compression": 6,
+}
+_EXPECTED_RAW = (
+    "run_kind", "manifest_sequence", "stage", "dataset_id", "seed", "method",
+    "trial", "parameter", "metric", "value",
+)
+_EXPECTED_AGGREGATE = (
+    "run_kind", "stage", "dataset_id", "method", "parameter", "metric", "n",
+    "mean", "sample_std", "median", "ci95_low", "ci95_high", "analysis_label",
+)
+_EXPECTED_PAIRED = (
+    "run_kind", "stage", "dataset_id", "metric", "baseline_method",
+    "comparison_method", "n", "mean_difference", "median_difference",
+    "paired_rank_biserial", "p_value", "holm_p_value", "holm_family_id",
+    "holm_family_size", "test", "analysis_label",
+)
+_EXPECTED_FRONT = (
+    "run_kind", "dataset_id", "seed", "method", "front_kind", "point_index",
+    "compression", "utility", "evaluation", "hypervolume",
+)
+_REMOVAL_METHODS = (
+    "minppi", "shap_bottom", "minshap_bottom", "banzhaf_bottom", "random_matched"
+)
+_NSGA_METHODS = ("full", "minppi_prefilter")
+_REQUIRED_ABLATION_SELECTORS = {
+    ("guidance", "random"),
+    ("guidance", "mi"),
+    ("guidance", "correlation"),
+    ("guidance", "mi_correlation"),
+    ("dispatcher", "random_mc"),
+    ("dispatcher", "mi_correlation_guided"),
+    ("dispatcher", "hybrid"),
+}
+_OPTIONAL_ABLATION_SELECTORS = {
+    ("dispatcher", "exact"),
+    ("utility", "accuracy"),
+    ("utility", "ovr_auc"),
+}
 
 
-# ================================================================
-# Figure 1: Overview (3 panels)
-# ================================================================
-def make_fig1_overview():
-    fig, axes = plt.subplots(1, 3, figsize=(11, 3.6))
+def _read_table(path: Path, expected: tuple[str, ...], run_kind: str) -> pd.DataFrame:
+    source = Path(path)
+    if not source.is_file() or source.is_symlink():
+        raise ValueError(f"canonical figure table is not a regular file: {source}")
+    try:
+        payload = source.read_bytes()
+        if b"\r" in payload:
+            raise ValueError("canonical figure table must use LF line endings")
+        payload.decode("utf-8")
+        frame = pd.read_csv(source, keep_default_na=False)
+    except (OSError, UnicodeDecodeError, pd.errors.ParserError) as exc:
+        raise ValueError(f"canonical figure table is malformed: {source.name}") from exc
+    if tuple(frame.columns) != expected:
+        raise ValueError(f"canonical figure table schema is invalid: {source.name}")
+    if not frame.empty and set(frame["run_kind"].astype(str)) != {run_kind}:
+        raise ValueError("figure table contains a foreign run kind")
+    if frame.duplicated().any():
+        raise ValueError("canonical figure table contains duplicate rows")
+    numeric = {
+        "manifest_sequence", "seed", "trial", "value", "n", "mean",
+        "sample_std", "median", "ci95_low", "ci95_high", "mean_difference",
+        "median_difference", "paired_rank_biserial", "p_value", "holm_p_value",
+        "holm_family_size", "point_index", "compression", "utility",
+        "evaluation", "hypervolume",
+    }.intersection(frame.columns)
+    for column in numeric:
+        values = pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype=float)
+        if not np.isfinite(values).all():
+            raise ValueError(f"canonical figure table {column} is not finite numeric")
+    integer_columns = {
+        "manifest_sequence", "seed", "trial", "n", "holm_family_size",
+        "point_index", "evaluation",
+    }.intersection(frame.columns)
+    for column in integer_columns:
+        values = pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype=float)
+        if (values < 0).any() or not np.equal(values, np.floor(values)).all():
+            raise ValueError(f"canonical figure table {column} is not nonnegative integer")
+    for column in set(frame.columns) - numeric:
+        if frame[column].isna().any():
+            raise ValueError(f"canonical figure table {column} contains missing text")
+    return frame
 
-    # ── (a) MinPPI Trichotomy — Example 2 from minppi_demo ────
-    ax = axes[0]
-    features = ["f_0", "f_1", "f_2", "f_3", "f_4"]
-    minss = [0, -1, 0, 0, 0]
-    colors = ["#2ca02c" if v == +1 else "#d62728" if v == -1 else "#7f7f7f"
-              for v in minss]
-    ax.bar(features, minss, color=colors, edgecolor="black", linewidth=0.5)
-    ax.axhline(y=0, color="black", linewidth=0.5)
-    ax.set_ylabel("MinSS")
-    ax.set_title("(a) MinPPI trichotomy", fontsize=10)
-    ax.set_ylim(-1.3, 0.5)
-    ax.text(1, 0.3, "HARMFUL", ha="center", fontsize=7,
-            color="#d62728", fontweight="bold")
 
-    # ── (b) Algorithm A vs B detection rate ───────────────────
-    ax = axes[1]
-    K_vals = [1, 2, 3, 5, 10, 20, 50]
-    A_detect = [0.026, 0.060, 0.124, 0.146, 0.322, 0.466, 0.850]
-    B_detect = [1.0] * 7
-    ax.plot(K_vals, A_detect, "s-", color="gray", label="Alg. A (random MC)",
-            markersize=5)
-    ax.plot(K_vals, B_detect, "o-", color="#1f77b4",
-            label="Alg. B (MI-correlation-guided)", markersize=5)
-    ax.set_xscale("log")
-    ax.set_xlabel("Budget K")
-    ax.set_ylabel("Detection rate")
-    ax.set_title("(b) Algorithm A vs B", fontsize=10)
-    ax.legend(fontsize=7)
-    ax.grid(True, alpha=0.3)
+def _unique(frame: pd.DataFrame, keys: list[str], context: str) -> None:
+    if frame.duplicated(keys, keep=False).any():
+        raise ValueError(f"{context} contains duplicate selector rows")
 
-    # ── (c) α operating points + NSGA-II fronts ───────────────
-    ax = axes[2]
-    fronts = pd.read_csv(PROJECT / "results/tables" / R_MOFS / "mofs_verify_fronts.csv")
-    pareto = pd.read_csv(PROJECT / "results/tables" / R_PARETO / "pareto_front.csv")
 
-    ds_show = ["madelon", "credit_card_fraud"]
-    alpha_colors = {0.85: "#d62728", 0.90: "#ff7f0e", 0.95: "#2ca02c",
-                    0.99: "#1f77b4"}
-    markers = {0.85: "s", 0.90: "D", 0.95: "o", 0.99: "^"}
-    for ds_idx, ds in enumerate(ds_show):
-        offset_y = 0.12 * ds_idx
-        # NSGA-II-full fronts (seed 42 as representative)
-        ff = fronts[(fronts.dataset == ds) & (fronts.seed == 42) &
-                     (fronts.method == "nsga2_full")]
-        if len(ff):
-            ax.scatter(ff.compression + ds_idx * 0.01,
-                       ff.auc + offset_y,
-                       c="gray", alpha=0.20, s=8, zorder=1)
-
-        # NSGA-II-filtered fronts (seed 42)
-        fp = fronts[(fronts.dataset == ds) & (fronts.seed == 42) &
-                     (fronts.method == "nsga2_filtered")]
-        if len(fp):
-            ax.scatter(fp.compression + ds_idx * 0.01,
-                       fp.auc + offset_y,
-                       c="#1f77b4", alpha=0.35, s=10, zorder=2, marker="x")
-
-        # α operating points (seed 42)
-        md = pareto[(pareto.dataset == ds) & (pareto.seed == 42)]
-        if len(md):
-            for _, row in md.iterrows():
-                y_val = (row.filtered_util
-                         if pd.notna(row.get("filtered_util"))
-                         else (row["AUC"] if pd.notna(row.get("AUC"))
-                               else row.get("R2", 0)))
-                ax.scatter(row.compression + ds_idx * 0.01,
-                           y_val + offset_y,
-                           color=alpha_colors.get(row.alpha, "#333"),
-                           marker=markers.get(row.alpha, "o"),
-                           s=80, zorder=5, edgecolors="black", linewidth=0.5)
-
-    handles = [
-        Line2D([], [], color="gray", marker="o", linestyle="", markersize=6,
-               label="NSGA2-full"),
-        Line2D([], [], color="#1f77b4", marker="x", linestyle="", markersize=6,
-               label="NSGA2-filt"),
-        Line2D([], [], color="#2ca02c", marker="o", linestyle="", markersize=6,
-               label="MinPPI α=0.95"),
+def _prepare_panels(
+    aggregate: pd.DataFrame,
+    paired: pd.DataFrame,
+    front: pd.DataFrame,
+    *,
+    run_kind: str,
+    require_front: bool = True,
+) -> dict[str, pd.DataFrame]:
+    expected_n = 5 if run_kind == "formal" else 1
+    selected_n = aggregate[
+        aggregate["stage"].isin(("estimator", "ablation", "alpha", "removal", "nsga2"))
     ]
-    ax.legend(handles=handles, fontsize=6, loc="lower right")
-    ax.set_xlabel("Compression")
-    ax.set_ylabel("AUC")
-    ax.set_title("(c) α-points vs NSGA-II fronts", fontsize=10)
-    ax.grid(True, alpha=0.3)
-    ax.text(0.5, 0.95, "Madelon (top)  Credit-Card (bottom) — seed 42",
-            transform=ax.transAxes, ha="center", fontsize=7, style="italic")
+    if not selected_n.empty and not (selected_n["n"] == expected_n).all():
+        raise ValueError("figure aggregate rows do not use the required seed units")
 
-    fig.tight_layout()
-    fp_out = OUT / "fig1_overview.pdf"
-    fig.savefig(fp_out, format="pdf", bbox_inches="tight")
+    estimator = aggregate[
+        (aggregate["stage"] == "estimator")
+        & aggregate["metric"].isin(("harmful_f1", "score_agreement"))
+    ].copy()
+    _unique(estimator, ["dataset_id", "method", "parameter", "metric"], "estimator agreement")
+    if not estimator.empty:
+        estimator["budget"] = estimator["parameter"].map(
+            lambda value: int(re.fullmatch(r"budget=([0-9]+)", str(value)).group(1))
+            if re.fullmatch(r"budget=([0-9]+)", str(value)) else -1
+        )
+        if (estimator["budget"] < 1).any():
+            raise ValueError("estimator agreement parameter is invalid")
+        counts = estimator.groupby(
+            ["dataset_id", "method", "parameter"], sort=True
+        )["metric"].nunique()
+        if (counts != 2).any():
+            if run_kind == "formal":
+                raise ValueError("missing formal estimator agreement rows")
+            estimator = estimator.iloc[0:0].copy()
+    elif run_kind == "formal":
+        raise ValueError("missing formal estimator agreement rows")
+
+    ablation = aggregate[
+        (aggregate["stage"] == "ablation")
+        & (aggregate["metric"] == "harmful_fraction")
+    ].copy()
+    _unique(
+        ablation,
+        ["dataset_id", "method", "parameter", "metric"],
+        "ablation selector",
+    )
+    if ablation.empty:
+        raise ValueError("missing ablation harmful_fraction selector rows")
+    parsed = ablation["parameter"].map(
+        lambda parameter: re.fullmatch(r"([^=]+)=([^=]+)", str(parameter))
+    )
+    if parsed.isna().any():
+        raise ValueError("ablation selector parameter is invalid")
+    ablation["axis"] = [match.group(1) for match in parsed]
+    ablation["value_name"] = [match.group(2) for match in parsed]
+    if not (ablation["method"] == ablation["axis"]).all():
+        raise ValueError("ablation selector method conflicts with axis")
+    allowed = _REQUIRED_ABLATION_SELECTORS | _OPTIONAL_ABLATION_SELECTORS
+    for dataset, rows in ablation.groupby("dataset_id", sort=True):
+        actual = set(zip(rows["axis"], rows["value_name"], strict=False))
+        if not actual <= allowed:
+            raise ValueError(f"ablation selector is not canonical for {dataset}")
+        if run_kind == "formal" and not _REQUIRED_ABLATION_SELECTORS <= actual:
+            raise ValueError(f"missing formal ablation selector rows for {dataset}")
+        utility = {value for axis, value in actual if axis == "utility"}
+        if utility and utility != {"accuracy", "ovr_auc"}:
+            raise ValueError(f"missing paired utility ablation selector rows for {dataset}")
+
+    alpha = aggregate[
+        (aggregate["stage"] == "alpha")
+        & (aggregate["method"] == "alpha_evaluation")
+        & aggregate["metric"].isin(("compression", "test_utility"))
+    ].copy()
+    _unique(alpha, ["dataset_id", "method", "parameter", "metric"], "alpha operating point")
+    compression = alpha[alpha["metric"] == "compression"][
+        ["dataset_id", "method", "parameter", "mean"]
+    ].rename(columns={"mean": "compression"})
+    utility = alpha[alpha["metric"] == "test_utility"][
+        ["dataset_id", "method", "parameter", "mean"]
+    ].rename(columns={"mean": "test_utility"})
+    alpha_points = compression.merge(
+        utility,
+        on=["dataset_id", "method", "parameter"],
+        how="outer",
+        validate="one_to_one",
+        indicator=True,
+    )
+    if alpha_points.empty or (alpha_points["_merge"] != "both").any():
+        raise ValueError("missing paired alpha compression/test_utility rows")
+    alpha_points = alpha_points.drop(columns="_merge")
+    alpha_points["alpha"] = alpha_points["parameter"].map(
+        lambda value: float(re.fullmatch(r"alpha=(.+)", str(value)).group(1))
+        if re.fullmatch(r"alpha=(.+)", str(value)) else np.nan
+    )
+    if not np.isfinite(alpha_points["alpha"]).all():
+        raise ValueError("alpha operating point parameter is invalid")
+
+    removal = aggregate[
+        (aggregate["stage"] == "removal")
+        & (aggregate["metric"] == "delta_utility")
+        & aggregate["method"].isin(_REMOVAL_METHODS)
+    ].copy()
+    _unique(removal, ["dataset_id", "method"], "removal delta_utility matrix")
+    datasets = sorted(removal["dataset_id"].astype(str).unique())
+    expected_pairs = {(dataset, method) for dataset in datasets for method in _REMOVAL_METHODS}
+    actual_pairs = set(zip(removal["dataset_id"], removal["method"], strict=False))
+    if not datasets or actual_pairs != expected_pairs:
+        raise ValueError("missing removal delta_utility matrix rows")
+    matrix = removal.pivot(index="dataset_id", columns="method", values="mean").loc[
+        datasets, list(_REMOVAL_METHODS)
+    ]
+    ranks = matrix.rank(axis=1, ascending=False, method="average")
+
+    nsga = aggregate[
+        (aggregate["stage"] == "nsga2")
+        & aggregate["method"].isin(_NSGA_METHODS)
+        & aggregate["metric"].isin(("test_hv", "convergence_evaluation_count"))
+    ].copy()
+    _unique(nsga, ["dataset_id", "method", "metric"], "NSGA-II aggregate")
+    nsga_datasets = sorted(nsga["dataset_id"].astype(str).unique())
+    expected_nsga = {
+        (dataset, method, metric)
+        for dataset in nsga_datasets
+        for method in _NSGA_METHODS
+        for metric in ("test_hv", "convergence_evaluation_count")
+    }
+    actual_nsga = set(zip(nsga["dataset_id"], nsga["method"], nsga["metric"], strict=False))
+    if not nsga_datasets or actual_nsga != expected_nsga:
+        raise ValueError("missing NSGA-II HV/convergence selector rows")
+
+    test_front = front[
+        (front["front_kind"] == "test") & front["method"].isin(_NSGA_METHODS)
+    ].copy()
+    _unique(
+        test_front,
+        ["dataset_id", "seed", "method", "front_kind", "point_index"],
+        "held-out Pareto front",
+    )
+    if require_front:
+        front_pairs = set(
+            zip(test_front["dataset_id"], test_front["method"], strict=False)
+        )
+        expected_front_pairs = {
+            (dataset, method) for dataset in nsga_datasets for method in _NSGA_METHODS
+        }
+        if front_pairs != expected_front_pairs:
+            raise ValueError("missing held-out Pareto front rows")
+    if not paired.empty:
+        if not paired["holm_family_id"].str.startswith("nsga2:").all():
+            raise ValueError("paired comparison family is invalid")
+        if not (paired["n"] == expected_n).all():
+            raise ValueError("paired comparison seed count is invalid")
+    return {
+        "estimator": estimator,
+        "ablation": ablation,
+        "alpha": alpha_points,
+        "removal": matrix,
+        "ranks": ranks,
+        "nsga": nsga,
+        "front": test_front,
+    }
+
+
+def _smoke_label(fig: plt.Figure, run_kind: str) -> None:
+    if run_kind == "smoke":
+        fig.text(
+            0.5, 0.988, "SMOKE - NOT FOR PAPER", ha="center", va="top",
+            color="#b00020", fontsize=12, fontweight="bold",
+        )
+
+
+def _save(fig: plt.Figure, destination: Path) -> Path:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(destination, format="pdf", bbox_inches="tight", metadata=_PDF_METADATA)
     plt.close(fig)
-    print(f"Saved: {fp_out.name}")
+    return destination
 
 
-# ================================================================
-# Figure 2: CD diagram placeholder + AUC@10 heatmap
-# ================================================================
-def make_fig2_cd_heatmap():
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.0))
+def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -> Path:
+    with plt.rc_context(_RC):
+        fig, axes = plt.subplots(1, 3, figsize=(11, 3.6))
+        estimator = panels["estimator"]
+        if estimator.empty:
+            axes[0].text(0.5, 0.5, "Insufficient estimator agreement rows", ha="center")
+        else:
+            grouped = estimator.groupby(["method", "budget", "metric"], sort=True)["mean"].mean()
+            for (method, metric), series in grouped.groupby(level=(0, 2), sort=True):
+                values = series.droplevel((0, 2)).sort_index()
+                display_method = "exact reference" if method == "exact" else method
+                axes[0].plot(
+                    values.index, values.values, marker="o",
+                    linestyle="-" if metric == "harmful_f1" else "--",
+                    label=f"{display_method} {metric}",
+                )
+            axes[0].legend(fontsize=5)
+        axes[0].set_title("(a) Estimator agreement by budget")
+        axes[0].set_xlabel("Budget")
+        axes[0].set_ylabel("Agreement score")
 
-    # ── Left: CD diagram info ──────────────────────────────────
-    ax = axes[0]
-    avg_ranks = pd.read_csv(
-        PROJECT / "results/tables" / R_MAIN / "avg_ranks_AUC@10.csv")
-    methods = avg_ranks["method"].tolist()
-    ranks = avg_ranks["avg_rank"].tolist()
+        ablation = panels["ablation"].sort_values(
+            ["dataset_id", "axis", "value_name"]
+        )
+        labels = [
+            f"{row.dataset_id}\n{row.axis}={row.value_name}"
+            for row in ablation.itertuples()
+        ]
+        axes[1].bar(range(len(ablation)), ablation["mean"], color="#4c78a8")
+        axes[1].set_xticks(range(len(ablation)), labels, rotation=45, ha="right")
+        axes[1].set_ylim(0.0, 1.0)
+        axes[1].set_title("(b) Ablation harmful fraction")
+        axes[1].set_ylabel("Harmful-feature fraction")
 
-    method_labels = {"shaptopk": "SHAP", "powershap": "PShap", "nsga2": "NSGA2",
-                     "banzhaf": "Banzhaf", "minshap": "MinShap", "shapg": "ShapG"}
-    labels = [method_labels.get(m, m) for m in methods]
-
-    # Simple rank bar chart + significance annotation
-    colors_bar = ["#2ca02c" if r <= 2.5 else "#ff7f0e" if r <= 4.0 else "#d62728"
-                  for r in ranks]
-    y_pos = range(len(methods))
-    ax.barh(y_pos, ranks, color=colors_bar, edgecolor="black", linewidth=0.5,
-            height=0.5)
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=8)
-    ax.invert_yaxis()
-    ax.set_xlabel("Avg. rank (1=best)")
-    ax.set_title("(a) AUC@10 ranks  (Friedman p=0.017)", fontsize=10)
-    for i, r in enumerate(ranks):
-        ax.text(r + 0.05, i, f"{r:.1f}", va="center", fontsize=7)
-    ax.set_xlim(0, max(ranks) + 1.2)
-    ax.grid(True, alpha=0.3, axis="x")
-
-    # ── Right: Heatmap ─────────────────────────────────────────
-    ax = axes[1]
-    mean_df = pd.read_csv(
-        PROJECT / "results/tables" / R_MAIN / "mean_metrics.csv")
-    m_order = ["shaptopk", "powershap", "nsga2", "banzhaf", "minshap", "shapg"]
-    m_labels = ["SHAP", "PShap", "NSGA2", "Banzhaf", "MinShap", "ShapG"]
-    ds_order = ["spambase", "madelon", "isolet", "gisette", "credit_card_fraud"]
-    ds_labels = ["Spambase", "Madelon", "ISOLET", "Gisette", "Credit-Card"]
-
-    heatmap_data = np.zeros((len(ds_order), len(m_order)))
-    for i, ds in enumerate(ds_order):
-        for j, m in enumerate(m_order):
-            row = mean_df[(mean_df.dataset == ds) & (mean_df.method == m)]
-            heatmap_data[i, j] = (row["AUC@10"].values[0]
-                                  if len(row) else 0)
-
-    im = ax.imshow(heatmap_data, cmap="RdYlGn", aspect="auto",
-                   vmin=0.79, vmax=0.99)
-    ax.set_xticks(range(len(m_order)))
-    ax.set_xticklabels(m_labels, rotation=45, ha="right", fontsize=8)
-    ax.set_yticks(range(len(ds_order)))
-    ax.set_yticklabels(ds_labels, fontsize=8)
-    for i in range(len(ds_order)):
-        for j in range(len(m_order)):
-            val = heatmap_data[i, j]
-            color = "white" if val < 0.90 else "black"
-            ax.text(j, i, f"{val:.3f}", ha="center", va="center",
-                    fontsize=7, color=color, fontweight="bold")
-    ax.set_title("(b) AUC@10 heatmap", fontsize=10)
-    cbar = plt.colorbar(im, ax=ax, shrink=0.82)
-    cbar.set_label("AUC@10", fontsize=8)
-
-    fig.tight_layout()
-    fp_out = OUT / "fig2_cd_heatmap.pdf"
-    fig.savefig(fp_out, format="pdf", bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved: {fp_out.name}")
+        markers = {"full": "o", "minppi_prefilter": "s"}
+        for (dataset, method), group in panels["front"].groupby(
+            ["dataset_id", "method"], sort=True
+        ):
+            axes[2].scatter(
+                group["compression"], group["utility"], s=14, alpha=0.65,
+                marker=markers[method], label=f"{dataset} {method}",
+            )
+        for dataset, group in panels["alpha"].groupby("dataset_id", sort=True):
+            ordered = group.sort_values("alpha")
+            axes[2].plot(
+                ordered["compression"], ordered["test_utility"], marker="X",
+                linestyle="--", linewidth=0.8, label=f"{dataset} alpha",
+            )
+        axes[2].legend(fontsize=5)
+        axes[2].set_title("(c) Alpha points and held-out Pareto fronts")
+        axes[2].set_xlabel("Compression")
+        axes[2].set_ylabel("Test utility")
+        for axis in axes:
+            axis.grid(True, alpha=0.25)
+        _smoke_label(fig, run_kind)
+        fig.tight_layout(rect=(0, 0, 1, 0.96))
+        return _save(fig, output / "fig1_overview.pdf")
 
 
-# ================================================================
-# Figure 3: Pre-filter verification
-# ================================================================
-def make_fig3_prefilter():
-    fig, axes = plt.subplots(1, 2, figsize=(11, 3.6))
+def _render_fig2(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -> Path:
+    with plt.rc_context(_RC):
+        fig, axes = plt.subplots(1, 2, figsize=(11, 4.0))
+        mean_ranks = panels["ranks"].mean(axis=0).sort_values()
+        axes[0].barh(range(len(mean_ranks)), mean_ranks.values, color="#72b7b2")
+        axes[0].set_yticks(range(len(mean_ranks)), mean_ranks.index)
+        axes[0].invert_yaxis()
+        axes[0].set_xlabel("Mean descending rank (1 = best)")
+        axes[0].set_title("(a) Descriptive delta-utility ranks")
+        axes[0].grid(True, axis="x", alpha=0.25)
 
-    mofs_agg = pd.read_csv(
-        PROJECT / "results/tables" / R_MOFS / "mofs_verify_agg.csv",
-        skiprows=3,
-        names=["dataset", "method", "hv_mean", "hv_std",
-               "search_dim_mean", "search_dim_std",
-               "runtime_s_mean", "runtime_s_std",
-               "converged_gen_mean", "converged_gen_std"])
+        matrix = panels["removal"]
+        image = axes[1].imshow(matrix.to_numpy(), cmap="RdYlGn", aspect="auto")
+        axes[1].set_xticks(range(len(matrix.columns)), matrix.columns, rotation=35, ha="right")
+        axes[1].set_yticks(range(len(matrix.index)), matrix.index)
+        axes[1].set_title("(b) Removal test delta_utility")
+        for row_index in range(len(matrix.index)):
+            for column_index in range(len(matrix.columns)):
+                axes[1].text(
+                    column_index, row_index,
+                    f"{matrix.iloc[row_index, column_index]:+.3f}",
+                    ha="center", va="center", fontsize=5,
+                )
+        fig.colorbar(image, ax=axes[1], shrink=0.8, label="delta_utility")
+        _smoke_label(fig, run_kind)
+        fig.tight_layout(rect=(0, 0, 1, 0.96))
+        return _save(fig, output / "fig2_cd_heatmap.pdf")
 
-    ds_list = ["spambase", "madelon", "isolet", "gisette",
-               "credit_card_fraud", "crimedata", "abalone"]
-    ds_short = ["Spam", "Mad", "ISO", "Gis", "CC", "Cri", "Aba"]
 
-    full_hv, filt_hv = [], []
-    full_std, filt_std = [], []
-    full_conv, filt_conv = [], []
+def _render_fig3(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -> Path:
+    with plt.rc_context(_RC):
+        fig, axes = plt.subplots(1, 2, figsize=(11, 3.6))
+        nsga = panels["nsga"]
+        datasets = sorted(nsga["dataset_id"].astype(str).unique())
+        x = np.arange(len(datasets), dtype=float)
+        width = 0.36
+        for axis, metric, title in (
+            (axes[0], "test_hv", "(a) Held-out hypervolume"),
+            (axes[1], "convergence_evaluation_count", "(b) Convergence evaluations"),
+        ):
+            for offset, method, color in (
+                (-width / 2, "full", "#999999"),
+                (width / 2, "minppi_prefilter", "#54a24b"),
+            ):
+                rows = nsga[(nsga["metric"] == metric) & (nsga["method"] == method)].set_index("dataset_id").loc[datasets]
+                errors = rows["sample_std"].to_numpy() if run_kind == "formal" else None
+                axis.bar(
+                    x + offset, rows["mean"].to_numpy(), width, yerr=errors,
+                    capsize=2 if errors is not None else 0, label=method, color=color,
+                )
+            axis.set_xticks(x, datasets, rotation=35, ha="right")
+            axis.set_title(title)
+            axis.grid(True, axis="y", alpha=0.25)
+            axis.legend(fontsize=6)
+        _smoke_label(fig, run_kind)
+        fig.tight_layout(rect=(0, 0, 1, 0.96))
+        return _save(fig, output / "fig3_prefilter.pdf")
 
-    for ds in ds_list:
-        fr = mofs_agg[(mofs_agg.dataset == ds) &
-                      (mofs_agg.method == "nsga2_full")]
-        pr = mofs_agg[(mofs_agg.dataset == ds) &
-                      (mofs_agg.method == "nsga2_filtered")]
-        full_hv.append(float(fr["hv_mean"].iloc[0]) if len(fr) else 0)
-        full_std.append(float(fr["hv_std"].iloc[0]) if len(fr) else 0)
-        filt_hv.append(float(pr["hv_mean"].iloc[0]) if len(pr) else 0)
-        filt_std.append(float(pr["hv_std"].iloc[0]) if len(pr) else 0)
-        full_conv.append(float(fr["converged_gen_mean"].iloc[0]) if len(fr) else 0)
-        filt_conv.append(float(pr["converged_gen_mean"].iloc[0]) if len(pr) else 0)
 
-    # ── (a) HV bar chart ───────────────────────────────────────
-    ax = axes[0]
-    x = np.arange(len(ds_list))
-    w = 0.35
-    ax.bar(x - w / 2, full_hv, w, yerr=full_std,
-           label="NSGA2-full", color="gray", edgecolor="black",
-           linewidth=0.5, capsize=3)
-    ax.bar(x + w / 2, filt_hv, w, yerr=filt_std,
-           label="NSGA2-filt", color="#2ca02c", edgecolor="black",
-           linewidth=0.5, capsize=3)
-    ax.set_xticks(x)
-    ax.set_xticklabels(ds_short, fontsize=8)
-    ax.set_ylabel("Hypervolume")
-    ax.set_title("(a) HV: full vs filtered", fontsize=10)
-    ax.legend(fontsize=7)
-    ax.grid(True, alpha=0.3, axis="y")
+def make_fig1_overview(
+    aggregate_table_path: Path, front_table_path: Path, output_directory: Path, *, run_kind: str
+) -> Path:
+    aggregate = _read_table(aggregate_table_path, _EXPECTED_AGGREGATE, run_kind)
+    paired = pd.DataFrame(columns=_EXPECTED_PAIRED)
+    front = _read_table(front_table_path, _EXPECTED_FRONT, run_kind)
+    return _render_fig1(
+        _prepare_panels(aggregate, paired, front, run_kind=run_kind),
+        Path(output_directory), run_kind,
+    )
 
-    # ── (b) Convergence speed ──────────────────────────────────
-    ax = axes[1]
-    ax.bar(x - w / 2, full_conv, w, label="NSGA2-full",
-           color="gray", edgecolor="black", linewidth=0.5)
-    ax.bar(x + w / 2, filt_conv, w, label="NSGA2-filt",
-           color="#2ca02c", edgecolor="black", linewidth=0.5)
-    ax.set_xticks(x)
-    ax.set_xticklabels(ds_short, fontsize=8)
-    ax.set_ylabel("Converged gen (lower = faster)")
-    ax.set_title("(b) Convergence speed", fontsize=10)
-    ax.legend(fontsize=7)
-    ax.grid(True, alpha=0.3, axis="y")
 
-    fig.tight_layout()
-    fp_out = OUT / "fig3_prefilter.pdf"
-    fig.savefig(fp_out, format="pdf", bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved: {fp_out.name}")
+def make_fig2_cd_heatmap(
+    aggregate_table_path: Path, output_directory: Path, *, run_kind: str
+) -> Path:
+    aggregate = _read_table(aggregate_table_path, _EXPECTED_AGGREGATE, run_kind)
+    empty_front = pd.DataFrame(columns=_EXPECTED_FRONT)
+    panels = _prepare_panels(
+        aggregate,
+        pd.DataFrame(columns=_EXPECTED_PAIRED),
+        empty_front,
+        run_kind=run_kind,
+        require_front=False,
+    )
+    return _render_fig2(panels, Path(output_directory), run_kind)
+
+
+def make_fig3_prefilter(
+    aggregate_table_path: Path,
+    comparison_table_path: Path,
+    output_directory: Path,
+    *,
+    run_kind: str,
+) -> Path:
+    aggregate = _read_table(aggregate_table_path, _EXPECTED_AGGREGATE, run_kind)
+    paired = _read_table(comparison_table_path, _EXPECTED_PAIRED, run_kind)
+    empty_front = pd.DataFrame(columns=_EXPECTED_FRONT)
+    panels = _prepare_panels(
+        aggregate, paired, empty_front, run_kind=run_kind, require_front=False
+    )
+    return _render_fig3(panels, Path(output_directory), run_kind)
+
+
+def generate_all_figures(
+    raw_table_path: Path,
+    aggregate_table_path: Path,
+    comparison_table_path: Path,
+    front_table_path: Path,
+    output_directory: Path,
+    *,
+    run_kind: str,
+) -> tuple[Path, Path, Path]:
+    """Preflight all semantics, then generate the three exact figure roles."""
+    if run_kind not in {"formal", "smoke"}:
+        raise ValueError("run_kind must be formal or smoke")
+    _read_table(raw_table_path, _EXPECTED_RAW, run_kind)
+    aggregate = _read_table(aggregate_table_path, _EXPECTED_AGGREGATE, run_kind)
+    paired = _read_table(comparison_table_path, _EXPECTED_PAIRED, run_kind)
+    front = _read_table(front_table_path, _EXPECTED_FRONT, run_kind)
+    panels = _prepare_panels(aggregate, paired, front, run_kind=run_kind)
+    output = Path(output_directory)
+    return (
+        _render_fig1(panels, output, run_kind),
+        _render_fig2(panels, output, run_kind),
+        _render_fig3(panels, output, run_kind),
+    )
+
+
+def _parser():
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    parser.add_argument("--raw-table", required=True, type=Path)
+    parser.add_argument("--aggregate-table", required=True, type=Path)
+    parser.add_argument("--comparison-table", required=True, type=Path)
+    parser.add_argument("--front-table", required=True, type=Path)
+    parser.add_argument("--output-directory", required=True, type=Path)
+    parser.add_argument("--run-kind", required=True, choices=("formal", "smoke"))
+    return parser
 
 
 if __name__ == "__main__":
-    make_fig1_overview()
-    make_fig2_cd_heatmap()
-    make_fig3_prefilter()
-    print(f"\nAll figures saved to: {OUT}")
+    arguments = _parser().parse_args()
+    generate_all_figures(
+        arguments.raw_table,
+        arguments.aggregate_table,
+        arguments.comparison_table,
+        arguments.front_table,
+        arguments.output_directory,
+        run_kind=arguments.run_kind,
+    )

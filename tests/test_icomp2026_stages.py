@@ -879,7 +879,8 @@ def test_real_validate_stage_writes_structured_checks_and_requires_raw_cache(
     assert checks["backend"] == "cpu"
     assert checks["raw_datasets"] == ["spambase", "abalone"]
     assert checks["registered_stages"] == [
-        "ablation", "alpha", "estimator", "nsga2", "preprocess", "removal", "validate"
+        "ablation", "alpha", "estimator", "figures", "nsga2", "preprocess",
+        "removal", "summarize", "validate",
     ]
     assert all(path.exists() for path in raw_paths.values())
 
@@ -1178,6 +1179,8 @@ def test_real_stage_registry_is_exact_and_direct_cli_help_remains_safe() -> None
         "alpha": stage_module.run_alpha_job,
         "nsga2": stage_module.run_nsga2_job,
         "ablation": stage_module.run_ablation_job,
+        "summarize": stage_module.run_summarize_job,
+        "figures": stage_module.run_figures_job,
     }
     completed = subprocess.run(
         [
@@ -1587,6 +1590,124 @@ def test_tiny_estimator_jobs_write_costs_and_exact_agreement(
             assert payload["coalition_count"] == payload["model_fit_count"] + 1
     assert all(records["exact"].metrics[key] == 1.0 for key in agreement)
     assert all(records["hybrid"].metrics[key] == 1.0 for key in agreement)
+
+
+def test_actual_exact_estimator_result_passes_summary_extraction_without_model_fit(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, layout, status, contexts, prepared = _tiny_estimator_setup(
+        tmp_path, smoke_protocol
+    )
+    context = next(item for item in contexts if item.job.method == "exact")
+
+    class NoFitCache:
+        def __init__(self, *args, **kwargs):
+            self.model_fit_count = 1
+            self.coalition_count = 2
+
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda _context: prepared
+    )
+    monkeypatch.setattr(voting_game_module, "AccFullCache", NoFitCache)
+    monkeypatch.setattr(
+        min_ppi_module,
+        "estimate_minppi_exact",
+        lambda **kwargs: {
+            feature: (-1 if index == 0 else 0)
+            for index, feature in enumerate(kwargs["X_train"].columns)
+        },
+    )
+    record = stage_module.run_estimator_job(context)
+    atomic_write_json(layout.root / context.job.output_relpath, asdict(record))
+    status.start(context.job.job_id)
+    status.succeed(context.job.job_id)
+    monkeypatch.setattr(stage_module, "_task9_manifest_row", lambda *args: prepared[-1])
+    omitted = {
+        item.job.job_id for item in contexts if item.job.job_id != context.job.job_id
+    }
+
+    raw_rows, _ = stage_module._validated_summary_rows(
+        context, omitted_job_ids=omitted
+    )
+
+    agreement = {
+        "harmful_precision", "harmful_recall", "harmful_f1", "score_agreement"
+    }
+    exact_agreement = {
+        row["metric"]: row["value"]
+        for row in raw_rows
+        if row["method"] == "exact" and row["metric"] in agreement
+    }
+    assert exact_agreement == {key: 1.0 for key in agreement}
+
+
+def test_actual_base_only_approximate_record_gains_late_exact_agreement_in_summary(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, layout, status, contexts, prepared = _tiny_estimator_setup(
+        tmp_path, smoke_protocol
+    )
+    by_method = {item.job.method: item for item in contexts}
+
+    class NoFitCache:
+        def __init__(self, *args, **kwargs):
+            self.model_fit_count = 1
+            self.coalition_count = 2
+
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda _context: prepared
+    )
+    monkeypatch.setattr(voting_game_module, "AccFullCache", NoFitCache)
+    scores = {
+        feature: (-1 if index == 0 else 0)
+        for index, feature in enumerate(prepared[0].columns)
+    }
+    monkeypatch.setattr(
+        min_ppi_module, "estimate_minppi_random_mc", lambda **kwargs: dict(scores)
+    )
+    monkeypatch.setattr(
+        min_ppi_module, "estimate_minppi_exact", lambda **kwargs: dict(scores)
+    )
+
+    approximate_context = by_method["random_mc"]
+    approximate = stage_module.run_estimator_job(approximate_context)
+    assert not {
+        "harmful_precision", "harmful_recall", "harmful_f1", "score_agreement"
+    }.intersection(approximate.metrics)
+    atomic_write_json(
+        layout.root / approximate_context.job.output_relpath, asdict(approximate)
+    )
+    status.start(approximate_context.job.job_id)
+    status.succeed(approximate_context.job.job_id)
+
+    exact_context = by_method["exact"]
+    exact = stage_module.run_estimator_job(exact_context)
+    atomic_write_json(layout.root / exact_context.job.output_relpath, asdict(exact))
+    status.start(exact_context.job.job_id)
+    status.succeed(exact_context.job.job_id)
+    monkeypatch.setattr(stage_module, "_task9_manifest_row", lambda *args: prepared[-1])
+    included = {approximate_context.job.job_id, exact_context.job.job_id}
+    omitted = {item.job.job_id for item in contexts if item.job.job_id not in included}
+
+    raw_rows, _ = stage_module._validated_summary_rows(
+        approximate_context, omitted_job_ids=omitted
+    )
+
+    published = {
+        row["metric"]: row["value"]
+        for row in raw_rows
+        if row["method"] == "random_mc"
+    }
+    assert {
+        "harmful_precision": 1.0,
+        "harmful_recall": 1.0,
+        "harmful_f1": 1.0,
+        "score_agreement": 1.0,
+    }.items() <= published.items()
 
 
 def test_estimator_omits_agreement_when_manifest_has_no_exact_job(
@@ -2381,7 +2502,7 @@ def test_estimator_artifact_link_failure_leaves_no_partial_publication(
     assert not list(destination.parent.glob(".*.tmp"))
 
 
-def test_task10_registry_contains_only_completed_stage_handlers() -> None:
+def test_task11_registry_contains_all_completed_stage_handlers() -> None:
     assert stage_module.STAGE_EXECUTORS == {
         "validate": stage_module.run_validate_job,
         "preprocess": stage_module.run_preprocess_job,
@@ -2390,6 +2511,8 @@ def test_task10_registry_contains_only_completed_stage_handlers() -> None:
         "alpha": stage_module.run_alpha_job,
         "nsga2": stage_module.run_nsga2_job,
         "ablation": stage_module.run_ablation_job,
+        "summarize": stage_module.run_summarize_job,
+        "figures": stage_module.run_figures_job,
     }
 
 
@@ -3917,7 +4040,7 @@ def test_pipeline_all_dispatches_exact_dependency_order(monkeypatch: pytest.Monk
     assert tuple(seen) == STAGE_ORDER
 
 
-def test_pipeline_all_advances_through_nsga2_and_ablation_then_stops_at_summarize(
+def test_pipeline_all_advances_through_registered_task11_stages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runner = object.__new__(PipelineRunner)
@@ -3933,10 +4056,892 @@ def test_pipeline_all_advances_through_nsga2_and_ablation_then_stops_at_summariz
         return stage_module.StageRunSummary(stage=stage)
 
     monkeypatch.setattr(runner, "execute", execute)
-    assert runner.run("all") == 1
-    assert tuple(seen) == (
-        "validate", "preprocess", "estimator", "removal", "alpha", "nsga2", "ablation"
+    assert runner.run("all") == 0
+    assert tuple(seen) == STAGE_ORDER
+
+
+def test_summarize_checks_all_five_upstream_stages_before_aggregation(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_manifest = [
+        {
+            "dataset_id": dataset.dataset_id,
+            "seed": seed,
+            "selected_feature_count": 7,
+        }
+        for dataset in smoke_protocol.datasets
+        for seed in smoke_protocol.seeds
+    ]
+    manifest = build_job_manifest(
+        smoke_protocol,
+        stages=("estimator", "removal", "alpha", "nsga2", "ablation", "summarize"),
+        data_manifest=data_manifest,
     )
+    layout = create_new_run(tmp_path / "results", "summary-incomplete", smoke_protocol)
+    status = StatusStore(layout, manifest)
+    summary_job = next(job for job in manifest if job.stage == "summarize")
+    context = StageContext(
+        smoke_protocol,
+        layout,
+        summary_job,
+        status,
+        AuditLog.from_manifest(layout.audit_path, manifest),
+    )
+    called = False
+
+    def forbidden(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("aggregation ran before completeness")
+
+    monkeypatch.setattr(stage_module, "aggregate_canonical_records", forbidden)
+    with pytest.raises(IncompleteRunError):
+        stage_module.run_summarize_job(context)
+    assert called is False
+
+
+def test_task11_stage_executors_are_registered() -> None:
+    assert stage_module.STAGE_EXECUTORS["summarize"] is stage_module.run_summarize_job
+    assert stage_module.STAGE_EXECUTORS["figures"] is stage_module.run_figures_job
+
+
+def test_summarize_rejects_tampered_estimator_artifact_before_aggregation(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_manifest = [
+        {
+            "dataset_id": dataset.dataset_id,
+            "seed": seed,
+            "selected_feature_count": 7,
+        }
+        for dataset in smoke_protocol.datasets
+        for seed in smoke_protocol.seeds
+    ]
+    manifest = build_job_manifest(
+        smoke_protocol,
+        stages=("estimator", "removal", "alpha", "nsga2", "ablation", "summarize"),
+        data_manifest=data_manifest,
+    )
+    layout = create_new_run(tmp_path / "results", "summary-tampered", smoke_protocol)
+    status = StatusStore(layout, manifest)
+    _write_data_manifest(layout, smoke_protocol)
+    estimator = next(job for job in manifest if job.stage == "estimator")
+    score_relpath = (
+        f"estimator/{estimator.dataset_id}/s{estimator.seed}/"
+        f"{estimator.method}/b{estimator.parameters['budget']}/scores.json"
+    )
+    atomic_write_json(
+        layout.root / estimator.output_relpath,
+        asdict(replace(_result(estimator), artifacts={"scores": score_relpath})),
+    )
+    atomic_write_json(layout.root / score_relpath, {"tampered": True})
+    summary_job = next(job for job in manifest if job.stage == "summarize")
+    context = StageContext(
+        smoke_protocol,
+        layout,
+        summary_job,
+        status,
+        AuditLog.from_manifest(layout.audit_path, manifest),
+    )
+    monkeypatch.setattr(stage_module, "assert_stage_complete", lambda *args: None)
+    monkeypatch.setattr(
+        stage_module,
+        "aggregate_canonical_records",
+        lambda *args: (_ for _ in ()).throw(
+            AssertionError("aggregation ran after a tampered artifact")
+        ),
+    )
+
+    with pytest.raises(ValueError, match="estimator.*artifact|artifact.*schema"):
+        stage_module.run_summarize_job(context)
+
+
+def test_estimator_artifact_validation_rejects_conflicting_result_metrics(
+    tmp_path: Path,
+) -> None:
+    job = JobSpec(
+        "job-estimator-summary", "a" * 64, "estimator", "toy", 42,
+        "exact", {"budget": 2}, (), "raw_metrics/estimator/job.json",
+    )
+    path = tmp_path / "scores.json"
+    atomic_write_json(
+        path,
+        {
+            "protocol_hash": job.protocol_hash,
+            "job_id": job.job_id,
+            "dataset_id": job.dataset_id,
+            "seed": job.seed,
+            "method": job.method,
+            "budget": 2,
+            "scores": [{"feature": "f0", "score": -1}],
+            "model_fit_count": 1,
+            "coalition_count": 2,
+        },
+    )
+
+    with pytest.raises(ValueError, match="ResultRecord.*conflict"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=job,
+            budget=2,
+            expected_features=("f0",),
+            expected_metrics={
+                "budget": 2,
+                "model_fit_count": 9,
+                "coalition_count": 2,
+                "runtime_s": 0.1,
+            },
+        )
+
+
+def test_summary_estimator_metrics_are_exact_and_recomputed_from_scores() -> None:
+    exact = {"f0": -1, "f1": 0, "f2": 1}
+    approximate = {"f0": -1, "f1": 1, "f2": 0}
+    agreement = stage_module._agreement_metrics(approximate, exact)
+    metrics = {
+        "budget": 10,
+        "model_fit_count": 7,
+        "coalition_count": 8,
+        "runtime_s": 0.5,
+        **agreement,
+    }
+    assert stage_module._validated_estimator_summary_metrics(
+        metrics,
+        approximate_scores=approximate,
+        exact_scores=exact,
+        budget=10,
+        model_fit_count=7,
+        coalition_count=8,
+    ) == metrics
+
+    with pytest.raises(ValueError, match="schema"):
+        stage_module._validated_estimator_summary_metrics(
+            {**metrics, "forged": 99.0},
+            approximate_scores=approximate,
+            exact_scores=exact,
+            budget=10,
+            model_fit_count=7,
+            coalition_count=8,
+        )
+    with pytest.raises(ValueError, match="agreement"):
+        stage_module._validated_estimator_summary_metrics(
+            {**metrics, "harmful_f1": 0.123},
+            approximate_scores=approximate,
+            exact_scores=exact,
+            budget=10,
+            model_fit_count=7,
+            coalition_count=8,
+        )
+
+
+def test_summary_exact_estimator_recomputes_self_agreement() -> None:
+    scores = {"f0": -1, "f1": 0}
+    metrics = {
+        "budget": 10,
+        "model_fit_count": 7,
+        "coalition_count": 8,
+        "runtime_s": 0.5,
+        "harmful_precision": 1.0,
+        "harmful_recall": 1.0,
+        "harmful_f1": 1.0,
+        "score_agreement": 1.0,
+    }
+
+    assert stage_module._validated_estimator_summary_metrics(
+        metrics,
+        approximate_scores=scores,
+        exact_scores=scores,
+        budget=10,
+        model_fit_count=7,
+        coalition_count=8,
+    ) == metrics
+
+
+def test_summary_derives_late_exact_agreement_from_base_only_approximate_record() -> None:
+    approximate = {"f0": -1, "f1": 1, "f2": 0}
+    exact = {"f0": -1, "f1": 0, "f2": 1}
+    base_metrics = {
+        "budget": 10,
+        "model_fit_count": 7,
+        "coalition_count": 8,
+        "runtime_s": 0.5,
+    }
+
+    published = stage_module._validated_estimator_summary_metrics(
+        base_metrics,
+        approximate_scores=approximate,
+        exact_scores=exact,
+        budget=10,
+        model_fit_count=7,
+        coalition_count=8,
+    )
+
+    assert published == {
+        **base_metrics,
+        **stage_module._agreement_metrics(approximate, exact),
+    }
+    with pytest.raises(ValueError, match="schema"):
+        stage_module._validated_estimator_summary_metrics(
+            {**base_metrics, "harmful_f1": 0.5},
+            approximate_scores=approximate,
+            exact_scores=exact,
+            budget=10,
+            model_fit_count=7,
+            coalition_count=8,
+        )
+
+
+def test_summary_ablation_metrics_are_exact_and_artifact_bound() -> None:
+    utility_document = {
+        "budget": 10,
+        "shared_group_id": "utility:isolet:s42:b10",
+        "shared_group_model_fit_count": 8,
+        "shared_group_coalition_count": 9,
+    }
+    utility_metrics = {
+        "axis": "utility",
+        "value": "accuracy",
+        **utility_document,
+    }
+    assert stage_module._validated_utility_ablation_summary_metrics(
+        utility_metrics,
+        value="accuracy",
+        document=utility_document,
+    ) == utility_metrics
+    with pytest.raises(ValueError, match="schema|conflict"):
+        stage_module._validated_utility_ablation_summary_metrics(
+            {**utility_metrics, "budget": 11},
+            value="accuracy",
+            document=utility_document,
+        )
+
+    single_document = {"budget": 10, "model_fit_count": 5, "coalition_count": 6}
+    single_metrics = {
+        "axis": "guidance", "value": "mi", **single_document,
+    }
+    assert stage_module._validated_single_ablation_summary_metrics(
+        single_metrics,
+        axis="guidance",
+        value="mi",
+        document=single_document,
+    ) == single_metrics
+    with pytest.raises(ValueError, match="schema"):
+        stage_module._validated_single_ablation_summary_metrics(
+            {**single_metrics, "extra": 1},
+            axis="guidance",
+            value="mi",
+            document=single_document,
+        )
+
+
+def test_ablation_score_outcomes_are_derived_from_selected_validated_score_map() -> None:
+    single = {
+        "scores": [
+            {"feature": "f0", "score": -1},
+            {"feature": "f1", "score": -1},
+            {"feature": "f2", "score": 0},
+            {"feature": "f3", "score": 1},
+        ]
+    }
+    utility = {
+        "scores": {
+            "accuracy": [
+                {"feature": "f0", "score": -1},
+                {"feature": "f1", "score": 0},
+            ],
+            "ovr_auc": [
+                {"feature": "f0", "score": 1},
+                {"feature": "f1", "score": 1},
+            ],
+        }
+    }
+
+    assert stage_module._ablation_score_outcomes(single) == {
+        "harmful_count": 2,
+        "harmful_fraction": 0.5,
+        "neutral_count": 1,
+        "beneficial_count": 1,
+    }
+    assert stage_module._ablation_score_outcomes(
+        utility, utility_value="accuracy"
+    ) == {
+        "harmful_count": 1,
+        "harmful_fraction": 0.5,
+        "neutral_count": 1,
+        "beneficial_count": 0,
+    }
+    assert stage_module._ablation_score_outcomes(
+        utility, utility_value="ovr_auc"
+    )["harmful_fraction"] == 0.0
+
+
+def test_ablation_artifact_outcomes_are_published_to_raw_and_aggregate_tables(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = smoke_protocol.datasets[0].dataset_id
+    seed = smoke_protocol.seeds[0]
+    budget = max(smoke_protocol.estimator_budgets)
+    jobs = (
+        JobSpec(
+            "job-ablation-guidance", "a" * 64, "ablation", dataset, seed,
+            "guidance", {"axis": "guidance", "value": "mi"}, (),
+            "raw_metrics/ablation/guidance.json",
+        ),
+        JobSpec(
+            "job-ablation-utility", "a" * 64, "ablation", dataset, seed,
+            "utility", {"axis": "utility", "value": "accuracy"}, (),
+            "raw_metrics/ablation/utility.json",
+        ),
+    )
+    layout = create_new_run(tmp_path / "results", "ablation-summary", smoke_protocol)
+    status = StatusStore(layout, jobs)
+    context = StageContext(
+        smoke_protocol,
+        layout,
+        jobs[0],
+        status,
+        AuditLog.from_manifest(layout.audit_path, jobs),
+    )
+    single_document = {
+        "budget": budget,
+        "model_fit_count": 2,
+        "coalition_count": 3,
+        "scores": [
+            {"feature": "f0", "score": -1},
+            {"feature": "f1", "score": 0},
+        ],
+    }
+    utility_document = {
+        "budget": budget,
+        "shared_group_id": f"utility:{dataset}:s{seed}:b{budget}",
+        "shared_group_model_fit_count": 2,
+        "shared_group_coalition_count": 3,
+        "scores": {
+            "accuracy": [
+                {"feature": "f0", "score": -1},
+                {"feature": "f1", "score": -1},
+            ],
+            "ovr_auc": [
+                {"feature": "f0", "score": 1},
+                {"feature": "f1", "score": 1},
+            ],
+        },
+    }
+    records = {
+        jobs[0].job_id: replace(
+            _result(jobs[0]),
+            metrics={
+                "axis": "guidance", "value": "mi", "budget": budget,
+                "model_fit_count": 2, "coalition_count": 3,
+            },
+        ),
+        jobs[1].job_id: replace(
+            _result(jobs[1]),
+            metrics={
+                "axis": "utility", "value": "accuracy", "budget": budget,
+                "shared_group_id": utility_document["shared_group_id"],
+                "shared_group_model_fit_count": 2,
+                "shared_group_coalition_count": 3,
+            },
+        ),
+    }
+    documents = {
+        jobs[0].job_id: single_document,
+        jobs[1].job_id: utility_document,
+    }
+    monkeypatch.setattr(
+        stage_module,
+        "read_result_record",
+        lambda _path, job: records[job.job_id],
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_manifest_row",
+        lambda _context: {"selected_features_json": '["f0", "f1"]'},
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "_validate_summary_ablation_artifact",
+        lambda item, _record, _features: documents[item.job.job_id],
+    )
+
+    raw_rows, _ = stage_module._validated_summary_rows(context)
+    tables = stage_module.aggregate_canonical_records(raw_rows, [])
+
+    harmful = {
+        (row["method"], row["parameter"]): row["value"]
+        for row in raw_rows
+        if row["metric"] == "harmful_fraction"
+    }
+    assert harmful == {
+        ("guidance", "guidance=mi"): 0.5,
+        ("utility", "utility=accuracy"): 1.0,
+    }
+    assert {
+        (row["method"], row["parameter"], row["mean"])
+        for row in tables["aggregate"]
+        if row["metric"] == "harmful_fraction"
+    } == {
+        ("guidance", "guidance=mi", 0.5),
+        ("utility", "utility=accuracy", 1.0),
+    }
+
+
+@pytest.mark.parametrize("stage", ("removal", "alpha"))
+def test_summary_validates_but_does_not_publish_internal_selection_plan_metrics(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    stage: str,
+) -> None:
+    dataset = smoke_protocol.datasets[0].dataset_id
+    seed = smoke_protocol.seeds[0]
+    job = JobSpec(
+        f"job-{stage}-plan",
+        "a" * 64,
+        stage,
+        dataset,
+        seed,
+        "selection_plan",
+        {},
+        (),
+        f"raw_metrics/{stage}/plan.json",
+    )
+    layout = create_new_run(tmp_path / "results", f"{stage}-plan-summary", smoke_protocol)
+    status = StatusStore(layout, (job,))
+    context = StageContext(
+        smoke_protocol,
+        layout,
+        job,
+        status,
+        AuditLog.from_manifest(layout.audit_path, (job,)),
+    )
+    relpath = f"{stage}/{dataset}/s{seed}/selection_plan.json"
+    record = replace(
+        _result(job),
+        metrics={"arbitrary_numeric_extra": 123.0},
+        artifacts={"selection_plan": relpath},
+    )
+    monkeypatch.setattr(stage_module, "read_result_record", lambda *args: record)
+    if stage == "removal":
+        monkeypatch.setattr(stage_module, "_read_removal_plan", lambda *args: {"k": 0})
+    else:
+        monkeypatch.setattr(stage_module, "_read_alpha_plan", lambda *args: {})
+
+    raw_rows, front_rows = stage_module._validated_summary_rows(context)
+
+    assert raw_rows == []
+    assert front_rows == []
+
+
+def test_summarize_rejects_noncanonical_formal_seed_tuple_before_extraction(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    formal = replace(
+        smoke_protocol,
+        run_kind="formal",
+        seeds=(42, 123, 456, 789),
+    )
+    data_manifest = [
+        {"dataset_id": dataset.dataset_id, "seed": seed, "selected_feature_count": 7}
+        for dataset in formal.datasets
+        for seed in formal.seeds
+    ]
+    manifest = build_job_manifest(
+        formal,
+        stages=("estimator", "removal", "alpha", "nsga2", "ablation", "summarize"),
+        data_manifest=data_manifest,
+    )
+    layout = create_new_run(tmp_path / "results", "bad-formal-seeds", formal)
+    status = StatusStore(layout, manifest)
+    job = next(item for item in manifest if item.stage == "summarize")
+    context = StageContext(
+        formal, layout, job, status, AuditLog.from_manifest(layout.audit_path, manifest)
+    )
+    monkeypatch.setattr(stage_module, "assert_stage_complete", lambda *args: None)
+    monkeypatch.setattr(
+        stage_module,
+        "_validated_summary_rows",
+        lambda *args: (_ for _ in ()).throw(AssertionError("extraction ran")),
+    )
+    with pytest.raises(ValueError, match="formal.*seed"):
+        stage_module.run_summarize_job(context)
+
+
+def test_approved_skip_metadata_is_deterministic_and_extraction_omits_job(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_manifest = [
+        {
+            "dataset_id": dataset.dataset_id,
+            "seed": seed,
+            "selected_feature_count": 7,
+        }
+        for dataset in smoke_protocol.datasets
+        for seed in smoke_protocol.seeds
+    ]
+    manifest = build_job_manifest(
+        smoke_protocol,
+        stages=("estimator", "removal", "alpha", "nsga2", "ablation", "summarize"),
+        data_manifest=data_manifest,
+    )
+    skipped = next(job for job in manifest if job.stage == "estimator")
+    reason = "approved synthetic omission"
+    layout = create_new_run(tmp_path / "results", "approved-skip", smoke_protocol)
+    status = StatusStore(layout, manifest, approved_skips={skipped.job_id: reason})
+    status.skip(skipped.job_id, reason)
+    summary_job = next(job for job in manifest if job.stage == "summarize")
+    context = StageContext(
+        smoke_protocol,
+        layout,
+        summary_job,
+        status,
+        AuditLog.from_manifest(layout.audit_path, manifest),
+    )
+    metadata, omitted_ids = stage_module._upstream_skip_metadata(context)
+    assert omitted_ids == {skipped.job_id}
+    assert metadata == [
+        {
+            "job_id": skipped.job_id,
+            "stage": skipped.stage,
+            "dataset_id": skipped.dataset_id,
+            "seed": skipped.seed,
+            "method": skipped.method,
+            "reason": reason,
+        }
+    ]
+
+    def no_skipped_read(path, job):
+        assert job.job_id != skipped.job_id
+        raise RuntimeError("reached next non-skipped job")
+
+    monkeypatch.setattr(stage_module, "read_result_record", no_skipped_read)
+    with pytest.raises(RuntimeError, match="next non-skipped"):
+        stage_module._validated_summary_rows(context, omitted_job_ids=omitted_ids)
+
+
+def test_summary_bundle_manifest_binds_every_file_and_detects_csv_tamper(
+    tmp_path: Path,
+) -> None:
+    tables = {
+        "raw": [],
+        "aggregate": [],
+        "paired": [],
+        "front": [],
+    }
+    payloads, manifest_hash = stage_module._summary_publication_payloads(
+        tables,
+        macros="",
+        provenance={"schema_version": 1, "run_kind": "smoke", "macros": {}},
+        run_kind="smoke",
+        skipped_jobs=[],
+        publication_allowed=True,
+    )
+    assert set(payloads) == {
+        "raw_metrics.csv", "aggregate_metrics.csv", "paired_comparisons.csv",
+        "plot_sources.csv", "latex_macros.tex",
+        "latex_macros_provenance.json", "summary_bundle_manifest.json",
+    }
+    bundle = stage_module._publish_bundle(tmp_path, "summary", payloads)
+    manifest = stage_module._validate_summary_bundle(
+        bundle,
+        expected_manifest_sha256=manifest_hash,
+        expected_run_kind="smoke",
+    )
+    assert manifest["schema_version"] == 1
+    assert manifest["publication_allowed"] is True
+    assert [entry["filename"] for entry in manifest["files"]] == [
+        "raw_metrics.csv", "aggregate_metrics.csv", "paired_comparisons.csv",
+        "plot_sources.csv", "latex_macros.tex", "latex_macros_provenance.json",
+    ]
+    for entry in manifest["files"]:
+        payload = (bundle / entry["filename"]).read_bytes()
+        assert entry["sha256"] == hashlib.sha256(payload).hexdigest()
+        assert entry["byte_length"] == len(payload)
+    (bundle / "raw_metrics.csv").write_bytes(
+        (bundle / "raw_metrics.csv").read_bytes() + b"tamper\n"
+    )
+    with pytest.raises(ValueError, match="hash|length|canonical|row"):
+        stage_module._validate_summary_bundle(
+            bundle,
+            expected_manifest_sha256=manifest_hash,
+            expected_run_kind="smoke",
+        )
+
+
+def test_bundle_publication_race_rejects_extra_entries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_replace = stage_module.os.replace
+
+    def racing_replace(source, destination):
+        source_path = Path(source)
+        destination_path = Path(destination)
+        if source_path.is_dir():
+            destination_path.mkdir()
+            for entry in source_path.iterdir():
+                (destination_path / entry.name).write_bytes(entry.read_bytes())
+            (destination_path / "unexpected.txt").write_bytes(b"extra")
+            raise FileExistsError
+        return original_replace(source, destination)
+
+    monkeypatch.setattr(stage_module.os, "replace", racing_replace)
+
+    with pytest.raises(RuntimeError, match="concurrent publication bundle conflicts"):
+        stage_module._publish_bundle(tmp_path, "paper", {"figure.pdf": b"%PDF"})
+
+
+def test_status_decide_stage_validator_turns_linked_tamper_into_invalid_success(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "validator-hook", smoke_protocol)
+    manifest = build_job_manifest(smoke_protocol, stages=("validate",))
+    status = StatusStore(layout, manifest)
+    _complete_jobs(layout, status, manifest)
+    called = []
+
+    def reject(record: ResultRecord) -> None:
+        called.append(record.job_id)
+        raise ValueError("linked artifact changed")
+
+    decision = status.decide(manifest[0].job_id, result_validator=reject)
+    assert decision.action == "execute"
+    assert decision.reason == "invalid_success"
+    assert called == [manifest[0].job_id]
+    assert status.entry(manifest[0].job_id)["state"] == "failed"
+
+
+def test_figure_bundle_requires_exact_three_pdfs_and_detects_tamper(
+    tmp_path: Path,
+) -> None:
+    generated = []
+    for name in ("fig1_overview.pdf", "fig2_cd_heatmap.pdf", "fig3_prefilter.pdf"):
+        path = tmp_path / name
+        path.write_bytes(b"%PDF-1.4\n" + name.encode("ascii"))
+        generated.append(path)
+    payloads, manifest_hash = stage_module._figure_publication_payloads(generated)
+    assert set(payloads) == {
+        "fig1_overview.pdf", "fig2_cd_heatmap.pdf", "fig3_prefilter.pdf",
+        "figure_bundle_manifest.json",
+    }
+    bundle = stage_module._publish_bundle(tmp_path, "paper", payloads)
+    stage_module._validate_figure_bundle(
+        bundle, expected_manifest_sha256=manifest_hash
+    )
+    (bundle / "fig3_prefilter.pdf").write_bytes(b"%PDF-1.4\ntampered")
+    with pytest.raises(ValueError, match="figure.*hash|hash.*figure"):
+        stage_module._validate_figure_bundle(
+            bundle, expected_manifest_sha256=manifest_hash
+        )
+
+    wrong = tmp_path / "wrong.pdf"
+    wrong.write_bytes(b"%PDF-1.4\nwrong")
+    with pytest.raises(ValueError, match="exact.*PDF|filename"):
+        stage_module._figure_publication_payloads([*generated[:2], wrong])
+
+
+def test_summarize_success_retry_validates_linked_bundle_bytes(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout = create_new_run(tmp_path / "results", "summary-retry", smoke_protocol)
+    manifest = build_job_manifest(smoke_protocol, stages=("summarize",))
+    status = StatusStore(layout, manifest)
+    job = manifest[0]
+    tables = {"raw": [], "aggregate": [], "paired": [], "front": []}
+    payloads, digest = stage_module._summary_publication_payloads(
+        tables,
+        macros="",
+        provenance={"schema_version": 1, "run_kind": "smoke", "macros": {}},
+        run_kind="smoke",
+        skipped_jobs=[],
+        publication_allowed=True,
+    )
+    stage_module._publish_bundle(layout.tables, "summary", payloads)
+    now = datetime.now(timezone.utc).isoformat()
+    record = ResultRecord(
+        job.job_id, job.protocol_hash, job.stage, job.dataset_id, job.seed, job.method,
+        {
+            "raw_row_count": 0, "aggregate_row_count": 0,
+            "paired_row_count": 0, "front_row_count": 0,
+            "run_kind": "smoke", "skipped_job_count": 0,
+            "publication_allowed": True, "bundle_manifest_sha256": digest,
+            "bundle_manifest_byte_length": len(payloads["summary_bundle_manifest.json"]),
+        },
+        {
+            key: f"tables/summary/{filename}"
+            for key, filename in stage_module._SUMMARY_FILES.items()
+        },
+        now, now,
+    )
+    atomic_write_json(layout.root / job.output_relpath, asdict(record))
+    status.start(job.job_id)
+    status.succeed(job.job_id)
+    context = StageContext(
+        smoke_protocol, layout, job, status,
+        AuditLog.from_manifest(layout.audit_path, manifest),
+    )
+    def validator(candidate):
+        return stage_module._validate_summarize_result_record(context, candidate)
+    assert status.decide(job.job_id, result_validator=validator).action == "skip"
+    (layout.tables / "summary" / "raw_metrics.csv").write_bytes(b"bad\n")
+    decision = status.decide(job.job_id, result_validator=validator)
+    assert decision == protocol_module.ResumeDecision("execute", "invalid_success")
+
+
+def test_formal_skipped_summary_suppresses_figures_without_creating_pdf_bundle(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    formal = replace(
+        smoke_protocol,
+        run_kind="formal",
+        seeds=(42, 123, 456, 789, 1024),
+    )
+    layout = create_new_run(tmp_path / "results", "suppressed-figures", formal)
+    manifest = build_job_manifest(formal, stages=("summarize", "figures"))
+    status = StatusStore(layout, manifest)
+    summary_job = next(job for job in manifest if job.stage == "summarize")
+    figure_job = next(job for job in manifest if job.stage == "figures")
+    skipped_jobs = [
+        {
+            "job_id": "synthetic-skipped-job", "stage": "estimator",
+            "dataset_id": "spambase", "seed": 42, "method": "exact",
+            "reason": "approved synthetic omission",
+        }
+    ]
+    payloads, digest = stage_module._summary_publication_payloads(
+        {"raw": [], "aggregate": [], "paired": [], "front": []},
+        macros="",
+        provenance={
+            "schema_version": 1, "run_kind": "formal",
+            "publication_allowed": False, "skipped_jobs": skipped_jobs,
+            "macros": {},
+        },
+        run_kind="formal",
+        skipped_jobs=skipped_jobs,
+        publication_allowed=False,
+    )
+    stage_module._publish_bundle(layout.tables, "summary", payloads)
+    now = datetime.now(timezone.utc).isoformat()
+    summary = ResultRecord(
+        summary_job.job_id, summary_job.protocol_hash, summary_job.stage,
+        summary_job.dataset_id, summary_job.seed, summary_job.method,
+        {
+            "raw_row_count": 0, "aggregate_row_count": 0,
+            "paired_row_count": 0, "front_row_count": 0,
+            "run_kind": "formal", "skipped_job_count": 1,
+            "publication_allowed": False, "bundle_manifest_sha256": digest,
+            "bundle_manifest_byte_length": len(payloads["summary_bundle_manifest.json"]),
+        },
+        {
+            key: f"tables/summary/{filename}"
+            for key, filename in stage_module._SUMMARY_FILES.items()
+        },
+        now, now,
+    )
+    atomic_write_json(layout.root / summary_job.output_relpath, asdict(summary))
+    status.start(summary_job.job_id)
+    status.succeed(summary_job.job_id)
+    context = StageContext(
+        formal, layout, figure_job, status,
+        AuditLog.from_manifest(layout.audit_path, manifest),
+    )
+
+    result = stage_module.run_figures_job(context)
+
+    assert result.metrics["publication_suppressed"] is True
+    assert result.metrics["figure_count"] == 0
+    assert result.artifacts == {}
+    assert not (layout.figures / "paper").exists()
+    stage_module._validate_figures_result_record(context, result)
+    with pytest.raises(ValueError, match="suppressed figures ResultRecord schema"):
+        stage_module._validate_figures_result_record(
+            context,
+            replace(result, metrics={**result.metrics, "run_kind": "smoke"}),
+        )
+
+
+def test_formal_summary_allows_approved_whole_seed_omission_and_suppresses_publication(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    formal = replace(
+        smoke_protocol,
+        run_kind="formal",
+        seeds=(42, 123, 456, 789, 1024),
+    )
+    data_manifest = [
+        {
+            "dataset_id": dataset.dataset_id,
+            "seed": seed,
+            "selected_feature_count": 7,
+        }
+        for dataset in formal.datasets
+        for seed in formal.seeds
+    ]
+    manifest = build_job_manifest(
+        formal,
+        stages=("estimator", "removal", "alpha", "nsga2", "ablation", "summarize"),
+        data_manifest=data_manifest,
+    )
+    skipped = tuple(
+        job
+        for job in manifest
+        if job.stage in stage_module._SUMMARY_REQUIRED_STAGES and job.seed == 1024
+    )
+    reason = "approved whole-seed omission"
+    approvals = {job.job_id: reason for job in skipped}
+    layout = create_new_run(tmp_path / "results", "formal-seed-skip", formal)
+    status = StatusStore(layout, manifest, approved_skips=approvals)
+    for job in manifest:
+        if job in skipped:
+            status.skip(job.job_id, reason)
+        elif job.stage in stage_module._SUMMARY_REQUIRED_STAGES:
+            atomic_write_json(layout.root / job.output_relpath, asdict(_result(job)))
+            status.start(job.job_id)
+            status.succeed(job.job_id)
+    summary_job = next(job for job in manifest if job.stage == "summarize")
+    context = StageContext(
+        formal,
+        layout,
+        summary_job,
+        status,
+        AuditLog.from_manifest(layout.audit_path, manifest),
+    )
+
+    def remaining_rows(_context, *, omitted_job_ids=None):
+        assert omitted_job_ids == {job.job_id for job in skipped}
+        assert all(not (layout.root / job.output_relpath).exists() for job in skipped)
+        return (
+            [
+                {
+                    "run_kind": "formal", "manifest_sequence": index,
+                    "stage": "removal", "dataset_id": "spambase", "seed": seed,
+                    "method": "minppi", "trial": 0, "parameter": "",
+                    "metric": "delta_utility", "value": -0.01,
+                }
+                for index, seed in enumerate((42, 123, 456, 789))
+            ],
+            [],
+        )
+
+    monkeypatch.setattr(stage_module, "_validated_summary_rows", remaining_rows)
+
+    result = stage_module.run_summarize_job(context)
+
+    assert result.metrics["publication_allowed"] is False
+    assert result.metrics["skipped_job_count"] == len(skipped)
+    bundle = stage_module._validate_summary_bundle(
+        layout.tables / "summary",
+        expected_manifest_sha256=result.metrics["bundle_manifest_sha256"],
+        expected_run_kind="formal",
+    )
+    assert bundle["publication_allowed"] is False
+    assert [entry["job_id"] for entry in bundle["skipped_jobs"]] == [
+        job.job_id for job in skipped
+    ]
 
 
 def test_selected_alpha_preflights_and_appends_missing_canonical_chunks(
@@ -4175,7 +5180,7 @@ def test_cli_lifecycle_is_append_logged_and_never_replaces_process_streams_or_cw
     assert len((run_root / "output.log").read_bytes()) > len(first_log)
 
 
-def test_all_runs_through_ablation_then_stops_before_unregistered_future_executors(
+def test_all_runs_through_registered_task11_executors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runner = object.__new__(PipelineRunner)
@@ -4187,8 +5192,5 @@ def test_all_runs_through_ablation_then_stops_before_unregistered_future_executo
         lambda stage: seen.append(stage) or stage_module.StageRunSummary(stage=stage),
     )
 
-    assert runner.run("all") == 1
-    assert tuple(seen) == (
-        "validate", "preprocess", "estimator", "removal", "alpha", "nsga2", "ablation"
-    )
-    assert "summarize" not in seen
+    assert runner.run("all") == 0
+    assert tuple(seen) == STAGE_ORDER

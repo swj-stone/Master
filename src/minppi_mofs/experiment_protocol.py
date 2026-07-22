@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 from uuid import uuid4
 
 import pandas as pd
@@ -1987,7 +1987,12 @@ class StatusStore:
             raise ValueError("status manifest contains foreign protocol hashes")
         return next(iter(hashes))
 
-    def decide(self, job_id: str) -> ResumeDecision:
+    def decide(
+        self,
+        job_id: str,
+        *,
+        result_validator: Callable[[ResultRecord], None] | None = None,
+    ) -> ResumeDecision:
         """Return whether a job may be skipped, validating prior success."""
         self._require_usable()
         job = self._job(job_id)
@@ -2007,7 +2012,9 @@ class StatusStore:
         if state != "success":  # guarded by schema validation
             raise RuntimeError("persisted status state is invalid")
         try:
-            read_result_record(self._result_path(job), job)
+            record = read_result_record(self._result_path(job), job)
+            if result_validator is not None:
+                result_validator(record)
         except ValueError as exc:
             self._replace_entry(
                 job,

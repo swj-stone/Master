@@ -913,34 +913,34 @@ two-point HV equals `0.28`.
 - Consumes: validated canonical records only
 - Produces: CSV tables, `latex_macros.tex`, and figures under the run directory
 
-- [ ] **Step 1: Write completeness-before-statistics tests**
+- [x] **Step 1: Write completeness-before-statistics tests**
 
 Monkeypatch the aggregation function and assert it is never called when one
 manifest job is missing.  Add complete five-seed fixtures and assert raw values,
 mean, standard deviation, median, deterministic 95% bootstrap interval, paired
 Wilcoxon/permutation result, Holm-adjusted p-value, and effect size.
 
-- [ ] **Step 2: Implement deterministic summary functions**
+- [x] **Step 2: Implement deterministic summary functions**
 
 Use seed `42` for bootstrap resampling and implement Holm correction locally to
 avoid another dependency.  Preserve every raw seed row.  Treat five seeds as
 paired units and label tests descriptive because power is low.
 
-- [ ] **Step 3: Generate LaTeX macros from the same tables**
+- [x] **Step 3: Generate LaTeX macros from the same tables**
 
 Escape names, format metrics from typed columns, and generate macros such as
 `\CreditCompression`, `\CreditDeltaUtility`, and `\NsgaMeanHvChange` only from
 validated aggregate rows.  Store the exact source table/column in a companion
 JSON provenance map.
 
-- [ ] **Step 4: Make figure generation read-only**
+- [x] **Step 4: Make figure generation read-only**
 
 Refactor `make_paper_figures.py` functions to accept explicit table paths and
 output directory.  They must not load raw datasets, train models, or write to
 legacy `results/figures`.  Smoke mode generates the same figure types from
 smoke tables and labels them as smoke artifacts.
 
-- [ ] **Step 5: Verify Task 11**
+- [x] **Step 5: Verify Task 11**
 
 Run summary/figure tests twice and compare hashes for deterministic CSV, macro,
 and PDF outputs where metadata permits stable hashes.

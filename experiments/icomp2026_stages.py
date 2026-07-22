@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import csv
+import io
 import json
 import os
 import shutil
@@ -38,6 +40,29 @@ from minppi_mofs.baselines.nsga2_fs import (
     _non_dominated_sort,
     nsga2_feature_selection,
 )
+
+if __package__:
+    from .summarize_icomp2026 import (
+        AGGREGATE_COLUMNS,
+        FRONT_COLUMNS,
+        PAIRED_COLUMNS,
+        RAW_COLUMNS,
+        aggregate_canonical_records,
+        csv_bytes,
+        generate_latex_macros,
+        provenance_bytes,
+    )
+else:
+    from summarize_icomp2026 import (  # type: ignore[no-redef]
+        AGGREGATE_COLUMNS,
+        FRONT_COLUMNS,
+        PAIRED_COLUMNS,
+        RAW_COLUMNS,
+        aggregate_canonical_records,
+        csv_bytes,
+        generate_latex_macros,
+        provenance_bytes,
+    )
 
 
 STAGE_DEPENDENCIES: Mapping[str, tuple[str, ...]] = {
@@ -166,7 +191,15 @@ def execute_stage(
         ):
             blocked.append(job.job_id)
             continue
-        decision = status.decide(job.job_id)
+        resume_context = StageContext(protocol, layout, job, status, audit)
+        result_validator = (
+            (lambda record, bound=resume_context: _validate_task11_result_record(bound, record))
+            if job.stage in {"summarize", "figures"}
+            else None
+        )
+        decision = status.decide(
+            job.job_id, result_validator=result_validator
+        )
         if decision.action == "skip":
             skipped.append(job.job_id)
             continue
@@ -185,6 +218,8 @@ def execute_stage(
             if not isinstance(result, ResultRecord):
                 raise TypeError("stage executor must return ResultRecord")
             atomic_write_json(layout.root / job.output_relpath, asdict(result))
+            if job.stage in {"summarize", "figures"}:
+                _validate_task11_result_record(item, result)
         except Exception as exc:
             status = _record_failure(status, layout, manifest, job.job_id, exc)
             failed.append(job.job_id)
@@ -834,6 +869,7 @@ def _read_score_artifact(
     expected_job: JobSpec,
     budget: int,
     expected_features: tuple[str, ...],
+    expected_metrics: Mapping[str, object] | None = None,
 ) -> dict[str, int]:
     try:
         document = read_canonical_json(path, context="estimator score artifact")
@@ -845,6 +881,9 @@ def _read_score_artifact(
         "protocol_hash", "job_id", "dataset_id", "seed", "method", "budget",
         "scores", "model_fit_count", "coalition_count",
     }
+    scheduled = expected_job.method in {"mi_correlation_guided", "hybrid"}
+    if scheduled:
+        expected_keys.add("schedule_digest")
     if not isinstance(document, dict) or set(document) != expected_keys:
         raise ValueError("estimator score artifact schema is invalid")
     for field in ("protocol_hash", "job_id", "dataset_id", "seed", "method"):
@@ -889,6 +928,35 @@ def _read_score_artifact(
         )
     ):
         raise ValueError("estimator score artifact cost counters are invalid")
+    if scheduled:
+        from minppi_mofs.min_ppi import (
+            algorithm_b_schedule_digest,
+            make_algorithm_b_perturbation_schedule,
+        )
+
+        expected_digest = algorithm_b_schedule_digest(
+            make_algorithm_b_perturbation_schedule(
+                expected_features, K_adv=budget, seed=expected_job.seed
+            )
+        )
+        if document["schedule_digest"] != expected_digest:
+            raise ValueError("estimator score artifact schedule digest is invalid")
+    if expected_metrics is not None:
+        if any(
+            expected_metrics.get(field) != document[field]
+            for field in ("budget", "model_fit_count", "coalition_count")
+        ):
+            raise ValueError(
+                "estimator ResultRecord metrics conflict with score artifact"
+            )
+        runtime = expected_metrics.get("runtime_s")
+        if (
+            isinstance(runtime, bool)
+            or not isinstance(runtime, (int, float))
+            or not __import__("math").isfinite(float(runtime))
+            or runtime < 0
+        ):
+            raise ValueError("estimator ResultRecord runtime is invalid")
     return normalized
 
 
@@ -3647,6 +3715,1199 @@ def run_nsga2_job(context: StageContext) -> ResultRecord:
     )
 
 
+_SUMMARY_REQUIRED_STAGES = ("estimator", "removal", "alpha", "nsga2", "ablation")
+_SUMMARY_FILES = {
+    "raw": "raw_metrics.csv",
+    "aggregate": "aggregate_metrics.csv",
+    "paired": "paired_comparisons.csv",
+    "front": "plot_sources.csv",
+    "latex_macros": "latex_macros.tex",
+    "latex_macros_provenance": "latex_macros_provenance.json",
+    "bundle_manifest": "summary_bundle_manifest.json",
+}
+_FORMAL_SEEDS = (42, 123, 456, 789, 1024)
+
+
+def _summary_job_context(context: StageContext, job: JobSpec) -> StageContext:
+    return StageContext(
+        context.protocol, context.layout, job, context.status, context.audit
+    )
+
+
+def _numeric_metrics(
+    *,
+    context: StageContext,
+    sequence: int,
+    method: str,
+    parameter: str,
+    trial: int,
+    metrics: Mapping[str, object],
+) -> list[dict[str, object]]:
+    import math
+
+    rows: list[dict[str, object]] = []
+    for name in sorted(metrics):
+        value = metrics[name]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            raise ValueError("summary metric must be finite")
+        rows.append(
+            {
+                "run_kind": context.protocol.run_kind,
+                "manifest_sequence": sequence,
+                "stage": context.job.stage,
+                "dataset_id": context.job.dataset_id,
+                "seed": context.job.seed,
+                "method": method,
+                "trial": trial,
+                "parameter": parameter,
+                "metric": name,
+                "value": numeric,
+            }
+        )
+    return rows
+
+
+def _validated_estimator_summary_metrics(
+    metrics: Mapping[str, object],
+    *,
+    approximate_scores: Mapping[str, int],
+    exact_scores: Mapping[str, int] | None,
+    budget: int,
+    model_fit_count: int,
+    coalition_count: int,
+) -> dict[str, object]:
+    base = {"budget", "model_fit_count", "coalition_count", "runtime_s"}
+    agreement_keys = {
+        "harmful_precision", "harmful_recall", "harmful_f1", "score_agreement"
+    }
+    allowed_schemas = {frozenset(base)}
+    if exact_scores is not None:
+        allowed_schemas.add(frozenset(base | agreement_keys))
+    if frozenset(metrics) not in allowed_schemas:
+        raise ValueError("estimator ResultRecord metric schema is invalid")
+    if (
+        metrics["budget"] != budget
+        or metrics["model_fit_count"] != model_fit_count
+        or metrics["coalition_count"] != coalition_count
+    ):
+        raise ValueError("estimator ResultRecord metrics conflict with score artifact")
+    runtime = metrics["runtime_s"]
+    if (
+        isinstance(runtime, bool)
+        or not isinstance(runtime, (int, float))
+        or not __import__("math").isfinite(float(runtime))
+        or runtime < 0
+    ):
+        raise ValueError("estimator ResultRecord runtime is invalid")
+    published = dict(metrics)
+    if exact_scores is not None:
+        recomputed = _agreement_metrics(approximate_scores, exact_scores)
+        if agreement_keys <= set(metrics) and any(
+            metrics[key] != recomputed[key] for key in agreement_keys
+        ):
+            raise ValueError("estimator ResultRecord agreement metrics are invalid")
+        published.update(recomputed)
+    return published
+
+
+def _validated_utility_ablation_summary_metrics(
+    metrics: Mapping[str, object],
+    *,
+    value: str,
+    document: Mapping[str, object],
+) -> dict[str, object]:
+    fields = {
+        "axis", "value", "budget", "shared_group_id",
+        "shared_group_model_fit_count", "shared_group_coalition_count",
+    }
+    if set(metrics) != fields:
+        raise ValueError("utility ablation ResultRecord metric schema is invalid")
+    if metrics["axis"] != "utility" or metrics["value"] != value or any(
+        metrics[field] != document[field]
+        for field in fields - {"axis", "value"}
+    ):
+        raise ValueError("utility ablation ResultRecord metrics conflict with artifact")
+    return dict(metrics)
+
+
+def _validated_single_ablation_summary_metrics(
+    metrics: Mapping[str, object],
+    *,
+    axis: str,
+    value: str,
+    document: Mapping[str, object],
+) -> dict[str, object]:
+    fields = {"axis", "value", "budget", "model_fit_count", "coalition_count"}
+    if set(metrics) != fields:
+        raise ValueError("single ablation ResultRecord metric schema is invalid")
+    if metrics["axis"] != axis or metrics["value"] != value or any(
+        metrics[field] != document[field]
+        for field in ("budget", "model_fit_count", "coalition_count")
+    ):
+        raise ValueError("single ablation ResultRecord metrics conflict with artifact")
+    return dict(metrics)
+
+
+def _ablation_score_outcomes(
+    document: Mapping[str, object],
+    *,
+    utility_value: str | None = None,
+) -> dict[str, float | int]:
+    scores = document.get("scores")
+    if utility_value is not None:
+        if not isinstance(scores, Mapping) or utility_value not in scores:
+            raise ValueError("utility ablation selected score map is invalid")
+        scores = scores[utility_value]
+    if not isinstance(scores, list) or not scores:
+        raise ValueError("ablation selected score map is invalid")
+    values: list[int] = []
+    for entry in scores:
+        score = entry.get("score") if isinstance(entry, Mapping) else None
+        if isinstance(score, bool) or not isinstance(score, int) or score not in {-1, 0, 1}:
+            raise ValueError("ablation selected score map is invalid")
+        values.append(score)
+    harmful_count = values.count(-1)
+    return {
+        "harmful_count": harmful_count,
+        "harmful_fraction": harmful_count / len(values),
+        "neutral_count": values.count(0),
+        "beneficial_count": values.count(1),
+    }
+
+
+def _artifact_bound_record_metrics(
+    record: ResultRecord,
+    document: Mapping[str, object],
+    fields: set[str],
+    *,
+    context: str,
+) -> dict[str, object]:
+    if set(record.metrics) != fields:
+        raise ValueError(f"{context} ResultRecord metric schema is invalid")
+    if any(record.metrics[field] != document[field] for field in fields):
+        raise ValueError(f"{context} ResultRecord metrics conflict with artifact")
+    return dict(record.metrics)
+
+
+def _validate_summary_ablation_artifact(
+    context: StageContext,
+    record: ResultRecord,
+    expected_features: tuple[str, ...],
+) -> dict[str, object]:
+    """Match Task 8's single-ablation artifact contract without split access."""
+    axis = str(context.job.parameters["axis"])
+    value = str(context.job.parameters["value"])
+    budget = max(context.protocol.estimator_budgets)
+    if axis == "utility":
+        group_id = f"utility:{context.job.dataset_id}:s{context.job.seed}:b{budget}"
+        relpath = (
+            f"ablation/{context.job.dataset_id}/s{context.job.seed}/"
+            f"utility/paired/b{budget}/scores.json"
+        )
+        if record.artifacts != {"paired_scores": relpath}:
+            raise ValueError("utility ablation artifact path is invalid")
+        document = _read_utility_pair_artifact(
+            context, context.layout.root / relpath, budget, group_id
+        )
+        return document
+    relpath = (
+        f"ablation/{context.job.dataset_id}/s{context.job.seed}/"
+        f"{axis}/{value}/b{budget}/scores.json"
+    )
+    if record.artifacts != {"scores": relpath}:
+        raise ValueError("ablation score artifact path is invalid")
+    document = read_canonical_json(
+        context.layout.root / relpath, context=f"{axis} ablation artifact"
+    )
+    scheduled = axis == "guidance" or (
+        axis == "dispatcher" and value in {"mi_correlation_guided", "hybrid"}
+    )
+    expected_keys = {
+        "protocol_hash", "job_id", "dataset_id", "seed", "axis", "value",
+        "method", "budget", "schedule_seed", "scores", "model_fit_count",
+        "coalition_count",
+    }
+    if scheduled:
+        expected_keys.add("schedule_digest")
+    if not isinstance(document, dict) or set(document) != expected_keys:
+        raise ValueError("ablation score artifact schema is invalid")
+    expected_method = "mi_correlation_guided" if axis == "guidance" else value
+    identity = {
+        "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id,
+        "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed,
+        "axis": axis,
+        "value": value,
+        "method": expected_method,
+        "budget": budget,
+        "schedule_seed": context.job.seed,
+    }
+    if any(document[field] != expected for field, expected in identity.items()):
+        raise ValueError("ablation score artifact identity is invalid")
+    scores = document["scores"]
+    if not isinstance(scores, list) or len(scores) != len(expected_features):
+        raise ValueError("ablation score artifact scores are invalid")
+    features: list[str] = []
+    for entry in scores:
+        score = entry.get("score") if isinstance(entry, dict) else None
+        if (
+            not isinstance(entry, dict)
+            or set(entry) != {"feature", "score"}
+            or not isinstance(entry["feature"], str)
+            or isinstance(score, bool)
+            or not isinstance(score, int)
+            or score not in {-1, 0, 1}
+        ):
+            raise ValueError("ablation score artifact scores are invalid")
+        features.append(entry["feature"])
+    if tuple(features) != expected_features or len(set(features)) != len(features):
+        raise ValueError("ablation score artifact feature order is invalid")
+    model_fits = document["model_fit_count"]
+    coalitions = document["coalition_count"]
+    if (
+        isinstance(model_fits, bool)
+        or not isinstance(model_fits, int)
+        or model_fits < 1
+        or isinstance(coalitions, bool)
+        or not isinstance(coalitions, int)
+        or coalitions < model_fits
+        or coalitions > model_fits + 1
+    ):
+        raise ValueError("ablation score artifact counters are invalid")
+    if any(
+        record.metrics.get(field) != document[field]
+        for field in ("budget", "model_fit_count", "coalition_count")
+    ) or record.metrics.get("axis") != axis or record.metrics.get("value") != value:
+        raise ValueError("ablation ResultRecord metrics conflict with score artifact")
+    if scheduled:
+        from minppi_mofs.min_ppi import (
+            algorithm_b_schedule_digest,
+            make_algorithm_b_perturbation_schedule,
+        )
+
+        expected_digest = algorithm_b_schedule_digest(
+            make_algorithm_b_perturbation_schedule(
+                expected_features, K_adv=budget, seed=context.job.seed
+            )
+        )
+        if document["schedule_digest"] != expected_digest:
+            raise ValueError("ablation score artifact schedule digest is invalid")
+    return document
+
+
+def _upstream_skip_metadata(
+    context: StageContext,
+) -> tuple[list[dict[str, object]], set[str]]:
+    skipped: list[dict[str, object]] = []
+    omitted: set[str] = set()
+    for job in context.status.manifest:
+        if job.stage not in _SUMMARY_REQUIRED_STAGES:
+            continue
+        entry = context.status.entry(job.job_id)
+        if entry["state"] != "skipped":
+            continue
+        reason = entry["skip_reason"]
+        if not isinstance(reason, str) or not reason:
+            raise ValueError("approved skipped job has no deterministic reason")
+        skipped.append(
+            {
+                "job_id": job.job_id,
+                "stage": job.stage,
+                "dataset_id": job.dataset_id,
+                "seed": job.seed,
+                "method": job.method,
+                "reason": reason,
+            }
+        )
+        omitted.add(job.job_id)
+    return skipped, omitted
+
+
+def _validated_summary_rows(
+    context: StageContext,
+    *,
+    omitted_job_ids: set[str] | None = None,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Extract values only after strict canonical stage-artifact validation."""
+    raw_rows: list[dict[str, object]] = []
+    front_rows: list[dict[str, object]] = []
+    omitted = set() if omitted_job_ids is None else set(omitted_job_ids)
+    for sequence, job in enumerate(context.status.manifest):
+        if job.stage not in _SUMMARY_REQUIRED_STAGES:
+            continue
+        if job.job_id in omitted:
+            continue
+        item = _summary_job_context(context, job)
+        record = read_result_record(context.layout.root / job.output_relpath, job)
+        parameter = ""
+        if job.stage == "estimator":
+            parameter = f"budget={job.parameters['budget']}"
+            budget = int(job.parameters["budget"])
+            expected_relpath = (
+                f"estimator/{job.dataset_id}/s{job.seed}/"
+                f"{job.method}/b{budget}/scores.json"
+            )
+            if record.artifacts != {"scores": expected_relpath}:
+                raise ValueError("estimator score artifact path is invalid")
+            features = tuple(
+                json.loads(str(_task9_manifest_row(item)["selected_features_json"]))
+            )
+            approximate_scores = _read_score_artifact(
+                context.layout.root / expected_relpath,
+                expected_job=job,
+                budget=budget,
+                expected_features=features,
+                expected_metrics=record.metrics,
+            )
+            exact_jobs = tuple(
+                candidate for candidate in context.status.manifest
+                if candidate.stage == "estimator"
+                and candidate.dataset_id == job.dataset_id
+                and candidate.seed == job.seed
+                and candidate.method == "exact"
+                and candidate.parameters.get("budget") == budget
+            )
+            if len(exact_jobs) > 1:
+                raise ValueError("estimator manifest has duplicate exact authority")
+            exact_scores = None
+            if exact_jobs and context.status.entry(exact_jobs[0].job_id)["state"] == "success":
+                exact_job = exact_jobs[0]
+                exact_record = read_result_record(
+                    context.layout.root / exact_job.output_relpath, exact_job
+                )
+                exact_relpath = (
+                    f"estimator/{exact_job.dataset_id}/s{exact_job.seed}/"
+                    f"exact/b{budget}/scores.json"
+                )
+                if exact_record.artifacts != {"scores": exact_relpath}:
+                    raise ValueError("exact estimator score artifact path is invalid")
+                exact_scores = _read_score_artifact(
+                    context.layout.root / exact_relpath,
+                    expected_job=exact_job,
+                    budget=budget,
+                    expected_features=features,
+                    expected_metrics=exact_record.metrics,
+                )
+            validated_metrics = _validated_estimator_summary_metrics(
+                record.metrics,
+                approximate_scores=approximate_scores,
+                exact_scores=exact_scores,
+                budget=budget,
+                model_fit_count=int(record.metrics["model_fit_count"]),
+                coalition_count=int(record.metrics["coalition_count"]),
+            )
+            raw_rows.extend(
+                _numeric_metrics(
+                    context=item, sequence=sequence, method=job.method,
+                    parameter=parameter, trial=0, metrics=validated_metrics,
+                )
+            )
+            continue
+        if job.stage == "ablation":
+            parameter = f"{job.parameters['axis']}={job.parameters['value']}"
+            features = tuple(
+                json.loads(str(_task9_manifest_row(item)["selected_features_json"]))
+            )
+            document = _validate_summary_ablation_artifact(item, record, features)
+            validated_metrics = (
+                _validated_utility_ablation_summary_metrics(
+                    record.metrics,
+                    value=str(job.parameters["value"]),
+                    document=document,
+                )
+                if job.parameters["axis"] == "utility"
+                else _validated_single_ablation_summary_metrics(
+                    record.metrics,
+                    axis=str(job.parameters["axis"]),
+                    value=str(job.parameters["value"]),
+                    document=document,
+                )
+            )
+            validated_metrics.update(
+                _ablation_score_outcomes(
+                    document,
+                    utility_value=(
+                        str(job.parameters["value"])
+                        if job.parameters["axis"] == "utility"
+                        else None
+                    ),
+                )
+            )
+            raw_rows.extend(
+                _numeric_metrics(
+                    context=item, sequence=sequence, method=job.method,
+                    parameter=parameter, trial=0, metrics=validated_metrics,
+                )
+            )
+            continue
+        if job.stage == "removal":
+            if job.method == "selection_plan":
+                plan = _read_removal_plan(item)
+                if record.artifacts != {
+                    "selection_plan": _removal_plan_relpath(item)
+                }:
+                    raise ValueError("removal plan result artifact path is invalid")
+                if int(plan["k"]) < 0:
+                    raise ValueError("validated removal plan k is invalid")
+                continue
+            relpath = _removal_result_relpath(item)
+            if record.artifacts != {"results": relpath}:
+                raise ValueError("removal result artifact path is invalid")
+            document = _validate_removal_result(
+                item,
+                read_canonical_json(
+                    context.layout.root / relpath,
+                    context="removal result artifact",
+                ),
+            )
+            _artifact_bound_record_metrics(
+                record,
+                document,
+                {
+                    "k", "selection_time_s", "evaluation_time_s",
+                    "selection_model_fit_count", "selection_coalition_count",
+                    "evaluation_model_fit_count",
+                },
+                context="removal",
+            )
+            for row in document["rows"]:
+                raw_rows.extend(
+                    _numeric_metrics(
+                        context=item, sequence=sequence, method=job.method,
+                        parameter="", trial=(0 if row["trial"] is None else int(row["trial"])),
+                        metrics={
+                            key: row[key]
+                            for key in (
+                                "k", "full_utility", "selected_utility",
+                                "delta_utility", "compression", "selection_time_s",
+                                "evaluation_time_s", "selection_model_fit_count",
+                                "selection_coalition_count", "evaluation_model_fit_count",
+                            )
+                        },
+                    )
+                )
+            continue
+        if job.stage == "alpha":
+            if job.method == "selection_plan":
+                _read_alpha_plan(item)
+                if record.artifacts != {"selection_plan": _alpha_plan_relpath(item)}:
+                    raise ValueError("alpha plan result artifact path is invalid")
+                continue
+            alpha = float(job.parameters["alpha"])
+            relpath = _alpha_result_relpath(item, alpha)
+            if record.artifacts != {"results": relpath}:
+                raise ValueError("alpha result artifact path is invalid")
+            document = _validate_alpha_result(
+                item,
+                read_canonical_json(
+                    context.layout.root / relpath, context="alpha result artifact"
+                ),
+            )
+            _artifact_bound_record_metrics(
+                record,
+                document,
+                {
+                    "harmful_count", "selection_time_s", "evaluation_time_s",
+                    "selection_model_fit_count", "selection_coalition_count",
+                    "evaluation_model_fit_count",
+                },
+                context="alpha",
+            )
+            raw_rows.extend(
+                _numeric_metrics(
+                    context=item, sequence=sequence, method=job.method,
+                    parameter=f"alpha={format(alpha, '.17g')}", trial=0,
+                    metrics={
+                        key: document[key]
+                        for key in (
+                            "harmful_count", "compression", "validation_utility",
+                            "test_utility", "full_test_utility", "delta_utility",
+                            "preservation", "selection_time_s", "evaluation_time_s",
+                            "selection_model_fit_count", "selection_coalition_count",
+                            "evaluation_model_fit_count",
+                        )
+                    },
+                )
+            )
+            continue
+        if job.stage == "nsga2":
+            plan, removal_record, retained = _nsga2_removal_authority(item)
+            original = tuple(plan["features"])
+            front_relpath = _nsga2_front_relpath(item, job.method)
+            front = _validate_nsga2_front_artifact(
+                item,
+                read_canonical_json(
+                    context.layout.root / front_relpath,
+                    context="NSGA-II validation-front artifact",
+                ),
+                variant=job.method,
+                original_features=original,
+                retained_features=retained,
+            )
+            result_relpath = _nsga2_result_relpath(item)
+            if record.artifacts != {"results": result_relpath}:
+                raise ValueError("NSGA-II result artifact path is invalid")
+            document = _validate_nsga2_result(
+                item,
+                read_canonical_json(
+                    context.layout.root / result_relpath,
+                    context="NSGA-II result artifact",
+                ),
+                front=front,
+                minppi_selection_time=float(
+                    removal_record.metrics["minppi_selection_time_s"]
+                ),
+            )
+            _artifact_bound_record_metrics(
+                record,
+                document,
+                {
+                    "population", "evaluation_count", "original_dimension",
+                    "search_dimension", "dimensional_reduction", "validation_hv",
+                    "test_hv", "convergence_evaluation_count",
+                    "final_front_evaluation_count", "evaluation_model_fit_count",
+                    "minppi_selection_time_s", "search_runtime_s",
+                    "evaluation_runtime_s", "total_runtime_s",
+                },
+                context="NSGA-II",
+            )
+            raw_rows.extend(
+                _numeric_metrics(
+                    context=item, sequence=sequence, method=job.method,
+                    parameter="", trial=0,
+                    metrics={
+                        key: document[key]
+                        for key in (
+                            "population", "evaluation_count", "original_dimension",
+                            "search_dimension", "dimensional_reduction", "validation_hv",
+                            "test_hv", "convergence_evaluation_count",
+                            "final_front_evaluation_count", "evaluation_model_fit_count",
+                            "minppi_selection_time_s", "search_runtime_s",
+                            "evaluation_runtime_s", "total_runtime_s",
+                        )
+                    },
+                )
+            )
+            for front_kind, entries, hypervolume in (
+                ("validation", document["validation_front"], document["validation_hv"]),
+                ("test", document["test_front"], document["test_hv"]),
+            ):
+                for point_index, entry in enumerate(entries):
+                    front_rows.append(
+                        {
+                            "run_kind": context.protocol.run_kind,
+                            "dataset_id": job.dataset_id,
+                            "seed": job.seed,
+                            "method": job.method,
+                            "front_kind": front_kind,
+                            "point_index": point_index,
+                            "compression": 1.0 - float(entry["objectives"][0]),
+                            "utility": 1.0 - float(entry["objectives"][1]),
+                            "evaluation": 0,
+                            "hypervolume": float(hypervolume),
+                        }
+                    )
+            population = int(document["population"])
+            for point_index, hypervolume in enumerate(front["hv_history"]):
+                front_rows.append(
+                    {
+                        "run_kind": context.protocol.run_kind,
+                        "dataset_id": job.dataset_id,
+                        "seed": job.seed,
+                        "method": job.method,
+                        "front_kind": "history",
+                        "point_index": point_index,
+                        "compression": 0.0,
+                        "utility": 0.0,
+                        "evaluation": population * (point_index + 2),
+                        "hypervolume": float(hypervolume),
+                    }
+                )
+    return raw_rows, front_rows
+
+
+def _validate_frozen_bundle_bytes(
+    destination: Path,
+    payloads: Mapping[str, bytes],
+    *,
+    conflict_message: str,
+) -> None:
+    if not destination.is_dir() or destination.is_symlink():
+        raise RuntimeError(conflict_message)
+    entries = tuple(destination.iterdir())
+    if (
+        {path.name for path in entries} != set(payloads)
+        or any(not path.is_file() or path.is_symlink() for path in entries)
+        or any(
+            (destination / name).read_bytes() != payload
+            for name, payload in payloads.items()
+        )
+    ):
+        raise RuntimeError(conflict_message)
+
+
+def _publish_bundle(
+    parent: Path,
+    directory_name: str,
+    payloads: Mapping[str, bytes],
+) -> Path:
+    """Install an immutable directory as one atomic publication unit."""
+    parent.mkdir(parents=True, exist_ok=True)
+    destination = parent / directory_name
+    if destination.exists():
+        _validate_frozen_bundle_bytes(
+            destination,
+            payloads,
+            conflict_message=(
+                "frozen publication bundle conflicts with recomputed content"
+            ),
+        )
+        return destination
+    staging = parent / f".{directory_name}.{uuid4().hex}.tmp"
+    staging.mkdir()
+    try:
+        for name, payload in payloads.items():
+            _atomic_write_bytes(staging / name, payload)
+        try:
+            os.replace(staging, destination)
+        except FileExistsError:
+            _validate_frozen_bundle_bytes(
+                destination,
+                payloads,
+                conflict_message="concurrent publication bundle conflicts",
+            )
+        return destination
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+
+
+def _summary_publication_payloads(
+    tables: Mapping[str, Sequence[Mapping[str, object]]],
+    *,
+    macros: str,
+    provenance: Mapping[str, object],
+    run_kind: str,
+    skipped_jobs: Sequence[Mapping[str, object]],
+    publication_allowed: bool,
+) -> tuple[dict[str, bytes], str]:
+    columns = {
+        "raw": RAW_COLUMNS,
+        "aggregate": AGGREGATE_COLUMNS,
+        "paired": PAIRED_COLUMNS,
+        "front": FRONT_COLUMNS,
+    }
+    payloads = {
+        _SUMMARY_FILES[key]: csv_bytes(tables[key], columns[key])
+        for key in ("raw", "aggregate", "paired", "front")
+    }
+    payloads[_SUMMARY_FILES["latex_macros"]] = macros.encode("utf-8")
+    payloads[_SUMMARY_FILES["latex_macros_provenance"]] = provenance_bytes(
+        provenance
+    )
+    row_counts = {
+        _SUMMARY_FILES["raw"]: len(tables["raw"]),
+        _SUMMARY_FILES["aggregate"]: len(tables["aggregate"]),
+        _SUMMARY_FILES["paired"]: len(tables["paired"]),
+        _SUMMARY_FILES["front"]: len(tables["front"]),
+        _SUMMARY_FILES["latex_macros"]: sum(
+            bool(line) for line in macros.splitlines()
+        ),
+        _SUMMARY_FILES["latex_macros_provenance"]: len(
+            provenance.get("macros", {})
+        ),
+    }
+    file_columns = {
+        _SUMMARY_FILES[key]: list(columns[key])
+        for key in ("raw", "aggregate", "paired", "front")
+    }
+    manifest = {
+        "schema_version": 1,
+        "run_kind": run_kind,
+        "publication_allowed": publication_allowed,
+        "skipped_jobs": [dict(row) for row in skipped_jobs],
+        "files": [
+            {
+                "filename": filename,
+                "schema_version": 1,
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "byte_length": len(payload),
+                "row_count": row_counts[filename],
+                "columns": file_columns.get(filename, []),
+            }
+            for filename, payload in payloads.items()
+        ],
+    }
+    manifest_payload = provenance_bytes(manifest)
+    manifest_hash = hashlib.sha256(manifest_payload).hexdigest()
+    payloads[_SUMMARY_FILES["bundle_manifest"]] = manifest_payload
+    return payloads, manifest_hash
+
+
+def _validate_summary_bundle(
+    bundle: Path,
+    *,
+    expected_manifest_sha256: str,
+    expected_run_kind: str,
+) -> dict[str, object]:
+    root = Path(bundle)
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("summary bundle is not a regular directory")
+    expected_names = set(_SUMMARY_FILES.values())
+    entries = tuple(root.iterdir())
+    if (
+        {path.name for path in entries} != expected_names
+        or any(not path.is_file() or path.is_symlink() for path in entries)
+    ):
+        raise ValueError("summary bundle entries are incomplete or unsafe")
+    manifest_path = root / _SUMMARY_FILES["bundle_manifest"]
+    manifest_payload = manifest_path.read_bytes()
+    if hashlib.sha256(manifest_payload).hexdigest() != expected_manifest_sha256:
+        raise ValueError("summary bundle manifest hash is invalid")
+    manifest = read_canonical_json(
+        manifest_path, context="summary bundle manifest"
+    )
+    if (
+        not isinstance(manifest, dict)
+        or set(manifest) != {
+            "schema_version", "run_kind", "publication_allowed",
+            "skipped_jobs", "files",
+        }
+        or manifest["schema_version"] != 1
+        or manifest["run_kind"] != expected_run_kind
+        or not isinstance(manifest["publication_allowed"], bool)
+        or not isinstance(manifest["skipped_jobs"], list)
+        or not isinstance(manifest["files"], list)
+    ):
+        raise ValueError("summary bundle manifest schema is invalid")
+    skip_keys = {"job_id", "stage", "dataset_id", "seed", "method", "reason"}
+    if any(
+        not isinstance(entry, dict)
+        or set(entry) != skip_keys
+        or not isinstance(entry["job_id"], str)
+        or not isinstance(entry["stage"], str)
+        or not isinstance(entry["dataset_id"], str)
+        or isinstance(entry["seed"], bool)
+        or not isinstance(entry["seed"], int)
+        or entry["seed"] < 0
+        or not isinstance(entry["method"], str)
+        or not isinstance(entry["reason"], str)
+        or not entry["reason"]
+        for entry in manifest["skipped_jobs"]
+    ) or len({entry["job_id"] for entry in manifest["skipped_jobs"]}) != len(
+        manifest["skipped_jobs"]
+    ):
+        raise ValueError("summary bundle skipped-job metadata is invalid")
+    expected_data_names = [
+        _SUMMARY_FILES[key]
+        for key in (
+            "raw", "aggregate", "paired", "front", "latex_macros",
+            "latex_macros_provenance",
+        )
+    ]
+    if [entry.get("filename") for entry in manifest["files"]] != expected_data_names:
+        raise ValueError("summary bundle manifest file order is invalid")
+    expected_columns = {
+        _SUMMARY_FILES["raw"]: list(RAW_COLUMNS),
+        _SUMMARY_FILES["aggregate"]: list(AGGREGATE_COLUMNS),
+        _SUMMARY_FILES["paired"]: list(PAIRED_COLUMNS),
+        _SUMMARY_FILES["front"]: list(FRONT_COLUMNS),
+    }
+    for entry in manifest["files"]:
+        if not isinstance(entry, dict) or set(entry) != {
+            "filename", "schema_version", "sha256", "byte_length",
+            "row_count", "columns",
+        } or entry["schema_version"] != 1:
+            raise ValueError("summary bundle file metadata schema is invalid")
+        filename = entry["filename"]
+        path = root / filename
+        payload = path.read_bytes()
+        if (
+            hashlib.sha256(payload).hexdigest() != entry["sha256"]
+            or len(payload) != entry["byte_length"]
+            or b"\r" in payload
+        ):
+            raise ValueError("summary bundle file hash, length, or canonical bytes are invalid")
+        try:
+            text = payload.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError("summary bundle file is not UTF-8") from exc
+        if filename.endswith(".csv"):
+            rows = list(csv.reader(io.StringIO(text, newline="")))
+            if not rows or rows[0] != expected_columns[filename]:
+                raise ValueError("summary bundle CSV schema is invalid")
+            actual_rows = len(rows) - 1
+        elif filename == _SUMMARY_FILES["latex_macros"]:
+            actual_rows = sum(bool(line) for line in text.splitlines())
+        else:
+            document = read_canonical_json(path, context="macro provenance")
+            actual_rows = len(document.get("macros", {})) if isinstance(document, dict) else -1
+        if actual_rows != entry["row_count"] or entry["columns"] != expected_columns.get(filename, []):
+            raise ValueError("summary bundle row count or columns are invalid")
+    return manifest
+
+
+_FIGURE_FILENAMES = (
+    "fig1_overview.pdf", "fig2_cd_heatmap.pdf", "fig3_prefilter.pdf"
+)
+_FIGURE_MANIFEST = "figure_bundle_manifest.json"
+
+
+def _figure_publication_payloads(
+    generated: Sequence[Path],
+) -> tuple[dict[str, bytes], str]:
+    paths = tuple(Path(path) for path in generated)
+    if tuple(path.name for path in paths) != _FIGURE_FILENAMES or any(
+        not path.is_file() or path.is_symlink() for path in paths
+    ):
+        raise ValueError("figure generation must return the exact three PDF filenames")
+    payloads = {path.name: path.read_bytes() for path in paths}
+    if any(not payload.startswith(b"%PDF-") for payload in payloads.values()):
+        raise ValueError("figure output is not a PDF")
+    manifest = {
+        "schema_version": 1,
+        "files": [
+            {
+                "filename": filename,
+                "sha256": hashlib.sha256(payloads[filename]).hexdigest(),
+                "byte_length": len(payloads[filename]),
+            }
+            for filename in _FIGURE_FILENAMES
+        ],
+    }
+    manifest_payload = provenance_bytes(manifest)
+    manifest_hash = hashlib.sha256(manifest_payload).hexdigest()
+    payloads[_FIGURE_MANIFEST] = manifest_payload
+    return payloads, manifest_hash
+
+
+def _validate_figure_bundle(
+    bundle: Path, *, expected_manifest_sha256: str
+) -> dict[str, object]:
+    root = Path(bundle)
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("figure bundle is not a regular directory")
+    entries = tuple(root.iterdir())
+    expected_names = {*_FIGURE_FILENAMES, _FIGURE_MANIFEST}
+    if (
+        {path.name for path in entries} != expected_names
+        or any(not path.is_file() or path.is_symlink() for path in entries)
+    ):
+        raise ValueError("figure bundle does not contain the exact regular PDF set")
+    manifest_path = root / _FIGURE_MANIFEST
+    payload = manifest_path.read_bytes()
+    if hashlib.sha256(payload).hexdigest() != expected_manifest_sha256:
+        raise ValueError("figure bundle manifest hash is invalid")
+    manifest = read_canonical_json(manifest_path, context="figure bundle manifest")
+    if (
+        not isinstance(manifest, dict)
+        or set(manifest) != {"schema_version", "files"}
+        or manifest["schema_version"] != 1
+        or not isinstance(manifest["files"], list)
+        or [entry.get("filename") for entry in manifest["files"]]
+        != list(_FIGURE_FILENAMES)
+    ):
+        raise ValueError("figure bundle manifest schema is invalid")
+    for entry in manifest["files"]:
+        if not isinstance(entry, dict) or set(entry) != {
+            "filename", "sha256", "byte_length"
+        }:
+            raise ValueError("figure bundle file metadata is invalid")
+        pdf = (root / entry["filename"]).read_bytes()
+        if (
+            not pdf.startswith(b"%PDF-")
+            or hashlib.sha256(pdf).hexdigest() != entry["sha256"]
+            or len(pdf) != entry["byte_length"]
+        ):
+            raise ValueError("figure PDF hash or length is invalid")
+    return manifest
+
+
+def run_summarize_job(context: StageContext) -> ResultRecord:
+    """Validate all upstream jobs before extracting or computing any statistic."""
+    started_at = _timestamp()
+    manifest = context.status.manifest
+    assert_stage_complete(context.layout, manifest, _SUMMARY_REQUIRED_STAGES)
+    if context.protocol.run_kind == "formal" and context.protocol.seeds != _FORMAL_SEEDS:
+        raise ValueError("formal summary requires seeds (42, 123, 456, 789, 1024)")
+    if (
+        context.job.stage != "summarize"
+        or context.job not in manifest
+        or context.job.dataset_id != "__run__"
+        or context.job.seed != 0
+        or context.job.method != "aggregate_results"
+        or context.job.parameters.get("required_stages") != list(_SUMMARY_REQUIRED_STAGES)
+    ):
+        raise ValueError("summarize job conflicts with frozen run-level authority")
+    skipped_jobs, omitted_job_ids = _upstream_skip_metadata(context)
+    raw_rows, front_rows = _validated_summary_rows(
+        context, omitted_job_ids=omitted_job_ids
+    )
+    tables = aggregate_canonical_records(
+        raw_rows,
+        front_rows,
+        allow_approved_skip_subset=(
+            context.protocol.run_kind == "formal" and bool(skipped_jobs)
+        ),
+    )
+    publication_allowed = not (
+        context.protocol.run_kind == "formal" and bool(skipped_jobs)
+    )
+    if publication_allowed:
+        macros, provenance = generate_latex_macros(
+            tables["aggregate"], tables["paired"], run_kind=context.protocol.run_kind
+        )
+    else:
+        macros = ""
+        provenance = {
+            "schema_version": 1,
+            "run_kind": context.protocol.run_kind,
+            "publication_allowed": False,
+            "skipped_jobs": skipped_jobs,
+            "macros": {},
+        }
+    payloads, bundle_manifest_sha256 = _summary_publication_payloads(
+        tables,
+        macros=macros,
+        provenance=provenance,
+        run_kind=context.protocol.run_kind,
+        skipped_jobs=skipped_jobs,
+        publication_allowed=publication_allowed,
+    )
+    _publish_bundle(context.layout.tables, "summary", payloads)
+    artifacts = {
+        key: f"tables/summary/{filename}" for key, filename in _SUMMARY_FILES.items()
+    }
+    return ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage=context.job.stage,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        method=context.job.method,
+        metrics={
+            "raw_row_count": len(tables["raw"]),
+            "aggregate_row_count": len(tables["aggregate"]),
+            "paired_row_count": len(tables["paired"]),
+            "front_row_count": len(tables["front"]),
+            "run_kind": context.protocol.run_kind,
+            "skipped_job_count": len(skipped_jobs),
+            "publication_allowed": publication_allowed,
+            "bundle_manifest_sha256": bundle_manifest_sha256,
+            "bundle_manifest_byte_length": len(
+                payloads[_SUMMARY_FILES["bundle_manifest"]]
+            ),
+        },
+        artifacts=artifacts,
+        started_at=started_at,
+        finished_at=_timestamp(),
+    )
+
+
+def _validate_summarize_result_record(
+    context: StageContext, record: ResultRecord
+) -> dict[str, object]:
+    expected_artifacts = {
+        key: f"tables/summary/{filename}" for key, filename in _SUMMARY_FILES.items()
+    }
+    expected_metrics = {
+        "raw_row_count", "aggregate_row_count", "paired_row_count",
+        "front_row_count", "run_kind", "skipped_job_count",
+        "publication_allowed", "bundle_manifest_sha256",
+        "bundle_manifest_byte_length",
+    }
+    if record.artifacts != expected_artifacts or set(record.metrics) != expected_metrics:
+        raise ValueError("summarize ResultRecord schema is invalid")
+    digest = record.metrics["bundle_manifest_sha256"]
+    if (
+        not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+        or record.metrics["run_kind"] != context.protocol.run_kind
+        or not isinstance(record.metrics["publication_allowed"], bool)
+    ):
+        raise ValueError("summarize ResultRecord identity metrics are invalid")
+    bundle = context.layout.root / "tables/summary"
+    manifest = _validate_summary_bundle(
+        bundle,
+        expected_manifest_sha256=digest,
+        expected_run_kind=context.protocol.run_kind,
+    )
+    manifest_bytes = (bundle / _SUMMARY_FILES["bundle_manifest"]).read_bytes()
+    if record.metrics["bundle_manifest_byte_length"] != len(manifest_bytes):
+        raise ValueError("summarize bundle manifest length conflicts with result")
+    row_counts = {
+        entry["filename"]: entry["row_count"] for entry in manifest["files"]
+    }
+    expected_counts = {
+        "raw_row_count": row_counts[_SUMMARY_FILES["raw"]],
+        "aggregate_row_count": row_counts[_SUMMARY_FILES["aggregate"]],
+        "paired_row_count": row_counts[_SUMMARY_FILES["paired"]],
+        "front_row_count": row_counts[_SUMMARY_FILES["front"]],
+        "skipped_job_count": len(manifest["skipped_jobs"]),
+    }
+    if any(record.metrics[key] != value for key, value in expected_counts.items()):
+        raise ValueError("summarize ResultRecord counts conflict with bundle")
+    if record.metrics["publication_allowed"] != manifest["publication_allowed"]:
+        raise ValueError("summarize publication state conflicts with bundle")
+    return manifest
+
+
+def _validate_figures_result_record(
+    context: StageContext, record: ResultRecord
+) -> None:
+    summary_jobs = tuple(
+        job for job in context.status.manifest if job.stage == "summarize"
+    )
+    if len(summary_jobs) != 1:
+        raise ValueError("figures validation requires one summarize job")
+    summary_job = summary_jobs[0]
+    summary_record = read_result_record(
+        context.layout.root / summary_job.output_relpath, summary_job
+    )
+    _validate_summarize_result_record(
+        _summary_job_context(context, summary_job), summary_record
+    )
+    current_summary_digest = summary_record.metrics["bundle_manifest_sha256"]
+    suppressed = record.metrics.get("publication_suppressed")
+    if suppressed is True:
+        if set(record.metrics) != {
+            "figure_count", "run_kind", "publication_suppressed",
+            "summary_bundle_manifest_sha256",
+        } or record.artifacts or record.metrics["figure_count"] != 0 or record.metrics[
+            "summary_bundle_manifest_sha256"
+        ] != current_summary_digest or record.metrics["run_kind"] != context.protocol.run_kind:
+            raise ValueError("suppressed figures ResultRecord schema is invalid")
+        return
+    expected_metrics = {
+        "figure_count", "run_kind", "publication_suppressed",
+        "summary_bundle_manifest_sha256", "bundle_manifest_sha256",
+        "bundle_manifest_byte_length",
+    }
+    expected_artifacts = {
+        Path(filename).stem: f"figures/paper/{filename}"
+        for filename in _FIGURE_FILENAMES
+    }
+    expected_artifacts["bundle_manifest"] = f"figures/paper/{_FIGURE_MANIFEST}"
+    if (
+        set(record.metrics) != expected_metrics
+        or record.artifacts != expected_artifacts
+        or record.metrics["figure_count"] != 3
+        or record.metrics["run_kind"] != context.protocol.run_kind
+        or record.metrics["publication_suppressed"] is not False
+        or record.metrics["summary_bundle_manifest_sha256"] != current_summary_digest
+    ):
+        raise ValueError("figures ResultRecord schema is invalid")
+    digest = record.metrics["bundle_manifest_sha256"]
+    if not isinstance(digest, str):
+        raise ValueError("figure bundle manifest hash is invalid")
+    bundle = context.layout.figures / "paper"
+    _validate_figure_bundle(bundle, expected_manifest_sha256=digest)
+    if record.metrics["bundle_manifest_byte_length"] != len(
+        (bundle / _FIGURE_MANIFEST).read_bytes()
+    ):
+        raise ValueError("figure bundle manifest length conflicts with result")
+
+
+def _validate_task11_result_record(context: StageContext, record: ResultRecord) -> None:
+    if context.job.stage == "summarize":
+        _validate_summarize_result_record(context, record)
+    elif context.job.stage == "figures":
+        _validate_figures_result_record(context, record)
+
+
+def run_figures_job(context: StageContext) -> ResultRecord:
+    """Generate deterministic figures solely from explicit summary table paths."""
+    started_at = _timestamp()
+    manifest = context.status.manifest
+    assert_stage_complete(context.layout, manifest, ("summarize",))
+    if (
+        context.job.stage != "figures"
+        or context.job not in manifest
+        or context.job.dataset_id != "__run__"
+        or context.job.seed != 0
+        or context.job.method != "generate_figures"
+    ):
+        raise ValueError("figures job conflicts with frozen run-level authority")
+    summary_jobs = tuple(job for job in manifest if job.stage == "summarize")
+    if len(summary_jobs) != 1:
+        raise ValueError("figures requires exactly one canonical summarize job")
+    summary = read_result_record(
+        context.layout.root / summary_jobs[0].output_relpath, summary_jobs[0]
+    )
+    summary_context = _summary_job_context(context, summary_jobs[0])
+    summary_manifest = _validate_summarize_result_record(summary_context, summary)
+    summary_digest = str(summary.metrics["bundle_manifest_sha256"])
+    if not summary_manifest["publication_allowed"]:
+        return ResultRecord(
+            job_id=context.job.job_id,
+            protocol_hash=context.job.protocol_hash,
+            stage=context.job.stage,
+            dataset_id=context.job.dataset_id,
+            seed=context.job.seed,
+            method=context.job.method,
+            metrics={
+                "figure_count": 0,
+                "run_kind": context.protocol.run_kind,
+                "publication_suppressed": True,
+                "summary_bundle_manifest_sha256": summary_digest,
+            },
+            artifacts={},
+            started_at=started_at,
+            finished_at=_timestamp(),
+        )
+
+    if __package__:
+        from .make_paper_figures import generate_all_figures
+    else:
+        from make_paper_figures import generate_all_figures  # type: ignore[no-redef]
+
+    staging = context.layout.figures / f".paper.{uuid4().hex}.tmp"
+    staging.mkdir()
+    try:
+        generated = generate_all_figures(
+            context.layout.root / summary.artifacts["raw"],
+            context.layout.root / summary.artifacts["aggregate"],
+            context.layout.root / summary.artifacts["paired"],
+            context.layout.root / summary.artifacts["front"],
+            staging,
+            run_kind=context.protocol.run_kind,
+        )
+        payloads, bundle_manifest_sha256 = _figure_publication_payloads(generated)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+    _publish_bundle(context.layout.figures, "paper", payloads)
+    artifacts = {
+        Path(filename).stem: f"figures/paper/{filename}"
+        for filename in _FIGURE_FILENAMES
+    }
+    artifacts["bundle_manifest"] = f"figures/paper/{_FIGURE_MANIFEST}"
+    return ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage=context.job.stage,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        method=context.job.method,
+        metrics={
+            "figure_count": 3,
+            "run_kind": context.protocol.run_kind,
+            "publication_suppressed": False,
+            "summary_bundle_manifest_sha256": summary_digest,
+            "bundle_manifest_sha256": bundle_manifest_sha256,
+            "bundle_manifest_byte_length": len(payloads[_FIGURE_MANIFEST]),
+        },
+        artifacts=artifacts,
+        started_at=started_at,
+        finished_at=_timestamp(),
+    )
+
+
 STAGE_EXECUTORS.update(
     {
         "validate": run_validate_job,
@@ -3656,5 +4917,7 @@ STAGE_EXECUTORS.update(
         "alpha": run_alpha_job,
         "nsga2": run_nsga2_job,
         "ablation": run_ablation_job,
+        "summarize": run_summarize_job,
+        "figures": run_figures_job,
     }
 )
