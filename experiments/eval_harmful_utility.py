@@ -19,7 +19,7 @@ c1 regression:     crimedata, abalone
 c2:                madelon only (唯一有 ground-truth 的数据集)
 #8:                spambase, madelon, isolet (α = 0.95)
 
-Output (``results/logs/<run_id>/``)::
+Output (``results/logs/<run_id>/``):
 
     metadata.json
     config.yaml
@@ -28,7 +28,7 @@ Output (``results/logs/<run_id>/``)::
     c2_madelon_ground_truth.csv       # precision, recall, F₁
     c8_minshap_vs_minppi.csv          # agreement stats
 
-Run::
+Run:
 
     python -u experiments/eval_harmful_utility.py
 """
