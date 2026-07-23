@@ -416,9 +416,21 @@ def test_hv_ignores_duplicate_and_dominated_points():
 --output-root results/icomp2026_rerun
 --seeds 42 123 456 789 1024
 --backend {cpu,cuda}
+--run-id <id>
 --resume
 --smoke
+--stop-after-jobs <N>  # 仅 smoke
 ```
+
+脚本入口采用 parent/worker 隔离。公共 parent 使用同一解释器和原始参数同步
+启动且只启动一个 worker；worker 在 `main()` 返回后原子写入带随机 nonce 的完成
+receipt。parent 只在 Windows worker 退出码为 `0xC0000409` 且 schema、nonce 和
+`main()` 返回码 0 全部匹配时输出 warning 并返回 0。controlled stop 75、普通
+非零退出、缺失或无效 receipt 均原样传播或 fail closed。parent 在分派前不导入
+`minppi_mofs` 或 stage 模块，因此 CUDA/XGBoost 状态只存在于单一 worker。
+
+所有 GPU/model 命令必须绝对串行：前一命令及其 worker 完全退出后才能启动下一
+命令。smoke 与 formal 必须使用不同 run ID 和目录。
 
 ### 6.1 环境验证
 
@@ -436,23 +448,44 @@ nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
 ### 6.2 Smoke run
 
 ```powershell
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage validate --config-dir configs --output-root results\icomp2026_rerun
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage all --config-dir configs --output-root results\icomp2026_rerun --seeds 42 --backend cuda --smoke
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage all --config-dir configs --output-root results\icomp2026_rerun --seeds 42 --backend cuda --run-id task5-smoke-recovery --smoke
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage all --config-dir configs --output-root results\icomp2026_rerun --seeds 42 --backend cuda --run-id task5-resume-check --smoke --stop-after-jobs 1
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage all --config-dir configs --output-root results\icomp2026_rerun --seeds 42 --backend cuda --run-id task5-resume-check --smoke --resume
 ```
 
-Smoke run 限制为 1 个 seed、2 个数据集、低预算，必须验证：结果目录、metadata、断点恢复、测试集访问审计、GPU 峰值显存、异常退出后的 resume。
+`task5-smoke` 是 55 个 durable job 已完成但原公共进程在 interpreter teardown
+返回非零的诊断记录；必须原样保留，不能作为验收结果。2026-07-23 的新验收 run
+`task5-smoke-recovery` public exit 为 0；worker 再现成功后 `0xC0000409`，parent
+输出限定 containment warning。其审计为 55/55 success、零
+failed/pending/running/skipped、24 条 allowed 和零 denied/unresolved 访问、完整
+六文件 summary bundle、三份非空 PDF，且 protocol/summary 的 `run_kind` 都是
+`smoke`。
+
+`task5-resume-check` 首命令 public exit 75，resume public exit 0。首个 validate
+job 的 result 与两个声明 artifact 在 resume 前后 SHA-256、字节数和 mtime 均
+不变，state 保持 `success`、attempt 保持 1；完成后 55 个 job 全部 success，所有
+成功 attempt 均为 1。两次成功完成的 worker 都在 `main()` 返回后再现相同
+teardown warning。整个验收期间同时最多一个 GPU 进程。
+
+Smoke run 限制为 1 个 seed、2 个数据集和低预算。它只验证 runner、metadata、
+resume、测试集访问审计、汇总和图；其表格、宏和 PDF 不是 formal 论文结果。
 
 ### 6.3 正式运行顺序
 
+以下只是后续阶段的顺序模板。Task 12 没有授权任何正式五种子命令；必须先由用户
+审阅上述证据并明确批准，再创建全新的 formal run ID。不得复用
+`task5-smoke`、`task5-smoke-recovery` 或 `task5-resume-check`，也不得把 smoke
+产物复制进 formal 目录。正式运行同样必须保持一 GPU/一 worker 串行。
+
 ```powershell
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage preprocess --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --resume
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage estimator --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --resume
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage removal --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --resume
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage alpha --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --resume
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage nsga2 --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --resume
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage ablation --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --resume
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage summarize --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --resume
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage figures --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --resume
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage preprocess --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --run-id APPROVED_FORMAL_RUN_ID
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage estimator --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --run-id APPROVED_FORMAL_RUN_ID --resume
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage removal --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --run-id APPROVED_FORMAL_RUN_ID --resume
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage alpha --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --run-id APPROVED_FORMAL_RUN_ID --resume
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage nsga2 --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --run-id APPROVED_FORMAL_RUN_ID --resume
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage ablation --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --run-id APPROVED_FORMAL_RUN_ID --resume
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage summarize --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --run-id APPROVED_FORMAL_RUN_ID --resume
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage figures --config-dir configs --output-root results\icomp2026_rerun --seeds 42 123 456 789 1024 --backend cuda --run-id APPROVED_FORMAL_RUN_ID --resume
 ```
 
 每个 stage 必须创建独立 `status.json`，记录成功、失败、跳过的 dataset/seed/method 组合。汇总阶段若发现任何组合缺失，必须失败退出，而不是对不完整数据静默取平均。

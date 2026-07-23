@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +44,37 @@ def _standard_library_parser() -> argparse.ArgumentParser:
 
 if __name__ == "__main__" and {"-h", "--help"}.intersection(sys.argv[1:]):
     _standard_library_parser().parse_args()
+
+
+if __package__:
+    from .native_process_guard import (  # noqa: E402
+        CONTROLLER_ERROR,
+        WorkerContract,
+        run_isolated_cli,
+        worker_contract,
+        write_worker_receipt,
+    )
+else:
+    from native_process_guard import (  # type: ignore[no-redef]  # noqa: E402
+        CONTROLLER_ERROR,
+        WorkerContract,
+        run_isolated_cli,
+        worker_contract,
+        write_worker_receipt,
+    )
+
+
+_SCRIPT_ARGUMENTS: tuple[str, ...] = ()
+_SCRIPT_WORKER_CONTRACT: WorkerContract | None = None
+if __name__ == "__main__":
+    _SCRIPT_ARGUMENTS = tuple(sys.argv[1:])
+    try:
+        _SCRIPT_WORKER_CONTRACT = worker_contract(os.environ)
+    except ValueError as exc:
+        print(f"pipeline worker contract error: {exc}", file=sys.stderr)
+        raise SystemExit(CONTROLLER_ERROR) from None
+    if _SCRIPT_WORKER_CONTRACT is None:
+        raise SystemExit(run_isolated_cli(Path(__file__), _SCRIPT_ARGUMENTS))
 
 
 from minppi_mofs.experiment_protocol import (  # noqa: E402
@@ -264,5 +296,29 @@ def _append_log(path: Path, message: str) -> None:
         handle.write(f"{timestamp} {message}\n")
 
 
+def _entrypoint(argv: Sequence[str] | None = None) -> int:
+    arguments = tuple(sys.argv[1:] if argv is None else argv)
+    try:
+        contract = worker_contract(os.environ)
+    except ValueError as exc:
+        print(f"pipeline worker contract error: {exc}", file=sys.stderr)
+        return CONTROLLER_ERROR
+    if contract is None:
+        return run_isolated_cli(Path(__file__), arguments)
+    return _run_worker(contract, arguments)
+
+
+def _run_worker(contract: WorkerContract, arguments: Sequence[str]) -> int:
+    result = main(arguments)
+    try:
+        write_worker_receipt(contract, result)
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"pipeline worker receipt error: {exc}", file=sys.stderr)
+        return CONTROLLER_ERROR
+    return result
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    if _SCRIPT_WORKER_CONTRACT is None:
+        raise SystemExit(CONTROLLER_ERROR)
+    raise SystemExit(_run_worker(_SCRIPT_WORKER_CONTRACT, _SCRIPT_ARGUMENTS))

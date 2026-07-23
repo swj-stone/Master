@@ -23,6 +23,8 @@ import minppi_mofs.min_ppi as min_ppi_module
 import minppi_mofs.shapg_integration as guidance_module
 import minppi_mofs.voting_game as voting_game_module
 import experiments.icomp2026_stages as stage_module
+import experiments.run_icomp2026_pipeline as pipeline_module
+from experiments.native_process_guard import WorkerContract
 from minppi_mofs.experiment_protocol import (
     AuditLog,
     AuditedSplitAccess,
@@ -1238,6 +1240,108 @@ except SystemExit as exc:
     assert "--stage" in completed.stdout
     assert "HEAVY_ATTEMPTS=\n" in completed.stdout
     assert "HEAVY_LOADED=False" in completed.stdout
+
+
+def test_parent_dispatch_is_declared_before_project_heavy_imports() -> None:
+    script = Path(__file__).parents[1] / "experiments" / "run_icomp2026_pipeline.py"
+    tree = ast.parse(script.read_text(encoding="utf-8"))
+    heavy_import_line = min(
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module is not None
+        and (
+            node.module.startswith("minppi_mofs")
+            or node.module.endswith("icomp2026_stages")
+        )
+    )
+    parent_dispatch_lines = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "run_isolated_cli"
+    ]
+
+    assert any(line < heavy_import_line for line in parent_dispatch_lines)
+
+
+def test_worker_contract_annotations_are_exact() -> None:
+    script = Path(__file__).parents[1] / "experiments" / "run_icomp2026_pipeline.py"
+    source = script.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    script_contract = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id == "_SCRIPT_WORKER_CONTRACT"
+    )
+    run_worker = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_run_worker"
+    )
+
+    assert ast.unparse(script_contract.annotation) == "WorkerContract | None"
+    assert isinstance(run_worker.args.args[0].annotation, ast.Name)
+    assert run_worker.args.args[0].annotation.id == "WorkerContract"
+    assert "type: ignore[arg-type]" not in source
+
+
+def test_nonhelp_parent_dispatches_once_before_any_heavy_import() -> None:
+    script = Path(__file__).parents[1] / "experiments" / "run_icomp2026_pipeline.py"
+    probe = f"""
+import builtins
+import runpy
+import sys
+import types
+
+script = {str(script)!r}
+real_import = builtins.__import__
+heavy_attempts = []
+dispatches = []
+
+guard = types.ModuleType('native_process_guard')
+guard.CONTROLLER_ERROR = 70
+guard.WorkerContract = object
+guard.worker_contract = lambda environ: None
+guard.write_worker_receipt = lambda contract, code: None
+def run_isolated(path, argv):
+    dispatches.append((str(path), tuple(argv)))
+    return 23
+guard.run_isolated_cli = run_isolated
+sys.modules['native_process_guard'] = guard
+
+def guarded_import(name, *args, **kwargs):
+    root = name.split('.')[0]
+    if root in {{'minppi_mofs', 'xgboost', 'pandas', 'sklearn'}}:
+        heavy_attempts.append(name)
+        raise ImportError('parent-loaded-heavy-' + name)
+    return real_import(name, *args, **kwargs)
+
+builtins.__import__ = guarded_import
+sys.argv = [script, '--stage', 'validate']
+try:
+    runpy.run_path(script, run_name='__main__')
+except SystemExit as exc:
+    print('EXIT=' + str(exc.code))
+print('DISPATCHES=' + repr(dispatches))
+print('HEAVY_ATTEMPTS=' + repr(heavy_attempts))
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=Path(__file__).parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "EXIT=23" in completed.stdout
+    assert completed.stdout.count("run_icomp2026_pipeline.py") == 1
+    assert "('--stage', 'validate')" in completed.stdout
+    assert "HEAVY_ATTEMPTS=[]" in completed.stdout
 
 
 def _publication_context(tmp_path: Path, smoke_protocol, run_id: str):
@@ -5178,6 +5282,130 @@ def test_cli_lifecycle_is_append_logged_and_never_replaces_process_streams_or_cw
     assert main(arguments + ["--resume"]) == 0
     assert (run_root / "output.log").read_bytes().startswith(first_log)
     assert len((run_root / "output.log").read_bytes()) > len(first_log)
+
+
+def test_entrypoint_worker_calls_main_once_and_records_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contract = WorkerContract(tmp_path / "receipt.json", "a" * 64)
+    arguments = ("--stage", "validate")
+    main_calls: list[tuple[str, ...]] = []
+    receipts: list[tuple[object, int]] = []
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "worker_contract",
+        lambda environ: contract,
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "main",
+        lambda argv: main_calls.append(tuple(argv)) or 75,
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "write_worker_receipt",
+        lambda worker, code: receipts.append((worker, code)),
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "run_isolated_cli",
+        lambda *_args, **_kwargs: pytest.fail("worker recursively spawned"),
+    )
+
+    assert pipeline_module._entrypoint(arguments) == 75
+    assert main_calls == [arguments]
+    assert receipts == [(contract, 75)]
+
+
+def test_entrypoint_parent_delegates_original_argv_without_calling_main(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    arguments = ("--stage", "validate", "--smoke")
+    delegated: list[tuple[Path, tuple[str, ...]]] = []
+    monkeypatch.setattr(sys, "argv", ["pipeline.py", *arguments])
+    monkeypatch.setattr(
+        pipeline_module,
+        "worker_contract",
+        lambda environ: None,
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "main",
+        lambda argv: pytest.fail("parent called pipeline main"),
+    )
+
+    def run_isolated(script: Path, argv: tuple[str, ...]) -> int:
+        delegated.append((script, argv))
+        return 2
+
+    monkeypatch.setattr(pipeline_module, "run_isolated_cli", run_isolated)
+
+    assert pipeline_module._entrypoint() == 2
+    assert delegated == [
+        (Path(pipeline_module.__file__), arguments),
+    ]
+
+
+def test_entrypoint_rejects_malformed_worker_contract_before_main(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def reject_contract(_environ: object) -> None:
+        raise ValueError("incomplete worker contract")
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "worker_contract",
+        reject_contract,
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "main",
+        lambda argv: pytest.fail("malformed worker contract reached main"),
+    )
+
+    assert pipeline_module._entrypoint(("--stage", "validate")) == 70
+    stderr = capsys.readouterr().err
+    assert stderr.count("\n") == 1
+    assert "incomplete worker contract" in stderr
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        OSError("receipt I/O failed"),
+        ValueError("receipt value failed"),
+        TypeError("receipt type failed"),
+    ],
+)
+def test_entrypoint_receipt_failure_returns_70_after_one_main_call(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    error: Exception,
+) -> None:
+    contract = WorkerContract(tmp_path / "receipt.json", "a" * 64)
+    main_calls = 0
+
+    def run_main(_argv: object) -> int:
+        nonlocal main_calls
+        main_calls += 1
+        return 0
+
+    def fail_receipt(_contract: object, _code: int) -> None:
+        raise error
+
+    monkeypatch.setattr(pipeline_module, "worker_contract", lambda environ: contract)
+    monkeypatch.setattr(pipeline_module, "main", run_main)
+    monkeypatch.setattr(pipeline_module, "write_worker_receipt", fail_receipt)
+
+    assert pipeline_module._entrypoint(("--stage", "validate")) == 70
+    assert main_calls == 1
+    stderr = capsys.readouterr().err
+    assert stderr.count("\n") == 1
+    assert str(error) in stderr
 
 
 def test_all_runs_through_registered_task11_executors(

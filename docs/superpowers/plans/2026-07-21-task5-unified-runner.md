@@ -959,7 +959,7 @@ and PDF outputs where metadata permits stable hashes.
   and Task 6 handoff
 - Does not produce formal paper results
 
-- [ ] **Step 1: Run all local verification before GPU use**
+- [x] **Step 1: Run all local verification before GPU use**
 
 ```powershell
 ..\venv\Scripts\python.exe -m pytest tests -q
@@ -970,7 +970,11 @@ git diff --check
 
 Expected: all tests pass, Ruff/compile/diff checks succeed.
 
-- [ ] **Step 2: Validate the real environment**
+Recovery acceptance evidence (2026-07-23): full pytest passed with 691 passed
+and 1 skipped; Ruff, the expanded six-file `py_compile`, and `git diff --check`
+all exited 0. The diff check reported only Git's LF-to-CRLF working-copy notice.
+
+- [x] **Step 2: Validate the real environment**
 
 ```powershell
 ..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage validate --config-dir configs --output-root results\icomp2026_rerun --backend cuda --run-id task5-validate
@@ -979,16 +983,31 @@ Expected: all tests pass, Ruff/compile/diff checks succeed.
 Expected: CUDA is visible, seven cached raw datasets/configs validate, and no
 model fitting occurs.
 
-- [ ] **Step 3: Run the two-dataset smoke pipeline**
+`task5-validate` exited 0 with one successful validate job. Its durable checks
+record XGBoost 3.3.0 with `USE_CUDA=true`, the NVIDIA GeForce RTX 5070 Laptop
+GPU, all seven cached raw-data authorities, all registered stages, and no model
+stage.
+
+- [x] **Step 3: Run the two-dataset smoke pipeline**
 
 ```powershell
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage all --config-dir configs --output-root results\icomp2026_rerun --seeds 42 --backend cuda --run-id task5-smoke --smoke
+..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage all --config-dir configs --output-root results\icomp2026_rerun --seeds 42 --backend cuda --run-id task5-smoke-recovery --smoke
 ```
 
 Expected: only Spambase and Abalone run; every requested job succeeds; status,
 manifest, audit, tables, macros, and figures exist under one run directory.
 
-- [ ] **Step 4: Demonstrate resume without rerunning successes**
+The earlier `task5-smoke` completed its durable 55 jobs but the public process
+returned nonzero during native CUDA/XGBoost teardown; it remains immutable
+diagnostic evidence and is not acceptance. `task5-smoke-recovery` returned
+public exit 0. Its worker reproduced Windows `0xC0000409` only after `main()`
+completed, and the parent emitted the authenticated containment warning. Audit:
+55/55 success; no failed, pending, running, skipped, denied, or unresolved jobs
+or accesses; complete six-file summary bundle; three non-empty PDFs; `run_kind`
+smoke. No formal directory was created, and the old run's key hashes, bytes,
+mtimes, status, and log remained unchanged.
+
+- [x] **Step 4: Demonstrate resume without rerunning successes**
 
 Create a separate controlled-interruption run, then resume it:
 
@@ -1001,13 +1020,25 @@ Expected: the first command exits with code 75 after one successful job.  The
 second command runs only pending work; the prior successful output hash and
 timestamp remain unchanged.
 
-- [ ] **Step 5: Audit and cleanup the smoke handoff**
+Observed public exits were 75 then 0. Before resume, the first validate job was
+`success`, attempt 1; its result and both declared artifacts were frozen by
+SHA-256, bytes, and UTC mtime. All values and the successful attempt remained
+identical after resume. The final root status was 55 successes and every job's
+attempt was 1. Ordinary code 75 propagated without a containment warning; the
+successful resumed worker reproduced the restricted post-success teardown and
+the parent returned 0 with the warning.
+
+- [x] **Step 5: Audit and cleanup the smoke handoff**
 
 Verify no unresolved denied test event, no missing combination, and no formal
 run record.  Keep smoke outputs labeled `run_kind: smoke`; do not copy them into
 the conference paper.
 
-- [ ] **Step 6: Update documentation**
+The acceptance commands were strictly serialized and `nvidia-smi` showed at
+most one compute process. Both accepted result directories are smoke-only. No
+formal five-seed run was started; Task 6 still requires explicit user approval.
+
+- [x] **Step 6: Update documentation**
 
 Document the authoritative CLI, frozen config policy, output schema, resume
 procedure, test-access meanings, and the exact Task 6 stage order.  Mark Task 5
