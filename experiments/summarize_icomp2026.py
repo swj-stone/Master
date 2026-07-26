@@ -19,6 +19,30 @@ import numpy as np
 BOOTSTRAP_SEED = 42
 BOOTSTRAP_RESAMPLES = 10_000
 FORMAL_SEEDS = (42, 123, 456, 789, 1024)
+ESTIMATOR_BASE_METRIC_FIELDS = frozenset(
+    {"budget", "model_fit_count", "coalition_count", "runtime_s"}
+)
+ESTIMATOR_AGREEMENT_METRIC_FIELDS = frozenset(
+    {"harmful_precision", "harmful_recall", "harmful_f1", "score_agreement"}
+)
+GROUPED_ESTIMATOR_METRIC_FIELDS = frozenset(
+    {
+        "logical_evaluation_count",
+        "logical_unique_coalition_count",
+        "physical_model_fit_count",
+        "cache_hit_count",
+        "group_request_digest",
+        "group_physical_model_fit_count",
+        "group_cache_hit_count",
+        "group_runtime_s",
+    }
+)
+ESTIMATOR_GROUP_METRIC_FIELDS = (
+    "group_request_digest",
+    "group_physical_model_fit_count",
+    "group_cache_hit_count",
+    "group_runtime_s",
+)
 
 RAW_COLUMNS = (
     "run_kind", "manifest_sequence", "stage", "dataset_id", "seed", "method",
@@ -47,6 +71,119 @@ def _finite_number(value: object, name: str) -> float:
     if not math.isfinite(result):
         raise ValueError(f"{name} must be a finite number")
     return result
+
+
+def validate_estimator_reporting_schema(
+    metrics: Mapping[str, object],
+    *,
+    execution_mode: str,
+    exact_scores_available: bool,
+) -> dict[str, object]:
+    """Validate the mode-aware estimator metric fields consumed by reporting."""
+    if execution_mode not in {"legacy", "grouped_nested_v1"}:
+        raise ValueError("estimator reporting execution mode is invalid")
+    if type(exact_scores_available) is not bool:
+        raise TypeError("exact_scores_available must be a bool")
+    required = set(ESTIMATOR_BASE_METRIC_FIELDS)
+    if execution_mode == "grouped_nested_v1":
+        required.update(GROUPED_ESTIMATOR_METRIC_FIELDS)
+    allowed_schemas = {frozenset(required)}
+    if execution_mode == "grouped_nested_v1":
+        allowed_schemas.add(frozenset(required | {"schedule_digest"}))
+    if exact_scores_available:
+        allowed_schemas.add(frozenset(required | ESTIMATOR_AGREEMENT_METRIC_FIELDS))
+        if execution_mode == "grouped_nested_v1":
+            allowed_schemas.add(
+                frozenset(
+                    required
+                    | ESTIMATOR_AGREEMENT_METRIC_FIELDS
+                    | {"schedule_digest"}
+                )
+            )
+    if frozenset(metrics) not in allowed_schemas:
+        raise ValueError("estimator ResultRecord metric schema is invalid")
+    return dict(metrics)
+
+
+def deduplicate_estimator_group_metrics(
+    projected_metrics: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Return unique grouped physical accounting and fail on digest conflicts."""
+    if isinstance(projected_metrics, (str, bytes)):
+        raise TypeError("projected estimator metrics must be a sequence")
+    groups_by_digest: dict[str, dict[str, object]] = {}
+    for metrics in projected_metrics:
+        if not isinstance(metrics, Mapping) or any(
+            field not in metrics for field in ESTIMATOR_GROUP_METRIC_FIELDS
+        ):
+            raise ValueError("grouped estimator accounting schema is invalid")
+        digest = metrics["group_request_digest"]
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+        ):
+            raise ValueError("grouped estimator request digest is invalid")
+        counts: dict[str, int] = {}
+        for field in (
+            "group_physical_model_fit_count",
+            "group_cache_hit_count",
+        ):
+            value = metrics[field]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"grouped estimator {field} is invalid")
+            counts[field] = value
+        runtime = _finite_number(metrics["group_runtime_s"], "group runtime")
+        if runtime < 0:
+            raise ValueError("grouped estimator group_runtime_s is invalid")
+        group = {
+            "group_request_digest": digest,
+            **counts,
+            "group_runtime_s": runtime,
+        }
+        previous = groups_by_digest.get(digest)
+        if previous is not None and previous != group:
+            raise ValueError(
+                "conflicting grouped estimator accounting for request digest"
+            )
+        groups_by_digest.setdefault(digest, group)
+    groups = list(groups_by_digest.values())
+    return {
+        "groups": groups,
+        "totals": {
+            "deduplicated_group_count": len(groups),
+            "deduplicated_group_physical_model_fit_count": sum(
+                int(group["group_physical_model_fit_count"]) for group in groups
+            ),
+            "deduplicated_group_cache_hit_count": sum(
+                int(group["group_cache_hit_count"]) for group in groups
+            ),
+            "deduplicated_group_runtime_s": sum(
+                float(group["group_runtime_s"]) for group in groups
+            ),
+        },
+    }
+
+
+def estimator_projection_reporting_metrics(
+    metrics: Mapping[str, object],
+    *,
+    execution_mode: str,
+) -> dict[str, object]:
+    """Keep per-projection metrics separate from complete grouped accounting."""
+    agreement_fields = ESTIMATOR_AGREEMENT_METRIC_FIELDS & frozenset(metrics)
+    validated = validate_estimator_reporting_schema(
+        metrics,
+        execution_mode=execution_mode,
+        exact_scores_available=bool(agreement_fields),
+    )
+    if execution_mode == "legacy":
+        return validated
+    return {
+        field: value
+        for field, value in validated.items()
+        if field not in ESTIMATOR_GROUP_METRIC_FIELDS
+    }
 
 
 def summarize_values(values: Sequence[float]) -> dict[str, int | float]:

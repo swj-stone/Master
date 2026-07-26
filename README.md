@@ -168,6 +168,36 @@ to_student/
 - 结果保存时附带 metadata：配置 hash、seed、git commit、时间戳
 - 大规模实验产物（模型权重、中间结果）不进 git，进 `.gitignore` 并文档化存储位置
 
+### ICOMP 2026 estimator execution and accounting
+
+- `execution.mode: legacy` runs every estimator projection independently and
+  retains the historical ResultRecord/table schema. The production protocol
+  uses `execution.mode: grouped_nested_v1`: one immutable bundle is built for
+  each dataset/seed authority and canonical method/budget jobs are projections
+  of its validated checkpoints.
+- Grouped budgets are nested prefixes of the frozen maximum-budget schedule.
+  A smaller budget means the deterministic prefix ending at that checkpoint;
+  it is not a separately randomized or independently fitted estimator run.
+- `model_fit_count` remains the backward-compatible logical count of unique
+  nonempty coalitions, and equals `logical_unique_coalition_count`.
+  `logical_evaluation_count` counts scheduled algorithm evaluations.
+  `physical_model_fit_count`, `cache_hit_count`, and `runtime_s` are
+  method/budget projection counters and component wall time.
+- Complete-bundle cost is reported separately as
+  `group_physical_model_fit_count`, `group_cache_hit_count`, and
+  `group_runtime_s`. Summary tables emit that scope once under
+  `__deduplicated_group_physical__` for each `group_request_digest`; totals
+  must sum those digest-deduplicated rows, never every projected job.
+- The source configuration keeps its CPU default. Every smoke or formal GPU
+  invocation must explicitly pass `--backend cuda`; do not infer or silently
+  select CUDA.
+- A run freezes its resolved protocol and source identity. After any source
+  change, create a new run ID instead of resuming, deleting, or overwriting an
+  existing run directory.
+- `icomp2026-formal-20260723` is a stopped, read-only legacy run. Never open,
+  resume, mutate, or mix its artifacts/tables with grouped results. A grouped
+  formal run requires a new run ID and its own complete publication lineage.
+
 **图片**:
 - 所有论文图片用 PDF 格式（见上一节第 6 条）
 - matplotlib 出图统一字体大小，与论文正文协调

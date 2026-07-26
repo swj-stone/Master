@@ -42,6 +42,50 @@ print('XGBOOST_LOADED=' + str('xgboost' in sys.modules))
     assert "XGBOOST_LOADED=False" in completed.stdout
 
 
+def test_native_progress_and_bundle_imports_do_not_load_pipeline_runner() -> None:
+    project_root = Path(__file__).parents[1]
+    probe = """
+import sys
+import experiments.icomp2026_progress
+import experiments.icomp2026_estimator_bundle
+print('RUNNER_LOADED=' + str(
+    'experiments.run_icomp2026_pipeline' in sys.modules
+))
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "RUNNER_LOADED=False" in completed.stdout
+
+
+def test_grouped_bundle_imports_in_direct_worker_module_layout() -> None:
+    project_root = Path(__file__).parents[1]
+    probe = """
+import sys
+import icomp2026_estimator_bundle
+print('RUNNER_LOADED=' + str(
+    'run_icomp2026_pipeline' in sys.modules
+    or 'experiments.run_icomp2026_pipeline' in sys.modules
+))
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=project_root / "experiments",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "RUNNER_LOADED=False" in completed.stdout
+
+
 def test_worker_contract_requires_path_instance() -> None:
     with pytest.raises(TypeError, match="receipt_path"):
         WorkerContract("receipt.json", "a" * 64)  # type: ignore[arg-type]

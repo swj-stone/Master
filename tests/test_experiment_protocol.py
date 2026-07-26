@@ -15,6 +15,7 @@ import yaml
 
 import minppi_mofs.experiment_protocol as protocol_module
 from minppi_mofs.experiment_protocol import (
+    ExecutionSpec,
     IncompleteRunError,
     ManifestStore,
     ResultRecord,
@@ -41,6 +42,12 @@ GLOBAL_CONFIG = {
     "datasets": ["spambase", "abalone"],
     "seeds": [42, 123],
     "backend": "cpu",
+    "execution": {
+        "mode": "grouped_nested_v1",
+        "cache_schema": "coalition_utility_v1",
+        "checkpoint_every_fits": 50,
+        "progress_every_seconds": 30,
+    },
     "model": {
         "n_estimators": 100,
         "max_depth": 4,
@@ -167,6 +174,121 @@ def test_load_resolved_protocol_merges_global_and_dataset_configs(
     assert protocol.nsga2["evaluations"] == 8
 
 
+def test_formal_protocol_freezes_grouped_execution(tmp_path: Path) -> None:
+    config_dir = _write_protocol(tmp_path / "configs")
+
+    source_protocol = load_resolved_protocol(
+        config_dir,
+        seeds=None,
+        backend=None,
+        smoke=False,
+    )
+    formal_protocol = load_resolved_protocol(
+        config_dir,
+        seeds=None,
+        backend="cuda",
+        smoke=False,
+    )
+
+    expected = ExecutionSpec(
+        mode="grouped_nested_v1",
+        cache_schema="coalition_utility_v1",
+        checkpoint_every_fits=50,
+        progress_every_seconds=30,
+    )
+    assert source_protocol.backend == "cpu"
+    assert formal_protocol.backend == "cuda"
+    assert source_protocol.execution == expected
+    assert formal_protocol.execution == expected
+
+
+@pytest.mark.parametrize(
+    "execution",
+    [
+        {"mode": "auto"},
+        {
+            "mode": "grouped_nested_v1",
+            "cache_schema": "coalition_utility_v1",
+            "checkpoint_every_fits": 50,
+            "progress_every_seconds": 30,
+            "unexpected": "value",
+        },
+        {
+            "mode": "auto",
+            "cache_schema": "coalition_utility_v1",
+            "checkpoint_every_fits": 50,
+            "progress_every_seconds": 30,
+        },
+        {
+            "mode": "legacy",
+            "cache_schema": "coalition_utility_v2",
+            "checkpoint_every_fits": 50,
+            "progress_every_seconds": 30,
+        },
+        {
+            "mode": "legacy",
+            "cache_schema": "coalition_utility_v1",
+            "checkpoint_every_fits": 0,
+            "progress_every_seconds": 30,
+        },
+        {
+            "mode": "legacy",
+            "cache_schema": "coalition_utility_v1",
+            "checkpoint_every_fits": True,
+            "progress_every_seconds": 30,
+        },
+        {
+            "mode": "legacy",
+            "cache_schema": "coalition_utility_v1",
+            "checkpoint_every_fits": 50,
+            "progress_every_seconds": 0,
+        },
+        {
+            "mode": "legacy",
+            "cache_schema": "coalition_utility_v1",
+            "checkpoint_every_fits": 50,
+            "progress_every_seconds": True,
+        },
+    ],
+)
+def test_execution_rejects_invalid_schema(
+    tmp_path: Path,
+    execution: dict[str, object],
+) -> None:
+    global_config = deepcopy(GLOBAL_CONFIG)
+    global_config["execution"] = execution
+    config_dir = _write_protocol(
+        tmp_path / "configs",
+        global_config=global_config,
+    )
+
+    with pytest.raises(ValueError, match="execution"):
+        load_resolved_protocol(
+            config_dir,
+            seeds=None,
+            backend=None,
+            smoke=False,
+        )
+
+
+def test_execution_accepts_legacy_mode(tmp_path: Path) -> None:
+    global_config = deepcopy(GLOBAL_CONFIG)
+    global_config["execution"]["mode"] = "legacy"
+    config_dir = _write_protocol(
+        tmp_path / "configs",
+        global_config=global_config,
+    )
+
+    protocol = load_resolved_protocol(
+        config_dir,
+        seeds=None,
+        backend=None,
+        smoke=False,
+    )
+
+    assert protocol.execution.mode == "legacy"
+
+
 def test_canonical_hash_is_independent_of_mapping_order() -> None:
     left = {"b": [2, 3], "a": {"y": 1, "x": 0}}
     right = {"a": {"x": 0, "y": 1}, "b": [2, 3]}
@@ -177,10 +299,16 @@ def test_canonical_hash_is_independent_of_mapping_order() -> None:
 def test_repository_protocol_configs_are_valid() -> None:
     config_dir = Path(__file__).resolve().parents[1] / "configs"
 
-    formal = load_resolved_protocol(
+    source = load_resolved_protocol(
         config_dir,
         seeds=None,
         backend=None,
+        smoke=False,
+    )
+    formal = load_resolved_protocol(
+        config_dir,
+        seeds=None,
+        backend="cuda",
         smoke=False,
     )
     smoke = load_resolved_protocol(
@@ -192,6 +320,9 @@ def test_repository_protocol_configs_are_valid() -> None:
 
     assert len(formal.datasets) == 7
     assert formal.seeds == (42, 123, 456, 789, 1024)
+    assert source.backend == "cpu"
+    assert formal.backend == "cuda"
+    assert formal.execution.mode == "grouped_nested_v1"
     assert tuple(dataset.dataset_id for dataset in smoke.datasets) == (
         "spambase",
         "abalone",
@@ -590,6 +721,10 @@ def test_create_new_run_builds_canonical_layout(
     assert layout.raw_metrics.is_dir()
     assert layout.tables.is_dir()
     assert layout.figures.is_dir()
+    assert layout.cache_root == layout.root / "cache"
+    assert layout.cache_root.is_dir()
+    assert layout.bundle_root == layout.root / "estimator" / "_bundles"
+    assert layout.bundle_root.is_dir()
     assert layout.audit_path == layout.root / "protocol_audit.json"
     assert layout.manifest_path == layout.root / "run_manifest.csv"
     assert layout.status_path == layout.root / "status.json"
@@ -597,6 +732,23 @@ def test_create_new_run_builds_canonical_layout(
 
     with pytest.raises(FileExistsError, match="already exists"):
         create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+
+
+@pytest.mark.parametrize("field", ["cache_root", "bundle_root"])
+def test_freeze_run_metadata_rejects_noncanonical_execution_layout_paths(
+    tmp_path: Path,
+    resolved_protocol,
+    field: str,
+) -> None:
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    conflicting = replace(layout, **{field: layout.root / "conflict"})
+
+    with pytest.raises(ValueError, match="canonical paths"):
+        freeze_run_metadata(
+            conflicting,
+            resolved_protocol,
+            project_root=tmp_path,
+        )
 
 
 @pytest.mark.parametrize(
@@ -674,6 +826,9 @@ def test_freeze_run_metadata_records_protocol_environment_and_sources(
     )
 
     assert (layout.root / "resolved_protocol.yaml").is_file()
+    frozen_protocol = yaml.safe_load(
+        (layout.root / "resolved_protocol.yaml").read_text(encoding="utf-8")
+    )
     environment = json.loads(
         (layout.root / "environment.json").read_text(encoding="utf-8")
     )
@@ -683,6 +838,12 @@ def test_freeze_run_metadata_records_protocol_environment_and_sources(
     assert environment["python"]
     assert environment["xgboost"]
     assert environment["backend"] == "cpu"
+    assert frozen_protocol["execution"] == {
+        "cache_schema": "coalition_utility_v1",
+        "checkpoint_every_fits": 50,
+        "mode": "grouped_nested_v1",
+        "progress_every_seconds": 30,
+    }
     assert {
         "numpy",
         "pandas",
@@ -848,6 +1009,58 @@ def test_resume_rejects_protocol_drift(
     freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
     changed = replace(resolved_protocol, alpha_default=0.90)
 
+    with pytest.raises(RuntimeError, match="protocol"):
+        open_resumed_run(
+            tmp_path / "results",
+            "run-1",
+            changed,
+            project_root=project_root,
+        )
+
+
+@pytest.mark.parametrize(
+    "changed_execution",
+    [
+        ExecutionSpec(
+            mode="legacy",
+            cache_schema="coalition_utility_v1",
+            checkpoint_every_fits=50,
+            progress_every_seconds=30,
+        ),
+        ExecutionSpec(
+            mode="grouped_nested_v1",
+            cache_schema="coalition_utility_v2",
+            checkpoint_every_fits=50,
+            progress_every_seconds=30,
+        ),
+        ExecutionSpec(
+            mode="grouped_nested_v1",
+            cache_schema="coalition_utility_v1",
+            checkpoint_every_fits=51,
+            progress_every_seconds=30,
+        ),
+        ExecutionSpec(
+            mode="grouped_nested_v1",
+            cache_schema="coalition_utility_v1",
+            checkpoint_every_fits=50,
+            progress_every_seconds=31,
+        ),
+    ],
+)
+def test_each_execution_field_changes_hash_and_prevents_resume(
+    tmp_path: Path,
+    resolved_protocol,
+    changed_execution: ExecutionSpec,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+    changed = replace(resolved_protocol, execution=changed_execution)
+
+    assert resolved_protocol_hash(changed) != resolved_protocol_hash(
+        resolved_protocol
+    )
     with pytest.raises(RuntimeError, match="protocol"):
         open_resumed_run(
             tmp_path / "results",

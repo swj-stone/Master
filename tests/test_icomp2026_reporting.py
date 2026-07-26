@@ -24,6 +24,129 @@ from experiments.summarize_icomp2026 import (
 FORMAL_SEEDS = (42, 123, 456, 789, 1024)
 
 
+def test_grouped_estimator_reporting_schema_preserves_comparison_and_accounting_metrics(
+) -> None:
+    metrics = {
+        "budget": 25,
+        "model_fit_count": 100,
+        "coalition_count": 101,
+        "logical_evaluation_count": 2500,
+        "logical_unique_coalition_count": 100,
+        "physical_model_fit_count": 40,
+        "cache_hit_count": 60,
+        "runtime_s": 12.5,
+        "group_request_digest": "a" * 64,
+        "group_physical_model_fit_count": 400,
+        "group_cache_hit_count": 600,
+        "group_runtime_s": 60.0,
+    }
+
+    validated = reporting_module.validate_estimator_reporting_schema(
+        metrics,
+        execution_mode="grouped_nested_v1",
+        exact_scores_available=False,
+    )
+
+    assert validated == metrics
+
+
+def test_grouped_reporting_requires_group_fields_without_changing_legacy_schema(
+) -> None:
+    legacy = {
+        "budget": 25,
+        "model_fit_count": 100,
+        "coalition_count": 101,
+        "runtime_s": 12.5,
+    }
+    assert reporting_module.validate_estimator_reporting_schema(
+        legacy,
+        execution_mode="legacy",
+        exact_scores_available=False,
+    ) == legacy
+    with pytest.raises(ValueError, match="schema"):
+        reporting_module.validate_estimator_reporting_schema(
+            legacy,
+            execution_mode="grouped_nested_v1",
+            exact_scores_available=False,
+        )
+
+
+def test_grouped_reporting_deduplicates_physical_totals_by_request_digest(
+) -> None:
+    first_group = {
+        "group_request_digest": "a" * 64,
+        "group_physical_model_fit_count": 400,
+        "group_cache_hit_count": 600,
+        "group_runtime_s": 60.0,
+    }
+    second_group = {
+        "group_request_digest": "b" * 64,
+        "group_physical_model_fit_count": 50,
+        "group_cache_hit_count": 75,
+        "group_runtime_s": 10.0,
+    }
+
+    accounting = reporting_module.deduplicate_estimator_group_metrics(
+        [first_group, dict(first_group), second_group]
+    )
+
+    assert accounting == {
+        "groups": [first_group, second_group],
+        "totals": {
+            "deduplicated_group_count": 2,
+            "deduplicated_group_physical_model_fit_count": 450,
+            "deduplicated_group_cache_hit_count": 675,
+            "deduplicated_group_runtime_s": 70.0,
+        },
+    }
+
+
+def test_grouped_projection_reporting_excludes_complete_group_values() -> None:
+    metrics = {
+        "budget": 25,
+        "model_fit_count": 100,
+        "coalition_count": 101,
+        "logical_evaluation_count": 2500,
+        "logical_unique_coalition_count": 100,
+        "physical_model_fit_count": 40,
+        "cache_hit_count": 60,
+        "runtime_s": 12.5,
+        "group_request_digest": "a" * 64,
+        "group_physical_model_fit_count": 400,
+        "group_cache_hit_count": 600,
+        "group_runtime_s": 60.0,
+    }
+
+    projected = reporting_module.estimator_projection_reporting_metrics(
+        metrics,
+        execution_mode="grouped_nested_v1",
+    )
+
+    assert projected == {
+        "budget": 25,
+        "model_fit_count": 100,
+        "coalition_count": 101,
+        "logical_evaluation_count": 2500,
+        "logical_unique_coalition_count": 100,
+        "physical_model_fit_count": 40,
+        "cache_hit_count": 60,
+        "runtime_s": 12.5,
+    }
+
+
+def test_grouped_reporting_rejects_conflicting_duplicate_group_values() -> None:
+    group = {
+        "group_request_digest": "a" * 64,
+        "group_physical_model_fit_count": 400,
+        "group_cache_hit_count": 600,
+        "group_runtime_s": 60.0,
+    }
+    with pytest.raises(ValueError, match="conflicting.*request digest"):
+        reporting_module.deduplicate_estimator_group_metrics(
+            [group, {**group, "group_runtime_s": 61.0}]
+        )
+
+
 def test_five_seed_statistics_are_exact_deterministic_and_low_power() -> None:
     values = [1.0, 2.0, 3.0, 4.0, 5.0]
 

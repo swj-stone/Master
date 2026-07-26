@@ -37,6 +37,8 @@ _CLASSIFICATION_UTILITIES = frozenset(
 )
 _REGRESSION_UTILITIES = frozenset({"r2", "rmse"})
 _VALID_BACKENDS = frozenset({"cpu", "cuda"})
+_VALID_EXECUTION_MODES = frozenset({"legacy", "grouped_nested_v1"})
+_EXECUTION_CACHE_SCHEMA = "coalition_utility_v1"
 _VALID_ESTIMATORS = frozenset(
     {"exact", "random_mc", "mi_correlation_guided", "hybrid"}
 )
@@ -99,6 +101,7 @@ _GLOBAL_KEYS = frozenset(
         "datasets",
         "seeds",
         "backend",
+        "execution",
         "model",
         "alpha",
         "estimator",
@@ -106,6 +109,14 @@ _GLOBAL_KEYS = frozenset(
         "nsga2",
         "ablations",
         "smoke",
+    }
+)
+_EXECUTION_KEYS = frozenset(
+    {
+        "mode",
+        "cache_schema",
+        "checkpoint_every_fits",
+        "progress_every_seconds",
     }
 )
 _MODEL_KEYS = frozenset(
@@ -154,6 +165,16 @@ class DatasetSpec:
 
 
 @dataclass(frozen=True)
+class ExecutionSpec:
+    """Frozen execution mechanics for estimator work."""
+
+    mode: str
+    cache_schema: str
+    checkpoint_every_fits: int
+    progress_every_seconds: int
+
+
+@dataclass(frozen=True)
 class ResolvedProtocol:
     """Validated experiment settings after CLI and smoke overrides."""
 
@@ -162,6 +183,7 @@ class ResolvedProtocol:
     datasets: tuple[DatasetSpec, ...]
     seeds: tuple[int, ...]
     backend: str
+    execution: ExecutionSpec
     model_params: dict[str, object]
     alpha_default: float
     alpha_grid: tuple[float, ...]
@@ -214,6 +236,8 @@ class RunLayout:
     raw_metrics: Path
     tables: Path
     figures: Path
+    cache_root: Path
+    bundle_root: Path
     audit_path: Path
     manifest_path: Path
     status_path: Path
@@ -781,8 +805,10 @@ def create_new_run(
         layout.raw_metrics,
         layout.tables,
         layout.figures,
+        layout.cache_root,
+        layout.bundle_root,
     ):
-        directory.mkdir()
+        directory.mkdir(parents=True)
     return layout
 
 
@@ -934,6 +960,8 @@ def open_resumed_run(
         layout.raw_metrics,
         layout.tables,
         layout.figures,
+        layout.cache_root,
+        layout.bundle_root,
     )
     if not all(path.is_dir() for path in required_directories):
         raise RuntimeError("run layout is incomplete and cannot be resumed")
@@ -948,6 +976,8 @@ def _run_layout(root: Path) -> RunLayout:
         raw_metrics=root / "raw_metrics",
         tables=root / "tables",
         figures=root / "figures",
+        cache_root=root / "cache",
+        bundle_root=root / "estimator" / "_bundles",
         audit_path=root / "protocol_audit.json",
         manifest_path=root / "run_manifest.csv",
         status_path=root / "status.json",
@@ -3099,6 +3129,37 @@ def load_resolved_protocol(
         else configured_backend
     )
 
+    execution_config = _mapping(global_config["execution"], "execution")
+    _expect_exact_keys(execution_config, _EXECUTION_KEYS, "execution")
+    execution_mode = _nonempty_string(
+        execution_config["mode"], "execution.mode"
+    )
+    if execution_mode not in _VALID_EXECUTION_MODES:
+        raise ValueError(
+            "execution.mode must be one of "
+            f"{sorted(_VALID_EXECUTION_MODES)}, got {execution_mode!r}"
+        )
+    cache_schema = _nonempty_string(
+        execution_config["cache_schema"], "execution.cache_schema"
+    )
+    if cache_schema != _EXECUTION_CACHE_SCHEMA:
+        raise ValueError(
+            "execution.cache_schema must be "
+            f"{_EXECUTION_CACHE_SCHEMA!r}, got {cache_schema!r}"
+        )
+    execution = ExecutionSpec(
+        mode=execution_mode,
+        cache_schema=cache_schema,
+        checkpoint_every_fits=_positive_int(
+            execution_config["checkpoint_every_fits"],
+            "execution.checkpoint_every_fits",
+        ),
+        progress_every_seconds=_positive_int(
+            execution_config["progress_every_seconds"],
+            "execution.progress_every_seconds",
+        ),
+    )
+
     model = _mapping(global_config["model"], "model")
     _expect_exact_keys(model, _MODEL_KEYS, "model")
     model_params = _validate_model(model)
@@ -3218,6 +3279,7 @@ def load_resolved_protocol(
         datasets=datasets,
         seeds=selected_seeds,
         backend=selected_backend,
+        execution=execution,
         model_params=model_params,
         alpha_default=alpha_default,
         alpha_grid=alpha_grid,

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -92,8 +91,10 @@ from minppi_mofs.experiment_protocol import (  # noqa: E402
 )
 
 if __package__:
+    from .icomp2026_progress import append_run_log  # noqa: E402
     from . import icomp2026_stages as stage_module
 else:
+    from icomp2026_progress import append_run_log  # type: ignore[no-redef]  # noqa: E402
     import icomp2026_stages as stage_module  # type: ignore[no-redef]
 
 STAGE_DEPENDENCIES = stage_module.STAGE_DEPENDENCIES
@@ -273,7 +274,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         layout = create_new_run(args.output_root, args.run_id, protocol)
         freeze_run_metadata(layout, protocol, project_root=project_root)
-    _append_log(layout.log_path, f"start stage={args.stage} resume={args.resume}")
+    append_run_log(
+        layout.log_path, f"start stage={args.stage} resume={args.resume}"
+    )
     try:
         result = PipelineRunner(
             protocol,
@@ -283,17 +286,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             allow_manifest_initialize=not args.resume,
         ).run(args.stage)
     except (OSError, RuntimeError, ValueError) as exc:
-        _append_log(layout.log_path, f"error {type(exc).__name__}: {exc}")
+        append_run_log(
+            layout.log_path, f"error {type(exc).__name__}: {exc}"
+        )
         return 2
-    _append_log(layout.log_path, f"finish stage={args.stage} exit_code={result}")
+    append_run_log(
+        layout.log_path, f"finish stage={args.stage} exit_code={result}"
+    )
     return result
-
-
-def _append_log(path: Path, message: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).isoformat()
-    with path.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(f"{timestamp} {message}\n")
 
 
 def _entrypoint(argv: Sequence[str] | None = None) -> int:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import csv
 import io
+from importlib import metadata
 import json
 import os
 import shutil
@@ -15,6 +16,13 @@ from pathlib import Path
 from typing import Callable, Mapping, Sequence
 from uuid import uuid4
 
+from minppi_mofs.coalition_cache import (
+    CoalitionCacheIdentity,
+    CoalitionUtilityCache,
+    SQLiteCoalitionStore,
+    hash_numeric_array,
+    hash_numeric_frame,
+)
 from minppi_mofs.experiment_protocol import (
     AuditLog,
     IncompleteRunError,
@@ -49,8 +57,11 @@ if __package__:
         RAW_COLUMNS,
         aggregate_canonical_records,
         csv_bytes,
+        deduplicate_estimator_group_metrics,
+        estimator_projection_reporting_metrics,
         generate_latex_macros,
         provenance_bytes,
+        validate_estimator_reporting_schema,
     )
 else:
     from summarize_icomp2026 import (  # type: ignore[no-redef]
@@ -60,8 +71,11 @@ else:
         RAW_COLUMNS,
         aggregate_canonical_records,
         csv_bytes,
+        deduplicate_estimator_group_metrics,
+        estimator_projection_reporting_metrics,
         generate_latex_macros,
         provenance_bytes,
+        validate_estimator_reporting_schema,
     )
 
 
@@ -69,10 +83,10 @@ STAGE_DEPENDENCIES: Mapping[str, tuple[str, ...]] = {
     "validate": (),
     "preprocess": ("validate",),
     "estimator": ("preprocess",),
-    "removal": ("preprocess",),
-    "alpha": ("preprocess",),
+    "removal": ("preprocess", "estimator"),
+    "alpha": ("preprocess", "estimator"),
     "nsga2": ("preprocess", "removal"),
-    "ablation": ("preprocess",),
+    "ablation": ("preprocess", "estimator"),
     "summarize": ("estimator", "removal", "alpha", "nsga2", "ablation"),
     "figures": ("summarize",),
 }
@@ -647,6 +661,316 @@ def _load_prepared_train_validation(context: StageContext):
     return X_train, y_train, X_val, y_val, row
 
 
+class _OpenedCoalitionCache:
+    """Own one immediately opened persistent store and its utility cache."""
+
+    def __init__(
+        self, store: SQLiteCoalitionStore, cache: CoalitionUtilityCache
+    ) -> None:
+        self._store = store
+        self._cache = cache
+
+    def __enter__(self) -> CoalitionUtilityCache:
+        return self._cache
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._cache, name)
+
+    def close(self) -> None:
+        self._store.close()
+
+
+def _validated_cache_manifest_authority(
+    context: StageContext, data_row: Mapping[str, object]
+) -> tuple[dict[str, object], object]:
+    """Validate one supplied rich row against frozen run and protocol authority."""
+    if not isinstance(context, StageContext):
+        raise TypeError("context must be a StageContext")
+    if not isinstance(data_row, Mapping):
+        raise TypeError("data_row must be a rich manifest mapping")
+    protocol_hash = resolved_protocol_hash(context.protocol)
+    if (
+        context.layout != context.status.layout
+        or context.job not in context.status.manifest
+        or context.job.protocol_hash != protocol_hash
+        or context.status.protocol_hash != protocol_hash
+    ):
+        raise ValueError("cache context conflicts with frozen run authority")
+    rows = read_rich_data_manifest(
+        context.layout.root / "data_manifest.csv", context.protocol
+    )
+    matches = tuple(
+        row
+        for row in rows
+        if row["dataset_id"] == context.job.dataset_id
+        and row["seed"] == context.job.seed
+    )
+    if len(matches) != 1:
+        raise ValueError("cache rich manifest authority is missing or duplicated")
+    row = matches[0]
+    if dict(data_row) != row:
+        raise ValueError("cache data row conflicts with rich manifest authority")
+    dataset = next(
+        (
+            item
+            for item in context.protocol.datasets
+            if item.dataset_id == context.job.dataset_id
+        ),
+        None,
+    )
+    if (
+        dataset is None
+        or row["task"] != dataset.task
+        or row["utility"] != dataset.utility
+        or row["target"] != dataset.target
+    ):
+        raise ValueError("cache data row conflicts with dataset authority")
+    return row, dataset
+
+
+def _validated_cache_frames(
+    row: Mapping[str, object],
+    X_train,
+    y_train,
+    X_eval,
+    y_eval,
+    *,
+    train_row_count: int,
+    eval_row_count: int,
+):
+    import numpy as np
+    import pandas as pd
+
+    if not isinstance(X_train, pd.DataFrame) or not isinstance(X_eval, pd.DataFrame):
+        raise TypeError("cache feature frames must be pandas DataFrames")
+    try:
+        selected = tuple(json.loads(str(row["selected_features_json"])))
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("cache manifest feature order is invalid") from exc
+    if (
+        tuple(X_train.columns) != selected
+        or tuple(X_eval.columns) != selected
+        or X_train.columns.duplicated().any()
+        or X_eval.columns.duplicated().any()
+    ):
+        raise ValueError("cache feature order conflicts with rich manifest")
+    train_target = np.asarray(y_train)
+    eval_target = np.asarray(y_eval)
+    if (
+        len(X_train) != train_row_count
+        or len(X_eval) != eval_row_count
+        or train_target.ndim != 1
+        or eval_target.ndim != 1
+        or len(train_target) != len(X_train)
+        or len(eval_target) != len(X_eval)
+    ):
+        raise ValueError("cache frame shape conflicts with rich manifest")
+    hash_numeric_frame(X_train)
+    hash_numeric_frame(X_eval)
+    hash_numeric_array(train_target)
+    hash_numeric_array(eval_target)
+    task = str(row["task"])
+    if task != "regression":
+        if (
+            not np.equal(train_target, np.floor(train_target)).all()
+            or not np.equal(eval_target, np.floor(eval_target)).all()
+        ):
+            raise ValueError("cache classification targets must be integer labels")
+        train_labels = tuple(int(value) for value in np.unique(train_target))
+        eval_labels = {int(value) for value in np.unique(eval_target)}
+        if task == "binary" and train_labels != (0, 1):
+            raise ValueError("cache binary train classes must be exactly {0,1}")
+        if task == "multiclass" and train_labels != tuple(
+            range(len(train_labels))
+        ):
+            raise ValueError(
+                "cache multiclass train classes must be zero-based contiguous"
+            )
+        if not eval_labels.issubset(train_labels):
+            raise ValueError("cache evaluation labels exceed training authority")
+    return X_train, train_target, X_eval, eval_target
+
+
+def _coalition_library_versions() -> dict[str, str]:
+    import numpy as np
+
+    try:
+        xgboost_version = metadata.version("xgboost")
+    except metadata.PackageNotFoundError:
+        xgboost_version = "unavailable"
+    return {"numpy": np.__version__, "xgboost": xgboost_version}
+
+
+def _cache_identity_from_validated_frames(
+    context: StageContext,
+    row: Mapping[str, object],
+    X_train,
+    y_train,
+    X_eval,
+    y_eval,
+    *,
+    namespace: str,
+) -> CoalitionCacheIdentity:
+    import numpy as np
+
+    class_labels = (
+        ()
+        if row["task"] == "regression"
+        else tuple(int(value) for value in np.unique(y_train))
+    )
+    return CoalitionCacheIdentity(
+        schema_version=context.protocol.execution.cache_schema,
+        protocol_hash=context.job.protocol_hash,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        namespace=namespace,
+        train_features_sha256=hash_numeric_frame(X_train),
+        train_target_sha256=hash_numeric_array(y_train),
+        eval_features_sha256=hash_numeric_frame(X_eval),
+        eval_target_sha256=hash_numeric_array(y_eval),
+        ordered_features=tuple(str(feature) for feature in X_train.columns),
+        task=str(row["task"]),
+        class_labels=class_labels,
+        model_params=context.protocol.model_params,
+        backend=context.protocol.backend,
+        model_seed=context.job.seed,
+        library_versions=_coalition_library_versions(),
+    )
+
+
+def _selection_cache_identity(
+    context: StageContext,
+    data_row: Mapping[str, object],
+    X_train,
+    y_train,
+    X_val,
+    y_val,
+) -> CoalitionCacheIdentity:
+    """Bind selection reuse to frozen authority and loaded numeric content."""
+    row, _dataset = _validated_cache_manifest_authority(context, data_row)
+    frames = _validated_cache_frames(
+        row,
+        X_train,
+        y_train,
+        X_val,
+        y_val,
+        train_row_count=int(row["train_row_count"]),
+        eval_row_count=int(row["val_row_count"]),
+    )
+    return _cache_identity_from_validated_frames(
+        context, row, *frames, namespace="selection_validation"
+    )
+
+
+def _cache_path(context: StageContext, namespace: str) -> Path:
+    if context.layout.cache_root != context.layout.root / "cache":
+        raise ValueError("run cache root is not canonical")
+    if namespace not in {"selection_validation", "final_test"}:
+        raise ValueError("coalition cache namespace is invalid")
+    if __package__:
+        from .icomp2026_estimator_bundle import _canonical_run_path
+    else:
+        from icomp2026_estimator_bundle import (  # type: ignore[no-redef]
+            _canonical_run_path,
+        )
+
+    return _canonical_run_path(
+        context.layout.root,
+        (
+            f"cache/{namespace}/{context.job.dataset_id}/"
+            f"s{context.job.seed}/coalitions.sqlite3"
+        ),
+        context="coalition cache",
+    )
+
+
+def _open_bound_cache(
+    context: StageContext,
+    identity: CoalitionCacheIdentity,
+    frames: tuple[object, object, object, object],
+) -> _OpenedCoalitionCache:
+    path = _cache_path(context, identity.namespace)
+    store = SQLiteCoalitionStore(
+        path,
+        identity,
+        commit_every_fits=context.protocol.execution.checkpoint_every_fits,
+    )
+    try:
+        cache = CoalitionUtilityCache(identity, *frames, store)
+        cache.validate_persistent_records()
+    except BaseException:
+        store.close()
+        raise
+    return _OpenedCoalitionCache(store, cache)
+
+
+def _open_selection_cache(
+    context: StageContext,
+    frames: object,
+    data_row: Mapping[str, object],
+) -> _OpenedCoalitionCache:
+    """Immediately reopen the run-scoped training/validation cache."""
+    row, _dataset = _validated_cache_manifest_authority(context, data_row)
+    if (
+        not isinstance(frames, (tuple, list))
+        or len(frames) != 4
+    ):
+        raise TypeError("selection cache frames must contain four values")
+    validated = _validated_cache_frames(
+        row,
+        *frames,
+        train_row_count=int(row["train_row_count"]),
+        eval_row_count=int(row["val_row_count"]),
+    )
+    identity = _cache_identity_from_validated_frames(
+        context, row, *validated, namespace="selection_validation"
+    )
+    return _open_bound_cache(context, identity, validated)
+
+
+def _open_final_test_cache(
+    context: StageContext,
+    train_val: object,
+    test: object,
+    data_row: Mapping[str, object],
+    reason: str,
+) -> _OpenedCoalitionCache:
+    """Audit the test read, then open its separately identified cache."""
+    row, _dataset = _validated_cache_manifest_authority(context, data_row)
+    if (
+        not isinstance(train_val, (tuple, list))
+        or len(train_val) != 2
+    ):
+        raise TypeError("final cache train_val must contain features and target")
+    audited_test = _task9_load_test(context, row, reason=reason)
+    if test is not None:
+        if not isinstance(test, (tuple, list)) or len(test) != 2:
+            raise TypeError("final cache test must contain features and target")
+        if (
+            hash_numeric_frame(test[0]) != hash_numeric_frame(audited_test[0])
+            or hash_numeric_array(test[1]) != hash_numeric_array(audited_test[1])
+        ):
+            raise ValueError("supplied test data conflicts with audited test data")
+    frames = _validated_cache_frames(
+        row,
+        train_val[0],
+        train_val[1],
+        audited_test[0],
+        audited_test[1],
+        train_row_count=(
+            int(row["train_row_count"]) + int(row["val_row_count"])
+        ),
+        eval_row_count=int(row["test_row_count"]),
+    )
+    identity = _cache_identity_from_validated_frames(
+        context, row, *frames, namespace="final_test"
+    )
+    return _open_bound_cache(context, identity, frames)
+
+
 def _label_summaries_match(
     actual: Mapping[str, object], expected: object, *, task: str
 ) -> bool:
@@ -670,7 +994,200 @@ def _label_summaries_match(
     )
 
 
+def group_request_from_context(
+    context: StageContext,
+    prepared_manifest_row: Mapping[str, object],
+    feature_order: Sequence[str],
+):
+    """Load the grouped request builder only for grouped estimator execution."""
+    if __package__:
+        from .icomp2026_estimator_bundle import (
+            group_request_from_context as build_request,
+        )
+    else:
+        from icomp2026_estimator_bundle import (  # type: ignore[no-redef]
+            group_request_from_context as build_request,
+        )
+
+    return build_request(context, prepared_manifest_row, feature_order)
+
+
+def ensure_estimator_bundle(
+    request: object,
+    frames: object,
+    run_root: Path,
+    progress_sink: Callable[[object], None],
+):
+    """Load the grouped bundle builder only for grouped estimator execution."""
+    if __package__:
+        from .icomp2026_estimator_bundle import (
+            ensure_estimator_bundle as ensure_bundle,
+        )
+    else:
+        from icomp2026_estimator_bundle import (  # type: ignore[no-redef]
+            ensure_estimator_bundle as ensure_bundle,
+        )
+
+    return ensure_bundle(request, frames, run_root, progress_sink)
+
+
+def _validate_grouped_estimator_bundle(bundle: object, request: object):
+    if __package__:
+        from .icomp2026_estimator_bundle import validate_estimator_bundle
+    else:
+        from icomp2026_estimator_bundle import (  # type: ignore[no-redef]
+            validate_estimator_bundle,
+        )
+
+    return validate_estimator_bundle(bundle, request)
+
+
+def _emit_estimator_progress(log_path: Path, event: object) -> None:
+    if __package__:
+        from .icomp2026_progress import emit_progress
+    else:
+        from icomp2026_progress import emit_progress  # type: ignore[no-redef]
+
+    emit_progress(log_path, event)
+
+
 def run_estimator_job(context: StageContext) -> ResultRecord:
+    """Dispatch one estimator job solely by its frozen execution mode."""
+    if context.protocol.execution.mode == "legacy":
+        return _run_legacy_estimator_job(context)
+    if context.protocol.execution.mode == "grouped_nested_v1":
+        return _run_grouped_estimator_job(context)
+    raise ValueError("unsupported execution mode")
+
+
+def _run_grouped_estimator_job(context: StageContext) -> ResultRecord:
+    """Project one canonical estimator job from its completed group bundle."""
+    started_at = _timestamp()
+    X_train, y_train, X_val, y_val, manifest_row = (
+        _load_prepared_train_validation(context)
+    )
+    feature_order = tuple(str(feature) for feature in X_train.columns)
+    request = group_request_from_context(context, manifest_row, feature_order)
+    bundle = ensure_estimator_bundle(
+        request=request,
+        frames=(X_train, y_train, X_val, y_val),
+        run_root=context.layout.root,
+        progress_sink=lambda event: _emit_estimator_progress(
+            context.layout.log_path, event
+        ),
+    )
+    bundle = _validate_grouped_estimator_bundle(bundle, request)
+
+    budget = context.job.parameters.get("budget")
+    if (
+        request.protocol_hash != context.job.protocol_hash
+        or request.dataset_id != context.job.dataset_id
+        or request.seed != context.job.seed
+        or context.job.method not in request.methods
+        or budget not in request.budgets
+    ):
+        raise ValueError("estimator job conflicts with grouped request authority")
+    matches = tuple(
+        checkpoint
+        for checkpoint in bundle.checkpoints
+        if checkpoint.method == context.job.method
+        and checkpoint.budget == budget
+    )
+    if len(matches) != 1:
+        raise ValueError(
+            "grouped estimator checkpoint is missing or duplicated"
+        )
+    checkpoint = matches[0]
+    checkpoint_features = tuple(
+        feature for feature, _score in checkpoint.scores
+    )
+    if (
+        checkpoint_features != feature_order
+        or checkpoint_features != request.ordered_features
+    ):
+        raise ValueError(
+            "grouped estimator checkpoint feature order is invalid"
+        )
+
+    ordered_scores = [
+        {"feature": feature, "score": score}
+        for feature, score in checkpoint.scores
+    ]
+    logical_unique = checkpoint.logical_unique_coalition_count
+    score_relpath = (
+        f"estimator/{context.job.dataset_id}/s{context.job.seed}/"
+        f"{context.job.method}/b{budget}/scores.json"
+    )
+    score_document = {
+        "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id,
+        "dataset_id": context.job.dataset_id,
+        "seed": context.job.seed,
+        "method": context.job.method,
+        "budget": budget,
+        "scores": ordered_scores,
+        "model_fit_count": logical_unique,
+        "coalition_count": logical_unique + 1,
+        "logical_evaluation_count": checkpoint.logical_evaluation_count,
+        "logical_unique_coalition_count": logical_unique,
+        "physical_model_fit_count": checkpoint.physical_model_fit_count,
+        "cache_hit_count": checkpoint.cache_hit_count,
+        "group_request_digest": request.digest,
+        "group_physical_model_fit_count": bundle.physical_model_fit_count,
+        "group_cache_hit_count": bundle.cache_hit_count,
+        "group_runtime_s": bundle.group_runtime_s,
+    }
+    if checkpoint.schedule_digest is not None:
+        score_document["schedule_digest"] = checkpoint.schedule_digest
+    _publish_idempotent_json(
+        context.layout.root / score_relpath,
+        score_document,
+        context="estimator score artifact",
+    )
+
+    metrics: dict[str, float | int | str | bool | None] = {
+        "budget": budget,
+        "model_fit_count": logical_unique,
+        "coalition_count": logical_unique + 1,
+        "logical_evaluation_count": checkpoint.logical_evaluation_count,
+        "logical_unique_coalition_count": logical_unique,
+        "physical_model_fit_count": checkpoint.physical_model_fit_count,
+        "cache_hit_count": checkpoint.cache_hit_count,
+        "runtime_s": checkpoint.component_runtime_s,
+        "group_request_digest": request.digest,
+        "group_physical_model_fit_count": bundle.physical_model_fit_count,
+        "group_cache_hit_count": bundle.cache_hit_count,
+        "group_runtime_s": bundle.group_runtime_s,
+    }
+    if checkpoint.schedule_digest is not None:
+        metrics["schedule_digest"] = checkpoint.schedule_digest
+    scores = dict(checkpoint.scores)
+    exact_scores = (
+        scores
+        if context.job.method == "exact"
+        else _completed_exact_scores(
+            context,
+            budget=budget,
+            expected_features=feature_order,
+        )
+    )
+    if exact_scores is not None:
+        metrics.update(_agreement_metrics(scores, exact_scores))
+    return ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage=context.job.stage,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        method=context.job.method,
+        metrics=metrics,
+        artifacts={"scores": score_relpath},
+        started_at=started_at,
+        finished_at=_timestamp(),
+    )
+
+
+def _run_legacy_estimator_job(context: StageContext) -> ResultRecord:
     """Run one manifest-authorized MinPPI estimator on train/validation only."""
     import math
 
@@ -860,7 +1377,187 @@ def _completed_exact_scores(
         expected_job=exact_job,
         budget=budget,
         expected_features=expected_features,
+        expected_metrics=record.metrics,
+        expected_execution_mode=context.protocol.execution.mode,
     )
+
+
+def _completed_estimator_checkpoint(
+    context: StageContext,
+    method: str,
+    budget: int,
+    expected_features: Sequence[str],
+):
+    """Return one fully validated grouped-estimator checkpoint authority."""
+    if not isinstance(context, StageContext):
+        raise TypeError("context must be a StageContext")
+    if (
+        isinstance(expected_features, (str, bytes))
+        or not isinstance(expected_features, Sequence)
+    ):
+        raise TypeError("expected_features must be an ordered sequence")
+    features = tuple(expected_features)
+    if (
+        not features
+        or any(
+            not isinstance(feature, str) or not feature
+            for feature in features
+        )
+        or len(set(features)) != len(features)
+    ):
+        raise ValueError("expected estimator features are invalid")
+    if (
+        not isinstance(method, str)
+        or method not in context.protocol.estimator_methods
+    ):
+        raise ValueError("estimator checkpoint method is invalid")
+    if (
+        isinstance(budget, bool)
+        or not isinstance(budget, int)
+        or budget not in context.protocol.estimator_budgets
+    ):
+        raise ValueError("estimator checkpoint budget is invalid")
+    protocol_hash = resolved_protocol_hash(context.protocol)
+    if (
+        context.protocol.execution.mode != "grouped_nested_v1"
+        or context.layout != context.status.layout
+        or context.job not in context.status.manifest
+        or context.job.protocol_hash != protocol_hash
+        or context.status.protocol_hash != protocol_hash
+    ):
+        raise ValueError(
+            "completed estimator lookup requires grouped run authority"
+        )
+    dataset = next(
+        (
+            item
+            for item in context.protocol.datasets
+            if item.dataset_id == context.job.dataset_id
+        ),
+        None,
+    )
+    if dataset is None or context.job.seed not in context.protocol.seeds:
+        raise ValueError("completed estimator dataset or seed is invalid")
+
+    matches = tuple(
+        job
+        for job in context.status.manifest
+        if job.stage == "estimator"
+        and job.dataset_id == context.job.dataset_id
+        and job.seed == context.job.seed
+        and job.method == method
+        and job.parameters.get("budget") == budget
+    )
+    if len(matches) != 1:
+        raise ValueError(
+            "completed estimator authority is missing or duplicated"
+        )
+    job = matches[0]
+    if (
+        job.protocol_hash != protocol_hash
+        or set(job.parameters) != {"task", "utility", "budget"}
+        or job.parameters["task"] != dataset.task
+        or job.parameters["utility"] != dataset.utility
+        or job.parameters["budget"] != budget
+    ):
+        raise ValueError("completed estimator job conflicts with authority")
+    if context.status.entry(job.job_id)["state"] != "success":
+        raise ValueError("completed estimator authority is not successful")
+
+    result_path = context.layout.root / job.output_relpath
+    read_canonical_json(result_path, context="estimator ResultRecord")
+    record = read_result_record(result_path, job)
+    expected_score_relpath = (
+        f"estimator/{job.dataset_id}/s{job.seed}/"
+        f"{job.method}/b{budget}/scores.json"
+    )
+    if (
+        set(record.artifacts) != {"scores"}
+        or record.artifacts["scores"] != expected_score_relpath
+    ):
+        raise ValueError(
+            "completed estimator ResultRecord score artifact is invalid"
+        )
+    scores = _read_score_artifact(
+        context.layout.root / expected_score_relpath,
+        expected_job=job,
+        budget=budget,
+        expected_features=features,
+        expected_metrics=record.metrics,
+        expected_execution_mode="grouped_nested_v1",
+    )
+
+    estimator_context = StageContext(
+        context.protocol, context.layout, job, context.status, context.audit
+    )
+    request = group_request_from_context(
+        estimator_context, _task9_manifest_row(context), features
+    )
+    if __package__:
+        from .icomp2026_estimator_bundle import (
+            bundle_from_document,
+            bundle_relpath,
+        )
+    else:
+        from icomp2026_estimator_bundle import (  # type: ignore[no-redef]
+            bundle_from_document,
+            bundle_relpath,
+        )
+
+    bundle = bundle_from_document(
+        read_canonical_json(
+            context.layout.root / bundle_relpath(request),
+            context="estimator bundle",
+        ),
+        request,
+    )
+    checkpoints = tuple(
+        checkpoint
+        for checkpoint in bundle.checkpoints
+        if checkpoint.method == method and checkpoint.budget == budget
+    )
+    if len(checkpoints) != 1:
+        raise ValueError(
+            "completed estimator bundle checkpoint is missing or duplicated"
+        )
+    checkpoint = checkpoints[0]
+    checkpoint_scores = dict(checkpoint.scores)
+    expected_metrics: dict[str, object] = {
+        "budget": checkpoint.budget,
+        "model_fit_count": checkpoint.logical_unique_coalition_count,
+        "coalition_count": checkpoint.logical_unique_coalition_count + 1,
+        "logical_evaluation_count": checkpoint.logical_evaluation_count,
+        "logical_unique_coalition_count": (
+            checkpoint.logical_unique_coalition_count
+        ),
+        "physical_model_fit_count": checkpoint.physical_model_fit_count,
+        "cache_hit_count": checkpoint.cache_hit_count,
+        "runtime_s": checkpoint.component_runtime_s,
+        "group_request_digest": request.digest,
+        "group_physical_model_fit_count": bundle.physical_model_fit_count,
+        "group_cache_hit_count": bundle.cache_hit_count,
+        "group_runtime_s": bundle.group_runtime_s,
+    }
+    if checkpoint.schedule_digest is not None:
+        expected_metrics["schedule_digest"] = checkpoint.schedule_digest
+    if (
+        tuple(checkpoint_scores) != features
+        or checkpoint_scores != scores
+        or not set(expected_metrics) <= set(record.metrics)
+        or any(
+            record.metrics[key] != value
+            for key, value in expected_metrics.items()
+        )
+        or (
+            checkpoint.schedule_digest is None
+            and "schedule_digest" in record.metrics
+        )
+    ):
+        raise ValueError(
+            "completed estimator ResultRecord, score artifact, and bundle "
+            "checkpoint conflict"
+        )
+    return checkpoint
 
 
 def _read_score_artifact(
@@ -870,6 +1567,7 @@ def _read_score_artifact(
     budget: int,
     expected_features: tuple[str, ...],
     expected_metrics: Mapping[str, object] | None = None,
+    expected_execution_mode: str | None = None,
 ) -> dict[str, int]:
     try:
         document = read_canonical_json(path, context="estimator score artifact")
@@ -877,12 +1575,56 @@ def _read_score_artifact(
         raise ValueError(
             "estimator score artifact is missing, malformed, or noncanonical JSON"
         ) from exc
-    expected_keys = {
+    base_keys = {
         "protocol_hash", "job_id", "dataset_id", "seed", "method", "budget",
         "scores", "model_fit_count", "coalition_count",
     }
-    scheduled = expected_job.method in {"mi_correlation_guided", "hybrid"}
-    if scheduled:
+    grouped_fields = {
+        "logical_evaluation_count",
+        "logical_unique_coalition_count",
+        "physical_model_fit_count",
+        "cache_hit_count",
+        "group_request_digest",
+        "group_physical_model_fit_count",
+        "group_cache_hit_count",
+        "group_runtime_s",
+    }
+    expected_grouped_fields = (
+        set()
+        if expected_metrics is None
+        else grouped_fields & set(expected_metrics)
+    )
+    if expected_grouped_fields and expected_grouped_fields != grouped_fields:
+        raise ValueError(
+            "estimator ResultRecord grouped metric schema is incomplete"
+        )
+    metrics_grouped = expected_grouped_fields == grouped_fields
+    if expected_execution_mode not in {
+        None, "legacy", "grouped_nested_v1"
+    }:
+        raise ValueError("estimator expected execution mode is invalid")
+    if expected_execution_mode is None:
+        grouped = metrics_grouped
+    else:
+        grouped = expected_execution_mode == "grouped_nested_v1"
+        if expected_metrics is not None and grouped != metrics_grouped:
+            raise ValueError(
+                "estimator ResultRecord metrics conflict with execution mode"
+            )
+    expected_keys = base_keys | (grouped_fields if grouped else set())
+    legacy_scheduled = expected_job.method in {
+        "mi_correlation_guided", "hybrid"
+    }
+    grouped_schedule_required = expected_job.method in {
+        "random_mc", "mi_correlation_guided"
+    } or (
+        expected_job.method == "hybrid"
+        and len(expected_features) > 20
+    )
+    if (
+        (grouped and grouped_schedule_required)
+        or (not grouped and legacy_scheduled)
+    ):
         expected_keys.add("schedule_digest")
     if not isinstance(document, dict) or set(document) != expected_keys:
         raise ValueError("estimator score artifact schema is invalid")
@@ -928,7 +1670,80 @@ def _read_score_artifact(
         )
     ):
         raise ValueError("estimator score artifact cost counters are invalid")
-    if scheduled:
+    if grouped:
+        logical_evaluations = document["logical_evaluation_count"]
+        logical_unique = document["logical_unique_coalition_count"]
+        physical_fits = document["physical_model_fit_count"]
+        cache_hits = document["cache_hit_count"]
+        group_fits = document["group_physical_model_fit_count"]
+        group_hits = document["group_cache_hit_count"]
+        group_runtime = document["group_runtime_s"]
+        request_digest = document["group_request_digest"]
+        exact_nonnegative_ints = (
+            logical_evaluations,
+            logical_unique,
+            physical_fits,
+            cache_hits,
+            group_fits,
+            group_hits,
+        )
+        if (
+            any(
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+                for value in exact_nonnegative_ints
+            )
+            or logical_evaluations < 1
+            or logical_unique < 1
+            or logical_unique > logical_evaluations
+            or model_fit_count != logical_unique
+            or coalition_count != logical_unique + 1
+            or physical_fits > logical_unique
+            or physical_fits > group_fits
+            or cache_hits > group_hits
+            or isinstance(group_runtime, bool)
+            or not isinstance(group_runtime, (int, float))
+            or not __import__("math").isfinite(float(group_runtime))
+            or group_runtime < 0
+            or not isinstance(request_digest, str)
+            or len(request_digest) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in request_digest
+            )
+        ):
+            raise ValueError("grouped estimator score counters are invalid")
+        if "schedule_digest" in document:
+            digest = document["schedule_digest"]
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(
+                    character not in "0123456789abcdef"
+                    for character in digest
+                )
+            ):
+                raise ValueError(
+                    "grouped estimator score schedule digest is invalid"
+                )
+            if (
+                expected_metrics is None
+                or expected_metrics.get("schedule_digest") != digest
+            ):
+                raise ValueError(
+                    "grouped estimator score schedule digest conflicts "
+                    "with ResultRecord authority"
+                )
+        elif (
+            expected_metrics is not None
+            and "schedule_digest" in expected_metrics
+        ):
+            raise ValueError(
+                "grouped estimator ResultRecord schedule digest conflicts "
+                "with score artifact"
+            )
+    elif legacy_scheduled:
         from minppi_mofs.min_ppi import (
             algorithm_b_schedule_digest,
             make_algorithm_b_perturbation_schedule,
@@ -942,9 +1757,12 @@ def _read_score_artifact(
         if document["schedule_digest"] != expected_digest:
             raise ValueError("estimator score artifact schedule digest is invalid")
     if expected_metrics is not None:
+        metric_fields = {"budget", "model_fit_count", "coalition_count"}
+        if grouped:
+            metric_fields.update(grouped_fields)
         if any(
             expected_metrics.get(field) != document[field]
-            for field in ("budget", "model_fit_count", "coalition_count")
+            for field in metric_fields
         ):
             raise ValueError(
                 "estimator ResultRecord metrics conflict with score artifact"
@@ -2010,14 +2828,23 @@ def _validate_removal_plan(context: StageContext, document: object) -> dict[str,
     repeats = context.protocol.removal["random_repeats"]
     minppi_removed: list[str] | None = None
     for item in methods:
+        method = item.get("method") if isinstance(item, dict) else None
+        expected_method_keys = {
+            "method", "trials", "model_fit_count", "coalition_count"
+        }
+        if method == "minppi":
+            expected_method_keys.update(
+                {
+                    "logical_unique_coalition_count",
+                    "physical_model_fit_count",
+                }
+            )
         if (
             not isinstance(item, dict)
-            or set(item)
-            != {"method", "trials", "model_fit_count", "coalition_count"}
+            or set(item) != expected_method_keys
             or not isinstance(item["trials"], list)
         ):
             raise ValueError("removal plan method schema is invalid")
-        method = item["method"]
         for field in ("model_fit_count", "coalition_count"):
             if (
                 isinstance(item[field], bool)
@@ -2029,6 +2856,20 @@ def _validate_removal_plan(context: StageContext, document: object) -> dict[str,
             item["model_fit_count"] != 0 or item["coalition_count"] != 0
         ):
             raise ValueError("non-model removal method has selection costs")
+        if method == "minppi" and (
+            isinstance(item["logical_unique_coalition_count"], bool)
+            or not isinstance(
+                item["logical_unique_coalition_count"], int
+            )
+            or item["logical_unique_coalition_count"] < 1
+            or item["coalition_count"]
+            != item["logical_unique_coalition_count"]
+            or item["model_fit_count"] != 0
+            or item["physical_model_fit_count"] != 0
+        ):
+            raise ValueError(
+                "reused MinPPI logical or physical counters are invalid"
+            )
         expected_trials = repeats if method == "random_matched" else 1
         if len(item["trials"]) != expected_trials:
             raise ValueError("removal plan trial count is invalid")
@@ -2143,6 +2984,13 @@ def _removal_selection_metrics(
         metrics[f"{method}_selection_coalition_count"] = int(
             methods[method]["coalition_count"]
         )
+    minppi = methods["minppi"]
+    metrics["minppi_selection_logical_unique_coalition_count"] = int(
+        minppi["logical_unique_coalition_count"]
+    )
+    metrics["minppi_selection_physical_model_fit_count"] = int(
+        minppi["physical_model_fit_count"]
+    )
     return metrics
 
 
@@ -2168,11 +3016,6 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
     from minppi_mofs.baselines.banzhaf_fs import compute_banzhaf_importance
     from minppi_mofs.baselines.min_shap import compute_minshap_importance
     from minppi_mofs.baselines.shap_top_k import compute_shap_topk_importance
-    from minppi_mofs.min_ppi import (
-        estimate_minppi_hybrid,
-        make_algorithm_b_perturbation_schedule,
-    )
-    from minppi_mofs.shapg_integration import build_mi_correlation_guidance
 
     started_at = _timestamp()
     relpath = _removal_plan_relpath(context)
@@ -2193,20 +3036,10 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
     budget = max(context.protocol.estimator_budgets)
     selection_times = {method: 0.0 for method in _REMOVAL_METHODS}
     minppi_started = time.perf_counter()
-    schedule = make_algorithm_b_perturbation_schedule(
-        features, K_adv=budget, seed=context.job.seed
+    checkpoint = _completed_estimator_checkpoint(
+        context, "hybrid", budget, features
     )
-    mi_scores, neighbors = build_mi_correlation_guidance(
-        X_train, y_train, task=dataset.task, seed=context.job.seed
-    )
-    cache = _make_job_cache(context, X_train, X_val, y_train, y_val)
-    minppi = estimate_minppi_hybrid(
-        X_train=X_train, X_val=X_val, y_train=y_train, y_val=y_val,
-        alpha=context.protocol.alpha_default, task=dataset.task,
-        utility=dataset.utility, K=budget, K_adv=budget,
-        mi_scores=mi_scores, correlation_neighbors=neighbors,
-        perturbation_schedule=schedule, acc_cache=cache, seed=context.job.seed,
-    )
+    minppi = dict(checkpoint.scores)
     ordered_minppi = _task9_scores(minppi, features)
     harmful = [feature for feature in features if float(minppi[feature]) == -1.0]
     k = len(harmful)
@@ -2266,21 +3099,29 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
             )[:k]
             trials = [_task9_subset_row(features, removed)]
         if method == "minppi":
-            model_fit_count = int(cache.model_fit_count)
-            coalition_count = int(cache.coalition_count)
+            model_fit_count = 0
+            coalition_count = int(
+                checkpoint.logical_unique_coalition_count
+            )
         elif method in diagnostics:
             model_fit_count = int(diagnostics[method].get("model_fit_count", 0))
             coalition_count = int(diagnostics[method].get("coalition_count", 0))
         else:
             model_fit_count = coalition_count = 0
-        methods.append(
-            {
-                "method": method,
-                "trials": trials,
-                "model_fit_count": model_fit_count,
-                "coalition_count": coalition_count,
-            }
-        )
+        method_document: dict[str, object] = {
+            "method": method,
+            "trials": trials,
+            "model_fit_count": model_fit_count,
+            "coalition_count": coalition_count,
+        }
+        if method == "minppi":
+            method_document.update(
+                logical_unique_coalition_count=(
+                    checkpoint.logical_unique_coalition_count
+                ),
+                physical_model_fit_count=0,
+            )
+        methods.append(method_document)
     baseline_fit_count = sum(
         item.get("model_fit_count", 0) for item in diagnostics.values()
     )
@@ -2307,8 +3148,11 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
                 for method in ("shap_bottom", "minshap_bottom", "banzhaf_bottom")
             ],
         ],
-        "selection_model_fit_count": int(cache.model_fit_count + baseline_fit_count),
-        "selection_coalition_count": int(cache.coalition_count + baseline_coalitions),
+        "selection_model_fit_count": int(baseline_fit_count),
+        "selection_coalition_count": int(
+            checkpoint.logical_unique_coalition_count
+            + baseline_coalitions
+        ),
     }
     _validate_removal_plan(context, document)
     _publish_idempotent_json(path, document, context="removal selection plan")
@@ -2354,6 +3198,8 @@ def _task9_plan_result(context: StageContext, *, stage: str) -> ResultRecord:
                     "selection_coalition_count",
                 )
             ),
+            "minppi_selection_logical_unique_coalition_count",
+            "minppi_selection_physical_model_fit_count",
         }
     else:
         expected_keys = {
@@ -2395,6 +3241,19 @@ def _task9_plan_result(context: StageContext, *, stage: str) -> ResultRecord:
                 != methods[method]["coalition_count"]
             ):
                 raise ValueError("removal selection method counters conflict with plan")
+        if (
+            record.metrics[
+                "minppi_selection_logical_unique_coalition_count"
+            ]
+            != methods["minppi"]["logical_unique_coalition_count"]
+            or record.metrics[
+                "minppi_selection_physical_model_fit_count"
+            ]
+            != methods["minppi"]["physical_model_fit_count"]
+        ):
+            raise ValueError(
+                "removal reused MinPPI counters conflict with plan"
+            )
         expected_time = sum(
             float(record.metrics[f"{method}_selection_time_s"])
             for method in _REMOVAL_METHODS
@@ -3778,16 +4637,16 @@ def _validated_estimator_summary_metrics(
     budget: int,
     model_fit_count: int,
     coalition_count: int,
+    execution_mode: str = "legacy",
 ) -> dict[str, object]:
-    base = {"budget", "model_fit_count", "coalition_count", "runtime_s"}
     agreement_keys = {
         "harmful_precision", "harmful_recall", "harmful_f1", "score_agreement"
     }
-    allowed_schemas = {frozenset(base)}
-    if exact_scores is not None:
-        allowed_schemas.add(frozenset(base | agreement_keys))
-    if frozenset(metrics) not in allowed_schemas:
-        raise ValueError("estimator ResultRecord metric schema is invalid")
+    validated = validate_estimator_reporting_schema(
+        metrics,
+        execution_mode=execution_mode,
+        exact_scores_available=exact_scores is not None,
+    )
     if (
         metrics["budget"] != budget
         or metrics["model_fit_count"] != model_fit_count
@@ -3802,7 +4661,7 @@ def _validated_estimator_summary_metrics(
         or runtime < 0
     ):
         raise ValueError("estimator ResultRecord runtime is invalid")
-    published = dict(metrics)
+    published = dict(validated)
     if exact_scores is not None:
         recomputed = _agreement_metrics(approximate_scores, exact_scores)
         if agreement_keys <= set(metrics) and any(
@@ -4035,6 +4894,9 @@ def _validated_summary_rows(
     """Extract values only after strict canonical stage-artifact validation."""
     raw_rows: list[dict[str, object]] = []
     front_rows: list[dict[str, object]] = []
+    grouped_estimator_entries: list[
+        tuple[int, StageContext, dict[str, object]]
+    ] = []
     omitted = set() if omitted_job_ids is None else set(omitted_job_ids)
     for sequence, job in enumerate(context.status.manifest):
         if job.stage not in _SUMMARY_REQUIRED_STAGES:
@@ -4099,11 +4961,20 @@ def _validated_summary_rows(
                 budget=budget,
                 model_fit_count=int(record.metrics["model_fit_count"]),
                 coalition_count=int(record.metrics["coalition_count"]),
+                execution_mode=context.protocol.execution.mode,
+            )
+            if context.protocol.execution.mode == "grouped_nested_v1":
+                grouped_estimator_entries.append(
+                    (sequence, item, validated_metrics)
+                )
+            projection_metrics = estimator_projection_reporting_metrics(
+                validated_metrics,
+                execution_mode=context.protocol.execution.mode,
             )
             raw_rows.extend(
                 _numeric_metrics(
                     context=item, sequence=sequence, method=job.method,
-                    parameter=parameter, trial=0, metrics=validated_metrics,
+                    parameter=parameter, trial=0, metrics=projection_metrics,
                 )
             )
             continue
@@ -4327,6 +5198,34 @@ def _validated_summary_rows(
                         "hypervolume": float(hypervolume),
                     }
                 )
+    if grouped_estimator_entries:
+        accounting = deduplicate_estimator_group_metrics(
+            [metrics for _, _, metrics in grouped_estimator_entries]
+        )
+        for group in accounting["groups"]:
+            digest = str(group["group_request_digest"])
+            sequence, item, _ = next(
+                entry
+                for entry in grouped_estimator_entries
+                if entry[2]["group_request_digest"] == digest
+            )
+            raw_rows.extend(
+                _numeric_metrics(
+                    context=item,
+                    sequence=sequence,
+                    method="__deduplicated_group_physical__",
+                    parameter=f"group_request_digest={digest}",
+                    trial=0,
+                    metrics={
+                        field: group[field]
+                        for field in (
+                            "group_physical_model_fit_count",
+                            "group_cache_hit_count",
+                            "group_runtime_s",
+                        )
+                    },
+                )
+            )
     return raw_rows, front_rows
 
 

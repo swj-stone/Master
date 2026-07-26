@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import ast
+import io
 import json
 import hashlib
+from importlib import metadata as package_metadata
 import os
+import sqlite3
 import subprocess
 import sys
 import warnings
@@ -22,9 +25,23 @@ import minppi_mofs.data_protocol as data_protocol_module
 import minppi_mofs.min_ppi as min_ppi_module
 import minppi_mofs.shapg_integration as guidance_module
 import minppi_mofs.voting_game as voting_game_module
+import experiments.icomp2026_estimator_bundle as estimator_bundle_module
 import experiments.icomp2026_stages as stage_module
 import experiments.run_icomp2026_pipeline as pipeline_module
+from experiments.icomp2026_estimator_bundle import (
+    ESTIMATOR_BUNDLE_SCHEMA_VERSION,
+    EstimatorBundle,
+    EstimatorCheckpoint,
+    EstimatorGroupRequest,
+    _schedule_authority,
+)
+from experiments.icomp2026_progress import append_run_log
 from experiments.native_process_guard import WorkerContract
+from minppi_mofs.coalition_cache import (
+    SQLiteCoalitionStore,
+    hash_numeric_array,
+    hash_numeric_frame,
+)
 from minppi_mofs.experiment_protocol import (
     AuditLog,
     AuditedSplitAccess,
@@ -358,6 +375,8 @@ def test_assert_stage_complete_aggregates_audit_defects_without_creating_audit(
         raw_metrics=root / "raw_metrics",
         tables=root / "tables",
         figures=root / "figures",
+        cache_root=root / "cache",
+        bundle_root=root / "estimator" / "_bundles",
         audit_path=root / "protocol_audit.json",
         manifest_path=root / "run_manifest.csv",
         status_path=root / "status.json",
@@ -407,6 +426,8 @@ def test_assert_stage_complete_rejects_audit_stage_that_does_not_match_job(
         raw_metrics=root / "raw_metrics",
         tables=root / "tables",
         figures=root / "figures",
+        cache_root=root / "cache",
+        bundle_root=root / "estimator" / "_bundles",
         audit_path=root / "protocol_audit.json",
         manifest_path=root / "run_manifest.csv",
         status_path=root / "status.json",
@@ -631,7 +652,8 @@ def test_invalid_utf8_audit_is_aggregated_by_completeness(tmp_path: Path) -> Non
     root.mkdir()
     layout = RunLayout(
         root=root, configs_frozen=root / "configs", raw_metrics=root / "metrics",
-        tables=root / "tables", figures=root / "figures", audit_path=root / "audit.json",
+        tables=root / "tables", figures=root / "figures", cache_root=root / "cache",
+        bundle_root=root / "estimator" / "_bundles", audit_path=root / "audit.json",
         manifest_path=root / "manifest.csv", status_path=root / "status.json", log_path=root / "log.txt",
     )
     job = JobSpec("job", "hash", "preprocess", "toy", 42, "prepare", {}, (), "preprocess/x.json")
@@ -1607,11 +1629,495 @@ def test_prepared_loader_rejects_train_or_validation_summary_mismatch(
         stage_module._load_prepared_train_validation(context)
 
 
-def _tiny_estimator_setup(tmp_path: Path, smoke_protocol, *, exact_max_features=20):
+def _prepared_cache_contexts(tmp_path: Path, smoke_protocol, run_id: str):
+    protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    protocol = replace(protocol, datasets=(protocol.datasets[0],))
+    layout = create_new_run(tmp_path / "results", run_id, protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    manifest = (
+        build_job_manifest(protocol, stages=("validate",))
+        + build_job_manifest(protocol, stages=("preprocess",))
+        + build_job_manifest(protocol, stages=("removal",))
+    )
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    stage_module.run_validate_job(
+        next(item for item in contexts if item.job.stage == "validate")
+    )
+    stage_module.run_preprocess_job(
+        next(item for item in contexts if item.job.stage == "preprocess")
+    )
+    selection = next(
+        item
+        for item in contexts
+        if item.job.stage == "removal" and item.job.method == "selection_plan"
+    )
+    final = next(
+        item
+        for item in contexts
+        if item.job.stage == "removal" and item.job.method == "full"
+    )
+    frames = stage_module._load_prepared_train_validation(selection)
+    return layout, selection, final, frames
+
+
+def test_selection_cache_identity_uses_loaded_prepared_numeric_content(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    _, context, _, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "selection-cache-identity"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+
+    identity = stage_module._selection_cache_identity(
+        context, row, X_train, y_train, X_val, y_val
+    )
+
+    assert identity.namespace == "selection_validation"
+    assert identity.protocol_hash == context.job.protocol_hash
+    assert identity.dataset_id == context.job.dataset_id
+    assert identity.seed == context.job.seed
+    assert identity.train_features_sha256 == hash_numeric_frame(X_train)
+    assert identity.train_target_sha256 == hash_numeric_array(y_train)
+    assert identity.eval_features_sha256 == hash_numeric_frame(X_val)
+    assert identity.eval_target_sha256 == hash_numeric_array(y_val)
+    assert identity.ordered_features == tuple(X_train.columns)
+    assert identity.task == "binary"
+    assert identity.class_labels == (0, 1)
+    assert dict(identity.model_params) == context.protocol.model_params
+    assert identity.backend == context.protocol.backend
+    assert identity.model_seed == context.job.seed
+    assert dict(identity.library_versions) == {
+        "numpy": np.__version__,
+        "xgboost": package_metadata.version("xgboost"),
+    }
+
+
+def test_selection_cache_validates_rich_row_before_hashing_loaded_content(
+    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, context, _, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "selection-cache-rich-row-first"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+    malformed = dict(row)
+    malformed["selected_feature_count"] = int(row["selected_feature_count"]) + 1
+    monkeypatch.setattr(
+        stage_module,
+        "hash_numeric_frame",
+        lambda *args: pytest.fail("numeric content hashed before rich-row validation"),
+        raising=False,
+    )
+
+    with pytest.raises(ValueError, match="manifest|row|authority"):
+        stage_module._selection_cache_identity(
+            context, malformed, X_train, y_train, X_val, y_val
+        )
+
+
+def test_selection_cache_path_and_identity_collisions_fail_closed(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout, context, _, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "selection-cache-collisions"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+    identity = stage_module._selection_cache_identity(
+        context, row, X_train, y_train, X_val, y_val
+    )
+    expected_path = (
+        layout.root
+        / "cache"
+        / "selection_validation"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    )
+    with stage_module._open_selection_cache(
+        context, (X_train, y_train, X_val, y_val), row
+    ) as cache:
+        assert cache.identity.digest == identity.digest
+        assert cache.stats.coalition_count == 0
+    assert expected_path.is_file()
+
+    changed_validation_file_row = dict(row)
+    changed_validation_file_row["val_file_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="manifest|row|authority"):
+        stage_module._open_selection_cache(
+            context,
+            (X_train, y_train, X_val, y_val),
+            changed_validation_file_row,
+        )
+
+    changed_val = X_val.copy()
+    changed_val.iloc[0, 0] += 0.25
+    changed_val_identity = stage_module._selection_cache_identity(
+        context, row, X_train, y_train, changed_val, y_val
+    )
+    collisions = (
+        changed_val_identity,
+        replace(identity, model_params={**context.protocol.model_params, "max_depth": 99}),
+        replace(
+            identity,
+            backend="cuda" if context.protocol.backend == "cpu" else "cpu",
+        ),
+        replace(identity, ordered_features=tuple(reversed(identity.ordered_features))),
+        replace(identity, namespace="final_test"),
+    )
+    for collision in collisions:
+        with pytest.raises(ValueError, match="metadata|identity|conflict"):
+            SQLiteCoalitionStore(
+                expected_path,
+                collision,
+                commit_every_fits=context.protocol.execution.checkpoint_every_fits,
+            )
+
+
+def test_selection_cache_never_reads_test_or_prebuilt_final_test_cache(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    layout, context, _, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "selection-cache-no-test"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+    selection_identity = stage_module._selection_cache_identity(
+        context, row, X_train, y_train, X_val, y_val
+    )
+    final_path = (
+        layout.root
+        / "cache"
+        / "final_test"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    )
+    final_identity = replace(selection_identity, namespace="final_test")
+    with SQLiteCoalitionStore(
+        final_path,
+        final_identity,
+        commit_every_fits=context.protocol.execution.checkpoint_every_fits,
+    ):
+        pass
+    test_path = layout.root / str(row["test_relpath"])
+    selection_path = (
+        layout.root
+        / "cache"
+        / "selection_validation"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    )
+    real_io_open = io.open
+    real_os_open = os.open
+    real_connect = sqlite3.connect
+    connect_paths: list[Path] = []
+
+    def forbidden_audited_test_load(*args, **kwargs):
+        pytest.fail("selection crossed the audited test-loader boundary")
+
+    def guarded_io_open(file, *args, **kwargs):
+        if isinstance(file, (str, os.PathLike)) and Path(file) == test_path:
+            pytest.fail("selection directly opened test.csv")
+        return real_io_open(file, *args, **kwargs)
+
+    def guarded_os_open(path, flags, mode=0o777, *, dir_fd=None):
+        if isinstance(path, (str, os.PathLike)) and Path(path) == test_path:
+            pytest.fail("selection used os.open on test.csv")
+        if dir_fd is None:
+            return real_os_open(path, flags, mode)
+        return real_os_open(path, flags, mode, dir_fd=dir_fd)
+
+    def recording_connect(database, *args, **kwargs):
+        path = Path(database)
+        connect_paths.append(path)
+        if path == final_path:
+            pytest.fail("selection connected to the final-test database")
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(stage_module, "_task9_load_test", forbidden_audited_test_load)
+    monkeypatch.setattr(io, "open", guarded_io_open)
+    monkeypatch.setattr(os, "open", guarded_os_open)
+    monkeypatch.setattr(sqlite3, "connect", recording_connect)
+    with stage_module._open_selection_cache(
+        context, (X_train, y_train, X_val, y_val), row
+    ) as cache:
+        assert cache.identity.namespace == "selection_validation"
+        assert cache.stats.coalition_count == 0
+    assert connect_paths == [selection_path]
+    assert final_path.is_file()
+
+
+def _prepared_test_fixture(layout: RunLayout, row: dict[str, object]):
+    frame = pd.read_csv(layout.root / str(row["test_relpath"]))
+    selected = json.loads(str(row["selected_features_json"]))
+    X_test = frame[selected].astype(float)
+    y_test = frame[str(row["target"])].to_numpy()
+    if row["task"] != "regression":
+        y_test = y_test.astype(int)
+    return X_test, y_test
+
+
+def test_final_test_cache_requires_audited_reason_before_opening(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout, _, context, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "final-cache-denied"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+    train_val = (
+        pd.concat([X_train, X_val], ignore_index=True),
+        np.concatenate([y_train, y_val]),
+    )
+    final_path = (
+        layout.root
+        / "cache"
+        / "final_test"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    )
+
+    with pytest.raises(_TestAccessViolation):
+        stage_module._open_final_test_cache(
+            context, train_val, None, row, reason="selection"
+        )
+
+    assert not final_path.exists()
+    event = context.audit.read_events()[-1]
+    assert event["decision"] == "denied"
+    assert event["reason"] == "selection"
+
+
+def test_final_test_cache_uses_audited_loader_and_separate_namespace(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout, _, context, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "final-cache-approved"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+    train_val = (
+        pd.concat([X_train, X_val], ignore_index=True),
+        np.concatenate([y_train, y_val]),
+    )
+    expected_path = (
+        layout.root
+        / "cache"
+        / "final_test"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    )
+
+    with stage_module._open_final_test_cache(
+        context,
+        train_val,
+        None,
+        row,
+        reason="final_removal_evaluation",
+    ) as cache:
+        assert cache.identity.namespace == "final_test"
+        assert cache.identity.train_features_sha256 == hash_numeric_frame(train_val[0])
+        assert cache.identity.train_target_sha256 == hash_numeric_array(train_val[1])
+        assert cache.identity.eval_features_sha256 != hash_numeric_frame(X_val)
+    assert expected_path.is_file()
+    events = context.audit.read_events()
+    assert len(events) == 1
+    assert events[0]["decision"] == "allowed"
+    assert events[0]["reason"] == "final_removal_evaluation"
+
+
+def test_final_test_cache_identical_supplied_test_is_audited_before_database(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    layout, _, context, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "final-cache-supplied-identical"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+    train_val = (
+        pd.concat([X_train, X_val], ignore_index=True),
+        np.concatenate([y_train, y_val]),
+    )
+    supplied_test = _prepared_test_fixture(layout, row)
+    final_path = (
+        layout.root
+        / "cache"
+        / "final_test"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    )
+    real_load_test = stage_module._task9_load_test
+    real_connect = sqlite3.connect
+    events: list[str] = []
+
+    def audited_load(*args, **kwargs):
+        events.append("audit")
+        return real_load_test(*args, **kwargs)
+
+    def ordered_connect(database, *args, **kwargs):
+        assert Path(database) == final_path
+        events.append("database")
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(stage_module, "_task9_load_test", audited_load)
+    monkeypatch.setattr(sqlite3, "connect", ordered_connect)
+    with stage_module._open_final_test_cache(
+        context,
+        train_val,
+        supplied_test,
+        row,
+        reason="final_removal_evaluation",
+    ) as cache:
+        assert cache.identity.eval_features_sha256 == hash_numeric_frame(
+            supplied_test[0]
+        )
+
+    assert events == ["audit", "database"]
+    assert context.audit.read_events()[-1]["decision"] == "allowed"
+
+
+@pytest.mark.parametrize("mutation", ("content", "columns", "target"))
+def test_final_test_cache_rejects_supplied_test_drift_before_database(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    layout, _, context, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, f"final-cache-supplied-{mutation}"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+    train_val = (
+        pd.concat([X_train, X_val], ignore_index=True),
+        np.concatenate([y_train, y_val]),
+    )
+    X_test, y_test = _prepared_test_fixture(layout, row)
+    if mutation == "content":
+        X_test.iloc[0, 0] += 1.0
+    elif mutation == "columns":
+        X_test = X_test[list(reversed(X_test.columns))]
+    else:
+        y_test = np.array(y_test, copy=True)
+        y_test[0] = 1 - int(y_test[0])
+    real_load_test = stage_module._task9_load_test
+    audit_calls = 0
+
+    def audited_load(*args, **kwargs):
+        nonlocal audit_calls
+        audit_calls += 1
+        return real_load_test(*args, **kwargs)
+
+    def forbidden_connect(*args, **kwargs):
+        pytest.fail("final-test database opened before supplied-test validation")
+
+    monkeypatch.setattr(stage_module, "_task9_load_test", audited_load)
+    monkeypatch.setattr(sqlite3, "connect", forbidden_connect)
+    with pytest.raises(ValueError, match="supplied test|audited test"):
+        stage_module._open_final_test_cache(
+            context,
+            train_val,
+            (X_test, y_test),
+            row,
+            reason="final_removal_evaluation",
+        )
+
+    assert audit_calls == 1
+    assert context.audit.read_events()[-1]["decision"] == "allowed"
+
+
+def test_stage_cache_path_rejects_parent_symlink_without_outside_write(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout, context, _, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "selection-cache-parent-symlink"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+    outside = tmp_path / "outside-symlink"
+    outside.mkdir()
+    linked_parent = layout.cache_root / "selection_validation"
+    try:
+        linked_parent.symlink_to(outside, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"symlink creation is unavailable: {error}")
+
+    with pytest.raises(ValueError, match="link|junction|reparse|path"):
+        stage_module._open_selection_cache(
+            context, (X_train, y_train, X_val, y_val), row
+        )
+
+    assert not (
+        outside
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    ).exists()
+
+
+def test_stage_cache_path_rejects_parent_junction_without_outside_write(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    if os.name != "nt":
+        pytest.skip("junctions are Windows-specific")
+    layout, context, _, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "selection-cache-parent-junction"
+    )
+    X_train, y_train, X_val, y_val, row = prepared
+    outside = tmp_path / "outside-junction"
+    outside.mkdir()
+    linked_parent = layout.cache_root / "selection_validation"
+    completed = subprocess.run(
+        ["cmd.exe", "/d", "/c", "mklink", "/J", str(linked_parent), str(outside)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        pytest.skip(f"junction creation is unavailable: {completed.stderr}")
+    try:
+        with pytest.raises(ValueError, match="link|junction|reparse|path"):
+            stage_module._open_selection_cache(
+                context, (X_train, y_train, X_val, y_val), row
+            )
+        assert not (
+            outside
+            / context.job.dataset_id
+            / f"s{context.job.seed}"
+            / "coalitions.sqlite3"
+        ).exists()
+    finally:
+        os.rmdir(linked_parent)
+
+
+def test_stage_cache_path_rejects_namespace_escape(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    _, context, _, _ = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "selection-cache-path-escape"
+    )
+
+    with pytest.raises(ValueError, match="namespace|unsafe|escape|path"):
+        stage_module._cache_path(context, "../final_test")
+
+
+def _tiny_estimator_setup(
+    tmp_path: Path,
+    smoke_protocol,
+    *,
+    exact_max_features=20,
+    execution_mode="legacy",
+):
     dataset = replace(smoke_protocol.datasets[0], max_features=5)
     protocol = replace(
         smoke_protocol,
         datasets=(dataset,),
+        execution=replace(
+            smoke_protocol.execution,
+            mode=execution_mode,
+        ),
         exact_max_features=exact_max_features,
         model_params={
             "n_estimators": 1,
@@ -1635,6 +2141,840 @@ def _tiny_estimator_setup(tmp_path: Path, smoke_protocol, *, exact_max_features=
     prepared = (X.iloc[:24].copy(), y[:24], X.iloc[24:].copy(), y[24:])
     row = {"selected_features_json": json.dumps(list(X.columns))}
     return protocol, layout, status, contexts, (*prepared, row)
+
+
+def _single_random_group_request(
+    context: StageContext, features: tuple[str, ...]
+) -> EstimatorGroupRequest:
+    return EstimatorGroupRequest(
+        protocol_hash=context.job.protocol_hash,
+        dataset_id=context.job.dataset_id,
+        seed=context.job.seed,
+        task=str(context.job.parameters["task"]),
+        utility=str(context.job.parameters["utility"]),
+        ordered_features=features,
+        split_hashes={"train": "a" * 64, "validation": "b" * 64},
+        model_params=context.protocol.model_params,
+        backend=context.protocol.backend,
+        methods=("random_mc",),
+        budgets=(int(context.job.parameters["budget"]),),
+        exact_max_features=context.protocol.exact_max_features,
+        alpha=context.protocol.alpha_default,
+        cache_schema=context.protocol.execution.cache_schema,
+        checkpoint_every_fits=context.protocol.execution.checkpoint_every_fits,
+        progress_every_seconds=context.protocol.execution.progress_every_seconds,
+    )
+
+
+def _completed_estimator_authority_setup(
+    tmp_path: Path,
+    smoke_protocol,
+) -> tuple[StageContext, EstimatorCheckpoint, JobSpec]:
+    protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    protocol = replace(
+        protocol,
+        datasets=(protocol.datasets[0],),
+        execution=replace(
+            protocol.execution,
+            mode="grouped_nested_v1",
+        ),
+        model_params={
+            "n_estimators": 1,
+            "max_depth": 1,
+            "learning_rate": 0.3,
+            "n_jobs": 1,
+        },
+    )
+    layout = create_new_run(
+        tmp_path / "r", "ca", protocol
+    )
+    freeze_run_metadata(
+        layout, protocol, project_root=Path(__file__).parents[1]
+    )
+    projection = (
+        {
+            "dataset_id": protocol.datasets[0].dataset_id,
+            "seed": protocol.seeds[0],
+            "selected_feature_count": 2,
+        },
+    )
+    manifest = (
+        build_job_manifest(protocol, stages=("validate",))
+        + build_job_manifest(protocol, stages=("preprocess",))
+        + build_job_manifest(
+            protocol, stages=("estimator",), data_manifest=projection
+        )
+        + build_job_manifest(protocol, stages=("removal",))
+    )
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    stage_module.run_validate_job(
+        next(item for item in contexts if item.job.stage == "validate")
+    )
+    stage_module.run_preprocess_job(
+        next(item for item in contexts if item.job.stage == "preprocess")
+    )
+    removal_context = next(
+        item
+        for item in contexts
+        if item.job.stage == "removal"
+        and item.job.method == "selection_plan"
+    )
+    X_train, _, _, _, row = stage_module._load_prepared_train_validation(
+        removal_context
+    )
+    features = tuple(str(feature) for feature in X_train.columns)
+    budget = max(protocol.estimator_budgets)
+    estimator_job = next(
+        job
+        for job in manifest
+        if job.stage == "estimator"
+        and job.dataset_id == removal_context.job.dataset_id
+        and job.seed == removal_context.job.seed
+        and job.method == "hybrid"
+        and job.parameters["budget"] == budget
+    )
+    estimator_context = StageContext(
+        protocol, layout, estimator_job, status, removal_context.audit
+    )
+    request = stage_module.group_request_from_context(
+        estimator_context, row, features
+    )
+    schedules = _schedule_authority(request)
+    schedule_by_method = {
+        "exact": None,
+        "random_mc": schedules.random_digest,
+        "mi_correlation_guided": schedules.guided_digest,
+        "hybrid": estimator_bundle_module._hybrid_schedule_digest(
+            feature_count=len(features),
+            random_digest=schedules.random_digest,
+            guided_digest=schedules.guided_digest,
+        ),
+    }
+    checkpoints = tuple(
+        EstimatorCheckpoint(
+            method=method,
+            budget=checkpoint_budget,
+            scores=tuple(
+                (
+                    feature,
+                    -1
+                    if method == "hybrid" and feature == features[0]
+                    else 0,
+                )
+                for feature in features
+            ),
+            logical_evaluation_count=4,
+            logical_unique_coalition_count=3,
+            physical_model_fit_count=0 if method == "hybrid" else 1,
+            cache_hit_count=1,
+            schedule_digest=schedule_by_method[method],
+            component_runtime_s=0.1,
+        )
+        for method in request.methods
+        for checkpoint_budget in request.budgets
+    )
+    bundle = EstimatorBundle(
+        schema_version=ESTIMATOR_BUNDLE_SCHEMA_VERSION,
+        request_digest=request.digest,
+        checkpoints=checkpoints,
+        physical_model_fit_count=3,
+        cache_hit_count=4,
+        group_runtime_s=0.5,
+    )
+    atomic_write_json(
+        layout.root / estimator_bundle_module.bundle_relpath(request),
+        estimator_bundle_module.bundle_to_document(bundle, request),
+    )
+    checkpoint = next(
+        item
+        for item in checkpoints
+        if item.method == "hybrid" and item.budget == budget
+    )
+    score_relpath = (
+        f"estimator/{estimator_job.dataset_id}/s{estimator_job.seed}/"
+        f"hybrid/b{budget}/scores.json"
+    )
+    score_document = {
+        "protocol_hash": estimator_job.protocol_hash,
+        "job_id": estimator_job.job_id,
+        "dataset_id": estimator_job.dataset_id,
+        "seed": estimator_job.seed,
+        "method": estimator_job.method,
+        "budget": budget,
+        "scores": [
+            {"feature": feature, "score": score}
+            for feature, score in checkpoint.scores
+        ],
+        "model_fit_count": checkpoint.logical_unique_coalition_count,
+        "coalition_count": checkpoint.logical_unique_coalition_count + 1,
+        "logical_evaluation_count": checkpoint.logical_evaluation_count,
+        "logical_unique_coalition_count": (
+            checkpoint.logical_unique_coalition_count
+        ),
+        "physical_model_fit_count": checkpoint.physical_model_fit_count,
+        "cache_hit_count": checkpoint.cache_hit_count,
+        "group_request_digest": request.digest,
+        "group_physical_model_fit_count": bundle.physical_model_fit_count,
+        "group_cache_hit_count": bundle.cache_hit_count,
+        "group_runtime_s": bundle.group_runtime_s,
+    }
+    if checkpoint.schedule_digest is not None:
+        score_document["schedule_digest"] = checkpoint.schedule_digest
+    atomic_write_json(layout.root / score_relpath, score_document)
+    metrics = {
+        "budget": budget,
+        "model_fit_count": checkpoint.logical_unique_coalition_count,
+        "coalition_count": checkpoint.logical_unique_coalition_count + 1,
+        "logical_evaluation_count": checkpoint.logical_evaluation_count,
+        "logical_unique_coalition_count": (
+            checkpoint.logical_unique_coalition_count
+        ),
+        "physical_model_fit_count": checkpoint.physical_model_fit_count,
+        "cache_hit_count": checkpoint.cache_hit_count,
+        "runtime_s": checkpoint.component_runtime_s,
+        "group_request_digest": request.digest,
+        "group_physical_model_fit_count": bundle.physical_model_fit_count,
+        "group_cache_hit_count": bundle.cache_hit_count,
+        "group_runtime_s": bundle.group_runtime_s,
+    }
+    if checkpoint.schedule_digest is not None:
+        metrics["schedule_digest"] = checkpoint.schedule_digest
+    now = datetime.now(timezone.utc).isoformat()
+    record = ResultRecord(
+        job_id=estimator_job.job_id,
+        protocol_hash=estimator_job.protocol_hash,
+        stage=estimator_job.stage,
+        dataset_id=estimator_job.dataset_id,
+        seed=estimator_job.seed,
+        method=estimator_job.method,
+        metrics=metrics,
+        artifacts={"scores": score_relpath},
+        started_at=now,
+        finished_at=now,
+    )
+    result_path = layout.root / estimator_job.output_relpath
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_json(result_path, asdict(record))
+    status.start(estimator_job.job_id)
+    status.succeed(estimator_job.job_id)
+    return removal_context, checkpoint, estimator_job
+
+
+def test_completed_estimator_checkpoint_returns_frozen_validated_authority(
+    tmp_path: Path,
+    smoke_protocol,
+) -> None:
+    context, expected, _ = _completed_estimator_authority_setup(
+        tmp_path, smoke_protocol
+    )
+
+    checkpoint = stage_module._completed_estimator_checkpoint(
+        context,
+        "hybrid",
+        max(context.protocol.estimator_budgets),
+        tuple(feature for feature, _ in expected.scores),
+    )
+
+    assert checkpoint == expected
+    with pytest.raises(FrozenInstanceError):
+        checkpoint.budget = 99  # type: ignore[misc]
+
+
+@pytest.mark.parametrize("authority_state", ["missing", "failed", "duplicate"])
+def test_completed_estimator_checkpoint_fails_closed_without_unique_success(
+    tmp_path: Path,
+    smoke_protocol,
+    authority_state: str,
+) -> None:
+    context, expected, estimator_job = _completed_estimator_authority_setup(
+        tmp_path, smoke_protocol
+    )
+    manifest = list(context.status.manifest)
+    if authority_state == "missing":
+        manifest.remove(estimator_job)
+    elif authority_state == "duplicate":
+        duplicate = replace(
+            estimator_job,
+            job_id="f" * 64,
+            output_relpath="raw_metrics/estimator/duplicate.json",
+        )
+        manifest.insert(manifest.index(estimator_job) + 1, duplicate)
+    layout = create_new_run(
+        tmp_path / "state", authority_state, context.protocol
+    )
+    status = StatusStore(layout, tuple(manifest))
+    if authority_state == "failed":
+        status.start(estimator_job.job_id)
+        status.fail(estimator_job.job_id, RuntimeError("expected failure"))
+    removal_job = next(
+        job
+        for job in manifest
+        if job.stage == "removal"
+        and job.dataset_id == context.job.dataset_id
+        and job.seed == context.job.seed
+        and job.method == "selection_plan"
+    )
+    rebound = StageContext(
+        context.protocol, layout, removal_job, status, context.audit
+    )
+
+    with pytest.raises(
+        ValueError, match="missing|duplicate|successful|authority"
+    ):
+        stage_module._completed_estimator_checkpoint(
+            rebound,
+            "hybrid",
+            expected.budget,
+            tuple(feature for feature, _ in expected.scores),
+        )
+
+
+@pytest.mark.parametrize(
+    "conflict",
+    [
+        "feature_order",
+        "result_counter",
+        "projection_score",
+        "bundle_score",
+        "bundle_request_digest",
+    ],
+)
+def test_completed_estimator_checkpoint_rejects_cross_artifact_conflicts(
+    tmp_path: Path,
+    smoke_protocol,
+    conflict: str,
+) -> None:
+    context, expected, estimator_job = _completed_estimator_authority_setup(
+        tmp_path, smoke_protocol
+    )
+    features = tuple(feature for feature, _ in expected.scores)
+    supplied_features = features
+    if conflict == "feature_order":
+        supplied_features = tuple(reversed(features))
+    elif conflict == "result_counter":
+        result_path = context.layout.root / estimator_job.output_relpath
+        document = json.loads(result_path.read_text(encoding="utf-8"))
+        document["metrics"]["logical_evaluation_count"] += 1
+        atomic_write_json(result_path, document)
+    elif conflict == "projection_score":
+        result = protocol_module.read_result_record(
+            context.layout.root / estimator_job.output_relpath, estimator_job
+        )
+        score_path = context.layout.root / result.artifacts["scores"]
+        document = json.loads(score_path.read_text(encoding="utf-8"))
+        document["scores"][0]["score"] = 0
+        atomic_write_json(score_path, document)
+    else:
+        bundle_path = next(context.layout.bundle_root.rglob("bundle.json"))
+        document = json.loads(bundle_path.read_text(encoding="utf-8"))
+        if conflict == "bundle_score":
+            hybrid = next(
+                item
+                for item in document["checkpoints"]
+                if item["method"] == "hybrid"
+                and item["budget"] == expected.budget
+            )
+            hybrid["scores"][0][1] = 0
+        else:
+            document["request_digest"] = "f" * 64
+        atomic_write_json(bundle_path, document)
+
+    with pytest.raises(
+        ValueError,
+        match="feature|conflict|artifact|bundle|ResultRecord",
+    ):
+        stage_module._completed_estimator_checkpoint(
+            context, "hybrid", expected.budget, supplied_features
+        )
+
+
+def test_completed_estimator_checkpoint_allows_later_selection_cache_rows(
+    tmp_path: Path,
+    smoke_protocol,
+) -> None:
+    context, expected, _ = _completed_estimator_authority_setup(
+        tmp_path, smoke_protocol
+    )
+    X_train, y_train, X_val, y_val, row = (
+        stage_module._load_prepared_train_validation(context)
+    )
+    features = tuple(str(feature) for feature in X_train.columns)
+    with stage_module._open_selection_cache(
+        context, (X_train, y_train, X_val, y_val), row
+    ) as cache:
+        for coalition in (
+            set(),
+            {features[0]},
+            {features[1]},
+            set(features),
+        ):
+            cache.evaluate(
+                coalition, str(context.job.parameters["utility"])
+            )
+        assert cache.stats.coalition_count == 4
+
+    assert (
+        stage_module._completed_estimator_checkpoint(
+            context, "hybrid", expected.budget, features
+        )
+        == expected
+    )
+
+
+def _forbid_direct_grouped_estimator_work(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def forbidden(*args, **kwargs):
+        pytest.fail("grouped projection invoked direct estimator/model work")
+
+    monkeypatch.setattr(stage_module, "_run_legacy_estimator_job", forbidden)
+    monkeypatch.setattr(stage_module, "fit_predict", forbidden)
+    monkeypatch.setattr(stage_module, "evaluate_fixed_subset", forbidden)
+    monkeypatch.setattr(voting_game_module, "AccFullCache", forbidden)
+    monkeypatch.setattr(
+        guidance_module, "build_mi_correlation_guidance", forbidden
+    )
+    for name in (
+        "estimate_minppi_exact",
+        "estimate_minppi_random_mc",
+        "estimate_minppi_mi_correlation_guided",
+        "estimate_minppi_hybrid",
+    ):
+        monkeypatch.setattr(min_ppi_module, name, forbidden)
+
+
+def test_grouped_estimator_job_projects_bundle_checkpoint(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, layout, _, contexts, prepared = _tiny_estimator_setup(
+        tmp_path,
+        smoke_protocol,
+        exact_max_features=4,
+        execution_mode="grouped_nested_v1",
+    )
+    context = next(item for item in contexts if item.job.method == "random_mc")
+    features = tuple(str(feature) for feature in prepared[0].columns)
+    request = _single_random_group_request(context, features)
+    checkpoint = EstimatorCheckpoint(
+        method="random_mc",
+        budget=2,
+        scores=tuple(
+            (feature, -1 if index == 0 else 0)
+            for index, feature in enumerate(features)
+        ),
+        logical_evaluation_count=21,
+        logical_unique_coalition_count=8,
+        physical_model_fit_count=5,
+        cache_hit_count=16,
+        schedule_digest=_schedule_authority(request).random_digest,
+        component_runtime_s=1.25,
+    )
+    bundle = EstimatorBundle(
+        schema_version=ESTIMATOR_BUNDLE_SCHEMA_VERSION,
+        request_digest=request.digest,
+        checkpoints=(checkpoint,),
+        physical_model_fit_count=5,
+        cache_hit_count=16,
+        group_runtime_s=1.5,
+    )
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda _context: prepared
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "group_request_from_context",
+        lambda *_args: request,
+        raising=False,
+    )
+    ensure_contract: dict[str, object] = {}
+    emitted: list[tuple[Path, object]] = []
+    progress_event = object()
+
+    def fake_ensure(
+        *,
+        request: object,
+        frames: object,
+        run_root: Path,
+        progress_sink,
+    ) -> EstimatorBundle:
+        ensure_contract.update(
+            request=request,
+            frames=frames,
+            run_root=run_root,
+            progress_sink=progress_sink,
+        )
+        progress_sink(progress_event)
+        return bundle
+
+    monkeypatch.setattr(
+        stage_module,
+        "ensure_estimator_bundle",
+        fake_ensure,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "_emit_estimator_progress",
+        lambda path, event: emitted.append((path, event)),
+    )
+    _forbid_direct_grouped_estimator_work(monkeypatch)
+
+    result = stage_module.run_estimator_job(context)
+
+    assert ensure_contract["request"] is request
+    assert tuple(
+        id(item) for item in ensure_contract["frames"]  # type: ignore[union-attr]
+    ) == tuple(id(item) for item in prepared[:4])
+    assert ensure_contract["run_root"] == context.layout.root
+    assert callable(ensure_contract["progress_sink"])
+    assert emitted == [(context.layout.log_path, progress_event)]
+    assert result.metrics == {
+        "budget": 2,
+        "model_fit_count": 8,
+        "coalition_count": 9,
+        "logical_evaluation_count": 21,
+        "logical_unique_coalition_count": 8,
+        "physical_model_fit_count": 5,
+        "cache_hit_count": 16,
+        "runtime_s": 1.25,
+        "group_request_digest": request.digest,
+        "group_physical_model_fit_count": 5,
+        "group_cache_hit_count": 16,
+        "group_runtime_s": 1.5,
+        "schedule_digest": checkpoint.schedule_digest,
+    }
+    assert result.artifacts == {
+        "scores": "estimator/spambase/s42/random_mc/b2/scores.json"
+    }
+    document = json.loads(
+        (layout.root / result.artifacts["scores"]).read_text(encoding="utf-8")
+    )
+    assert document["schedule_digest"] == checkpoint.schedule_digest
+    assert document["group_request_digest"] == request.digest
+    assert document["physical_model_fit_count"] == 5
+    assert [item["feature"] for item in document["scores"]] == list(features)
+
+
+def test_legacy_mode_does_not_open_bundle(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _, _, contexts, prepared = _tiny_estimator_setup(
+        tmp_path, smoke_protocol, exact_max_features=4
+    )
+    grouped_context = next(
+        item for item in contexts if item.job.method == "random_mc"
+    )
+    context = replace(
+        grouped_context,
+        protocol=replace(
+            grouped_context.protocol,
+            execution=replace(
+                grouped_context.protocol.execution,
+                mode="legacy",
+            ),
+        ),
+    )
+
+    class NoFitCache:
+        model_fit_count = 3
+        coalition_count = 4
+
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda _context: prepared
+    )
+    monkeypatch.setattr(voting_game_module, "AccFullCache", NoFitCache)
+    monkeypatch.setattr(
+        min_ppi_module,
+        "estimate_minppi_random_mc",
+        lambda **kwargs: {feature: 0 for feature in kwargs["X_train"].columns},
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "ensure_estimator_bundle",
+        lambda *_args, **_kwargs: pytest.fail("bundle used"),
+        raising=False,
+    )
+
+    result = stage_module.run_estimator_job(context)
+
+    assert result.metrics["budget"] == 2
+    assert result.metrics["model_fit_count"] == 3
+    assert result.metrics["coalition_count"] == 4
+
+
+def test_legacy_estimator_helper_exact_behavior_is_characterized(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, layout, _, contexts, prepared = _tiny_estimator_setup(
+        tmp_path, smoke_protocol
+    )
+    context = next(item for item in contexts if item.job.method == "exact")
+    scores = {
+        "f0": -1,
+        "f1": 0,
+        "f2": 1,
+        "f3": 0,
+        "f4": 0,
+    }
+    cache_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    estimator_calls: list[dict[str, object]] = []
+
+    class DeterministicCache:
+        model_fit_count = 4
+        coalition_count = 5
+
+        def __init__(self, *args, **kwargs) -> None:
+            cache_calls.append((args, kwargs))
+
+    def exact_estimator(**kwargs):
+        estimator_calls.append(kwargs)
+        return dict(scores)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("unrelated legacy or grouped boundary was used")
+
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda _context: prepared
+    )
+    monkeypatch.setattr(stage_module, "ensure_estimator_bundle", forbidden)
+    monkeypatch.setattr(voting_game_module, "AccFullCache", DeterministicCache)
+    monkeypatch.setattr(min_ppi_module, "estimate_minppi_exact", exact_estimator)
+    for name in (
+        "estimate_minppi_random_mc",
+        "estimate_minppi_mi_correlation_guided",
+        "estimate_minppi_hybrid",
+        "make_algorithm_b_perturbation_schedule",
+    ):
+        monkeypatch.setattr(min_ppi_module, name, forbidden)
+    monkeypatch.setattr(
+        guidance_module, "build_mi_correlation_guidance", forbidden
+    )
+    timestamps = iter(("2026-01-01T00:00:00+00:00", "2026-01-01T00:00:03+00:00"))
+    clocks = iter((10.0, 12.5))
+    monkeypatch.setattr(stage_module, "_timestamp", lambda: next(timestamps))
+    monkeypatch.setattr(stage_module.time, "perf_counter", lambda: next(clocks))
+
+    record = stage_module._run_legacy_estimator_job(context)
+
+    assert record == ResultRecord(
+        job_id=context.job.job_id,
+        protocol_hash=context.job.protocol_hash,
+        stage="estimator",
+        dataset_id="spambase",
+        seed=42,
+        method="exact",
+        metrics={
+            "budget": 2,
+            "model_fit_count": 4,
+            "coalition_count": 5,
+            "runtime_s": 2.5,
+            "harmful_precision": 1.0,
+            "harmful_recall": 1.0,
+            "harmful_f1": 1.0,
+            "score_agreement": 1.0,
+        },
+        artifacts={"scores": "estimator/spambase/s42/exact/b2/scores.json"},
+        started_at="2026-01-01T00:00:00+00:00",
+        finished_at="2026-01-01T00:00:03+00:00",
+    )
+    document = json.loads(
+        (layout.root / record.artifacts["scores"]).read_text(encoding="utf-8")
+    )
+    assert document == {
+        "protocol_hash": context.job.protocol_hash,
+        "job_id": context.job.job_id,
+        "dataset_id": "spambase",
+        "seed": 42,
+        "method": "exact",
+        "budget": 2,
+        "scores": [
+            {"feature": "f0", "score": -1},
+            {"feature": "f1", "score": 0},
+            {"feature": "f2", "score": 1},
+            {"feature": "f3", "score": 0},
+            {"feature": "f4", "score": 0},
+        ],
+        "model_fit_count": 4,
+        "coalition_count": 5,
+    }
+    assert len(cache_calls) == 1
+    cache_args, cache_kwargs = cache_calls[0]
+    assert tuple(id(value) for value in cache_args) == tuple(
+        id(value) for value in (prepared[0], prepared[2], prepared[1], prepared[3])
+    )
+    assert cache_kwargs == {
+        "task": "binary",
+        "utility": "roc_auc",
+        "seed": 42,
+        "model_params": {
+            **context.protocol.model_params,
+            "tree_method": "hist",
+            "device": "cpu",
+        },
+    }
+    assert len(estimator_calls) == 1
+    call = estimator_calls[0]
+    assert set(call) == {
+        "X_train",
+        "X_val",
+        "y_train",
+        "y_val",
+        "alpha",
+        "task",
+        "utility",
+        "acc_cache",
+        "seed",
+    }
+    assert call["acc_cache"].model_fit_count == 4
+    assert call["alpha"] == 0.95
+    assert call["task"] == "binary"
+    assert call["utility"] == "roc_auc"
+    assert call["seed"] == 42
+
+
+def test_legacy_estimator_helper_guided_schedule_behavior_is_characterized(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, layout, _, contexts, prepared = _tiny_estimator_setup(
+        tmp_path, smoke_protocol, exact_max_features=4
+    )
+    context = next(
+        item for item in contexts if item.job.method == "mi_correlation_guided"
+    )
+    schedule = object()
+    mi_scores = {"f0": 0.75}
+    neighbors = {"f0": ("f1",)}
+    schedule_calls: list[tuple[tuple[str, ...], int, int]] = []
+    guidance_calls: list[tuple[object, object, str, int]] = []
+    estimator_calls: list[dict[str, object]] = []
+
+    class DeterministicCache:
+        model_fit_count = 6
+        coalition_count = 7
+
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+    def make_schedule(features, *, K_adv, seed):
+        schedule_calls.append((tuple(features), K_adv, seed))
+        return schedule
+
+    def guidance(X_train, y_train, *, task, seed):
+        guidance_calls.append((X_train, y_train, task, seed))
+        return mi_scores, neighbors
+
+    def guided_estimator(**kwargs):
+        estimator_calls.append(kwargs)
+        return {
+            "f0": -1,
+            "f1": 1,
+            "f2": 0,
+            "f3": 0,
+            "f4": 1,
+        }
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("unrelated legacy or grouped boundary was used")
+
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda _context: prepared
+    )
+    monkeypatch.setattr(stage_module, "ensure_estimator_bundle", forbidden)
+    monkeypatch.setattr(voting_game_module, "AccFullCache", DeterministicCache)
+    monkeypatch.setattr(
+        min_ppi_module, "make_algorithm_b_perturbation_schedule", make_schedule
+    )
+    monkeypatch.setattr(
+        min_ppi_module,
+        "algorithm_b_schedule_digest",
+        lambda value: "d" * 64 if value is schedule else forbidden(),
+    )
+    monkeypatch.setattr(
+        guidance_module, "build_mi_correlation_guidance", guidance
+    )
+    monkeypatch.setattr(
+        min_ppi_module,
+        "estimate_minppi_mi_correlation_guided",
+        guided_estimator,
+    )
+    for name in (
+        "estimate_minppi_exact",
+        "estimate_minppi_random_mc",
+        "estimate_minppi_hybrid",
+    ):
+        monkeypatch.setattr(min_ppi_module, name, forbidden)
+    timestamps = iter(("2026-01-02T00:00:00+00:00", "2026-01-02T00:00:02+00:00"))
+    clocks = iter((20.0, 21.75))
+    monkeypatch.setattr(stage_module, "_timestamp", lambda: next(timestamps))
+    monkeypatch.setattr(stage_module.time, "perf_counter", lambda: next(clocks))
+
+    record = stage_module._run_legacy_estimator_job(context)
+
+    assert record.metrics == {
+        "budget": 2,
+        "model_fit_count": 6,
+        "coalition_count": 7,
+        "runtime_s": 1.75,
+    }
+    assert record.artifacts == {
+        "scores": (
+            "estimator/spambase/s42/mi_correlation_guided/b2/scores.json"
+        )
+    }
+    assert record.started_at == "2026-01-02T00:00:00+00:00"
+    assert record.finished_at == "2026-01-02T00:00:02+00:00"
+    document = json.loads(
+        (layout.root / record.artifacts["scores"]).read_text(encoding="utf-8")
+    )
+    assert set(document) == {
+        "protocol_hash",
+        "job_id",
+        "dataset_id",
+        "seed",
+        "method",
+        "budget",
+        "scores",
+        "model_fit_count",
+        "coalition_count",
+        "schedule_digest",
+    }
+    assert document["scores"] == [
+        {"feature": "f0", "score": -1},
+        {"feature": "f1", "score": 1},
+        {"feature": "f2", "score": 0},
+        {"feature": "f3", "score": 0},
+        {"feature": "f4", "score": 1},
+    ]
+    assert document["model_fit_count"] == 6
+    assert document["coalition_count"] == 7
+    assert document["schedule_digest"] == "d" * 64
+    assert schedule_calls == [(("f0", "f1", "f2", "f3", "f4"), 2, 42)]
+    assert len(guidance_calls) == 1
+    assert guidance_calls[0][0] is prepared[0]
+    assert guidance_calls[0][1] is prepared[1]
+    assert guidance_calls[0][2:] == ("binary", 42)
+    assert len(estimator_calls) == 1
+    call = estimator_calls[0]
+    assert call["K_adv"] == 2
+    assert call["mi_scores"] is mi_scores
+    assert call["correlation_neighbors"] is neighbors
+    assert call["perturbation_schedule"] is schedule
+    assert call["alpha"] == 0.95
+    assert call["task"] == "binary"
+    assert call["utility"] == "roc_auc"
+    assert call["seed"] == 42
 
 
 def test_tiny_estimator_jobs_write_costs_and_exact_agreement(
@@ -2057,6 +3397,7 @@ dataset = replace(protocol.datasets[0], max_features=8)
 protocol = replace(
     protocol,
     datasets=(dataset,),
+    execution=replace(protocol.execution, mode="legacy"),
     estimator_methods=("mi_correlation_guided",),
     estimator_budgets=(3,),
     model_params={"n_estimators": 1, "max_depth": 1, "learning_rate": 0.3, "n_jobs": 1},
@@ -2649,6 +3990,48 @@ def _task9_contexts(tmp_path: Path, protocol, stage: str):
     return layout, manifest, contexts
 
 
+def _patch_completed_hybrid_checkpoint(
+    monkeypatch: pytest.MonkeyPatch,
+    features: tuple[str, ...],
+    *,
+    harmful: bool = True,
+    calls: dict[str, int] | None = None,
+) -> EstimatorCheckpoint:
+    removed = {"f1", "f3"} if harmful else set()
+    checkpoint = EstimatorCheckpoint(
+        method="hybrid",
+        budget=2,
+        scores=tuple(
+            (feature, -1 if feature in removed else 0)
+            for feature in features
+        ),
+        logical_evaluation_count=9,
+        logical_unique_coalition_count=7,
+        physical_model_fit_count=0,
+        cache_hit_count=5,
+        schedule_digest=None,
+        component_runtime_s=0.2,
+    )
+
+    def completed(
+        _context: StageContext,
+        method: str,
+        budget: int,
+        expected_features: tuple[str, ...],
+    ) -> EstimatorCheckpoint:
+        assert method == "hybrid"
+        assert budget == checkpoint.budget
+        assert expected_features == features
+        if calls is not None:
+            calls["checkpoint"] += 1
+        return checkpoint
+
+    monkeypatch.setattr(
+        stage_module, "_completed_estimator_checkpoint", completed
+    )
+    return checkpoint
+
+
 def _patch_task9_selection(
     monkeypatch: pytest.MonkeyPatch, *, harmful_by_alpha: bool = False
 ) -> tuple[pd.DataFrame, np.ndarray, pd.DataFrame, np.ndarray, dict[str, int]]:
@@ -2658,7 +4041,13 @@ def _patch_task9_selection(
     y_train = np.array([0, 1] * 6)
     X_val = X_train.iloc[:4].reset_index(drop=True)
     y_val = y_train[:4]
-    calls = {"loader": 0, "guidance": 0, "schedule": 0, "hybrid": 0}
+    calls = {
+        "loader": 0,
+        "guidance": 0,
+        "schedule": 0,
+        "hybrid": 0,
+        "checkpoint": 0,
+    }
 
     def loader(context):
         calls["loader"] += 1
@@ -2704,7 +4093,121 @@ def _patch_task9_selection(
     monkeypatch.setattr(guidance_module, "build_mi_correlation_guidance", guidance)
     monkeypatch.setattr(min_ppi_module, "make_algorithm_b_perturbation_schedule", schedule)
     monkeypatch.setattr(min_ppi_module, "estimate_minppi_hybrid", hybrid)
+    _patch_completed_hybrid_checkpoint(
+        monkeypatch, tuple(X_train.columns), calls=calls
+    )
     return X_train, y_train, X_val, y_val, calls
+
+
+def test_removal_uses_completed_max_budget_hybrid_without_recomputation(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    layout, _, contexts = _task9_contexts(
+        tmp_path, smoke_protocol, "removal"
+    )
+    context = next(
+        item for item in contexts if item.job.method == "selection_plan"
+    )
+    X_train, _, _, _, _ = _patch_task9_selection(monkeypatch)
+    features = tuple(str(feature) for feature in X_train.columns)
+    budget = max(smoke_protocol.estimator_budgets)
+    checkpoint = EstimatorCheckpoint(
+        method="hybrid",
+        budget=budget,
+        scores=tuple(
+            (feature, -1 if feature in {"f1", "f3"} else 0)
+            for feature in features
+        ),
+        logical_evaluation_count=17,
+        logical_unique_coalition_count=11,
+        physical_model_fit_count=0,
+        cache_hit_count=9,
+        schedule_digest=None,
+        component_runtime_s=0.4,
+    )
+    calls: list[tuple[str, int, tuple[str, ...]]] = []
+
+    def completed(
+        supplied_context: StageContext,
+        method: str,
+        supplied_budget: int,
+        expected_features: tuple[str, ...],
+    ) -> EstimatorCheckpoint:
+        assert supplied_context is context
+        calls.append((method, supplied_budget, expected_features))
+        return checkpoint
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("removal recomputed the grouped MinPPI estimator")
+
+    monkeypatch.setattr(
+        stage_module, "_completed_estimator_checkpoint", completed
+    )
+    monkeypatch.setattr(min_ppi_module, "estimate_minppi_hybrid", forbidden)
+    monkeypatch.setattr(
+        min_ppi_module, "make_algorithm_b_perturbation_schedule", forbidden
+    )
+    monkeypatch.setattr(
+        guidance_module, "build_mi_correlation_guidance", forbidden
+    )
+    monkeypatch.setattr(stage_module, "_make_job_cache", forbidden)
+    from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
+
+    baseline_scores = {
+        "f0": 4.0,
+        "f1": 1.0,
+        "f2": 3.0,
+        "f3": 2.0,
+    }
+    for module, name in (
+        (shap_top_k, "compute_shap_topk_importance"),
+        (min_shap, "compute_minshap_importance"),
+        (banzhaf_fs, "compute_banzhaf_importance"),
+    ):
+        monkeypatch.setattr(
+            module,
+            name,
+            lambda *args, diagnostics, **kwargs: diagnostics.update(
+                model_fit_count=2, coalition_count=3
+            )
+            or baseline_scores,
+        )
+
+    record = stage_module.run_removal_job(context)
+
+    assert calls == [("hybrid", budget, features)]
+    document = json.loads(
+        (layout.root / record.artifacts["selection_plan"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    minppi_group = next(
+        item for item in document["scores"] if item["method"] == "minppi"
+    )
+    assert {
+        item["feature"]: int(item["score"])
+        for item in minppi_group["values"]
+    } == dict(checkpoint.scores)
+    minppi_method = next(
+        item for item in document["methods"] if item["method"] == "minppi"
+    )
+    assert minppi_method["model_fit_count"] == 0
+    assert minppi_method["physical_model_fit_count"] == 0
+    assert (
+        minppi_method["logical_unique_coalition_count"]
+        == checkpoint.logical_unique_coalition_count
+    )
+    assert (
+        record.metrics["minppi_selection_physical_model_fit_count"] == 0
+    )
+    assert (
+        record.metrics[
+            "minppi_selection_logical_unique_coalition_count"
+        ]
+        == checkpoint.logical_unique_coalition_count
+    )
 
 
 @pytest.mark.parametrize("harmful", [True, False])
@@ -2720,10 +4223,8 @@ def test_removal_plan_freezes_complete_matched_scope_without_test_access(
     from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
 
     if not harmful:
-        monkeypatch.setattr(
-            min_ppi_module,
-            "estimate_minppi_hybrid",
-            lambda *args, **kwargs: {name: 0 for name in X_train},
+        _patch_completed_hybrid_checkpoint(
+            monkeypatch, tuple(X_train.columns), harmful=False, calls=calls
         )
     monkeypatch.setattr(
         shap_top_k,
@@ -2755,8 +4256,10 @@ def test_removal_plan_freezes_complete_matched_scope_without_test_access(
         for trial in method["trials"]:
             assert len(trial["removed_features"]) == (0 if method["method"] == "full" else expected_k)
     assert calls["loader"] == 1
-    assert calls["guidance"] == 1
-    assert calls["schedule"] == 1
+    assert calls["checkpoint"] == 1
+    assert calls["guidance"] == 0
+    assert calls["schedule"] == 0
+    assert calls["hybrid"] == 0
     methods_by_name = {item["method"]: item for item in document["methods"]}
     for method in stage_module._REMOVAL_METHODS:
         assert record.metrics[f"{method}_selection_model_fit_count"] == methods_by_name[method]["model_fit_count"]
@@ -2795,6 +4298,7 @@ def test_alpha_plan_freezes_complete_grid_with_one_shared_cache_and_setup(
         "guidance": 1,
         "schedule": 1,
         "hybrid": len(smoke_protocol.alpha_grid),
+        "checkpoint": 0,
     }
     assert not any("recommend" in key or "argmax" in key for key in document)
     assert document["initial_model_fit_count"] == 1
@@ -3225,10 +4729,8 @@ def test_every_removal_method_preserves_exact_job_totals_for_k0_and_k2(
     from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
 
     if not harmful:
-        monkeypatch.setattr(
-            min_ppi_module,
-            "estimate_minppi_hybrid",
-            lambda *args, **kwargs: {name: 0 for name in X_train},
+        _patch_completed_hybrid_checkpoint(
+            monkeypatch, tuple(X_train.columns), harmful=False
         )
     baseline_scores = {"f0": 4.0, "f1": 1.0, "f2": 3.0, "f3": 2.0}
     for module, name in (
@@ -3337,30 +4839,8 @@ def test_removal_stage_uses_real_audited_test_accessor_exactly_once(
     )
     from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
 
-    monkeypatch.setattr(
-        stage_module,
-        "_make_job_cache",
-        lambda context, X_train, *args, **kwargs: _Task9FakeCache(
-            tuple(X_train.columns)
-        ),
-    )
-    monkeypatch.setattr(
-        guidance_module,
-        "build_mi_correlation_guidance",
-        lambda X, *args, **kwargs: (
-            {feature: 0.0 for feature in X.columns},
-            {feature: [] for feature in X.columns},
-        ),
-    )
-    monkeypatch.setattr(
-        min_ppi_module,
-        "make_algorithm_b_perturbation_schedule",
-        lambda *args, **kwargs: object(),
-    )
-    monkeypatch.setattr(
-        min_ppi_module,
-        "estimate_minppi_hybrid",
-        lambda X_train, **kwargs: {feature: 0 for feature in X_train.columns},
+    _patch_completed_hybrid_checkpoint(
+        monkeypatch, ("signal", "noise"), harmful=False
     )
     for module, name in (
         (shap_top_k, "compute_shap_topk_importance"),
@@ -3901,6 +5381,73 @@ def test_stage_context_is_frozen_single_job_value(tmp_path: Path, smoke_protocol
         context.job = manifest[0]  # type: ignore[misc]
 
 
+def test_cross_stage_reuse_requires_completed_estimator_stage() -> None:
+    assert stage_module.STAGE_DEPENDENCIES["removal"] == (
+        "preprocess",
+        "estimator",
+    )
+    assert stage_module.STAGE_DEPENDENCIES["alpha"] == (
+        "preprocess",
+        "estimator",
+    )
+    assert stage_module.STAGE_DEPENDENCIES["ablation"] == (
+        "preprocess",
+        "estimator",
+    )
+
+
+def test_removal_dependency_failure_does_not_open_cache_or_write_artifact(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    projection = tuple(
+        {
+            "dataset_id": dataset.dataset_id,
+            "seed": seed,
+            "selected_feature_count": 2,
+        }
+        for dataset in smoke_protocol.datasets
+        for seed in smoke_protocol.seeds
+    )
+    preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    estimator = build_job_manifest(
+        smoke_protocol, stages=("estimator",), data_manifest=projection
+    )
+    removal = build_job_manifest(smoke_protocol, stages=("removal",))
+    manifest = preprocess + estimator + removal
+    layout = create_new_run(
+        tmp_path / "results", "removal-needs-estimator", smoke_protocol
+    )
+    status = StatusStore(layout, manifest)
+    _complete_jobs(layout, status, preprocess)
+    contexts = _contexts(smoke_protocol, layout, manifest, status)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("dependency failure opened a coalition cache")
+
+    monkeypatch.setattr(stage_module, "_open_selection_cache", forbidden)
+    monkeypatch.setattr(stage_module, "_make_job_cache", forbidden)
+    summary = execute_stage(
+        "removal",
+        context=contexts,
+        executors={"removal": stage_module.run_removal_job},
+    )
+
+    assert summary.exit_code == 1
+    assert summary.dependency_issues
+    assert not list(
+        (layout.root / "removal").rglob("selection_plan.json")
+    )
+    assert not list(layout.cache_root.rglob("*.sqlite3"))
+    assert all(
+        status.entry(job.job_id)["state"] == "pending" for job in estimator
+    )
+    assert all(
+        status.entry(job.job_id)["state"] == "pending" for job in removal
+    )
+
+
 def test_execute_stage_continues_independent_jobs_after_failure(
     tmp_path: Path, smoke_protocol
 ) -> None:
@@ -3956,8 +5503,20 @@ def test_execute_stage_enforces_stage_and_job_dependencies(
 ) -> None:
     layout = create_new_run(tmp_path / "results", "dependencies-run", smoke_protocol)
     preprocess = build_job_manifest(smoke_protocol, stages=("preprocess",))
+    projection = tuple(
+        {
+            "dataset_id": dataset.dataset_id,
+            "seed": seed,
+            "selected_feature_count": 2,
+        }
+        for dataset in smoke_protocol.datasets
+        for seed in smoke_protocol.seeds
+    )
+    estimator = build_job_manifest(
+        smoke_protocol, stages=("estimator",), data_manifest=projection
+    )
     removal = build_job_manifest(smoke_protocol, stages=("removal",))
-    manifest = preprocess + removal
+    manifest = preprocess + estimator + removal
     status = StatusStore(layout, manifest)
     contexts = _contexts(smoke_protocol, layout, manifest, status)
 
@@ -3969,6 +5528,13 @@ def test_execute_stage_enforces_stage_and_job_dependencies(
     assert all(status.entry(job.job_id)["state"] == "pending" for job in removal)
 
     _complete_jobs(layout, status, preprocess)
+    still_blocked = execute_stage(
+        "removal",
+        context=contexts,
+        executors={"removal": lambda context: _result(context.job)},
+    )
+    assert still_blocked.dependency_issues
+    _complete_jobs(layout, status, estimator)
 
     def executor(context: StageContext) -> ResultRecord:
         if context.job == removal[0]:
@@ -4298,6 +5864,205 @@ def test_estimator_artifact_validation_rejects_conflicting_result_metrics(
         )
 
 
+def _strict_mode_estimator_job() -> JobSpec:
+    return JobSpec(
+        "job-estimator-mode",
+        "a" * 64,
+        "estimator",
+        "toy",
+        42,
+        "exact",
+        {"budget": 2},
+        (),
+        "raw_metrics/estimator/job-mode.json",
+    )
+
+
+def _legacy_mode_score_document(job: JobSpec) -> dict[str, object]:
+    return {
+        "protocol_hash": job.protocol_hash,
+        "job_id": job.job_id,
+        "dataset_id": job.dataset_id,
+        "seed": job.seed,
+        "method": job.method,
+        "budget": 2,
+        "scores": [{"feature": "f0", "score": -1}],
+        "model_fit_count": 3,
+        "coalition_count": 4,
+    }
+
+
+def _grouped_mode_score_document(job: JobSpec) -> dict[str, object]:
+    return {
+        **_legacy_mode_score_document(job),
+        "logical_evaluation_count": 7,
+        "logical_unique_coalition_count": 3,
+        "physical_model_fit_count": 2,
+        "cache_hit_count": 4,
+        "group_request_digest": "c" * 64,
+        "group_physical_model_fit_count": 8,
+        "group_cache_hit_count": 12,
+        "group_runtime_s": 9.0,
+    }
+
+
+def _grouped_mode_expected_metrics() -> dict[str, object]:
+    return {
+        "budget": 2,
+        "model_fit_count": 3,
+        "coalition_count": 4,
+        "logical_evaluation_count": 7,
+        "logical_unique_coalition_count": 3,
+        "physical_model_fit_count": 2,
+        "cache_hit_count": 4,
+        "runtime_s": 1.25,
+        "group_request_digest": "c" * 64,
+        "group_physical_model_fit_count": 8,
+        "group_cache_hit_count": 12,
+        "group_runtime_s": 9.0,
+    }
+
+
+def test_grouped_expected_metrics_reject_legacy_score_artifact(
+    tmp_path: Path,
+) -> None:
+    job = _strict_mode_estimator_job()
+    path = tmp_path / "legacy-under-grouped.json"
+    atomic_write_json(path, _legacy_mode_score_document(job))
+
+    with pytest.raises(ValueError, match="schema|mode|grouped"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=job,
+            budget=2,
+            expected_features=("f0",),
+            expected_metrics=_grouped_mode_expected_metrics(),
+        )
+
+
+def test_legacy_expected_metrics_reject_grouped_score_artifact(
+    tmp_path: Path,
+) -> None:
+    job = _strict_mode_estimator_job()
+    path = tmp_path / "grouped-under-legacy.json"
+    atomic_write_json(path, _grouped_mode_score_document(job))
+
+    with pytest.raises(ValueError, match="schema|mode|legacy"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=job,
+            budget=2,
+            expected_features=("f0",),
+            expected_metrics={
+                "budget": 2,
+                "model_fit_count": 3,
+                "coalition_count": 4,
+                "runtime_s": 1.25,
+            },
+        )
+
+
+def test_grouped_expected_metrics_reject_partial_grouped_score_artifact(
+    tmp_path: Path,
+) -> None:
+    job = _strict_mode_estimator_job()
+    document = _grouped_mode_score_document(job)
+    del document["group_cache_hit_count"]
+    path = tmp_path / "partial-grouped-artifact.json"
+    atomic_write_json(path, document)
+
+    with pytest.raises(ValueError, match="schema|grouped"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=job,
+            budget=2,
+            expected_features=("f0",),
+            expected_metrics=_grouped_mode_expected_metrics(),
+        )
+
+
+def test_partial_grouped_expected_metrics_are_rejected(
+    tmp_path: Path,
+) -> None:
+    job = _strict_mode_estimator_job()
+    path = tmp_path / "partial-grouped-metrics.json"
+    atomic_write_json(path, _grouped_mode_score_document(job))
+
+    with pytest.raises(ValueError, match="schema|grouped|metrics"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=job,
+            budget=2,
+            expected_features=("f0",),
+            expected_metrics={
+                "budget": 2,
+                "model_fit_count": 3,
+                "coalition_count": 4,
+                "runtime_s": 1.25,
+                "group_request_digest": "c" * 64,
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "conflicting_value"),
+    [
+        ("logical_evaluation_count", 8),
+        ("logical_unique_coalition_count", 4),
+        ("physical_model_fit_count", 1),
+        ("cache_hit_count", 5),
+        ("group_request_digest", "d" * 64),
+        ("group_physical_model_fit_count", 9),
+        ("group_cache_hit_count", 13),
+        ("group_runtime_s", 10.0),
+    ],
+)
+def test_grouped_score_artifact_compares_every_grouped_metric_value(
+    tmp_path: Path,
+    field: str,
+    conflicting_value: object,
+) -> None:
+    job = _strict_mode_estimator_job()
+    path = tmp_path / f"grouped-conflict-{field}.json"
+    atomic_write_json(path, _grouped_mode_score_document(job))
+    expected_metrics = _grouped_mode_expected_metrics()
+    expected_metrics[field] = conflicting_value
+
+    with pytest.raises(ValueError, match="ResultRecord.*conflict"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=job,
+            budget=2,
+            expected_features=("f0",),
+            expected_metrics=expected_metrics,
+        )
+
+
+def test_grouped_scheduled_score_digest_is_bound_to_result_record(
+    tmp_path: Path,
+) -> None:
+    job = replace(_strict_mode_estimator_job(), method="random_mc")
+    document = {
+        **_grouped_mode_score_document(job),
+        "schedule_digest": "d" * 64,
+    }
+    path = tmp_path / "grouped-schedule-conflict.json"
+    atomic_write_json(path, document)
+    expected_metrics = {
+        **_grouped_mode_expected_metrics(),
+        "schedule_digest": "c" * 64,
+    }
+
+    with pytest.raises(ValueError, match="schedule digest|ResultRecord"):
+        stage_module._read_score_artifact(
+            path,
+            expected_job=job,
+            budget=2,
+            expected_features=("f0",),
+            expected_metrics=expected_metrics,
+        )
+
+
 def test_summary_estimator_metrics_are_exact_and_recomputed_from_scores() -> None:
     exact = {"f0": -1, "f1": 0, "f2": 1}
     approximate = {"f0": -1, "f1": 1, "f2": 0}
@@ -4335,6 +6100,48 @@ def test_summary_estimator_metrics_are_exact_and_recomputed_from_scores() -> Non
             budget=10,
             model_fit_count=7,
             coalition_count=8,
+        )
+
+
+def test_summary_grouped_estimator_metrics_are_mode_aware() -> None:
+    metrics = {
+        "budget": 25,
+        "model_fit_count": 100,
+        "coalition_count": 101,
+        "logical_evaluation_count": 2500,
+        "logical_unique_coalition_count": 100,
+        "physical_model_fit_count": 40,
+        "cache_hit_count": 60,
+        "runtime_s": 12.5,
+        "group_request_digest": "a" * 64,
+        "group_physical_model_fit_count": 400,
+        "group_cache_hit_count": 600,
+        "group_runtime_s": 60.0,
+    }
+
+    assert stage_module._validated_estimator_summary_metrics(
+        metrics,
+        approximate_scores={"f0": -1},
+        exact_scores=None,
+        budget=25,
+        model_fit_count=100,
+        coalition_count=101,
+        execution_mode="grouped_nested_v1",
+    ) == metrics
+    with pytest.raises(ValueError, match="schema"):
+        stage_module._validated_estimator_summary_metrics(
+            {
+                "budget": 25,
+                "model_fit_count": 100,
+                "coalition_count": 101,
+                "runtime_s": 12.5,
+            },
+            approximate_scores={"f0": -1},
+            exact_scores=None,
+            budget=25,
+            model_fit_count=100,
+            coalition_count=101,
+            execution_mode="grouped_nested_v1",
         )
 
 
@@ -5048,7 +6855,7 @@ def test_formal_summary_allows_approved_whole_seed_omission_and_suppresses_publi
     ]
 
 
-def test_selected_alpha_preflights_and_appends_missing_canonical_chunks(
+def test_selected_alpha_dependency_failure_does_not_append_manifest(
     tmp_path: Path, smoke_protocol
 ) -> None:
     layout = create_new_run(tmp_path / "results", "alpha-first", smoke_protocol)
@@ -5066,17 +6873,12 @@ def test_selected_alpha_preflights_and_appends_missing_canonical_chunks(
         layout,
         executors={"alpha": lambda context: _result(context.job)},
     )
-    assert runner.run("alpha") == 0
+    assert runner.run("alpha") == 1
 
-    extended = manifests.load()
-    assert tuple(dict.fromkeys(job.stage for job in extended)) == (
-        "validate", "preprocess", "estimator", "removal", "alpha"
-    )
-    reopened = StatusStore(layout, extended)
-    assert all(
-        reopened.entry(job.job_id)["state"] == "pending"
-        for job in extended
-        if job.stage in {"estimator", "removal"}
+    unchanged = manifests.load()
+    assert tuple(dict.fromkeys(job.stage for job in unchanged)) == (
+        "validate",
+        "preprocess",
     )
 
 
@@ -5282,6 +7084,33 @@ def test_cli_lifecycle_is_append_logged_and_never_replaces_process_streams_or_cw
     assert main(arguments + ["--resume"]) == 0
     assert (run_root / "output.log").read_bytes().startswith(first_log)
     assert len((run_root / "output.log").read_bytes()) > len(first_log)
+
+
+def test_shared_run_log_helper_preserves_append_only_runner_format(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "logs" / "output.log"
+
+    append_run_log(path, "start stage=validate resume=False")
+    first = path.read_bytes()
+    append_run_log(path, "finish stage=validate exit_code=0")
+    complete = path.read_bytes()
+
+    assert complete.startswith(first)
+    lines = complete.decode("utf-8").splitlines()
+    assert len(lines) == 2
+    for line, message in zip(
+        lines,
+        (
+            "start stage=validate resume=False",
+            "finish stage=validate exit_code=0",
+        ),
+        strict=True,
+    ):
+        timestamp, actual_message = line.split(" ", maxsplit=1)
+        parsed = datetime.fromisoformat(timestamp)
+        assert parsed.tzinfo == timezone.utc
+        assert actual_message == message
 
 
 def test_entrypoint_worker_calls_main_once_and_records_result(

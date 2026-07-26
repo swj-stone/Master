@@ -18,12 +18,18 @@ Run::
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from pathlib import Path
+import subprocess
+import sys
 
 import numpy as np
 import pandas as pd
 import pytest
 from sklearn.model_selection import train_test_split
 
+import minppi_mofs.min_ppi as min_ppi_module
+import minppi_mofs.nested_estimation as nested_estimation
+from minppi_mofs.nested_estimation import make_nested_guided_schedule
 from minppi_mofs.min_ppi import (
     AlgorithmBPerturbationSchedule,
     AlgorithmBPerturbationTrial,
@@ -321,6 +327,88 @@ class TestSharedCoalitionPlanExecution:
 class TestAlgorithmA:
     """Algorithm A: random MC estimation."""
 
+    def test_legacy_module_import_does_not_import_nested(self) -> None:
+        script = (
+            "import importlib.abc\n"
+            "import sys\n"
+            "target = 'minppi_mofs.nested_estimation'\n"
+            "class BlockNestedImport(importlib.abc.MetaPathFinder):\n"
+            "    def find_spec(self, fullname, path=None, target=None):\n"
+            "        if fullname == 'minppi_mofs.nested_estimation':\n"
+            "            raise AssertionError('legacy module imported nested')\n"
+            "        return None\n"
+            "sys.meta_path.insert(0, BlockNestedImport())\n"
+            "import minppi_mofs.min_ppi\n"
+            "assert target not in sys.modules\n"
+        )
+
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=Path(__file__).parents[1],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert completed.returncode == 0, completed.stderr
+
+    def test_legacy_path_keeps_its_output_and_does_not_call_nested(
+        self, small_data, monkeypatch
+    ) -> None:
+        class RecordingCache:
+            def __init__(self) -> None:
+                self.calls: list[tuple[frozenset[str], str]] = []
+
+            def set_threshold(self, alpha: float) -> None:
+                assert alpha == 0.95
+
+            def eval_marginal(self, coalition: set[str], feature: str) -> int:
+                self.calls.append((frozenset(coalition), feature))
+                return {
+                    "f_signal": 0,
+                    "f_weak": -1,
+                    "f_noise1": 1,
+                    "f_noise2": 0,
+                    "f_noise3": -1,
+                }[feature]
+
+        def fail_if_nested_is_called(*args, **kwargs):
+            raise AssertionError("legacy random MC called the nested implementation")
+
+        for name, value in vars(nested_estimation).items():
+            if callable(value) and getattr(value, "__module__", None) == (
+                nested_estimation.__name__
+            ):
+                monkeypatch.setattr(
+                    nested_estimation,
+                    name,
+                    fail_if_nested_is_called,
+                )
+        X_train, X_val, y_train, y_val = small_data
+        cache = RecordingCache()
+
+        result = estimate_minppi_random_mc(
+            X_train,
+            X_val,
+            y_train,
+            y_val,
+            K=25,
+            acc_cache=cache,
+            seed=42,
+        )
+
+        assert result == {
+            "f_signal": 0,
+            "f_weak": -1,
+            "f_noise1": 1,
+            "f_noise2": 0,
+            "f_noise3": -1,
+        }
+        assert not hasattr(min_ppi_module, "make_nested_random_schedule")
+        assert sum(feature == "f_weak" for _, feature in cache.calls) == 1
+        assert sum(feature == "f_noise3" for _, feature in cache.calls) == 1
+        assert sum(feature == "f_signal" for _, feature in cache.calls) == 16
+
     def test_returns_all_features(self, small_data, acc_cache) -> None:
         """Must return a value for every feature."""
         X_tr, X_val, y_tr, y_val = small_data
@@ -377,6 +465,16 @@ class TestAlgorithmA:
 
 class TestAlgorithmB:
     """Algorithm B: MI-correlation-guided adversarial search."""
+
+    def test_legacy_algorithm_b_schedule_remains_available(self) -> None:
+        features = ("a", "b", "c")
+
+        legacy = make_algorithm_b_perturbation_schedule(
+            features, K_adv=25, seed=42
+        )
+        nested = make_nested_guided_schedule(features, budgets=(25,), seed=42)
+
+        assert legacy.K_adv == nested.max_budget == 25
 
     def test_falls_back_to_random_when_no_neighbors(
         self, small_data, acc_cache
