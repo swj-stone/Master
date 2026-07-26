@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from dataclasses import FrozenInstanceError
 
 import numpy as np
 import pandas as pd
@@ -229,6 +230,114 @@ print(json.dumps({function_name}(X, y, n_coalitions=8, seed=5, model_params={{'n
         ("minppi_mofs.baselines.banzhaf_fs", "compute_banzhaf_importance"),
     ],
 )
+def test_legacy_none_coalition_utility_accepts_empty_feature_frame(
+    module_name: str, function_name: str
+) -> None:
+    function = getattr(importlib.import_module(module_name), function_name)
+    X = pd.DataFrame(index=range(20))
+
+    result = function(
+        X,
+        np.array([0, 1] * 10),
+        n_coalitions=2,
+        per_coalition=1,
+        model_params={"n_estimators": 2},
+        backend="cpu",
+        seed=8,
+        coalition_utility=None,
+    )
+
+    assert result == {}
+
+
+@pytest.mark.parametrize(
+    ("module_name", "function_name"),
+    [
+        ("minppi_mofs.baselines.min_shap", "compute_minshap_importance"),
+        ("minppi_mofs.baselines.banzhaf_fs", "compute_banzhaf_importance"),
+    ],
+)
+def test_legacy_none_coalition_utility_accepts_unique_non_string_columns(
+    module_name: str, function_name: str
+) -> None:
+    function = getattr(importlib.import_module(module_name), function_name)
+    X = pd.DataFrame(
+        {
+            10: np.arange(20, dtype=float),
+            20: np.arange(20, dtype=float) + 1,
+        }
+    )
+
+    result = function(
+        X,
+        np.array([0, 1] * 10),
+        n_coalitions=2,
+        per_coalition=1,
+        model_params={"n_estimators": 2},
+        backend="cpu",
+        seed=8,
+        coalition_utility=None,
+    )
+
+    assert tuple(result) == (10, 20)
+    assert np.isfinite(list(result.values())).all()
+
+
+@pytest.mark.parametrize(
+    ("module_name", "function_name"),
+    [
+        ("minppi_mofs.baselines.min_shap", "compute_minshap_importance"),
+        ("minppi_mofs.baselines.banzhaf_fs", "compute_banzhaf_importance"),
+    ],
+)
+def test_legacy_none_creates_sampling_rng_before_evaluator(
+    monkeypatch: pytest.MonkeyPatch,
+    module_name: str,
+    function_name: str,
+) -> None:
+    module = importlib.import_module(module_name)
+    function = getattr(module, function_name)
+    events: list[str] = []
+    original_default_rng = module.np.random.default_rng
+
+    class RecordingLegacyEvaluator:
+        def __init__(self, *args, **kwargs) -> None:
+            events.append("evaluator")
+
+        def __call__(self, coalition: set[str]) -> float:
+            return float(len(coalition))
+
+    def recording_rng(*args, **kwargs):
+        events.append("rng")
+        return original_default_rng(*args, **kwargs)
+
+    monkeypatch.setattr(module, "CoalitionUtility", RecordingLegacyEvaluator)
+    monkeypatch.setattr(module.np.random, "default_rng", recording_rng)
+    X = pd.DataFrame(
+        {"a": np.arange(20, dtype=float), "b": np.arange(20, dtype=float) + 1}
+    )
+
+    function(
+        X,
+        np.array([0, 1] * 10),
+        n_coalitions=2,
+        per_coalition=1,
+        model_params={"n_estimators": 2},
+        backend="cpu",
+        seed=8,
+        coalition_utility=None,
+    )
+
+    assert events[:2] == ["rng", "evaluator"]
+
+
+@pytest.mark.parametrize(
+    ("module_name", "function_name"),
+    [
+        ("minppi_mofs.baselines.min_shap", "compute_minshap_importance"),
+        ("minppi_mofs.baselines.banzhaf_fs", "compute_banzhaf_importance"),
+    ],
+)
 def test_coalition_baselines_propagate_multiclass_policy_and_keep_feature_order(
     monkeypatch: pytest.MonkeyPatch, module_name: str, function_name: str
 ) -> None:
@@ -264,6 +373,732 @@ def test_coalition_baselines_propagate_multiclass_policy_and_keep_feature_order(
     assert all(item["model_params"] == {"n_estimators": 6, "n_jobs": 1} for item in seen)
     assert all(item["backend"] == "cuda" for item in seen)
     assert diagnostics["coalition_count"] >= 1
+
+
+class _SuppliedCoalitionUtility:
+    def __init__(
+        self,
+        feature_order: tuple[str, ...],
+        *,
+        task: str = "binary",
+        utility: str = "roc_auc",
+        model_params: dict[str, object] | None = None,
+        backend: str = "cpu",
+        seed: int = 8,
+        test_size: float = 0.2,
+        max_samples: int = 5000,
+    ) -> None:
+        self.feature_order = feature_order
+        self.task = task
+        self.utility = utility
+        self.model_params = model_params or {
+            "n_estimators": 6,
+            "n_jobs": 1,
+        }
+        self.backend = backend
+        self.seed = seed
+        self.test_size = test_size
+        self.max_samples = max_samples
+        self.coalitions: list[frozenset[str]] = []
+
+    def __call__(self, coalition: set[str]) -> float:
+        self.coalitions.append(frozenset(coalition))
+        return float(len(coalition))
+
+
+class _CanonicalRecordingEvaluator:
+    def __init__(self, identity, prepared_split) -> None:
+        from minppi_mofs.baselines._coalition_utility import (
+            CoalitionUtilityDiagnostics,
+        )
+
+        self.identity = identity
+        self.prepared_split = prepared_split
+        self.coalitions: list[frozenset[str]] = []
+        self._seen: set[tuple[str, ...]] = set()
+        self._logical = 0
+        self._physical = 0
+        self._hits = 0
+        self._diagnostics_type = CoalitionUtilityDiagnostics
+
+    @property
+    def diagnostics_snapshot(self):
+        return self._diagnostics_type(
+            logical_evaluation_count=self._logical,
+            logical_unique_coalition_count=len(self._seen),
+            physical_model_fit_count=self._physical,
+            cache_hit_count=self._hits,
+        )
+
+    def __call__(self, coalition: set[str]) -> float:
+        key = tuple(
+            feature
+            for feature in self.identity.ordered_features
+            if feature in coalition
+        )
+        self.coalitions.append(frozenset(coalition))
+        self._logical += 1
+        if key in self._seen:
+            self._hits += 1
+        else:
+            self._seen.add(key)
+            self._physical += int(bool(key))
+        return float(len(coalition))
+
+
+def _canonical_recording_evaluator(
+    X: pd.DataFrame,
+    y: np.ndarray,
+    *,
+    task: str = "binary",
+    utility: str = "roc_auc",
+    model_params: dict[str, object] | None = None,
+    backend: str = "cpu",
+    seed: int = 8,
+):
+    from minppi_mofs.baselines._coalition_utility import (
+        _prepare_baseline_internal_split,
+        make_baseline_utility_identity,
+    )
+
+    resolved_model_params = model_params or {
+        "n_estimators": 6,
+        "n_jobs": 1,
+    }
+    prepared = _prepare_baseline_internal_split(
+        X, y, task=task, seed=seed
+    )
+    identity = make_baseline_utility_identity(
+        X,
+        y,
+        prepared=prepared,
+        task=task,
+        utility=utility,
+        model_params=resolved_model_params,
+        backend=backend,
+        seed=seed,
+        store_identity_digest="b" * 64,
+        library_versions={"numpy": np.__version__, "xgboost": "test"},
+    )
+    return _CanonicalRecordingEvaluator(identity, prepared)
+
+
+def test_prepared_baseline_split_and_identity_are_frozen_authority() -> None:
+    from minppi_mofs.baselines._coalition_utility import (
+        BaselineUtilityIdentity,
+        PreparedBaselineSplit,
+        _prepare_baseline_internal_split,
+        make_baseline_utility_identity,
+    )
+    from minppi_mofs.coalition_cache import (
+        hash_numeric_array,
+        hash_numeric_frame,
+    )
+
+    X = pd.DataFrame(
+        {
+            "a": np.arange(20, dtype=float),
+            "b": np.arange(20, dtype=float) + 1,
+        }
+    )
+    y = np.array([0, 1] * 10)
+    prepared = _prepare_baseline_internal_split(
+        X, y, task="binary", seed=8
+    )
+    identity = make_baseline_utility_identity(
+        X,
+        y,
+        prepared=prepared,
+        task="binary",
+        utility="roc_auc",
+        model_params={"n_estimators": 2},
+        backend="cpu",
+        seed=8,
+        store_identity_digest="b" * 64,
+        library_versions={"numpy": np.__version__, "xgboost": "test"},
+    )
+
+    assert isinstance(prepared, PreparedBaselineSplit)
+    assert isinstance(identity, BaselineUtilityIdentity)
+    assert identity.raw_features_sha256 == hash_numeric_frame(X)
+    assert identity.raw_target_sha256 == hash_numeric_array(y)
+    assert identity.train_features_sha256 == prepared.train_features_sha256
+    assert identity.train_target_sha256 == prepared.train_target_sha256
+    assert identity.eval_features_sha256 == prepared.eval_features_sha256
+    assert identity.eval_target_sha256 == prepared.eval_target_sha256
+    assert identity.ordered_features == ("a", "b")
+    assert identity.namespace == "baseline_internal"
+    assert identity.store_identity_digest == "b" * 64
+    assert prepared.sample_indices == tuple(range(len(X)))
+    assert prepared.train_positions == (
+        10, 16, 2, 19, 9, 4, 0, 12, 15, 14, 5, 17, 18, 3, 7, 13
+    )
+    assert prepared.eval_positions == (8, 6, 1, 11)
+    assert (
+        prepared.train_features_sha256
+        == "a076b3ef11c13661734e45a99d62bc9735538a89978890d73b0e35e02ca52bec"
+    )
+    assert (
+        prepared.train_target_sha256
+        == "1d495f874964c68fa32d64ed091e5ce9b7141f1b03a5779752a702954d06243a"
+    )
+    assert (
+        prepared.eval_features_sha256
+        == "6e3be03054ee77ba4881547979560238959a3a6a6c189112f8875b8121431c96"
+    )
+    assert (
+        prepared.eval_target_sha256
+        == "9f3b9cd5087cc361af1eca6b7ffb79fb81425e2088473334f5fdf81dbaedf3af"
+    )
+    with pytest.raises(FrozenInstanceError):
+        identity.seed = 9
+    with pytest.raises(ValueError, match="read-only"):
+        prepared.y_train[0] = 99
+
+
+def test_supplied_evaluator_requires_canonical_identity_and_diagnostics_before_rng(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from minppi_mofs.baselines import banzhaf_fs
+
+    X = pd.DataFrame(
+        {"a": np.arange(20, dtype=float), "b": np.arange(20, dtype=float) + 1}
+    )
+    evaluator = _SuppliedCoalitionUtility(tuple(X.columns))
+    monkeypatch.setattr(
+        banzhaf_fs.np.random,
+        "default_rng",
+        lambda *_args, **_kwargs: pytest.fail(
+            "sampling RNG was created before canonical protocol validation"
+        ),
+    )
+
+    with pytest.raises(TypeError, match="identity|diagnostics|canonical|frozen"):
+        banzhaf_fs.compute_banzhaf_importance(
+            X,
+            np.array([0, 1] * 10),
+            n_coalitions=2,
+            per_coalition=1,
+            task="binary",
+            utility="roc_auc",
+            model_params={"n_estimators": 6, "n_jobs": 1},
+            backend="cpu",
+            seed=8,
+            coalition_utility=evaluator,
+        )
+    assert not evaluator.coalitions
+
+
+def test_supplied_evaluator_rejects_wrong_raw_data_before_sampling_rng(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from minppi_mofs.baselines import banzhaf_fs
+
+    X = pd.DataFrame(
+        {"a": np.arange(20, dtype=float), "b": np.arange(20, dtype=float) + 1}
+    )
+    y = np.array([0, 1] * 10)
+    evaluator = _canonical_recording_evaluator(X, y)
+    changed = X.copy()
+    changed.iloc[0, 0] += 0.5
+    monkeypatch.setattr(
+        banzhaf_fs.np.random,
+        "default_rng",
+        lambda *_args, **_kwargs: pytest.fail(
+            "sampling RNG was created before raw-data validation"
+        ),
+    )
+
+    with pytest.raises(ValueError, match="raw|authority|features"):
+        banzhaf_fs.compute_banzhaf_importance(
+            changed,
+            y,
+            n_coalitions=2,
+            per_coalition=1,
+            task="binary",
+            utility="roc_auc",
+            model_params={"n_estimators": 6, "n_jobs": 1},
+            backend="cpu",
+            seed=8,
+            coalition_utility=evaluator,
+        )
+    assert not evaluator.coalitions
+
+
+def test_supplied_evaluator_rejects_untrusted_diagnostics_before_sampling_rng(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from minppi_mofs.baselines import banzhaf_fs
+
+    X = pd.DataFrame(
+        {"a": np.arange(20, dtype=float), "b": np.arange(20, dtype=float) + 1}
+    )
+    y = np.array([0, 1] * 10)
+    canonical = _canonical_recording_evaluator(X, y)
+
+    class NoDiagnostics:
+        identity = canonical.identity
+        prepared_split = canonical.prepared_split
+
+        def __call__(self, coalition: set[str]) -> float:
+            pytest.fail("untrusted evaluator was called")
+
+    monkeypatch.setattr(
+        banzhaf_fs.np.random,
+        "default_rng",
+        lambda *_args, **_kwargs: pytest.fail(
+            "sampling RNG was created before diagnostics validation"
+        ),
+    )
+
+    with pytest.raises(TypeError, match="diagnostics"):
+        banzhaf_fs.compute_banzhaf_importance(
+            X,
+            y,
+            n_coalitions=2,
+            per_coalition=1,
+            task="binary",
+            utility="roc_auc",
+            model_params={"n_estimators": 6, "n_jobs": 1},
+            backend="cpu",
+            seed=8,
+            coalition_utility=NoDiagnostics(),
+        )
+
+
+def test_supplied_evaluator_rejects_duplicate_columns_before_sampling_rng(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from minppi_mofs.baselines import banzhaf_fs
+
+    X = pd.DataFrame(
+        {"a": np.arange(20, dtype=float), "b": np.arange(20, dtype=float) + 1}
+    )
+    y = np.array([0, 1] * 10)
+    evaluator = _canonical_recording_evaluator(X, y)
+    duplicated = X.copy()
+    duplicated.columns = ["a", "a"]
+    monkeypatch.setattr(
+        banzhaf_fs.np.random,
+        "default_rng",
+        lambda *_args, **_kwargs: pytest.fail(
+            "sampling RNG was created before duplicate-column validation"
+        ),
+    )
+
+    with pytest.raises(ValueError, match="unique|duplicate|universe"):
+        banzhaf_fs.compute_banzhaf_importance(
+            duplicated,
+            y,
+            n_coalitions=2,
+            per_coalition=1,
+            task="binary",
+            utility="roc_auc",
+            model_params={"n_estimators": 6, "n_jobs": 1},
+            backend="cpu",
+            seed=8,
+            coalition_utility=evaluator,
+        )
+    assert not evaluator.coalitions
+
+
+@pytest.mark.parametrize(
+    ("module_name", "function_name"),
+    [
+        ("minppi_mofs.baselines.min_shap", "compute_minshap_importance"),
+        ("minppi_mofs.baselines.banzhaf_fs", "compute_banzhaf_importance"),
+    ],
+)
+def test_coalition_baselines_use_one_supplied_evaluator(
+    module_name: str, function_name: str
+) -> None:
+    function = getattr(importlib.import_module(module_name), function_name)
+    X = pd.DataFrame(
+        {
+            "z": np.arange(18, dtype=float),
+            "a": np.arange(18, dtype=float) + 1,
+            "q": np.arange(18, dtype=float) + 2,
+        }
+    )
+    policy = {
+        "task": "binary",
+        "utility": "roc_auc",
+        "model_params": {"n_estimators": 6, "n_jobs": 1},
+        "backend": "cpu",
+        "seed": 8,
+    }
+    y = np.array([0, 1] * 9)
+    evaluator = _canonical_recording_evaluator(X, y, **policy)
+
+    scores = function(
+        X,
+        y,
+        n_coalitions=8,
+        per_coalition=2,
+        coalition_utility=evaluator,
+        **policy,
+    )
+
+    assert tuple(scores) == tuple(X.columns)
+    assert evaluator.coalitions
+    assert evaluator.coalitions[0] == frozenset(X.columns)
+
+
+@pytest.mark.parametrize(
+    ("module_name", "function_name"),
+    [
+        ("minppi_mofs.baselines.min_shap", "compute_minshap_importance"),
+        ("minppi_mofs.baselines.banzhaf_fs", "compute_banzhaf_importance"),
+    ],
+)
+def test_supplied_evaluator_rejects_wrong_universe_before_sampling(
+    monkeypatch: pytest.MonkeyPatch, module_name: str, function_name: str
+) -> None:
+    module = importlib.import_module(module_name)
+    function = getattr(module, function_name)
+    X = pd.DataFrame(
+        {
+            "z": np.arange(18, dtype=float),
+            "a": np.arange(18, dtype=float) + 1,
+            "q": np.arange(18, dtype=float) + 2,
+        }
+    )
+    evaluator = _canonical_recording_evaluator(
+        X.loc[:, ["z", "a"]],
+        np.array([0, 1] * 9),
+        model_params={"n_estimators": 6, "n_jobs": 1},
+    )
+    monkeypatch.setattr(
+        module.np.random,
+        "default_rng",
+        lambda *_args, **_kwargs: pytest.fail(
+            "sampling RNG was created before evaluator-universe validation"
+        ),
+    )
+
+    with pytest.raises(ValueError, match="feature|universe|order"):
+        function(
+            X,
+            np.array([0, 1] * 9),
+            n_coalitions=8,
+            per_coalition=2,
+            task="binary",
+            utility="roc_auc",
+            model_params={"n_estimators": 6, "n_jobs": 1},
+            backend="cpu",
+            seed=8,
+            coalition_utility=evaluator,
+        )
+    assert not evaluator.coalitions
+
+
+@pytest.mark.parametrize(
+    ("field", "conflicting_value"),
+    [
+        ("task", "multiclass"),
+        ("utility", "accuracy"),
+        ("model_params", {"n_estimators": 7, "n_jobs": 1}),
+        ("backend", "cuda"),
+        ("seed", 9),
+        ("test_size", 0.25),
+        ("max_samples", 4999),
+    ],
+)
+def test_supplied_evaluator_rejects_policy_conflict_before_sampling(
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    conflicting_value: object,
+) -> None:
+    from minppi_mofs.baselines import banzhaf_fs
+
+    X = pd.DataFrame(
+        {
+            "z": np.arange(18, dtype=float),
+            "a": np.arange(18, dtype=float) + 1,
+            "q": np.arange(18, dtype=float) + 2,
+        }
+    )
+    from dataclasses import replace
+
+    evaluator = _canonical_recording_evaluator(
+        X,
+        np.array([0, 1] * 9),
+        model_params={"n_estimators": 6, "n_jobs": 1},
+    )
+    evaluator.identity = replace(
+        evaluator.identity, **{field: conflicting_value}
+    )
+    monkeypatch.setattr(
+        banzhaf_fs.np.random,
+        "default_rng",
+        lambda *_args, **_kwargs: pytest.fail(
+            "sampling RNG was created before evaluator-policy validation"
+        ),
+    )
+
+    with pytest.raises(ValueError, match=field):
+        banzhaf_fs.compute_banzhaf_importance(
+            X,
+            np.array([0, 1] * 9),
+            n_coalitions=8,
+            per_coalition=2,
+            task="binary",
+            utility="roc_auc",
+            model_params={"n_estimators": 6, "n_jobs": 1},
+            backend="cpu",
+            seed=8,
+            coalition_utility=evaluator,
+        )
+    assert not evaluator.coalitions
+
+
+def test_shared_cache_backed_baselines_match_legacy_and_reduce_real_fits(
+    tmp_path: Path,
+) -> None:
+    from minppi_mofs.baselines._coalition_utility import (
+        _prepare_baseline_internal_split,
+        make_shared_baseline_utility,
+    )
+    from minppi_mofs.baselines.banzhaf_fs import compute_banzhaf_importance
+    from minppi_mofs.baselines.min_shap import compute_minshap_importance
+    from minppi_mofs.coalition_cache import (
+        CACHE_SCHEMA_VERSION,
+        CoalitionCacheIdentity,
+        SQLiteCoalitionStore,
+    )
+
+    rng = np.random.default_rng(17)
+    X = pd.DataFrame(
+        rng.normal(size=(60, 3)), columns=("signal", "noise_1", "noise_2")
+    )
+    y = (X["signal"].to_numpy() + 0.1 * rng.normal(size=len(X)) > 0).astype(int)
+    policy = {
+        "task": "binary",
+        "utility": "roc_auc",
+        "model_params": {
+            "n_estimators": 2,
+            "max_depth": 2,
+            "learning_rate": 0.3,
+            "n_jobs": 1,
+        },
+        "backend": "cpu",
+        "seed": 8,
+    }
+    legacy_min_diag: dict[str, int] = {}
+    legacy_banzhaf_diag: dict[str, int] = {}
+    legacy_min = compute_minshap_importance(
+        X,
+        y,
+        n_coalitions=8,
+        per_coalition=2,
+        diagnostics=legacy_min_diag,
+        **policy,
+    )
+    legacy_banzhaf = compute_banzhaf_importance(
+        X,
+        y,
+        n_coalitions=8,
+        per_coalition=2,
+        diagnostics=legacy_banzhaf_diag,
+        **policy,
+    )
+
+    prepared = _prepare_baseline_internal_split(
+        X,
+        y,
+        task="binary",
+        seed=8,
+    )
+    identity = CoalitionCacheIdentity(
+        schema_version=CACHE_SCHEMA_VERSION,
+        protocol_hash="a" * 64,
+        dataset_id="toy",
+        seed=8,
+        namespace="baseline_internal",
+        train_features_sha256=prepared.train_features_sha256,
+        train_target_sha256=prepared.train_target_sha256,
+        eval_features_sha256=prepared.eval_features_sha256,
+        eval_target_sha256=prepared.eval_target_sha256,
+        ordered_features=tuple(X.columns),
+        task="binary",
+        class_labels=(0, 1),
+        model_params=policy["model_params"],
+        backend="cpu",
+        model_seed=8,
+        library_versions={"numpy": np.__version__, "xgboost": "test"},
+    )
+    shared_diag: dict[str, int] = {}
+    shared_min_diag: dict[str, int] = {}
+    shared_banzhaf_diag: dict[str, int] = {}
+    with SQLiteCoalitionStore(
+        tmp_path / "baseline.sqlite3",
+        identity,
+        commit_every_fits=2,
+    ) as store:
+        evaluator = make_shared_baseline_utility(
+            X,
+            y,
+            store=store,
+            diagnostics=shared_diag,
+            prepared=prepared,
+            **policy,
+        )
+        shared_min = compute_minshap_importance(
+            X,
+            y,
+            n_coalitions=8,
+            per_coalition=2,
+            diagnostics=shared_min_diag,
+            coalition_utility=evaluator,
+            **policy,
+        )
+        shared_banzhaf = compute_banzhaf_importance(
+            X,
+            y,
+            n_coalitions=8,
+            per_coalition=2,
+            diagnostics=shared_banzhaf_diag,
+            coalition_utility=evaluator,
+            **policy,
+        )
+
+    for feature in X.columns:
+        assert shared_min[feature] == pytest.approx(
+            legacy_min[feature], abs=1e-12
+        )
+        assert shared_banzhaf[feature] == pytest.approx(
+            legacy_banzhaf[feature], abs=1e-12
+        )
+    assert shared_diag["physical_model_fit_count"] < (
+        legacy_min_diag["model_fit_count"]
+        + legacy_banzhaf_diag["model_fit_count"]
+    )
+    assert shared_banzhaf_diag["physical_model_fit_count"] == 0
+    assert shared_banzhaf_diag["cache_hit_count"] == shared_banzhaf_diag[
+        "logical_evaluation_count"
+    ]
+    assert shared_banzhaf_diag["model_fit_count"] > 0
+    assert shared_diag["logical_evaluation_count"] > 0
+    assert shared_diag["logical_unique_coalition_count"] > 0
+    assert shared_diag["cache_hit_count"] > 0
+    assert shared_diag["model_fit_count"] == shared_diag[
+        "physical_model_fit_count"
+    ]
+    assert shared_diag["coalition_count"] == shared_diag[
+        "logical_unique_coalition_count"
+    ]
+    assert (
+        shared_diag["logical_evaluation_count"]
+        == shared_diag["logical_unique_coalition_count"]
+        + shared_diag["cache_hit_count"]
+    )
+
+
+def test_warm_reopened_shared_baseline_reports_logical_and_physical_costs(
+    tmp_path: Path,
+) -> None:
+    from minppi_mofs.baselines._coalition_utility import (
+        _prepare_baseline_internal_split,
+        make_shared_baseline_utility,
+    )
+    from minppi_mofs.baselines.banzhaf_fs import compute_banzhaf_importance
+    from minppi_mofs.coalition_cache import (
+        CACHE_SCHEMA_VERSION,
+        CoalitionCacheIdentity,
+        SQLiteCoalitionStore,
+    )
+
+    X = pd.DataFrame(
+        {"a": np.arange(20, dtype=float), "b": np.arange(20, dtype=float) + 1}
+    )
+    y = np.array([0, 1] * 10)
+    policy = {
+        "task": "binary",
+        "utility": "roc_auc",
+        "model_params": {"n_estimators": 2, "n_jobs": 1},
+        "backend": "cpu",
+        "seed": 8,
+    }
+    prepared = _prepare_baseline_internal_split(
+        X, y, task="binary", seed=8
+    )
+    identity = CoalitionCacheIdentity(
+        schema_version=CACHE_SCHEMA_VERSION,
+        protocol_hash="c" * 64,
+        dataset_id="toy",
+        seed=8,
+        namespace="baseline_internal",
+        train_features_sha256=prepared.train_features_sha256,
+        train_target_sha256=prepared.train_target_sha256,
+        eval_features_sha256=prepared.eval_features_sha256,
+        eval_target_sha256=prepared.eval_target_sha256,
+        ordered_features=("a", "b"),
+        task="binary",
+        class_labels=(0, 1),
+        model_params=policy["model_params"],
+        backend="cpu",
+        model_seed=8,
+        library_versions={"numpy": np.__version__, "xgboost": "test"},
+    )
+    path = tmp_path / "warm.sqlite3"
+    cold_method: dict[str, int] = {}
+    with SQLiteCoalitionStore(
+        path, identity, commit_every_fits=1
+    ) as store:
+        evaluator = make_shared_baseline_utility(
+            X, y, store=store, diagnostics={}, prepared=prepared, **policy
+        )
+        compute_banzhaf_importance(
+            X,
+            y,
+            n_coalitions=2,
+            per_coalition=1,
+            diagnostics=cold_method,
+            coalition_utility=evaluator,
+            **policy,
+        )
+
+    assert cold_method == {
+        "coalition_count": 4,
+        "model_fit_count": 3,
+        "logical_evaluation_count": 5,
+        "logical_unique_coalition_count": 4,
+        "physical_model_fit_count": 3,
+        "cache_hit_count": 1,
+    }
+
+    aggregate: dict[str, int] = {}
+    method: dict[str, int] = {}
+    with SQLiteCoalitionStore(
+        path, identity, commit_every_fits=1
+    ) as reopened:
+        evaluator = make_shared_baseline_utility(
+            X,
+            y,
+            store=reopened,
+            diagnostics=aggregate,
+            prepared=prepared,
+            **policy,
+        )
+        compute_banzhaf_importance(
+            X,
+            y,
+            n_coalitions=2,
+            per_coalition=1,
+            diagnostics=method,
+            coalition_utility=evaluator,
+            **policy,
+        )
+
+    assert method == {
+        "coalition_count": 4,
+        "model_fit_count": 3,
+        "logical_evaluation_count": 5,
+        "logical_unique_coalition_count": 4,
+        "physical_model_fit_count": 0,
+        "cache_hit_count": 5,
+    }
+    assert aggregate == method
 
 
 def test_shap_baseline_uses_canonical_multiclass_model_policy(

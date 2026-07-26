@@ -11,6 +11,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+from types import SimpleNamespace
 import warnings
 from dataclasses import FrozenInstanceError, asdict, replace
 from datetime import datetime, timezone
@@ -38,7 +39,10 @@ from experiments.icomp2026_estimator_bundle import (
 from experiments.icomp2026_progress import append_run_log
 from experiments.native_process_guard import WorkerContract
 from minppi_mofs.coalition_cache import (
+    CACHE_SCHEMA_VERSION,
+    CoalitionCacheStats,
     SQLiteCoalitionStore,
+    canonical_coalition,
     hash_numeric_array,
     hash_numeric_frame,
 )
@@ -1847,6 +1851,126 @@ def test_selection_cache_never_reads_test_or_prebuilt_final_test_cache(
         assert cache.stats.coalition_count == 0
     assert connect_paths == [selection_path]
     assert final_path.is_file()
+
+
+def test_shared_baseline_utility_uses_only_baseline_internal_namespace(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    layout, context, _, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "baseline-internal-isolation"
+    )
+    X_train, y_train, _, _, row = prepared
+    diagnostics: dict[str, int] = {}
+
+    with stage_module._open_shared_baseline_utility(
+        context, X_train, y_train, row, diagnostics
+    ) as evaluator:
+        assert evaluator.feature_order == tuple(X_train.columns)
+        assert np.isfinite(evaluator(set(X_train.columns)))
+
+    expected_path = (
+        layout.root
+        / "cache"
+        / "baseline_internal"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    )
+    assert expected_path.is_file()
+    assert not (
+        layout.root
+        / "cache"
+        / "selection_validation"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    ).exists()
+    assert not (
+        layout.root
+        / "cache"
+        / "final_test"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    ).exists()
+    assert diagnostics["logical_evaluation_count"] == 1
+    assert diagnostics["physical_model_fit_count"] == 1
+    assert diagnostics["cache_hit_count"] == 0
+
+
+def test_shared_baseline_store_closes_when_baseline_raises(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, context, _, prepared = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "baseline-internal-exception-close"
+    )
+    X_train, y_train, _, _, row = prepared
+    original_close = SQLiteCoalitionStore.close
+    closed: list[Path] = []
+
+    def recording_close(store: SQLiteCoalitionStore) -> None:
+        closed.append(store.path)
+        original_close(store)
+
+    monkeypatch.setattr(SQLiteCoalitionStore, "close", recording_close)
+    with pytest.raises(RuntimeError, match="baseline failed"):
+        with stage_module._open_shared_baseline_utility(
+            context, X_train, y_train, row, {}
+        ):
+            raise RuntimeError("baseline failed")
+
+    assert closed == [
+        context.layout.root
+        / "cache"
+        / "baseline_internal"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    ]
+
+
+def test_shared_baseline_prepares_internal_split_exactly_once(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from minppi_mofs.baselines import _coalition_utility as utility_module
+
+    _, context, _, prepared_frames = _prepared_cache_contexts(
+        tmp_path, smoke_protocol, "baseline-internal-single-split"
+    )
+    X_train, y_train, _, _, row = prepared_frames
+    original_prepare = utility_module._prepare_baseline_internal_split
+    calls = 0
+    prepared_objects: list[object] = []
+
+    def recording_prepare(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        prepared = original_prepare(*args, **kwargs)
+        prepared_objects.append(prepared)
+        return prepared
+
+    monkeypatch.setattr(
+        utility_module, "_prepare_baseline_internal_split", recording_prepare
+    )
+    with stage_module._open_shared_baseline_utility(
+        context, X_train, y_train, row, {}
+    ) as evaluator:
+        assert evaluator(set(X_train.columns)) >= 0.0
+        assert evaluator.prepared_split is prepared_objects[0]
+        assert (
+            evaluator.identity.prepared_split_digest
+            == evaluator.prepared_split.digest
+        )
+        assert (
+            evaluator.identity.train_features_sha256
+            == evaluator.prepared_split.train_features_sha256
+        )
+
+    assert calls == 1
 
 
 def _prepared_test_fixture(layout: RunLayout, row: dict[str, object]):
@@ -3963,8 +4087,10 @@ def test_task11_registry_contains_all_completed_stage_handlers() -> None:
 
 class _Task9FakeCache:
     def __init__(self, features: tuple[str, ...]) -> None:
-        self._coalitions = {tuple(sorted(features))}
+        self.feature_order = features
+        self._coalitions = {features}
         self._model_fit_count = 1
+        self._cache_hit_count = 0
 
     @property
     def model_fit_count(self) -> int:
@@ -3974,11 +4100,23 @@ class _Task9FakeCache:
     def coalition_count(self) -> int:
         return len(self._coalitions)
 
-    def evaluate(self, features: set[str]) -> float:
-        key = tuple(sorted(features))
+    @property
+    def stats(self):
+        return SimpleNamespace(
+            physical_model_fit_count=self._model_fit_count,
+            cache_hit_count=self._cache_hit_count,
+            coalition_count=len(self._coalitions),
+        )
+
+    def evaluate(self, features: set[str], utility: str | None = None) -> float:
+        key = tuple(
+            feature for feature in self.feature_order if feature in features
+        )
         if key not in self._coalitions:
             self._coalitions.add(key)
             self._model_fit_count += bool(key)
+        else:
+            self._cache_hit_count += 1
         return 0.7 + 0.01 * len(features)
 
 
@@ -4047,6 +4185,9 @@ def _patch_task9_selection(
         "schedule": 0,
         "hybrid": 0,
         "checkpoint": 0,
+        "alpha_authority": 0,
+        "alpha_exact": 0,
+        "selection_cache": 0,
     }
 
     def loader(context):
@@ -4089,6 +4230,102 @@ def _patch_task9_selection(
         lambda context, X_train, *args, **kwargs: _Task9FakeCache(
             tuple(X_train.columns)
         ),
+    )
+    alpha_cache = _Task9FakeCache(tuple(X_train.columns))
+
+    class FakeOpenedSelectionCache:
+        def __enter__(self):
+            return alpha_cache
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return None
+
+    def open_selection_cache(*_args, **_kwargs):
+        calls["selection_cache"] += 1
+        return FakeOpenedSelectionCache()
+
+    class FakeAlphaView:
+        def __init__(self, cache, *, utility: str, alpha: float) -> None:
+            self.cache = cache
+            self.feature_order = cache.feature_order
+            self.alpha = alpha
+            self._logical_coalitions: list[tuple[str, ...]] = []
+            self.evaluate(set(self.feature_order))
+
+        def evaluate(self, coalition: set[str]) -> float:
+            key = tuple(
+                feature
+                for feature in self.feature_order
+                if feature in coalition
+            )
+            self._logical_coalitions.append(key)
+            return self.cache.evaluate(set(coalition))
+
+        @property
+        def logical_coalitions(self) -> tuple[tuple[str, ...], ...]:
+            return tuple(self._logical_coalitions)
+
+    def alpha_exact(*args, acc_cache, alpha: float, **kwargs):
+        calls["alpha_exact"] += 1
+        acc_cache.evaluate(set())
+        acc_cache.evaluate({"f0"})
+        if harmful_by_alpha and alpha < 0.9:
+            removed = {"f0"}
+        elif harmful_by_alpha:
+            removed = {"f1", "f3"}
+        else:
+            removed = {"f1", "f3"}
+        return {
+            name: (-1 if name in removed else 0) for name in X_train
+        }
+
+    def alpha_authority(*_args, **_kwargs):
+        calls["alpha_authority"] += 1
+        return (
+            SimpleNamespace(schedule_digest=None),
+            SimpleNamespace(digest="a" * 64, budgets=(2,)),
+            SimpleNamespace(random_schedule=None, guided_schedule=None),
+        )
+
+    monkeypatch.setattr(
+        stage_module, "_open_selection_cache", open_selection_cache
+    )
+    monkeypatch.setattr(
+        stage_module, "_AlphaCoalitionUtilityView", FakeAlphaView
+    )
+    monkeypatch.setattr(min_ppi_module, "estimate_minppi_exact", alpha_exact)
+    monkeypatch.setattr(
+        stage_module, "_alpha_estimator_authority", alpha_authority
+    )
+
+    class FakeSharedUtility:
+        def __init__(self, context: StageContext) -> None:
+            self.feature_order = tuple(X_train.columns)
+            self.task = str(context.job.parameters["task"])
+            self.utility = str(context.job.parameters["utility"])
+            self.model_params = context.protocol.model_params
+            self.backend = context.protocol.backend
+            self.seed = context.job.seed
+            self.test_size = 0.2
+            self.max_samples = 5000
+
+        def __call__(self, coalition: set[str]) -> float:
+            return 0.7 + 0.01 * len(coalition)
+
+    class FakeOpenedSharedUtility:
+        def __init__(self, context: StageContext) -> None:
+            self.evaluator = FakeSharedUtility(context)
+
+        def __enter__(self):
+            return self.evaluator
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return None
+
+    monkeypatch.setattr(
+        stage_module,
+        "_open_shared_baseline_utility",
+        lambda context, *args, **kwargs: FakeOpenedSharedUtility(context),
     )
     monkeypatch.setattr(guidance_module, "build_mi_correlation_guidance", guidance)
     monkeypatch.setattr(min_ppi_module, "make_algorithm_b_perturbation_schedule", schedule)
@@ -4210,6 +4447,68 @@ def test_removal_uses_completed_max_budget_hybrid_without_recomputation(
     )
 
 
+def test_removal_shares_one_evaluator_between_minshap_and_banzhaf(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    layout, _, contexts = _task9_contexts(
+        tmp_path, smoke_protocol, "removal"
+    )
+    context = next(
+        item for item in contexts if item.job.method == "selection_plan"
+    )
+    _patch_task9_selection(monkeypatch)
+    from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
+
+    shared = object()
+    closed: list[bool] = []
+    received: list[object] = []
+
+    class Opened:
+        def __enter__(self):
+            return shared
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            closed.append(True)
+
+    monkeypatch.setattr(
+        stage_module,
+        "_open_shared_baseline_utility",
+        lambda *args, **kwargs: Opened(),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        shap_top_k,
+        "compute_shap_topk_importance",
+        lambda *args, diagnostics, **kwargs: diagnostics.update(
+            model_fit_count=1, coalition_count=1
+        )
+        or {"f0": 4.0, "f1": 1.0, "f2": 3.0, "f3": 2.0},
+    )
+
+    def baseline(*args, diagnostics, coalition_utility, **kwargs):
+        received.append(coalition_utility)
+        diagnostics.update(model_fit_count=1, coalition_count=2)
+        return {"f0": 4.0, "f1": 1.0, "f2": 3.0, "f3": 2.0}
+
+    monkeypatch.setattr(min_shap, "compute_minshap_importance", baseline)
+    monkeypatch.setattr(banzhaf_fs, "compute_banzhaf_importance", baseline)
+
+    stage_module.run_removal_job(context)
+
+    assert received == [shared, shared]
+    assert closed == [True]
+    assert (
+        layout.root
+        / "cache"
+        / "selection_validation"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    ).exists() is False
+
+
 @pytest.mark.parametrize("harmful", [True, False])
 def test_removal_plan_freezes_complete_matched_scope_without_test_access(
     tmp_path: Path,
@@ -4282,6 +4581,486 @@ def test_removal_plan_freezes_complete_matched_scope_without_test_access(
         stage_module.run_removal_job(plan_context)
 
 
+@pytest.mark.parametrize(
+    (
+        "feature_count",
+        "exact_scores",
+        "random_scores",
+        "guided_scores",
+        "expected",
+    ),
+    [
+        (20, {"f": -1}, None, None, {"f": -1}),
+        (
+            21,
+            None,
+            None,
+            {
+                budget: {"f": int(budget == 200)}
+                for budget in (10, 25, 50, 100, 200)
+            },
+            {"f": 1},
+        ),
+        (
+            75,
+            None,
+            None,
+            {
+                budget: {"f": int(budget == 200)}
+                for budget in (10, 25, 50, 100, 200)
+            },
+            {"f": 1},
+        ),
+        (
+            76,
+            None,
+            {
+                budget: {"f": int(budget < 200)}
+                for budget in (10, 25, 50, 100, 200)
+            },
+            {
+                budget: {"f": int(budget == 200)}
+                for budget in (10, 25, 50, 100, 200)
+            },
+            {"f": 0},
+        ),
+    ],
+)
+def test_alpha_max_budget_derivation_accepts_full_formal_checkpoint_maps(
+    feature_count: int,
+    exact_scores: dict[str, int] | None,
+    random_scores: dict[int, dict[str, int]] | None,
+    guided_scores: dict[int, dict[str, int]] | None,
+    expected: dict[str, int],
+) -> None:
+    budgets = (10, 25, 50, 100, 200)
+
+    assert stage_module._derive_alpha_max_budget_scores(
+        feature_count=feature_count,
+        budgets=budgets,
+        exact_scores=exact_scores,
+        random_scores=random_scores,
+        guided_scores=guided_scores,
+    ) == expected
+
+
+class _DeterministicAlphaCoverageCache:
+    """Canonical in-memory cache for alpha coverage contract tests."""
+
+    def __init__(
+        self,
+        features: tuple[str, ...],
+        *,
+        known: set[tuple[str, ...]] | None = None,
+    ) -> None:
+        self.feature_order = features
+        self.identity = SimpleNamespace(task="binary")
+        self.known = set() if known is None else set(known)
+        self._physical_model_fit_count = 0
+        self._cache_hit_count = 0
+
+    @property
+    def stats(self) -> CoalitionCacheStats:
+        return CoalitionCacheStats(
+            physical_model_fit_count=self._physical_model_fit_count,
+            cache_hit_count=self._cache_hit_count,
+            coalition_count=len(self.known),
+        )
+
+    def evaluate(self, coalition: set[str], utility: str) -> float:
+        assert utility == "accuracy"
+        key = canonical_coalition(self.feature_order, coalition)
+        if key in self.known:
+            self._cache_hit_count += 1
+        else:
+            self.known.add(key)
+            self._physical_model_fit_count += int(bool(key))
+        return len(key) / len(self.feature_order)
+
+
+def _alpha_coverage_request(feature_count: int) -> EstimatorGroupRequest:
+    return EstimatorGroupRequest(
+        protocol_hash="a" * 64,
+        dataset_id=f"coverage-{feature_count}",
+        seed=42,
+        task="binary",
+        utility="accuracy",
+        ordered_features=tuple(f"f{index}" for index in range(feature_count)),
+        split_hashes={"train": "b" * 64, "validation": "c" * 64},
+        model_params={"n_estimators": 1},
+        backend="cpu",
+        methods=("hybrid",),
+        budgets=(10, 25, 50, 100, 200),
+        exact_max_features=20,
+        alpha=0.95,
+        cache_schema=CACHE_SCHEMA_VERSION,
+        checkpoint_every_fits=1,
+        progress_every_seconds=1,
+    )
+
+
+def _exercise_nested_alpha_coverage(
+    request: EstimatorGroupRequest,
+    cache: _DeterministicAlphaCoverageCache,
+) -> tuple[dict[str, int], tuple[tuple[str, ...], ...]]:
+    from minppi_mofs.nested_estimation import (
+        estimate_guided_checkpoints,
+        estimate_random_checkpoints,
+    )
+
+    schedules = _schedule_authority(request)
+    view = stage_module._AlphaCoalitionUtilityView(
+        cache, utility=request.utility, alpha=request.alpha
+    )
+    random_scores = (
+        estimate_random_checkpoints(schedules.random_schedule, view)
+        if schedules.random_schedule is not None
+        else None
+    )
+    guided_scores = (
+        estimate_guided_checkpoints(
+            schedules.guided_schedule,
+            view,
+            mi_scores=None,
+            correlation_neighbors=None,
+        )
+        if schedules.guided_schedule is not None
+        else None
+    )
+    scores = stage_module._derive_alpha_max_budget_scores(
+        feature_count=len(request.ordered_features),
+        budgets=request.budgets,
+        exact_scores=None,
+        random_scores=random_scores,
+        guided_scores=guided_scores,
+    )
+    retained = {
+        feature for feature, score in scores.items() if score != -1
+    }
+    view.evaluate(retained)
+    return scores, view.logical_coalitions
+
+
+@pytest.mark.parametrize("feature_count", [21, 75, 76])
+def test_alpha_nested_cache_zero_fit_only_with_complete_required_coverage(
+    feature_count: int,
+) -> None:
+    request = _alpha_coverage_request(feature_count)
+    cold = _DeterministicAlphaCoverageCache(request.ordered_features)
+    cold_scores, cold_calls = _exercise_nested_alpha_coverage(request, cold)
+    required = set(cold.known)
+    assert cold.stats.physical_model_fit_count > 0
+
+    warm = _DeterministicAlphaCoverageCache(
+        request.ordered_features, known=required
+    )
+    warm_scores, warm_calls = _exercise_nested_alpha_coverage(request, warm)
+    assert warm_scores == cold_scores
+    assert warm_calls == cold_calls
+    assert warm.stats.physical_model_fit_count == 0
+    assert warm.stats.cache_hit_count > 0
+
+    missing = next(coalition for coalition in cold_calls if coalition)
+    partial = _DeterministicAlphaCoverageCache(
+        request.ordered_features, known=required - {missing}
+    )
+    partial_scores, partial_calls = _exercise_nested_alpha_coverage(
+        request, partial
+    )
+    assert partial_scores == cold_scores
+    assert partial_calls == cold_calls
+    assert partial.stats.physical_model_fit_count == 1
+    assert missing in partial.known
+
+
+def _real_grouped_alpha_cache_setup(
+    tmp_path: Path,
+    smoke_protocol,
+) -> tuple[
+    StageContext,
+    tuple[pd.DataFrame, np.ndarray, pd.DataFrame, np.ndarray, dict[str, object]],
+]:
+    protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    protocol = replace(
+        protocol,
+        datasets=(protocol.datasets[0],),
+        execution=replace(protocol.execution, mode="grouped_nested_v1"),
+        model_params={
+            "n_estimators": 1,
+            "max_depth": 1,
+            "learning_rate": 0.3,
+            "n_jobs": 1,
+        },
+    )
+    layout = create_new_run(tmp_path / "results", "alpha-real-cache", protocol)
+    freeze_run_metadata(
+        layout, protocol, project_root=Path(__file__).parents[1]
+    )
+    projection = (
+        {
+            "dataset_id": protocol.datasets[0].dataset_id,
+            "seed": protocol.seeds[0],
+            "selected_feature_count": 2,
+        },
+    )
+    manifest = (
+        build_job_manifest(protocol, stages=("validate",))
+        + build_job_manifest(protocol, stages=("preprocess",))
+        + build_job_manifest(
+            protocol, stages=("estimator",), data_manifest=projection
+        )
+        + build_job_manifest(protocol, stages=("alpha",))
+    )
+    status = StatusStore(layout, manifest)
+    contexts = _contexts(protocol, layout, manifest, status)
+    for stage in ("validate", "preprocess"):
+        stage_context = next(
+            item for item in contexts if item.job.stage == stage
+        )
+        record = getattr(stage_module, f"run_{stage}_job")(stage_context)
+        _mark_task9_plan_success(stage_context, record)
+
+    estimator_context = next(
+        item
+        for item in contexts
+        if item.job.stage == "estimator"
+        and item.job.method == "hybrid"
+        and item.job.parameters["budget"]
+        == max(protocol.estimator_budgets)
+    )
+    estimator_record = stage_module.run_estimator_job(estimator_context)
+    _mark_task9_plan_success(estimator_context, estimator_record)
+    alpha_context = next(
+        item
+        for item in contexts
+        if item.job.stage == "alpha" and item.job.method == "selection_plan"
+    )
+    prepared = stage_module._load_prepared_train_validation(alpha_context)
+    return alpha_context, prepared
+
+
+def _selection_cache_row_count(
+    context: StageContext,
+    prepared: tuple[
+        pd.DataFrame, np.ndarray, pd.DataFrame, np.ndarray, dict[str, object]
+    ],
+) -> int:
+    X_train, y_train, X_val, y_val, row = prepared
+    with stage_module._open_selection_cache(
+        context, (X_train, y_train, X_val, y_val), row
+    ) as cache:
+        return cache.stats.coalition_count
+
+
+def test_alpha_grid_reuses_complete_estimator_cache_without_new_fits(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context, prepared = _real_grouped_alpha_cache_setup(
+        tmp_path, smoke_protocol
+    )
+    before_rows = _selection_cache_row_count(context, prepared)
+    legacy_fit_calls = 0
+    original_fit = voting_game_module.XGBClassifier.fit
+
+    def count_legacy_fit(model, *args, **kwargs):
+        nonlocal legacy_fit_calls
+        legacy_fit_calls += 1
+        return original_fit(model, *args, **kwargs)
+
+    monkeypatch.setattr(
+        voting_game_module.XGBClassifier, "fit", count_legacy_fit
+    )
+
+    record = stage_module.run_alpha_job(context)
+
+    after_rows = _selection_cache_row_count(context, prepared)
+    document = json.loads(
+        (context.layout.root / record.artifacts["selection_plan"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert legacy_fit_calls == 0
+    assert before_rows == after_rows == 4
+    assert len(document["entries"]) == len(context.protocol.alpha_grid) == 4
+    assert len(
+        [
+            job
+            for job in context.status.manifest
+            if job.stage == "alpha"
+            and job.dataset_id == context.job.dataset_id
+            and job.seed == context.job.seed
+            and job.method == "alpha_evaluation"
+        ]
+    ) == 4
+    assert set(document) == {
+        "schema_version",
+        "protocol_hash",
+        "job_id",
+        "dataset_id",
+        "seed",
+        "task",
+        "utility",
+        "budget",
+        "features",
+        "entries",
+        "group_request_digest",
+        "schedule_digest",
+        "initial_model_fit_count",
+        "initial_coalition_count",
+        "selection_model_fit_count",
+        "selection_coalition_count",
+        "selection_logical_evaluation_count",
+        "selection_logical_unique_coalition_count",
+        "selection_physical_model_fit_count",
+        "selection_cache_hit_count",
+        "selection_group_runtime_s",
+    }
+    assert document["selection_physical_model_fit_count"] == 0
+    assert document["selection_cache_hit_count"] > 0
+    assert document["selection_group_runtime_s"] >= 0.0
+    assert document["selection_model_fit_count"] == 0
+    assert document["selection_coalition_count"] == 0
+    assert document["selection_logical_unique_coalition_count"] <= sum(
+        entry["logical_unique_coalition_count"]
+        for entry in document["entries"]
+    )
+    assert document["selection_group_runtime_s"] + 1e-12 >= sum(
+        entry["component_runtime_s"] for entry in document["entries"]
+    )
+    for entry in document["entries"]:
+        assert set(entry) == {
+            "alpha",
+            "alpha_token",
+            "harmful_count",
+            "compression",
+            "validation_utility",
+            "retained_features",
+            "removed_features",
+            "retained_hash",
+            "model_fit_count",
+            "coalition_count",
+            "logical_evaluation_count",
+            "logical_unique_coalition_count",
+            "physical_model_fit_count",
+            "cache_hit_count",
+            "component_runtime_s",
+            "scores",
+        }
+        assert entry["logical_evaluation_count"] >= 1
+        assert entry["logical_unique_coalition_count"] >= 1
+        assert entry["physical_model_fit_count"] == 0
+        assert entry["cache_hit_count"] >= 1
+        assert entry["component_runtime_s"] >= 0.0
+        assert "group_runtime_s" not in entry
+
+
+def test_alpha_grid_partial_cache_fits_only_missing_row_and_persists_it(
+    tmp_path: Path,
+    smoke_protocol,
+) -> None:
+    context, prepared = _real_grouped_alpha_cache_setup(
+        tmp_path, smoke_protocol
+    )
+    features = tuple(str(feature) for feature in prepared[0].columns)
+    cache_path = (
+        context.layout.cache_root
+        / "selection_validation"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    )
+    coalition_key = json.dumps(
+        list(features), ensure_ascii=False, separators=(",", ":")
+    )
+    with sqlite3.connect(cache_path) as connection:
+        deleted = connection.execute(
+            "DELETE FROM coalition_utility WHERE coalition_key = ?",
+            (coalition_key,),
+        ).rowcount
+    assert deleted == 1
+    assert _selection_cache_row_count(context, prepared) == 3
+
+    record = stage_module.run_alpha_job(context)
+
+    document = json.loads(
+        (context.layout.root / record.artifacts["selection_plan"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert document["selection_physical_model_fit_count"] == 1
+    assert document["selection_model_fit_count"] == 1
+    assert document["selection_coalition_count"] == 1
+    assert sum(
+        entry["physical_model_fit_count"] for entry in document["entries"]
+    ) == 1
+    assert _selection_cache_row_count(context, prepared) == 4
+    X_train, y_train, X_val, y_val, row = prepared
+    with stage_module._open_selection_cache(
+        context, (X_train, y_train, X_val, y_val), row
+    ) as cache:
+        before = cache.stats
+        cache.evaluate(set(features), str(context.job.parameters["utility"]))
+        after = cache.stats
+    assert after.physical_model_fit_count == before.physical_model_fit_count
+    assert after.cache_hit_count == before.cache_hit_count + 1
+
+
+def test_alpha_schedule_tamper_fails_before_cache_access_or_artifact(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context, prepared = _real_grouped_alpha_cache_setup(
+        tmp_path, smoke_protocol
+    )
+    row = prepared[-1]
+    estimator_job = next(
+        job
+        for job in context.status.manifest
+        if job.stage == "estimator"
+        and job.dataset_id == context.job.dataset_id
+        and job.seed == context.job.seed
+    )
+    request = stage_module.group_request_from_context(
+        StageContext(
+            context.protocol,
+            context.layout,
+            estimator_job,
+            context.status,
+            context.audit,
+        ),
+        row,
+        tuple(str(feature) for feature in prepared[0].columns),
+    )
+    bundle_path = (
+        context.layout.root / estimator_bundle_module.bundle_relpath(request)
+    )
+    bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    scheduled = next(
+        checkpoint
+        for checkpoint in bundle["checkpoints"]
+        if checkpoint["schedule_digest"] is not None
+    )
+    scheduled["schedule_digest"] = "f" * 64
+    atomic_write_json(bundle_path, bundle)
+    monkeypatch.setattr(
+        stage_module,
+        "_open_selection_cache",
+        lambda *_args, **_kwargs: pytest.fail(
+            "alpha opened the cache before schedule validation"
+        ),
+    )
+
+    with pytest.raises(ValueError, match="schedule.*authority"):
+        stage_module.run_alpha_job(context)
+
+    assert not (
+        context.layout.root / stage_module._alpha_plan_relpath(context)
+    ).exists()
+
+
 def test_alpha_plan_freezes_complete_grid_with_one_shared_cache_and_setup(
     tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4295,18 +5074,21 @@ def test_alpha_plan_freezes_complete_grid_with_one_shared_cache_and_setup(
     assert len({item["alpha_token"] for item in document["entries"]}) == len(smoke_protocol.alpha_grid)
     assert calls == {
         "loader": 1,
-        "guidance": 1,
-        "schedule": 1,
-        "hybrid": len(smoke_protocol.alpha_grid),
+        "guidance": 0,
+        "schedule": 0,
+        "hybrid": 0,
         "checkpoint": 0,
+        "alpha_authority": 2,
+        "alpha_exact": len(smoke_protocol.alpha_grid),
+        "selection_cache": 1,
     }
     assert not any("recommend" in key or "argmax" in key for key in document)
-    assert document["initial_model_fit_count"] == 1
-    assert document["initial_coalition_count"] == 1
-    assert document["selection_model_fit_count"] == 1 + sum(
+    assert document["initial_model_fit_count"] == 0
+    assert document["initial_coalition_count"] == 0
+    assert document["selection_model_fit_count"] == sum(
         entry["model_fit_count"] for entry in document["entries"]
     )
-    assert document["selection_coalition_count"] == 1 + sum(
+    assert document["selection_coalition_count"] == sum(
         entry["coalition_count"] for entry in document["entries"]
     )
     for entry in document["entries"]:
@@ -4919,6 +5701,18 @@ def test_alpha_evaluation_reads_test_once_and_reuses_exact_frozen_entry(
     ]
     assert document["selection_model_fit_count"] == frozen["model_fit_count"]
     assert document["selection_coalition_count"] == frozen["coalition_count"]
+    assert document["selection_logical_evaluation_count"] == frozen[
+        "logical_evaluation_count"
+    ]
+    assert document["selection_logical_unique_coalition_count"] == frozen[
+        "logical_unique_coalition_count"
+    ]
+    assert document["selection_physical_model_fit_count"] == frozen[
+        "physical_model_fit_count"
+    ]
+    assert document["selection_cache_hit_count"] == frozen["cache_hit_count"]
+    assert "selection_group_runtime_s" not in document
+    assert "group_request_digest" not in document
 
     monkeypatch.setattr(
         stage_module,
@@ -4946,10 +5740,14 @@ def test_alpha_evaluation_reads_test_once_and_reuses_exact_frozen_entry(
     def mutate_negative_evaluation_time(payload):
         payload["evaluation_time_s"] = -1.0
 
+    def mutate_selection_cache_hits(payload):
+        payload["selection_cache_hit_count"] += 1
+
     for mutation in (
         mutate_selection_time,
         mutate_selection_fits,
         mutate_selection_coalitions,
+        mutate_selection_cache_hits,
         mutate_evaluation_fits,
         mutate_negative_evaluation_time,
     ):
@@ -5066,6 +5864,54 @@ def test_alpha_plan_rejects_coherent_harmful_set_conflict_with_frozen_scores(
     )
 
     with pytest.raises(ValueError, match="harmful|score|plan"):
+        stage_module.run_alpha_job(plan_context)
+
+
+@pytest.mark.parametrize(
+    ("field", "tampered_value"),
+    [
+        ("score", 0.5),
+        ("score", True),
+        ("harmful_count", 2.0),
+    ],
+)
+def test_alpha_plan_rejects_non_discrete_scores_and_non_exact_harmful_count(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    tampered_value: object,
+) -> None:
+    layout, _, contexts = _task9_contexts(
+        tmp_path, smoke_protocol, "alpha"
+    )
+    plan_context = next(
+        item
+        for item in contexts
+        if item.job.method == "selection_plan"
+    )
+    _patch_task9_selection(monkeypatch, harmful_by_alpha=True)
+    record = stage_module.run_alpha_job(plan_context)
+    path = layout.root / record.artifacts["selection_plan"]
+    document = json.loads(path.read_text(encoding="utf-8"))
+    entry = document["entries"][0]
+    if field == "score":
+        score = next(
+            item for item in entry["scores"] if item["score"] == 0.0
+        )
+        score["score"] = tampered_value
+    else:
+        entry["harmful_count"] = tampered_value
+    atomic_write_json(path, document)
+    monkeypatch.setattr(
+        stage_module,
+        "_load_prepared_train_validation",
+        lambda context: (_ for _ in ()).throw(
+            AssertionError("invalid alpha plan triggered refit")
+        ),
+    )
+
+    with pytest.raises(ValueError, match="harmful|score|plan|count"):
         stage_module.run_alpha_job(plan_context)
 
 

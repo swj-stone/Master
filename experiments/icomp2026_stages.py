@@ -19,7 +19,9 @@ from uuid import uuid4
 from minppi_mofs.coalition_cache import (
     CoalitionCacheIdentity,
     CoalitionUtilityCache,
+    CoalitionUtilityView,
     SQLiteCoalitionStore,
+    canonical_coalition,
     hash_numeric_array,
     hash_numeric_frame,
 )
@@ -683,6 +685,23 @@ class _OpenedCoalitionCache:
         self._store.close()
 
 
+class _OpenedSharedBaselineUtility:
+    """Own one shared baseline evaluator and its persistent store."""
+
+    def __init__(self, store: SQLiteCoalitionStore, evaluator: Callable) -> None:
+        self._store = store
+        self._evaluator = evaluator
+
+    def __enter__(self) -> Callable:
+        return self._evaluator
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
+
+    def close(self) -> None:
+        self._store.close()
+
+
 def _validated_cache_manifest_authority(
     context: StageContext, data_row: Mapping[str, object]
 ) -> tuple[dict[str, object], object]:
@@ -868,7 +887,11 @@ def _selection_cache_identity(
 def _cache_path(context: StageContext, namespace: str) -> Path:
     if context.layout.cache_root != context.layout.root / "cache":
         raise ValueError("run cache root is not canonical")
-    if namespace not in {"selection_validation", "final_test"}:
+    if namespace not in {
+        "selection_validation",
+        "baseline_internal",
+        "final_test",
+    }:
         raise ValueError("coalition cache namespace is invalid")
     if __package__:
         from .icomp2026_estimator_bundle import _canonical_run_path
@@ -929,6 +952,64 @@ def _open_selection_cache(
         context, row, *validated, namespace="selection_validation"
     )
     return _open_bound_cache(context, identity, validated)
+
+
+def _open_shared_baseline_utility(
+    context: StageContext,
+    X,
+    y,
+    data_row: Mapping[str, object],
+    diagnostics: dict[str, int],
+) -> _OpenedSharedBaselineUtility:
+    """Open one baseline-internal evaluator shared by MinShap and Banzhaf."""
+    from minppi_mofs.baselines._coalition_utility import (
+        _prepare_baseline_internal_split,
+        make_shared_baseline_utility,
+    )
+
+    row, dataset = _validated_cache_manifest_authority(context, data_row)
+    if (
+        str(row["task"]) != dataset.task
+        or str(row["utility"]) != dataset.utility
+    ):
+        raise ValueError("baseline cache policy conflicts with dataset authority")
+    prepared = _prepare_baseline_internal_split(
+        X,
+        y,
+        task=dataset.task,
+        seed=context.job.seed,
+    )
+    identity = _cache_identity_from_validated_frames(
+        context,
+        row,
+        prepared.X_train,
+        prepared.y_train,
+        prepared.X_eval,
+        prepared.y_eval,
+        namespace="baseline_internal",
+    )
+    store = SQLiteCoalitionStore(
+        _cache_path(context, "baseline_internal"),
+        identity,
+        commit_every_fits=context.protocol.execution.checkpoint_every_fits,
+    )
+    try:
+        evaluator = make_shared_baseline_utility(
+            X,
+            y,
+            task=dataset.task,
+            utility=dataset.utility,
+            model_params=context.protocol.model_params,
+            backend=context.protocol.backend,
+            seed=context.job.seed,
+            store=store,
+            diagnostics=diagnostics,
+            prepared=prepared,
+        )
+    except BaseException:
+        store.close()
+        raise
+    return _OpenedSharedBaselineUtility(store, evaluator)
 
 
 def _open_final_test_cache(
@@ -2996,11 +3077,27 @@ def _removal_selection_metrics(
 
 def _alpha_selection_metrics(
     document: Mapping[str, object], times: Mapping[str, float]
-) -> dict[str, float | int]:
+) -> dict[str, float | int | str]:
     return {
-        "selection_time_s": sum(float(value) for value in times.values()),
+        "selection_time_s": float(document["selection_group_runtime_s"]),
         "selection_model_fit_count": int(document["selection_model_fit_count"]),
         "selection_coalition_count": int(document["selection_coalition_count"]),
+        "selection_logical_evaluation_count": int(
+            document["selection_logical_evaluation_count"]
+        ),
+        "selection_logical_unique_coalition_count": int(
+            document["selection_logical_unique_coalition_count"]
+        ),
+        "selection_physical_model_fit_count": int(
+            document["selection_physical_model_fit_count"]
+        ),
+        "selection_cache_hit_count": int(
+            document["selection_cache_hit_count"]
+        ),
+        "selection_group_runtime_s": float(
+            document["selection_group_runtime_s"]
+        ),
+        "group_request_digest": str(document["group_request_digest"]),
         **{
             f"{entry['alpha_token']}_selection_time_s": float(
                 times[str(entry["alpha_token"])]
@@ -3031,7 +3128,9 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
             ),
         )
     dataset = _task9_authority(context, stage="removal")
-    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
+    X_train, y_train, X_val, y_val, data_row = (
+        _load_prepared_train_validation(context)
+    )
     features = tuple(X_train.columns)
     budget = max(context.protocol.estimator_budgets)
     selection_times = {method: 0.0 for method in _REMOVAL_METHODS}
@@ -3046,17 +3145,16 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
     selection_times["minppi"] = time.perf_counter() - minppi_started
     diagnostics: dict[str, dict[str, int]] = {}
     baseline_values: dict[str, Mapping[str, float]] = {}
-    baseline_calls = (
-        ("shap_bottom", compute_shap_topk_importance, {}),
-        ("minshap_bottom", compute_minshap_importance, {"n_coalitions": budget, "per_coalition": 5}),
-        ("banzhaf_bottom", compute_banzhaf_importance, {"n_coalitions": budget, "per_coalition": 5}),
-    )
-    for method, function, extra in baseline_calls:
+    def compute_baseline(
+        method: str,
+        function: Callable,
+        extra: Mapping[str, object],
+        *,
+        coalition_utility: Callable | None = None,
+    ) -> None:
         diag: dict[str, int] = {}
         baseline_started = time.perf_counter()
-        scores = function(
-            X_train,
-            y_train,
+        kwargs: dict[str, object] = dict(
             task=dataset.task,
             utility=dataset.utility,
             model_params=context.protocol.model_params,
@@ -3065,10 +3163,39 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
             diagnostics=diag,
             **extra,
         )
+        if coalition_utility is not None:
+            kwargs["coalition_utility"] = coalition_utility
+        scores = function(
+            X_train,
+            y_train,
+            **kwargs,
+        )
         selection_times[method] = time.perf_counter() - baseline_started
         _task9_scores(scores, features)
         diagnostics[method] = diag
         baseline_values[method] = scores
+
+    compute_baseline("shap_bottom", compute_shap_topk_importance, {})
+    shared_diagnostics: dict[str, int] = {}
+    with _open_shared_baseline_utility(
+        context,
+        X_train,
+        y_train,
+        data_row,
+        shared_diagnostics,
+    ) as shared_utility:
+        compute_baseline(
+            "minshap_bottom",
+            compute_minshap_importance,
+            {"n_coalitions": budget, "per_coalition": 5},
+            coalition_utility=shared_utility,
+        )
+        compute_baseline(
+            "banzhaf_bottom",
+            compute_banzhaf_importance,
+            {"n_coalitions": budget, "per_coalition": 5},
+            coalition_utility=shared_utility,
+        )
     methods: list[dict[str, object]] = []
     index = {feature: position for position, feature in enumerate(features)}
     for method in _REMOVAL_METHODS:
@@ -3206,6 +3333,12 @@ def _task9_plan_result(context: StageContext, *, stage: str) -> ResultRecord:
             "selection_time_s",
             "selection_model_fit_count",
             "selection_coalition_count",
+            "selection_logical_evaluation_count",
+            "selection_logical_unique_coalition_count",
+            "selection_physical_model_fit_count",
+            "selection_cache_hit_count",
+            "selection_group_runtime_s",
+            "group_request_digest",
             *(
                 f"{item['alpha_token']}_selection_time_s"
                 for item in document["entries"]
@@ -3214,7 +3347,12 @@ def _task9_plan_result(context: StageContext, *, stage: str) -> ResultRecord:
     if set(record.metrics) != expected_keys:
         raise ValueError(f"{stage} selection plan ResultRecord metric schema is invalid")
     for key, value in record.metrics.items():
-        if key.endswith("_time_s"):
+        if key == "group_request_digest":
+            if value != document["group_request_digest"]:
+                raise ValueError(
+                    "alpha selection request digest conflicts with plan"
+                )
+        elif key.endswith(("_time_s", "_runtime_s")):
             if (
                 isinstance(value, bool)
                 or not isinstance(value, (int, float))
@@ -3223,7 +3361,9 @@ def _task9_plan_result(context: StageContext, *, stage: str) -> ResultRecord:
             ):
                 raise ValueError(f"{stage} selection runtime metric is invalid")
         elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            raise ValueError(f"{stage} selection counter metric is invalid")
+            raise ValueError(
+                f"{stage} selection counter metric {key!r} is invalid"
+            )
     if (
         record.metrics["selection_model_fit_count"]
         != document["selection_model_fit_count"]
@@ -3259,10 +3399,34 @@ def _task9_plan_result(context: StageContext, *, stage: str) -> ResultRecord:
             for method in _REMOVAL_METHODS
         )
     else:
-        expected_time = sum(
-            float(record.metrics[f"{item['alpha_token']}_selection_time_s"])
-            for item in document["entries"]
-        )
+        for field in (
+            "selection_logical_evaluation_count",
+            "selection_logical_unique_coalition_count",
+            "selection_physical_model_fit_count",
+            "selection_cache_hit_count",
+        ):
+            if record.metrics[field] != document[field]:
+                raise ValueError(
+                    "alpha selection grouped counters conflict with plan"
+                )
+        if (
+            record.metrics["selection_group_runtime_s"]
+            != document["selection_group_runtime_s"]
+        ):
+            raise ValueError(
+                "alpha selection grouped runtime conflicts with plan"
+            )
+        for item in document["entries"]:
+            if (
+                record.metrics[
+                    f"{item['alpha_token']}_selection_time_s"
+                ]
+                != item["component_runtime_s"]
+            ):
+                raise ValueError(
+                    "alpha selection component runtime conflicts with plan"
+                )
+        expected_time = float(document["selection_group_runtime_s"])
     if record.metrics["selection_time_s"] != expected_time:
         raise ValueError(f"{stage} aggregate selection runtime is invalid")
     return record
@@ -3443,6 +3607,10 @@ def _result_record_from_artifact(
             if key in {
                 "k", "harmful_count", "selection_time_s", "evaluation_time_s",
                 "selection_model_fit_count", "selection_coalition_count",
+                "selection_logical_evaluation_count",
+                "selection_logical_unique_coalition_count",
+                "selection_physical_model_fit_count",
+                "selection_cache_hit_count",
                 "evaluation_model_fit_count",
             }
         },
@@ -3567,6 +3735,88 @@ def _alpha_plan_relpath(context: StageContext) -> str:
     return f"alpha/{context.job.dataset_id}/s{context.job.seed}/selection_plan.json"
 
 
+class _AlphaCoalitionUtilityView(CoalitionUtilityView):
+    """Record alpha-local logical calls while sharing one persistent cache."""
+
+    def __init__(
+        self,
+        cache: CoalitionUtilityCache,
+        *,
+        utility: str,
+        alpha: float,
+    ) -> None:
+        self._logical_coalitions: list[tuple[str, ...]] = []
+        super().__init__(cache, utility=utility, alpha=alpha)
+
+    def evaluate(self, coalition) -> float:
+        self._logical_coalitions.append(
+            canonical_coalition(self.feature_order, coalition)
+        )
+        return super().evaluate(coalition)
+
+    @property
+    def logical_coalitions(self) -> tuple[tuple[str, ...], ...]:
+        return tuple(self._logical_coalitions)
+
+
+def _alpha_estimator_authority(
+    context: StageContext,
+    data_row: Mapping[str, object],
+    features: tuple[str, ...],
+):
+    """Bind alpha work to the completed maximum-budget grouped schedule."""
+    budget = max(context.protocol.estimator_budgets)
+    checkpoint = _completed_estimator_checkpoint(
+        context, "hybrid", budget, features
+    )
+    estimator_jobs = tuple(
+        job
+        for job in context.status.manifest
+        if job.stage == "estimator"
+        and job.dataset_id == context.job.dataset_id
+        and job.seed == context.job.seed
+        and job.method == "hybrid"
+        and job.parameters.get("budget") == budget
+    )
+    if len(estimator_jobs) != 1:
+        raise ValueError(
+            "alpha estimator group authority is missing or duplicated"
+        )
+    estimator_context = StageContext(
+        context.protocol,
+        context.layout,
+        estimator_jobs[0],
+        context.status,
+        context.audit,
+    )
+    request = group_request_from_context(
+        estimator_context, data_row, features
+    )
+    if __package__:
+        from .icomp2026_estimator_bundle import (
+            _hybrid_schedule_digest,
+            _schedule_authority,
+        )
+    else:
+        from icomp2026_estimator_bundle import (  # type: ignore[no-redef]
+            _hybrid_schedule_digest,
+            _schedule_authority,
+        )
+
+    schedules = _schedule_authority(request)
+    expected_schedule_digest = _hybrid_schedule_digest(
+        feature_count=len(features),
+        random_digest=schedules.random_digest,
+        guided_digest=schedules.guided_digest,
+    )
+    if checkpoint.schedule_digest != expected_schedule_digest:
+        raise ValueError(
+            "alpha hybrid checkpoint schedule digest conflicts with "
+            "deterministic schedule authority"
+        )
+    return checkpoint, request, schedules
+
+
 def _validate_alpha_scope(context: StageContext) -> None:
     jobs = tuple(
         job for job in context.status.manifest
@@ -3585,13 +3835,17 @@ def _validate_alpha_plan(context: StageContext, value: object) -> dict[str, obje
         "schema_version", "protocol_hash", "job_id", "dataset_id", "seed", "task",
         "utility", "budget", "features", "entries", "selection_model_fit_count",
         "selection_coalition_count", "initial_model_fit_count",
-        "initial_coalition_count",
+        "initial_coalition_count", "group_request_digest", "schedule_digest",
+        "selection_logical_evaluation_count",
+        "selection_logical_unique_coalition_count",
+        "selection_physical_model_fit_count", "selection_cache_hit_count",
+        "selection_group_runtime_s",
     }
     if not isinstance(value, dict) or set(value) != expected:
         raise ValueError("alpha selection plan schema is invalid")
     dataset = _task9_authority(context, stage="alpha")
     if (
-        value["schema_version"] != 1
+        value["schema_version"] != 2
         or value["protocol_hash"] != context.job.protocol_hash
         or value["job_id"] != _task9_manifest_plan(context, stage="alpha").job_id
         or value["dataset_id"] != context.job.dataset_id
@@ -3611,13 +3865,26 @@ def _validate_alpha_plan(context: StageContext, value: object) -> dict[str, obje
     )
     if features != manifest_features:
         raise ValueError("alpha plan features conflict with rich manifest authority")
+    checkpoint, request, _schedules = _alpha_estimator_authority(
+        context, manifest_row, features
+    )
+    if (
+        value["group_request_digest"] != request.digest
+        or value["schedule_digest"] != checkpoint.schedule_digest
+    ):
+        raise ValueError(
+            "alpha plan request or schedule digest conflicts with "
+            "estimator authority"
+        )
     entries = value["entries"]
     if not isinstance(entries, list) or [item.get("alpha") if isinstance(item, dict) else None for item in entries] != list(context.protocol.alpha_grid):
         raise ValueError("alpha selection plan grid is incomplete or out of order")
     expected_entry = {
         "alpha", "alpha_token", "harmful_count", "compression", "validation_utility",
         "retained_features", "removed_features", "retained_hash", "model_fit_count",
-        "coalition_count", "scores",
+        "coalition_count", "scores", "logical_evaluation_count",
+        "logical_unique_coalition_count", "physical_model_fit_count",
+        "cache_hit_count", "component_runtime_s",
     }
     for entry in entries:
         if not isinstance(entry, dict) or set(entry) != expected_entry:
@@ -3626,6 +3893,14 @@ def _validate_alpha_plan(context: StageContext, value: object) -> dict[str, obje
         if entry["alpha_token"] != _alpha_token(alpha):
             raise ValueError("alpha plan token is invalid")
         harmful_count = entry["harmful_count"]
+        if (
+            isinstance(harmful_count, bool)
+            or not isinstance(harmful_count, int)
+            or harmful_count < 0
+        ):
+            raise ValueError(
+                "alpha plan harmful count must be a non-negative integer"
+            )
         subset = {
             "trial": None, "rng_seed": None,
             "retained_features": entry["retained_features"],
@@ -3645,6 +3920,7 @@ def _validate_alpha_plan(context: StageContext, value: object) -> dict[str, obje
                 isinstance(item.get("score"), bool)
                 or not isinstance(item.get("score"), (int, float))
                 or not __import__("math").isfinite(float(item["score"]))
+                or float(item["score"]) not in (-1.0, 0.0, 1.0)
                 for item in scores
             )
         ):
@@ -3658,20 +3934,43 @@ def _validate_alpha_plan(context: StageContext, value: object) -> dict[str, obje
             raise ValueError("alpha plan compression is invalid")
         if not __import__("math").isfinite(float(entry["validation_utility"])):
             raise ValueError("alpha validation utility is invalid")
-        for field in ("model_fit_count", "coalition_count"):
+        for field in (
+            "model_fit_count", "coalition_count",
+            "logical_evaluation_count", "logical_unique_coalition_count",
+            "physical_model_fit_count", "cache_hit_count",
+        ):
             if isinstance(entry[field], bool) or not isinstance(entry[field], int) or entry[field] < 0:
                 raise ValueError("alpha plan cost is invalid")
-        if entry["model_fit_count"] > entry["coalition_count"]:
+        if (
+            entry["model_fit_count"] > entry["coalition_count"]
+            or entry["physical_model_fit_count"] != entry["model_fit_count"]
+            or entry["logical_unique_coalition_count"]
+            > entry["logical_evaluation_count"]
+            or entry["physical_model_fit_count"]
+            > entry["logical_unique_coalition_count"]
+            or entry["cache_hit_count"] > entry["logical_evaluation_count"]
+        ):
             raise ValueError("alpha plan model-fit delta exceeds coalition delta")
+        component_runtime = entry["component_runtime_s"]
+        if (
+            isinstance(component_runtime, bool)
+            or not isinstance(component_runtime, (int, float))
+            or not __import__("math").isfinite(float(component_runtime))
+            or component_runtime < 0
+        ):
+            raise ValueError("alpha plan component runtime is invalid")
     for field in (
         "initial_model_fit_count", "initial_coalition_count",
         "selection_model_fit_count", "selection_coalition_count",
+        "selection_logical_evaluation_count",
+        "selection_logical_unique_coalition_count",
+        "selection_physical_model_fit_count", "selection_cache_hit_count",
     ):
         if isinstance(value[field], bool) or not isinstance(value[field], int) or value[field] < 0:
             raise ValueError("alpha plan aggregate cost is invalid")
     if (
-        value["initial_model_fit_count"] != 1
-        or value["initial_coalition_count"] != 1
+        value["initial_model_fit_count"] != 0
+        or value["initial_coalition_count"] != 0
     ):
         raise ValueError("alpha plan initial full-coalition costs are invalid")
     if value["selection_model_fit_count"] != value["initial_model_fit_count"] + sum(
@@ -3682,6 +3981,39 @@ def _validate_alpha_plan(context: StageContext, value: object) -> dict[str, obje
         entry["coalition_count"] for entry in entries
     ):
         raise ValueError("alpha plan aggregate coalition count is invalid")
+    if (
+        value["selection_physical_model_fit_count"]
+        != value["selection_model_fit_count"]
+        or value["selection_physical_model_fit_count"]
+        != sum(entry["physical_model_fit_count"] for entry in entries)
+        or value["selection_cache_hit_count"]
+        != sum(entry["cache_hit_count"] for entry in entries)
+        or value["selection_logical_evaluation_count"]
+        != sum(entry["logical_evaluation_count"] for entry in entries)
+        or value["selection_logical_unique_coalition_count"]
+        > value["selection_logical_evaluation_count"]
+        or value["selection_physical_model_fit_count"]
+        > value["selection_logical_unique_coalition_count"]
+        or value["selection_cache_hit_count"]
+        > value["selection_logical_evaluation_count"]
+        or value["selection_logical_unique_coalition_count"]
+        > sum(
+            entry["logical_unique_coalition_count"] for entry in entries
+        )
+    ):
+        raise ValueError("alpha plan grouped accounting is invalid")
+    group_runtime = value["selection_group_runtime_s"]
+    if (
+        isinstance(group_runtime, bool)
+        or not isinstance(group_runtime, (int, float))
+        or not __import__("math").isfinite(float(group_runtime))
+        or group_runtime < 0
+        or group_runtime + 1e-12
+        < __import__("math").fsum(
+            float(entry["component_runtime_s"]) for entry in entries
+        )
+    ):
+        raise ValueError("alpha plan grouped runtime is invalid")
     return value
 
 
@@ -3695,8 +4027,34 @@ def _read_alpha_plan(context: StageContext) -> dict[str, object]:
     )
 
 
+def _derive_alpha_max_budget_scores(
+    *,
+    feature_count: int,
+    budgets: Sequence[int],
+    exact_scores: Mapping[str, int] | None,
+    random_scores: Mapping[int, Mapping[str, int]] | None,
+    guided_scores: Mapping[int, Mapping[str, int]] | None,
+) -> dict[str, int]:
+    """Derive every authorized checkpoint, then select the maximum budget."""
+    from minppi_mofs.nested_estimation import derive_hybrid_checkpoints
+
+    checkpoints = tuple(budgets)
+    derived = derive_hybrid_checkpoints(
+        feature_count=feature_count,
+        checkpoints=checkpoints,
+        exact_scores=exact_scores,
+        random_scores=random_scores,
+        guided_scores=guided_scores,
+    )
+    return derived[checkpoints[-1]]
+
+
 def _run_alpha_plan(context: StageContext) -> ResultRecord:
-    from minppi_mofs.min_ppi import estimate_minppi_hybrid, make_algorithm_b_perturbation_schedule
+    from minppi_mofs.min_ppi import estimate_minppi_exact
+    from minppi_mofs.nested_estimation import (
+        estimate_guided_checkpoints,
+        estimate_random_checkpoints,
+    )
     from minppi_mofs.shapg_integration import build_mi_correlation_guidance
 
     started_at = _timestamp()
@@ -3710,60 +4068,164 @@ def _run_alpha_plan(context: StageContext) -> ResultRecord:
             relpath=relpath,
             metrics=_alpha_selection_metrics(
                 document,
-                {str(item["alpha_token"]): 0.0 for item in document["entries"]},
+                {
+                    str(item["alpha_token"]): float(
+                        item["component_runtime_s"]
+                    )
+                    for item in document["entries"]
+                },
             ),
         )
     dataset = _task9_authority(context, stage="alpha")
-    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
+    X_train, y_train, X_val, y_val, data_row = (
+        _load_prepared_train_validation(context)
+    )
     features = tuple(X_train.columns)
     budget = max(context.protocol.estimator_budgets)
-    schedule = make_algorithm_b_perturbation_schedule(features, K_adv=budget, seed=context.job.seed)
-    mi_scores, neighbors = build_mi_correlation_guidance(X_train, y_train, task=dataset.task, seed=context.job.seed)
-    cache = _make_job_cache(context, X_train, X_val, y_train, y_val)
-    initial_model_fit_count = int(cache.model_fit_count)
-    initial_coalition_count = int(cache.coalition_count)
+    checkpoint, request, schedules = _alpha_estimator_authority(
+        context, data_row, features
+    )
+    if schedules.guided_schedule is not None:
+        mi_scores, neighbors = build_mi_correlation_guidance(
+            X_train, y_train, task=dataset.task, seed=context.job.seed
+        )
+    else:
+        mi_scores, neighbors = None, None
     entries = []
     selection_times: dict[str, float] = {}
-    for alpha in context.protocol.alpha_grid:
-        alpha_started = time.perf_counter()
-        before_fits = cache.model_fit_count
-        before_coalitions = cache.coalition_count
-        scores = estimate_minppi_hybrid(
-            X_train=X_train, X_val=X_val, y_train=y_train, y_val=y_val,
-            alpha=alpha, task=dataset.task, utility=dataset.utility, K=budget, K_adv=budget,
-            mi_scores=mi_scores, correlation_neighbors=neighbors,
-            perturbation_schedule=schedule, acc_cache=cache, seed=context.job.seed,
-        )
-        ordered_scores = _task9_scores(scores, features)
-        removed = [feature for feature in features if float(scores[feature]) == -1.0]
-        subset = _task9_subset_row(features, removed)
-        validation_utility = float(cache.evaluate(set(subset["retained_features"])))
-        alpha_token = _alpha_token(alpha)
-        selection_times[alpha_token] = time.perf_counter() - alpha_started
-        entries.append(
-            {
-                "alpha": alpha,
-                "alpha_token": alpha_token,
-                "harmful_count": len(removed),
-                "compression": len(removed) / len(features),
-                "validation_utility": validation_utility,
-                "retained_features": subset["retained_features"],
-                "removed_features": subset["removed_features"],
-                "retained_hash": subset["retained_hash"],
-                "model_fit_count": cache.model_fit_count - before_fits,
-                "coalition_count": cache.coalition_count - before_coalitions,
-                "scores": ordered_scores,
-            }
-        )
+    group_logical_coalitions: set[tuple[str, ...]] = set()
+    group_started = time.perf_counter()
+    with _open_selection_cache(
+        context, (X_train, y_train, X_val, y_val), data_row
+    ) as cache:
+        group_before = cache.stats
+        for alpha in context.protocol.alpha_grid:
+            alpha_started = time.perf_counter()
+            alpha_before = cache.stats
+            view = _AlphaCoalitionUtilityView(
+                cache, utility=dataset.utility, alpha=alpha
+            )
+            exact_scores = None
+            random_scores = None
+            guided_scores = None
+            if len(features) <= 20:
+                exact_scores = estimate_minppi_exact(
+                    X_train,
+                    X_val,
+                    y_train,
+                    y_val,
+                    alpha=alpha,
+                    task=dataset.task,
+                    utility=dataset.utility,
+                    acc_cache=view,
+                    seed=context.job.seed,
+                )
+            else:
+                if len(features) > 75:
+                    if schedules.random_schedule is None:
+                        raise RuntimeError(
+                            "alpha random schedule authority is missing"
+                        )
+                    random_scores = estimate_random_checkpoints(
+                        schedules.random_schedule, view
+                    )
+                if schedules.guided_schedule is None:
+                    raise RuntimeError(
+                        "alpha guided schedule authority is missing"
+                    )
+                guided_scores = estimate_guided_checkpoints(
+                    schedules.guided_schedule,
+                    view,
+                    mi_scores=mi_scores,
+                    correlation_neighbors=neighbors,
+                )
+            scores = _derive_alpha_max_budget_scores(
+                feature_count=len(features),
+                budgets=request.budgets,
+                exact_scores=exact_scores,
+                random_scores=random_scores,
+                guided_scores=guided_scores,
+            )
+            ordered_scores = _task9_scores(scores, features)
+            removed = [
+                feature
+                for feature in features
+                if float(scores[feature]) == -1.0
+            ]
+            subset = _task9_subset_row(features, removed)
+            validation_utility = float(
+                view.evaluate(set(subset["retained_features"]))
+            )
+            alpha_after = cache.stats
+            physical_delta = (
+                alpha_after.physical_model_fit_count
+                - alpha_before.physical_model_fit_count
+            )
+            hit_delta = (
+                alpha_after.cache_hit_count - alpha_before.cache_hit_count
+            )
+            coalition_delta = (
+                alpha_after.coalition_count - alpha_before.coalition_count
+            )
+            logical_coalitions = view.logical_coalitions
+            group_logical_coalitions.update(logical_coalitions)
+            alpha_token = _alpha_token(alpha)
+            component_runtime = time.perf_counter() - alpha_started
+            selection_times[alpha_token] = component_runtime
+            entries.append(
+                {
+                    "alpha": alpha,
+                    "alpha_token": alpha_token,
+                    "harmful_count": len(removed),
+                    "compression": len(removed) / len(features),
+                    "validation_utility": validation_utility,
+                    "retained_features": subset["retained_features"],
+                    "removed_features": subset["removed_features"],
+                    "retained_hash": subset["retained_hash"],
+                    "model_fit_count": physical_delta,
+                    "coalition_count": coalition_delta,
+                    "logical_evaluation_count": len(logical_coalitions),
+                    "logical_unique_coalition_count": len(
+                        set(logical_coalitions)
+                    ),
+                    "physical_model_fit_count": physical_delta,
+                    "cache_hit_count": hit_delta,
+                    "component_runtime_s": component_runtime,
+                    "scores": ordered_scores,
+                }
+            )
+        group_after = cache.stats
+    group_runtime = time.perf_counter() - group_started
+    group_physical_fits = (
+        group_after.physical_model_fit_count
+        - group_before.physical_model_fit_count
+    )
+    group_cache_hits = (
+        group_after.cache_hit_count - group_before.cache_hit_count
+    )
+    group_coalition_delta = (
+        group_after.coalition_count - group_before.coalition_count
+    )
     document = {
-        "schema_version": 1, "protocol_hash": context.job.protocol_hash,
+        "schema_version": 2, "protocol_hash": context.job.protocol_hash,
         "job_id": context.job.job_id, "dataset_id": context.job.dataset_id,
         "seed": context.job.seed, "task": dataset.task, "utility": dataset.utility,
         "budget": budget, "features": list(features), "entries": entries,
-        "initial_model_fit_count": initial_model_fit_count,
-        "initial_coalition_count": initial_coalition_count,
-        "selection_model_fit_count": cache.model_fit_count,
-        "selection_coalition_count": cache.coalition_count,
+        "group_request_digest": request.digest,
+        "schedule_digest": checkpoint.schedule_digest,
+        "initial_model_fit_count": 0,
+        "initial_coalition_count": 0,
+        "selection_model_fit_count": group_physical_fits,
+        "selection_coalition_count": group_coalition_delta,
+        "selection_logical_evaluation_count": sum(
+            int(entry["logical_evaluation_count"]) for entry in entries
+        ),
+        "selection_logical_unique_coalition_count": len(
+            group_logical_coalitions
+        ),
+        "selection_physical_model_fit_count": group_physical_fits,
+        "selection_cache_hit_count": group_cache_hits,
+        "selection_group_runtime_s": group_runtime,
     }
     _validate_alpha_plan(context, document)
     _publish_idempotent_json(path, document, context="alpha selection plan")
@@ -3787,6 +4249,9 @@ def _validate_alpha_result(context: StageContext, value: object) -> dict[str, ob
         "full_test_utility", "delta_utility", "preservation", "selection_time_s",
         "evaluation_time_s", "selection_model_fit_count",
         "selection_coalition_count", "evaluation_model_fit_count",
+        "selection_logical_evaluation_count",
+        "selection_logical_unique_coalition_count",
+        "selection_physical_model_fit_count", "selection_cache_hit_count",
     }
     if not isinstance(value, dict) or set(value) != expected:
         raise ValueError("alpha result artifact schema is invalid")
@@ -3814,6 +4279,13 @@ def _validate_alpha_result(context: StageContext, value: object) -> dict[str, ob
         != plan_record.metrics[f"{entry['alpha_token']}_selection_time_s"]
         or value["selection_model_fit_count"] != entry["model_fit_count"]
         or value["selection_coalition_count"] != entry["coalition_count"]
+        or value["selection_logical_evaluation_count"]
+        != entry["logical_evaluation_count"]
+        or value["selection_logical_unique_coalition_count"]
+        != entry["logical_unique_coalition_count"]
+        or value["selection_physical_model_fit_count"]
+        != entry["physical_model_fit_count"]
+        or value["selection_cache_hit_count"] != entry["cache_hit_count"]
         or value["evaluation_model_fit_count"] != expected_evaluation_fits
     ):
         raise ValueError("alpha result counters or selection time are not exact")
@@ -3841,6 +4313,9 @@ def _validate_alpha_result(context: StageContext, value: object) -> dict[str, ob
         raise ValueError("alpha result preservation is invalid")
     for field in (
         "selection_model_fit_count", "selection_coalition_count",
+        "selection_logical_evaluation_count",
+        "selection_logical_unique_coalition_count",
+        "selection_physical_model_fit_count", "selection_cache_hit_count",
         "evaluation_model_fit_count",
     ):
         if isinstance(value[field], bool) or not isinstance(value[field], int) or value[field] < 0:
@@ -3900,6 +4375,16 @@ def _run_alpha_evaluation(context: StageContext) -> ResultRecord:
         "evaluation_time_s": evaluation_time,
         "selection_model_fit_count": int(entry["model_fit_count"]),
         "selection_coalition_count": int(entry["coalition_count"]),
+        "selection_logical_evaluation_count": int(
+            entry["logical_evaluation_count"]
+        ),
+        "selection_logical_unique_coalition_count": int(
+            entry["logical_unique_coalition_count"]
+        ),
+        "selection_physical_model_fit_count": int(
+            entry["physical_model_fit_count"]
+        ),
+        "selection_cache_hit_count": int(entry["cache_hit_count"]),
         "evaluation_model_fit_count": sum(bool(key) for key in cache),
     }
     _validate_alpha_result(context, document)
