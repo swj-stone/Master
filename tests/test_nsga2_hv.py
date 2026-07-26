@@ -171,9 +171,135 @@ def test_initial_population_only_is_a_complete_exact_budget_schedule(
         ref_point=(1.1, 1.1),
     )
 
-    assert evaluations == 4
+    assert result.logical_evaluation_count == 4
+    assert evaluations == result.unique_subset_count
+    assert result.memoization_hit_count == 4 - evaluations
     assert result.hv_history == []
     assert result.converged_gen == 0
+
+
+def test_duplicate_masks_are_evaluated_once_without_changing_logical_count() -> None:
+    X = pd.DataFrame(
+        {"f0": [0.0, 1.0], "f1": [1.0, 0.0]}
+    )
+    calls: list[tuple[str, ...]] = []
+
+    def utility_evaluator(selected: tuple[str, ...]) -> float:
+        calls.append(selected)
+        return 0.5 + 0.1 * len(selected)
+
+    result = nsga2_feature_selection(
+        X,
+        np.array([0, 1]),
+        X,
+        np.array([0, 1]),
+        pop_size=4,
+        max_gen=1,
+        seed=42,
+        utility_evaluator=utility_evaluator,
+    )
+
+    assert result.logical_evaluation_count == 8
+    assert result.unique_subset_count == len(calls) == len(set(calls))
+    assert result.unique_subset_count <= 4
+    assert result.memoization_hit_count == 8 - result.unique_subset_count
+    assert all(
+        selected == tuple(feature for feature in X if feature in selected)
+        for selected in calls
+    )
+
+
+def test_callback_memoization_preserves_complete_evolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    X = pd.DataFrame(
+        {
+            "f0": [0.0, 1.0],
+            "f1": [1.0, 0.0],
+            "f2": [0.5, 0.5],
+        }
+    )
+
+    def utility(selected: tuple[str, ...]) -> float:
+        return 0.4 + 0.1 * len(selected) + (
+            0.05 if "f0" in selected else 0.0
+        )
+
+    monkeypatch.setattr(
+        nsga2_module,
+        "evaluate_fixed_subset",
+        lambda *args, **_kwargs: utility(tuple(args[4])),
+    )
+    common = {
+        "pop_size": 6,
+        "max_gen": 3,
+        "seed": 17,
+        "ref_point": (1.1, 1.1),
+    }
+    legacy = nsga2_feature_selection(
+        X, np.array([0, 1]), X, np.array([0, 1]), **common
+    )
+    callback = nsga2_feature_selection(
+        X,
+        np.array([0, 1]),
+        X,
+        np.array([0, 1]),
+        utility_evaluator=utility,
+        **common,
+    )
+
+    assert [
+        (mask.tolist(), fitness)
+        for mask, fitness in callback.pareto_front
+    ] == [
+        (mask.tolist(), fitness)
+        for mask, fitness in legacy.pareto_front
+    ]
+    assert callback.hv == legacy.hv
+    assert callback.hv_history == legacy.hv_history
+    assert callback.converged_gen == legacy.converged_gen
+    assert callback.logical_evaluation_count == (
+        legacy.logical_evaluation_count
+    )
+
+
+def test_formal_population_and_generation_schedule_keeps_800_logical_evaluations() -> None:
+    X = pd.DataFrame(
+        {f"f{index}": [0.0, 1.0] for index in range(6)}
+    )
+    result = nsga2_feature_selection(
+        X,
+        np.array([0, 1]),
+        X,
+        np.array([0, 1]),
+        pop_size=40,
+        max_gen=19,
+        seed=42,
+        utility_evaluator=lambda selected: 0.5,
+    )
+
+    assert result.logical_evaluation_count == 800
+    assert result.logical_evaluation_count == (
+        result.unique_subset_count + result.memoization_hit_count
+    )
+
+
+def test_initial_all_unique_masks_have_no_memoization_hits() -> None:
+    X = pd.DataFrame({"f0": [0.0, 1.0]})
+    result = nsga2_feature_selection(
+        X,
+        np.array([0, 1]),
+        X,
+        np.array([0, 1]),
+        pop_size=2,
+        max_gen=0,
+        seed=42,
+        utility_evaluator=lambda selected: 0.5 + 0.1 * len(selected),
+    )
+
+    assert result.logical_evaluation_count == 2
+    assert result.unique_subset_count == 2
+    assert result.memoization_hit_count == 0
 
 
 # ---------------------------------------------------------------------------

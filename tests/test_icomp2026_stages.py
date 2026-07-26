@@ -2293,6 +2293,11 @@ def _single_random_group_request(
 def _completed_estimator_authority_setup(
     tmp_path: Path,
     smoke_protocol,
+    *,
+    consumer_stage: str = "removal",
+    ablation_axis: str | None = None,
+    ablation_value: str | None = None,
+    estimator_method: str = "hybrid",
 ) -> tuple[StageContext, EstimatorCheckpoint, JobSpec]:
     protocol, _ = _synthetic_stage_protocol(tmp_path, smoke_protocol)
     protocol = replace(
@@ -2328,7 +2333,11 @@ def _completed_estimator_authority_setup(
         + build_job_manifest(
             protocol, stages=("estimator",), data_manifest=projection
         )
-        + build_job_manifest(protocol, stages=("removal",))
+        + build_job_manifest(
+            protocol,
+            stages=(consumer_stage,),
+            data_manifest=projection if consumer_stage == "ablation" else None,
+        )
     )
     status = StatusStore(layout, manifest)
     contexts = _contexts(protocol, layout, manifest, status)
@@ -2338,14 +2347,23 @@ def _completed_estimator_authority_setup(
     stage_module.run_preprocess_job(
         next(item for item in contexts if item.job.stage == "preprocess")
     )
-    removal_context = next(
-        item
-        for item in contexts
-        if item.job.stage == "removal"
-        and item.job.method == "selection_plan"
-    )
+    if consumer_stage == "removal":
+        consumer_context = next(
+            item
+            for item in contexts
+            if item.job.stage == "removal"
+            and item.job.method == "selection_plan"
+        )
+    else:
+        consumer_context = next(
+            item
+            for item in contexts
+            if item.job.stage == consumer_stage
+            and item.job.method == ablation_axis
+            and item.job.parameters.get("value") == ablation_value
+        )
     X_train, _, _, _, row = stage_module._load_prepared_train_validation(
-        removal_context
+        consumer_context
     )
     features = tuple(str(feature) for feature in X_train.columns)
     budget = max(protocol.estimator_budgets)
@@ -2353,13 +2371,13 @@ def _completed_estimator_authority_setup(
         job
         for job in manifest
         if job.stage == "estimator"
-        and job.dataset_id == removal_context.job.dataset_id
-        and job.seed == removal_context.job.seed
-        and job.method == "hybrid"
+        and job.dataset_id == consumer_context.job.dataset_id
+        and job.seed == consumer_context.job.seed
+        and job.method == estimator_method
         and job.parameters["budget"] == budget
     )
     estimator_context = StageContext(
-        protocol, layout, estimator_job, status, removal_context.audit
+        protocol, layout, estimator_job, status, consumer_context.audit
     )
     request = stage_module.group_request_from_context(
         estimator_context, row, features
@@ -2413,11 +2431,11 @@ def _completed_estimator_authority_setup(
     checkpoint = next(
         item
         for item in checkpoints
-        if item.method == "hybrid" and item.budget == budget
+        if item.method == estimator_method and item.budget == budget
     )
     score_relpath = (
         f"estimator/{estimator_job.dataset_id}/s{estimator_job.seed}/"
-        f"hybrid/b{budget}/scores.json"
+        f"{estimator_method}/b{budget}/scores.json"
     )
     score_document = {
         "protocol_hash": estimator_job.protocol_hash,
@@ -2482,7 +2500,7 @@ def _completed_estimator_authority_setup(
     atomic_write_json(result_path, asdict(record))
     status.start(estimator_job.job_id)
     status.succeed(estimator_job.job_id)
-    return removal_context, checkpoint, estimator_job
+    return consumer_context, checkpoint, estimator_job
 
 
 def test_completed_estimator_checkpoint_returns_frozen_validated_authority(
@@ -2723,12 +2741,14 @@ def test_grouped_estimator_job_projects_bundle_checkpoint(
         frames: object,
         run_root: Path,
         progress_sink,
+        build_owner_job_id: str,
     ) -> EstimatorBundle:
         ensure_contract.update(
             request=request,
             frames=frames,
             run_root=run_root,
             progress_sink=progress_sink,
+            build_owner_job_id=build_owner_job_id,
         )
         progress_sink(progress_event)
         return bundle
@@ -2753,6 +2773,7 @@ def test_grouped_estimator_job_projects_bundle_checkpoint(
         id(item) for item in ensure_contract["frames"]  # type: ignore[union-attr]
     ) == tuple(id(item) for item in prepared[:4])
     assert ensure_contract["run_root"] == context.layout.root
+    assert ensure_contract["build_owner_job_id"] == context.job.job_id
     assert callable(ensure_contract["progress_sink"])
     assert emitted == [(context.layout.log_path, progress_event)]
     assert result.metrics == {
@@ -3387,6 +3408,16 @@ def test_utility_ablation_publishes_and_reuses_one_shared_cache_pair(
     assert set(payload["scores"]) == {"accuracy", "ovr_auc"}
     assert payload["secondary_model_fit_delta"] == 0
     assert payload["secondary_coalition_delta"] == 0
+    assert payload["prediction_digests"]["accuracy"] == payload[
+        "prediction_digests"
+    ]["ovr_auc"]
+    assert len(payload["prediction_records"]) == payload[
+        "shared_group_coalition_count"
+    ]
+    assert all(
+        set(item) == {"coalition", "prediction_sha256"}
+        for item in payload["prediction_records"]
+    )
     assert payload["shared_group_model_fit_count"] == accuracy.metrics[
         "shared_group_model_fit_count"
     ]
@@ -3429,72 +3460,186 @@ def test_utility_ablation_reuse_rejects_manifest_feature_order_conflict(
         stage_module.run_ablation_job(utility_contexts["ovr_auc"])
 
 
-def test_guidance_ablation_maps_components_with_equal_budget_seed_and_schedule(
-    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "method",
+    ["exact", "random_mc", "mi_correlation_guided", "hybrid"],
+)
+def test_dispatcher_ablation_projects_completed_max_budget_checkpoint(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
 ) -> None:
-    layout, contexts, prepared = _tiny_ablation_setup(tmp_path, smoke_protocol)
-    monkeypatch.setattr(
-        stage_module, "_load_prepared_train_validation", lambda context: prepared
+    context, checkpoint, _ = _completed_estimator_authority_setup(
+        tmp_path,
+        smoke_protocol,
+        consumer_stage="ablation",
+        ablation_axis="dispatcher",
+        ablation_value=method,
+        estimator_method=method,
     )
-    mi = {f"f{i}": float(4 - i) for i in range(4)}
-    neighbors = {f"f{i}": [f"f{(i + 1) % 4}"] for i in range(4)}
-    monkeypatch.setattr(
-        guidance_module, "compute_mi_guidance_signal", lambda *args, **kwargs: mi
-    )
-    monkeypatch.setattr(
-        guidance_module, "get_correlation_neighbors", lambda *args, **kwargs: neighbors
-    )
-    monkeypatch.setattr(
-        guidance_module,
-        "build_mi_correlation_guidance",
-        lambda *args, **kwargs: (mi, neighbors),
-    )
-    calls: list[dict[str, object]] = []
 
-    def fake_algorithm_b(*args, **kwargs):
-        calls.append(kwargs)
-        value = (
-            1
-            if kwargs["mi_scores"] is None and kwargs["correlation_neighbors"] is None
-            else 0
-            if kwargs["correlation_neighbors"] is None
-            else -1
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("dispatcher ablation recomputed a completed estimator")
+
+    for name in (
+        "estimate_minppi_exact",
+        "estimate_minppi_random_mc",
+        "estimate_minppi_mi_correlation_guided",
+        "estimate_minppi_hybrid",
+    ):
+        monkeypatch.setattr(min_ppi_module, name, forbidden)
+    monkeypatch.setattr(stage_module, "_make_job_cache", forbidden)
+
+    record = stage_module.run_ablation_job(context)
+    payload = json.loads(
+        (context.layout.root / record.artifacts["scores"]).read_text(
+            encoding="utf-8"
         )
-        return {feature: value for feature in kwargs["X_train"].columns}
+    )
+
+    assert payload["job_id"] == context.job.job_id
+    assert payload["scores"] == [
+        {"feature": feature, "score": score}
+        for feature, score in checkpoint.scores
+    ]
+    assert payload["logical_evaluation_count"] == (
+        checkpoint.logical_evaluation_count
+    )
+    assert payload["logical_unique_coalition_count"] == (
+        checkpoint.logical_unique_coalition_count
+    )
+    assert payload["physical_model_fit_count"] == 0
+    assert record.metrics["physical_model_fit_count"] == 0
+    assert stage_module._validate_summary_ablation_artifact(
+        context,
+        record,
+        tuple(feature for feature, _score in checkpoint.scores),
+    ) == payload
+
+
+def test_mi_correlation_guidance_projects_completed_guided_checkpoint(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context, checkpoint, _ = _completed_estimator_authority_setup(
+        tmp_path,
+        smoke_protocol,
+        consumer_stage="ablation",
+        ablation_axis="guidance",
+        ablation_value="mi_correlation",
+        estimator_method="mi_correlation_guided",
+    )
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("MI/correlation guidance recomputed a completed checkpoint")
 
     monkeypatch.setattr(
-        min_ppi_module, "estimate_minppi_mi_correlation_guided", fake_algorithm_b
+        min_ppi_module, "estimate_minppi_mi_correlation_guided", forbidden
     )
-    guidance_contexts = [item for item in contexts if item.job.method == "guidance"]
-    records = [stage_module.run_ablation_job(item) for item in guidance_contexts]
+    monkeypatch.setattr(
+        guidance_module, "build_mi_correlation_guidance", forbidden
+    )
+    monkeypatch.setattr(stage_module, "_make_job_cache", forbidden)
 
-    expected = {
-        "random": (None, None),
-        "mi": (mi, None),
-        "correlation": (None, neighbors),
-        "mi_correlation": (mi, neighbors),
-    }
-    by_value = {item.job.parameters["value"]: item for item in guidance_contexts}
-    schedule_digests: set[str] = set()
-    schedules: list[object] = []
-    for call, record in zip(calls, records, strict=True):
-        value = record.metrics["value"]
-        assert (call["mi_scores"], call["correlation_neighbors"]) == expected[value]
-        assert call["K_adv"] == record.metrics["budget"] == 2
-        assert call["seed"] == by_value[value].job.seed == 42
-        schedules.append(call["perturbation_schedule"])
-        payload = json.loads(
-            (layout.root / record.artifacts["scores"]).read_text(encoding="utf-8")
+    record = stage_module.run_ablation_job(context)
+    payload = json.loads(
+        (context.layout.root / record.artifacts["scores"]).read_text(
+            encoding="utf-8"
         )
-        assert payload["value"] == value
-        assert payload["budget"] == 2
-        assert payload["schedule_seed"] == 42
-        schedule_digests.add(payload["schedule_digest"])
-        assert payload["method"] == "mi_correlation_guided"
-        assert payload["model_fit_count"] >= 1
-        assert payload["coalition_count"] >= 1
-    assert len(schedule_digests) == 1
-    assert all(schedule == schedules[0] for schedule in schedules)
+    )
+
+    assert payload["scores"] == [
+        {"feature": feature, "score": score}
+        for feature, score in checkpoint.scores
+    ]
+    assert payload["schedule_digest"] == checkpoint.schedule_digest
+    assert payload["physical_model_fit_count"] == 0
+    assert record.metrics["physical_model_fit_count"] == 0
+
+
+@pytest.mark.parametrize("value", ["random", "mi", "correlation"])
+def test_remaining_guidance_uses_selection_cache_with_exact_warm_and_partial_deltas(
+    tmp_path: Path,
+    smoke_protocol,
+    value: str,
+) -> None:
+    context, checkpoint, _ = _completed_estimator_authority_setup(
+        tmp_path,
+        smoke_protocol,
+        consumer_stage="ablation",
+        ablation_axis="guidance",
+        ablation_value=value,
+        estimator_method="mi_correlation_guided",
+    )
+
+    cold = stage_module.run_ablation_job(context)
+    artifact = context.layout.root / cold.artifacts["scores"]
+    cold_payload = json.loads(artifact.read_text(encoding="utf-8"))
+    assert cold_payload["physical_model_fit_count"] > 0
+    assert cold_payload["schedule_digest"] == checkpoint.schedule_digest
+
+    artifact.unlink()
+    warm = stage_module.run_ablation_job(context)
+    warm_payload = json.loads(
+        (context.layout.root / warm.artifacts["scores"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert warm_payload["scores"] == cold_payload["scores"]
+    assert warm_payload["physical_model_fit_count"] == 0
+    assert warm_payload["cache_hit_count"] > 0
+
+    features = tuple(feature for feature, _score in checkpoint.scores)
+    cache_path = (
+        context.layout.cache_root
+        / "selection_validation"
+        / context.job.dataset_id
+        / f"s{context.job.seed}"
+        / "coalitions.sqlite3"
+    )
+    coalition_key = json.dumps(
+        list(features), ensure_ascii=False, separators=(",", ":")
+    )
+    with sqlite3.connect(cache_path) as connection:
+        deleted = connection.execute(
+            "DELETE FROM coalition_utility WHERE coalition_key = ?",
+            (coalition_key,),
+        ).rowcount
+    assert deleted == 1
+    (context.layout.root / warm.artifacts["scores"]).unlink()
+
+    partial = stage_module.run_ablation_job(context)
+    partial_payload = json.loads(
+        (context.layout.root / partial.artifacts["scores"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert partial_payload["scores"] == cold_payload["scores"]
+    assert partial_payload["physical_model_fit_count"] == 1
+
+
+def test_dispatcher_ablation_rejects_published_schedule_digest_tamper(
+    tmp_path: Path,
+    smoke_protocol,
+) -> None:
+    context, _, _ = _completed_estimator_authority_setup(
+        tmp_path,
+        smoke_protocol,
+        consumer_stage="ablation",
+        ablation_axis="dispatcher",
+        ablation_value="random_mc",
+        estimator_method="random_mc",
+    )
+    record = stage_module.run_ablation_job(context)
+    artifact = context.layout.root / record.artifacts["scores"]
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+    payload["schedule_digest"] = "f" * 64
+    atomic_write_json(artifact, payload)
+
+    with pytest.raises(ValueError, match="schedule|digest|ablation"):
+        stage_module.run_ablation_job(context)
 
 
 def test_estimator_artifact_is_identical_across_python_hash_seeds(tmp_path: Path) -> None:
@@ -3571,54 +3716,11 @@ print(json.dumps({
     assert outputs[0] == outputs[1]
 
 
-def test_dispatcher_ablation_maps_direct_estimators_and_exact_is_manifest_gated(
-    tmp_path: Path, smoke_protocol, monkeypatch: pytest.MonkeyPatch
+def test_dispatcher_exact_ablation_is_manifest_gated(
+    tmp_path: Path, smoke_protocol
 ) -> None:
-    layout, contexts, prepared = _tiny_ablation_setup(tmp_path, smoke_protocol)
-    monkeypatch.setattr(
-        stage_module, "_load_prepared_train_validation", lambda context: prepared
-    )
-    calls: list[tuple[str, dict[str, object]]] = []
-
-    def fake(name: str, score: int):
-        def run(*args, **kwargs):
-            calls.append((name, kwargs))
-            return {feature: score for feature in kwargs["X_train"].columns}
-        return run
-
-    monkeypatch.setattr(min_ppi_module, "estimate_minppi_exact", fake("exact", 1))
-    monkeypatch.setattr(min_ppi_module, "estimate_minppi_random_mc", fake("random_mc", 0))
-    monkeypatch.setattr(
-        min_ppi_module,
-        "estimate_minppi_mi_correlation_guided",
-        fake("mi_correlation_guided", -1),
-    )
-    monkeypatch.setattr(min_ppi_module, "estimate_minppi_hybrid", fake("hybrid", 0))
-    monkeypatch.setattr(
-        guidance_module,
-        "build_mi_correlation_guidance",
-        lambda *args, **kwargs: ({"f0": 1.0}, {"f0": ["f1"]}),
-    )
+    _, contexts, _ = _tiny_ablation_setup(tmp_path, smoke_protocol)
     dispatcher_contexts = [item for item in contexts if item.job.method == "dispatcher"]
-    records = [stage_module.run_ablation_job(item) for item in dispatcher_contexts]
-
-    assert [name for name, _ in calls] == [
-        item.job.parameters["value"] for item in dispatcher_contexts
-    ]
-    for (name, call), record in zip(calls, records, strict=True):
-        assert record.metrics["value"] == name
-        assert record.metrics["budget"] == 2
-        if name == "random_mc":
-            assert call["K"] == 2
-        elif name == "mi_correlation_guided":
-            assert call["K_adv"] == 2
-        elif name == "hybrid":
-            assert call["K"] == call["K_adv"] == 2
-        payload = json.loads(
-            (layout.root / record.artifacts["scores"]).read_text(encoding="utf-8")
-        )
-        assert payload["value"] == name
-
     exact_context = next(
         item
         for item in dispatcher_contexts
@@ -5156,7 +5258,198 @@ def _task10_contexts_with_frozen_removal(
     return layout, nsga_contexts, plan_record
 
 
-def test_nsga2_jobs_freeze_both_fair_fronts_before_test_and_retrain_every_mask(
+class _Task7OpenedCache:
+    def __init__(self, cache: _Task9FakeCache, namespace: str) -> None:
+        self.cache = cache
+        self.namespace = namespace
+        self.closed = False
+
+    def __enter__(self):
+        assert not self.closed
+        return self.cache
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.closed = True
+
+
+def _task7_fake_search(X_train, y_train, X_val, y_val, **kwargs):
+    from minppi_mofs.baselines.nsga2_fs import NSGA2Result
+
+    evaluator = kwargs["utility_evaluator"]
+    features = tuple(X_train.columns)
+    subsets = (
+        (),
+        features[:1],
+        features[1:2],
+        features[:2],
+    )
+    for selected in subsets:
+        evaluator(selected)
+    small = np.zeros(len(features), dtype=int)
+    large = np.zeros(len(features), dtype=int)
+    small[0] = 1
+    large[: min(2, len(features))] = 1
+    denominator = kwargs["cardinality_denominator"]
+    front = [
+        (small, (float(small.sum()) / denominator, 0.4)),
+        (large, (float(large.sum()) / denominator, 0.2)),
+    ]
+    points = np.asarray([item[1] for item in front])
+    return NSGA2Result(
+        pareto_front=front,
+        hv=stage_module._compute_hv(points, np.asarray(kwargs["ref_point"])),
+        runtime_s=1.0,
+        converged_gen=1,
+        hv_history=[0.1],
+        logical_evaluation_count=8,
+        unique_subset_count=4,
+        memoization_hit_count=4,
+    )
+
+
+def test_nsga_search_uses_selection_cache_only(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, contexts, _ = _task10_contexts_with_frozen_removal(
+        tmp_path, smoke_protocol, monkeypatch
+    )
+    prepared = _task9_evaluation_loader(("f0", "f1", "f2", "f3"))
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda _context: prepared
+    )
+    selection_cache = _Task9FakeCache(tuple(prepared[0].columns))
+    opened: list[_Task7OpenedCache] = []
+
+    def open_selection(*_args, **_kwargs):
+        wrapper = _Task7OpenedCache(selection_cache, "selection_validation")
+        opened.append(wrapper)
+        return wrapper
+
+    monkeypatch.setattr(stage_module, "_open_selection_cache", open_selection)
+    monkeypatch.setattr(
+        stage_module,
+        "_open_final_test_cache",
+        lambda *_args, **_kwargs: pytest.fail(
+            "validation search opened the final-test cache"
+        ),
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "_task9_load_test",
+        lambda *_args, **_kwargs: pytest.fail(
+            "validation search accessed audited test data"
+        ),
+    )
+    monkeypatch.setattr(
+        stage_module, "nsga2_feature_selection", _task7_fake_search
+    )
+
+    documents, _, _ = stage_module._ensure_nsga2_fronts(contexts[0])
+
+    assert [wrapper.namespace for wrapper in opened] == [
+        "selection_validation",
+        "selection_validation",
+    ]
+    assert all(wrapper.closed for wrapper in opened)
+    assert [document["logical_evaluation_count"] for document in documents.values()] == [
+        8,
+        8,
+    ]
+    assert [document["unique_subset_count"] for document in documents.values()] == [
+        4,
+        4,
+    ]
+    assert [document["memoization_hit_count"] for document in documents.values()] == [
+        4,
+        4,
+    ]
+
+
+def test_nsga_final_front_opens_test_cache_after_both_fronts_are_frozen(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    layout, contexts, _ = _task10_contexts_with_frozen_removal(
+        tmp_path, smoke_protocol, monkeypatch
+    )
+    prepared = _task9_evaluation_loader(("f0", "f1", "f2", "f3"))
+    monkeypatch.setattr(
+        stage_module, "_load_prepared_train_validation", lambda _context: prepared
+    )
+    selection_cache = _Task9FakeCache(tuple(prepared[0].columns))
+    final_cache = _Task9FakeCache(tuple(prepared[0].columns))
+    monkeypatch.setattr(
+        stage_module,
+        "_open_selection_cache",
+        lambda *_args, **_kwargs: _Task7OpenedCache(
+            selection_cache, "selection_validation"
+        ),
+    )
+    monkeypatch.setattr(
+        stage_module, "nsga2_feature_selection", _task7_fake_search
+    )
+    audit_reads: list[str] = []
+
+    def load_test(context, row, *, reason):
+        audit_reads.append(reason)
+        return prepared[0].iloc[:4].reset_index(drop=True), prepared[1][:4]
+
+    monkeypatch.setattr(stage_module, "_task9_load_test", load_test)
+    opened: list[_Task7OpenedCache] = []
+
+    def open_final(context, train_val, test, row, reason):
+        assert test is None
+        assert all(
+            (
+                layout.root
+                / (
+                    f"nsga2/{context.job.dataset_id}/s{context.job.seed}/"
+                    f"{variant}/validation_front.json"
+                )
+            ).exists()
+            for variant in ("full", "minppi_prefilter")
+        )
+        load_test(context, row, reason=reason)
+        wrapper = _Task7OpenedCache(final_cache, "final_test")
+        opened.append(wrapper)
+        return wrapper
+
+    monkeypatch.setattr(stage_module, "_open_final_test_cache", open_final)
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda *_args, **_kwargs: pytest.fail(
+            "final front bypassed the final-test cache"
+        ),
+    )
+
+    record = stage_module.run_nsga2_job(contexts[0])
+    document = json.loads(
+        (layout.root / record.artifacts["results"]).read_text(encoding="utf-8")
+    )
+
+    assert audit_reads == ["final_nsga2_front_evaluation"]
+    assert [wrapper.namespace for wrapper in opened] == ["final_test"]
+    assert opened[0].closed
+    assert document["evaluation_count"] == 8
+    assert document["logical_evaluation_count"] == 8
+    assert document["final_front_evaluation_count"] == len(
+        document["validation_front"]
+    )
+    assert document["validation_front"] == [
+        {
+            "mask": entry["mask"],
+            "selected_features": entry["selected_features"],
+            "objectives": entry["objectives"],
+        }
+        for entry in document["validation_front"]
+    ]
+
+
+def test_nsga2_jobs_freeze_both_fair_fronts_before_cached_test_evaluation(
     tmp_path: Path,
     smoke_protocol,
     monkeypatch: pytest.MonkeyPatch,
@@ -5192,6 +5485,9 @@ def test_nsga2_jobs_freeze_both_fair_fronts_before_test_and_retrain_every_mask(
             runtime_s=1.0 if dimension == 4 else 2.0,
             converged_gen=1,
             hv_history=[0.1],
+            logical_evaluation_count=8,
+            unique_subset_count=4,
+            memoization_hit_count=4,
         )
 
     monkeypatch.setattr(stage_module, "nsga2_feature_selection", search, raising=False)
@@ -5209,14 +5505,40 @@ def test_nsga2_jobs_freeze_both_fair_fronts_before_test_and_retrain_every_mask(
 
     monkeypatch.setattr(stage_module, "_task9_load_test", load_test)
     evaluated: list[tuple[int, tuple[str, ...], str, str]] = []
+    final_cache = _Task9FakeCache(tuple(prepared[0].columns))
+    real_evaluate = final_cache.evaluate
 
-    def evaluate(X_train_val, y_train_val, X_test, y_test, features, **kwargs):
+    def evaluate(features, utility):
         evaluated.append(
-            (len(X_train_val), tuple(features), kwargs["utility"], kwargs["backend"])
+            (
+                12,
+                tuple(
+                    feature
+                    for feature in final_cache.feature_order
+                    if feature in features
+                ),
+                utility,
+                smoke_protocol.backend,
+            )
         )
-        return 0.55 + 0.1 * len(features)
+        return real_evaluate(features, utility)
 
-    monkeypatch.setattr(stage_module, "evaluate_fixed_subset", evaluate)
+    final_cache.evaluate = evaluate
+
+    def open_final(context, train_val, test, row, reason):
+        assert len(train_val[0]) == len(train_val[1]) == 12
+        assert test is None
+        load_test(context, row, reason=reason)
+        return _Task7OpenedCache(final_cache, "final_test")
+
+    monkeypatch.setattr(stage_module, "_open_final_test_cache", open_final)
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda *_args, **_kwargs: pytest.fail(
+            "NSGA-II final evaluation bypassed the final-test cache"
+        ),
+    )
     records = [stage_module.run_nsga2_job(context) for context in contexts]
 
     assert [columns for columns, _ in search_calls] == [
@@ -5243,7 +5565,12 @@ def test_nsga2_jobs_freeze_both_fair_fronts_before_test_and_retrain_every_mask(
         for record in records
     ]
     assert [document["evaluation_count"] for document in documents] == [8, 8]
+    assert [document["logical_evaluation_count"] for document in documents] == [8, 8]
+    assert [document["unique_subset_count"] for document in documents] == [4, 4]
+    assert [document["memoization_hit_count"] for document in documents] == [4, 4]
     assert [document["convergence_evaluation_count"] for document in documents] == [8, 8]
+    assert [document["evaluation_model_fit_count"] for document in documents] == [2, 1]
+    assert [document["evaluation_cache_hit_count"] for document in documents] == [0, 1]
     assert documents[0]["dimensional_reduction"] == 0.0
     assert documents[1]["dimensional_reduction"] == 0.5
     assert documents[0]["minppi_selection_time_s"] == 0.0
@@ -5347,6 +5674,9 @@ def test_nsga2_stage_allows_initial_population_only_exact_budget(
             runtime_s=0.1,
             converged_gen=0,
             hv_history=[],
+            logical_evaluation_count=4,
+            unique_subset_count=1,
+            memoization_hit_count=3,
         )
 
     monkeypatch.setattr(stage_module, "nsga2_feature_selection", search)
@@ -5359,7 +5689,11 @@ def test_nsga2_stage_allows_initial_population_only_exact_budget(
         ),
     )
     monkeypatch.setattr(
-        stage_module, "evaluate_fixed_subset", lambda *args, **kwargs: 0.7
+        stage_module,
+        "_open_final_test_cache",
+        lambda context, train_val, test, row, reason: _Task7OpenedCache(
+            _Task9FakeCache(tuple(prepared[0].columns)), "final_test"
+        ),
     )
 
     record = stage_module.run_nsga2_job(contexts[0])
@@ -7072,7 +7406,15 @@ def test_summary_ablation_metrics_are_exact_and_artifact_bound() -> None:
             document=utility_document,
         )
 
-    single_document = {"budget": 10, "model_fit_count": 5, "coalition_count": 6}
+    single_document = {
+        "budget": 10,
+        "model_fit_count": 5,
+        "coalition_count": 6,
+        "logical_evaluation_count": 8,
+        "logical_unique_coalition_count": 6,
+        "physical_model_fit_count": 5,
+        "cache_hit_count": 2,
+    }
     single_metrics = {
         "axis": "guidance", "value": "mi", **single_document,
     }
@@ -7165,6 +7507,10 @@ def test_ablation_artifact_outcomes_are_published_to_raw_and_aggregate_tables(
         "budget": budget,
         "model_fit_count": 2,
         "coalition_count": 3,
+        "logical_evaluation_count": 5,
+        "logical_unique_coalition_count": 3,
+        "physical_model_fit_count": 2,
+        "cache_hit_count": 1,
         "scores": [
             {"feature": "f0", "score": -1},
             {"feature": "f1", "score": 0},
@@ -7189,10 +7535,14 @@ def test_ablation_artifact_outcomes_are_published_to_raw_and_aggregate_tables(
     records = {
         jobs[0].job_id: replace(
             _result(jobs[0]),
-            metrics={
-                "axis": "guidance", "value": "mi", "budget": budget,
-                "model_fit_count": 2, "coalition_count": 3,
-            },
+                metrics={
+                    "axis": "guidance", "value": "mi", "budget": budget,
+                    "model_fit_count": 2, "coalition_count": 3,
+                    "logical_evaluation_count": 5,
+                    "logical_unique_coalition_count": 3,
+                    "physical_model_fit_count": 2,
+                    "cache_hit_count": 1,
+                },
         ),
         jobs[1].job_id: replace(
             _result(jobs[1]),

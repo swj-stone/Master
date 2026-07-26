@@ -1766,6 +1766,7 @@ def test_interrupted_ensure_resumes_committed_cache_without_cold_refit(
             frames=frames,
             run_root=interrupted_root,
             progress_sink=lambda event: None,
+            build_owner_job_id="a" * 64,
             fit_hook=stop_after_51,
         )
 
@@ -1786,6 +1787,9 @@ def test_interrupted_ensure_resumes_committed_cache_without_cold_refit(
             progress_path, context="interrupted estimator progress"
         )
     )
+    assert interrupted_progress.build_owner_run_id == interrupted_root.name
+    assert interrupted_progress.build_owner_job_id == "a" * 64
+    assert interrupted_progress.initial_fitted_entry_count == 0
     with sqlite3.connect(cache_path) as connection:
         first_entry_count = connection.execute(
             "SELECT COUNT(*) FROM coalition_utility"
@@ -1799,6 +1803,7 @@ def test_interrupted_ensure_resumes_committed_cache_without_cold_refit(
         frames=frames,
         run_root=interrupted_root,
         progress_sink=lambda event: None,
+        build_owner_job_id="a" * 64,
         fit_hook=None,
     )
     resumed_physical_fits = len(physical_fits) - before_resume
@@ -1815,6 +1820,7 @@ def test_interrupted_ensure_resumes_committed_cache_without_cold_refit(
         frames=frames,
         run_root=cold_root,
         progress_sink=lambda event: None,
+        build_owner_job_id="b" * 64,
         fit_hook=None,
     )
     cold_physical_fits = len(physical_fits) - before_cold
@@ -1840,6 +1846,19 @@ def test_interrupted_ensure_resumes_committed_cache_without_cold_refit(
         >= interrupted_progress.event.elapsed_s
     )
     assert final_progress.event.algorithm == "complete"
+    assert (
+        final_progress.build_owner_run_id
+        == interrupted_progress.build_owner_run_id
+    )
+    assert (
+        final_progress.build_owner_job_id
+        == interrupted_progress.build_owner_job_id
+    )
+    assert (
+        final_progress.initial_fitted_entry_count
+        == interrupted_progress.initial_fitted_entry_count
+        == 0
+    )
     assert (
         final_progress.event.physical_model_fit_count
         == resumed.physical_model_fit_count
@@ -1899,10 +1918,17 @@ def test_progress_payload_round_trip_is_exact_and_redacted() -> None:
     event = _progress_event()
 
     document = progress_to_document(
-        event, last_completed_trial_index=7200
+        event,
+        last_completed_trial_index=7200,
+        build_owner_run_id="icomp2026-cold-20260726",
+        build_owner_job_id="c" * 64,
+        initial_fitted_entry_count=0,
     )
 
     assert set(document) == {
+        "build_owner_run_id",
+        "build_owner_job_id",
+        "initial_fitted_entry_count",
         "request_digest",
         "schedule_digest",
         "dataset_id",
@@ -1918,7 +1944,11 @@ def test_progress_payload_round_trip_is_exact_and_redacted() -> None:
         "eta_s",
         "last_completed_trial_index",
     }
-    assert progress_from_document(document).event == event
+    restored = progress_from_document(document)
+    assert restored.event == event
+    assert restored.build_owner_run_id == "icomp2026-cold-20260726"
+    assert restored.build_owner_job_id == "c" * 64
+    assert restored.initial_fitted_entry_count == 0
     line = format_progress(event)
     assert line == (
         "[madelon seed=42 random] feature 37/100, K=100/200 "
@@ -1927,6 +1957,33 @@ def test_progress_payload_round_trip_is_exact_and_redacted() -> None:
     assert "label" not in line
     assert "target" not in line
     assert "0.123456789" not in line
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("build_owner_run_id", "", "owner"),
+        ("build_owner_run_id", "../foreign-run", "owner"),
+        ("build_owner_job_id", "", "owner job"),
+        ("build_owner_job_id", "not-a-job-id", "owner job"),
+        ("initial_fitted_entry_count", -1, "initial fitted"),
+        ("initial_fitted_entry_count", True, "initial fitted"),
+    ],
+)
+def test_progress_rejects_invalid_build_provenance(
+    field: str, value: object, message: str
+) -> None:
+    document = progress_to_document(
+        _progress_event(),
+        last_completed_trial_index=0,
+        build_owner_run_id="icomp2026-cold-20260726",
+        build_owner_job_id="c" * 64,
+        initial_fitted_entry_count=0,
+    )
+    document[field] = value
+
+    with pytest.raises(ValueError, match=message):
+        progress_from_document(document)
 
 
 @pytest.mark.parametrize(
@@ -1982,6 +2039,7 @@ def test_completed_bundle_reuse_validates_identical_frames_without_fit(
         frames=frames,
         run_root=tmp_path,
         progress_sink=lambda event: None,
+        build_owner_job_id="a" * 64,
     )
 
     def forbid_fit(*args: object, **kwargs: object) -> np.ndarray:
@@ -1994,6 +2052,7 @@ def test_completed_bundle_reuse_validates_identical_frames_without_fit(
         frames=frames,
         run_root=tmp_path,
         progress_sink=lambda event: None,
+        build_owner_job_id="b" * 64,
         fit_hook=lambda count: pytest.fail(
             f"completed reuse crossed fit boundary {count}"
         ),
@@ -2001,6 +2060,13 @@ def test_completed_bundle_reuse_validates_identical_frames_without_fit(
 
     assert reopened == bundle
     assert reopened is not bundle
+    progress = progress_from_document(
+        read_canonical_json(
+            tmp_path / progress_relpath(request),
+            context="completed estimator progress",
+        )
+    )
+    assert progress.build_owner_job_id == "a" * 64
 
 
 def test_completed_bundle_reuse_fails_closed_when_progress_is_missing(
@@ -2034,6 +2100,48 @@ def test_completed_bundle_reuse_fails_closed_when_progress_is_missing(
         )
 
     assert len(fits) == before_reuse
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("build_owner_run_id", "foreign-run"),
+        ("initial_fitted_entry_count", 1),
+    ],
+)
+def test_completed_bundle_reuse_rejects_tampered_build_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    request = replace(
+        _builder_request(3),
+        methods=("exact",),
+        checkpoint_every_fits=1,
+    )
+    frames = _valid_ensure_frames(request)
+    _install_constant_binary_fit(monkeypatch)
+    ensure_estimator_bundle(
+        request=request,
+        frames=frames,
+        run_root=tmp_path,
+        progress_sink=lambda event: None,
+    )
+    progress_path = tmp_path / progress_relpath(request)
+    document = read_canonical_json(
+        progress_path, context="estimator progress"
+    )
+    document[field] = replacement
+    atomic_write_json(progress_path, document)
+
+    with pytest.raises(ValueError, match="build provenance"):
+        ensure_estimator_bundle(
+            request=request,
+            frames=frames,
+            run_root=tmp_path,
+            progress_sink=lambda event: None,
+        )
 
 
 def test_completed_bundle_reuse_rejects_changed_finite_frame_values(
@@ -2232,6 +2340,31 @@ def _interrupt_after_first_fit(
             run_root=run_root,
             progress_sink=lambda event: None,
             fit_hook=stop_after_first,
+        )
+
+
+def test_active_resume_rejects_different_owner_job(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    request = replace(
+        _builder_request(3),
+        methods=("exact",),
+        checkpoint_every_fits=1,
+    )
+    frames = _valid_ensure_frames(request)
+    _install_constant_binary_fit(monkeypatch)
+    _interrupt_after_first_fit(
+        request=request, frames=frames, run_root=tmp_path
+    )
+
+    with pytest.raises(ValueError, match="active.*owner job"):
+        ensure_estimator_bundle(
+            request=request,
+            frames=frames,
+            run_root=tmp_path,
+            progress_sink=lambda event: None,
+            build_owner_job_id="d" * 64,
         )
 
 
@@ -2770,6 +2903,9 @@ def _write_zero_progress(
         progress_to_document(
             event,
             last_completed_trial_index=last_completed_trial_index,
+            build_owner_run_id=run_root.name,
+            build_owner_job_id=request.digest,
+            initial_fitted_entry_count=0,
         ),
     )
 

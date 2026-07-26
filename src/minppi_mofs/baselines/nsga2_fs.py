@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import time
 import warnings
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Optional
 
@@ -67,6 +67,9 @@ class NSGA2Result:
     runtime_s: float
     converged_gen: int
     hv_history: list[float]
+    logical_evaluation_count: int
+    unique_subset_count: int
+    memoization_hit_count: int
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +90,7 @@ def _evaluate_individual(
     backend: str = "cpu",
     seed: int = 42,
     cardinality_denominator: int | None = None,
+    utility_evaluator: Callable[[tuple[str, ...]], float] | None = None,
 ) -> tuple[float, float]:
     """Evaluate one candidate solution.
 
@@ -111,7 +115,7 @@ def _evaluate_individual(
             "cardinality_denominator must be a positive integer at least as large "
             "as the search dimension"
         )
-    selected = [X_tr.columns[j] for j in range(n) if mask[j]]
+    selected = tuple(X_tr.columns[j] for j in range(n) if mask[j])
     chosen_utility = utility or (
         "r2" if task == "regression" else "accuracy" if task == "multiclass" else "roc_auc"
     )
@@ -125,17 +129,21 @@ def _evaluate_individual(
             "n_jobs": 1,
         }
     )
-    value = evaluate_fixed_subset(
-        X_tr,
-        y_tr,
-        X_val,
-        y_val,
-        selected,
-        task=task,
-        utility=chosen_utility,
-        model_params=params,
-        backend=backend,
-        seed=seed,
+    value = (
+        utility_evaluator(selected)
+        if utility_evaluator is not None
+        else evaluate_fixed_subset(
+            X_tr,
+            y_tr,
+            X_val,
+            y_val,
+            selected,
+            task=task,
+            utility=chosen_utility,
+            model_params=params,
+            backend=backend,
+            seed=seed,
+        )
     )
     clipped = float(np.clip(value, 0.0, 1.0))
     return len(selected) / denominator, 1.0 - clipped
@@ -290,6 +298,7 @@ def nsga2_feature_selection(
     ref_point: tuple[float, float] = (1.0, 1.0),
     verbose: bool = False,
     cardinality_denominator: int | None = None,
+    utility_evaluator: Callable[[tuple[str, ...]], float] | None = None,
 ) -> NSGA2Result:
     """Run NSGA-II for multi-objective feature selection.
 
@@ -328,23 +337,48 @@ def nsga2_feature_selection(
             "cardinality_denominator must be a positive integer at least as large "
             "as the search dimension"
         )
+    if utility_evaluator is not None and not callable(utility_evaluator):
+        raise TypeError("utility_evaluator must be callable")
     p_mut = p_mutation if p_mutation is not None else (1.0 / n if n else 0.0)
     reference = np.asarray(ref_point, dtype=float)
     t0 = time.perf_counter()
+    utility_by_features: dict[tuple[str, ...], float] = {}
+    logical_evaluation_count = 0
+    memoization_hit_count = 0
+
+    def evaluate_mask(mask: np.ndarray) -> tuple[float, float]:
+        nonlocal logical_evaluation_count, memoization_hit_count
+        logical_evaluation_count += 1
+        selected = tuple(
+            feature
+            for feature, bit in zip(X_train.columns, mask, strict=True)
+            if bit
+        )
+        if selected in utility_by_features:
+            memoization_hit_count += 1
+            clipped_utility = utility_by_features[selected]
+        else:
+            fitness = _evaluate_individual(
+                mask,
+                X_train,
+                y_train,
+                X_val,
+                y_val,
+                task=task,
+                utility=utility,
+                model_params=model_params,
+                backend=backend,
+                seed=seed,
+                cardinality_denominator=denominator,
+                utility_evaluator=utility_evaluator,
+            )
+            clipped_utility = 1.0 - fitness[1]
+            utility_by_features[selected] = clipped_utility
+        return len(selected) / denominator, 1.0 - clipped_utility
 
     # ── Initialisation ──
     pop = rng.integers(0, 2, size=(pop_size, n)).astype(np.float64)
-    fit = np.array(
-        [
-            _evaluate_individual(
-                pop[i], X_train, y_train, X_val, y_val,
-                task=task, utility=utility, model_params=model_params,
-                backend=backend, seed=seed,
-                cardinality_denominator=denominator,
-            )
-            for i in range(pop_size)
-        ]
-    )
+    fit = np.array([evaluate_mask(pop[i]) for i in range(pop_size)])
     converged_gen: int = 0  # computed post-hoc below
     hv_history: list[float] = []
 
@@ -383,15 +417,7 @@ def nsga2_feature_selection(
                 offspring[i + 1] = c2
 
         off_fit = np.array(
-            [
-                _evaluate_individual(
-                    offspring[j], X_train, y_train, X_val, y_val,
-                    task=task, utility=utility, model_params=model_params,
-                    backend=backend, seed=seed,
-                    cardinality_denominator=denominator,
-                )
-                for j in range(pop_size)
-            ]
+            [evaluate_mask(offspring[j]) for j in range(pop_size)]
         )
 
         # Merge + non-dominated sort + select
@@ -437,12 +463,21 @@ def nsga2_feature_selection(
     for i in pf_idx:
         pf_list.append((pop[i].astype(int), (float(fit[i, 0]), float(fit[i, 1]))))
 
+    unique_subset_count = len(utility_by_features)
+    if (
+        logical_evaluation_count
+        != unique_subset_count + memoization_hit_count
+    ):
+        raise RuntimeError("NSGA-II memoization accounting is inconsistent")
     return NSGA2Result(
         pareto_front=pf_list,
         hv=hv_final,
         runtime_s=runtime,
         converged_gen=converged_gen,
         hv_history=hv_history,
+        logical_evaluation_count=logical_evaluation_count,
+        unique_subset_count=unique_subset_count,
+        memoization_hit_count=memoization_hit_count,
     )
 
 

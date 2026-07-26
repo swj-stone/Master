@@ -1098,6 +1098,8 @@ def ensure_estimator_bundle(
     frames: object,
     run_root: Path,
     progress_sink: Callable[[object], None],
+    *,
+    build_owner_job_id: str,
 ):
     """Load the grouped bundle builder only for grouped estimator execution."""
     if __package__:
@@ -1109,7 +1111,13 @@ def ensure_estimator_bundle(
             ensure_estimator_bundle as ensure_bundle,
         )
 
-    return ensure_bundle(request, frames, run_root, progress_sink)
+    return ensure_bundle(
+        request,
+        frames,
+        run_root,
+        progress_sink,
+        build_owner_job_id=build_owner_job_id,
+    )
 
 
 def _validate_grouped_estimator_bundle(bundle: object, request: object):
@@ -1156,6 +1164,7 @@ def _run_grouped_estimator_job(context: StageContext) -> ResultRecord:
         progress_sink=lambda event: _emit_estimator_progress(
             context.layout.log_path, event
         ),
+        build_owner_job_id=context.job.job_id,
     )
     bundle = _validate_grouped_estimator_bundle(bundle, request)
 
@@ -1904,6 +1913,7 @@ def run_ablation_job(context: StageContext) -> ResultRecord:
 
 
 def _run_utility_ablation(context: StageContext) -> ResultRecord:
+    from minppi_mofs.coalition_cache import prediction_digest
     from minppi_mofs.min_ppi import (
         estimate_minppi_random_mc,
         make_shared_coalition_plan,
@@ -1966,6 +1976,13 @@ def _run_utility_ablation(context: StageContext) -> ResultRecord:
             acc_cache=views["accuracy"],
             seed=context.job.seed,
         )
+        accuracy_records = [
+            {
+                "coalition": list(coalition),
+                "prediction_sha256": prediction_digest(predictions),
+            }
+            for coalition, predictions in sorted(cache._preds.items())
+        ]
         before_secondary = (cache.model_fit_count, cache.coalition_count)
         secondary = estimate_minppi_random_mc(
             X_train,
@@ -1981,6 +1998,27 @@ def _run_utility_ablation(context: StageContext) -> ResultRecord:
             acc_cache=views["ovr_auc"],
             seed=context.job.seed,
         )
+        ovr_auc_records = [
+            {
+                "coalition": list(coalition),
+                "prediction_sha256": prediction_digest(predictions),
+            }
+            for coalition, predictions in sorted(cache._preds.items())
+        ]
+        if ovr_auc_records != accuracy_records:
+            raise RuntimeError(
+                "utility ablation metrics did not share prediction records"
+            )
+        records_payload = json.dumps(
+            accuracy_records,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        shared_prediction_digest = hashlib.sha256(
+            records_payload
+        ).hexdigest()
         scores["accuracy"] = [
             {"feature": feature, "score": int(primary[feature])}
             for feature in X_train.columns
@@ -2002,6 +2040,11 @@ def _run_utility_ablation(context: StageContext) -> ResultRecord:
             "shared_group_coalition_count": cache.coalition_count,
             "secondary_model_fit_delta": cache.model_fit_count - before_secondary[0],
             "secondary_coalition_delta": cache.coalition_count - before_secondary[1],
+            "prediction_records": accuracy_records,
+            "prediction_digests": {
+                "accuracy": shared_prediction_digest,
+                "ovr_auc": shared_prediction_digest,
+            },
         }
         _publish_idempotent_json(path, document, context="utility paired artifact")
         document = _read_utility_pair_artifact(context, path, budget, group_id)
@@ -2044,6 +2087,7 @@ def _read_utility_pair_artifact(
         "shared_group_id", "scores", "plan_step_count",
         "shared_group_model_fit_count", "shared_group_coalition_count",
         "secondary_model_fit_delta", "secondary_coalition_delta",
+        "prediction_records", "prediction_digests",
     }
     if not isinstance(document, dict) or set(document) != expected_keys:
         raise ValueError("utility paired artifact schema is invalid")
@@ -2117,6 +2161,51 @@ def _read_utility_pair_artifact(
         "secondary_coalition_delta"
     ] != 0:
         raise ValueError("utility paired artifact did not reuse the shared cache")
+    prediction_records = document["prediction_records"]
+    prediction_digests = document["prediction_digests"]
+    if (
+        not isinstance(prediction_records, list)
+        or len(prediction_records) != document["shared_group_coalition_count"]
+        or not isinstance(prediction_digests, dict)
+        or set(prediction_digests) != {"accuracy", "ovr_auc"}
+    ):
+        raise ValueError(
+            "utility paired prediction coalition cost evidence is invalid"
+        )
+    seen_coalitions: set[tuple[str, ...]] = set()
+    for record in prediction_records:
+        if (
+            not isinstance(record, dict)
+            or set(record) != {"coalition", "prediction_sha256"}
+            or not isinstance(record["coalition"], list)
+            or any(
+                not isinstance(feature, str)
+                for feature in record["coalition"]
+            )
+            or tuple(record["coalition"]) in seen_coalitions
+            or not isinstance(record["prediction_sha256"], str)
+            or len(record["prediction_sha256"]) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in record["prediction_sha256"]
+            )
+        ):
+            raise ValueError("utility paired prediction evidence is invalid")
+        seen_coalitions.add(tuple(record["coalition"]))
+    expected_prediction_digest = hashlib.sha256(
+        json.dumps(
+            prediction_records,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if (
+        prediction_digests["accuracy"] != expected_prediction_digest
+        or prediction_digests["ovr_auc"] != expected_prediction_digest
+    ):
+        raise ValueError("utility paired prediction digests are invalid")
 
     from minppi_mofs.min_ppi import make_shared_coalition_plan
 
@@ -2138,13 +2227,8 @@ def _read_utility_pair_artifact(
 
 
 def _run_guidance_ablation(context: StageContext) -> ResultRecord:
-    from minppi_mofs.min_ppi import (
-        algorithm_b_schedule_digest,
-        estimate_minppi_mi_correlation_guided,
-        make_algorithm_b_perturbation_schedule,
-    )
+    from minppi_mofs.nested_estimation import estimate_guided_checkpoints
     from minppi_mofs.shapg_integration import (
-        build_mi_correlation_guidance,
         compute_mi_guidance_signal,
         get_correlation_neighbors,
     )
@@ -2155,11 +2239,36 @@ def _run_guidance_ablation(context: StageContext) -> ResultRecord:
     if value not in allowed:
         raise ValueError("guidance ablation value is not frozen")
     budget = max(context.protocol.estimator_budgets)
-    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
-    schedule = make_algorithm_b_perturbation_schedule(
-        tuple(X_train.columns), K_adv=budget, seed=context.job.seed
+    manifest_row = _task9_manifest_row(context)
+    features = tuple(
+        json.loads(str(manifest_row["selected_features_json"]))
     )
-    schedule_digest = algorithm_b_schedule_digest(schedule)
+    checkpoint, _request, schedules = _ablation_estimator_authority(
+        context, "mi_correlation_guided", features
+    )
+    if value == "mi_correlation":
+        return _publish_single_ablation(
+            context,
+            started_at=started_at,
+            value=str(value),
+            estimator_method="mi_correlation_guided",
+            budget=budget,
+            scores=dict(checkpoint.scores),
+            model_fit_count=checkpoint.logical_unique_coalition_count,
+            coalition_count=checkpoint.logical_unique_coalition_count + 1,
+            logical_evaluation_count=checkpoint.logical_evaluation_count,
+            logical_unique_coalition_count=(
+                checkpoint.logical_unique_coalition_count
+            ),
+            physical_model_fit_count=0,
+            cache_hit_count=0,
+            schedule_digest=checkpoint.schedule_digest,
+        )
+    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(
+        context
+    )
+    if schedules.guided_schedule is None or schedules.guided_digest is None:
+        raise RuntimeError("guidance ablation schedule authority is missing")
     task = str(context.job.parameters["task"])
     mi_scores = None
     correlation_neighbors = None
@@ -2171,26 +2280,26 @@ def _run_guidance_ablation(context: StageContext) -> ResultRecord:
         correlation_neighbors = get_correlation_neighbors(
             X_train, seed=context.job.seed
         )
-    elif value == "mi_correlation":
-        mi_scores, correlation_neighbors = build_mi_correlation_guidance(
-            X_train, y_train, task=task, seed=context.job.seed
+    with _open_selection_cache(
+        context,
+        (X_train, y_train, X_val, y_val),
+        manifest_row,
+    ) as cache:
+        before = cache.stats
+        view = _AlphaCoalitionUtilityView(
+            cache,
+            utility=str(context.job.parameters["utility"]),
+            alpha=context.protocol.alpha_default,
         )
-    cache = _make_job_cache(context, X_train, X_val, y_train, y_val)
-    scores = estimate_minppi_mi_correlation_guided(
-        X_train=X_train,
-        X_val=X_val,
-        y_train=y_train,
-        y_val=y_val,
-        alpha=context.protocol.alpha_default,
-        task=task,
-        utility=str(context.job.parameters["utility"]),
-        K_adv=budget,
-        mi_scores=mi_scores,
-        correlation_neighbors=correlation_neighbors,
-        perturbation_schedule=schedule,
-        acc_cache=cache,
-        seed=context.job.seed,
-    )
+        scores = estimate_guided_checkpoints(
+            schedules.guided_schedule,
+            view,
+            mi_scores=mi_scores,
+            correlation_neighbors=correlation_neighbors,
+        )[budget]
+        after = cache.stats
+        logical_coalitions = view.logical_coalitions
+    unique_coalitions = set(logical_coalitions)
     return _publish_single_ablation(
         context,
         started_at=started_at,
@@ -2198,22 +2307,20 @@ def _run_guidance_ablation(context: StageContext) -> ResultRecord:
         estimator_method="mi_correlation_guided",
         budget=budget,
         scores=scores,
-        cache=cache,
-        schedule_digest=schedule_digest,
+        model_fit_count=sum(bool(item) for item in unique_coalitions),
+        coalition_count=len(unique_coalitions),
+        logical_evaluation_count=len(logical_coalitions),
+        logical_unique_coalition_count=len(unique_coalitions),
+        physical_model_fit_count=(
+            after.physical_model_fit_count
+            - before.physical_model_fit_count
+        ),
+        cache_hit_count=after.cache_hit_count - before.cache_hit_count,
+        schedule_digest=schedules.guided_digest,
     )
 
 
 def _run_dispatcher_ablation(context: StageContext) -> ResultRecord:
-    from minppi_mofs.min_ppi import (
-        algorithm_b_schedule_digest,
-        estimate_minppi_exact,
-        estimate_minppi_hybrid,
-        estimate_minppi_mi_correlation_guided,
-        estimate_minppi_random_mc,
-        make_algorithm_b_perturbation_schedule,
-    )
-    from minppi_mofs.shapg_integration import build_mi_correlation_guidance
-
     started_at = _timestamp()
     value = context.job.parameters["value"]
     allowed = {"exact", "random_mc", "mi_correlation_guided", "hybrid"}
@@ -2228,61 +2335,93 @@ def _run_dispatcher_ablation(context: StageContext) -> ResultRecord:
     ):
         raise ValueError("exact dispatcher job is absent from the manifest")
     budget = max(context.protocol.estimator_budgets)
-    X_train, y_train, X_val, y_val, _ = _load_prepared_train_validation(context)
-    task = str(context.job.parameters["task"])
-    utility = str(context.job.parameters["utility"])
-    cache = _make_job_cache(context, X_train, X_val, y_train, y_val)
-    common = {
-        "X_train": X_train,
-        "X_val": X_val,
-        "y_train": y_train,
-        "y_val": y_val,
-        "alpha": context.protocol.alpha_default,
-        "task": task,
-        "utility": utility,
-        "acc_cache": cache,
-        "seed": context.job.seed,
-    }
-    schedule_digest = None
-    if value == "exact":
-        scores = estimate_minppi_exact(**common)
-    elif value == "random_mc":
-        scores = estimate_minppi_random_mc(K=budget, **common)
-    else:
-        schedule = make_algorithm_b_perturbation_schedule(
-            tuple(X_train.columns), K_adv=budget, seed=context.job.seed
-        )
-        schedule_digest = algorithm_b_schedule_digest(schedule)
-        mi_scores, correlation_neighbors = build_mi_correlation_guidance(
-            X_train, y_train, task=task, seed=context.job.seed
-        )
-        if value == "mi_correlation_guided":
-            scores = estimate_minppi_mi_correlation_guided(
-                K_adv=budget,
-                mi_scores=mi_scores,
-                correlation_neighbors=correlation_neighbors,
-                perturbation_schedule=schedule,
-                **common,
-            )
-        else:
-            scores = estimate_minppi_hybrid(
-                K=budget,
-                K_adv=budget,
-                mi_scores=mi_scores,
-                correlation_neighbors=correlation_neighbors,
-                perturbation_schedule=schedule,
-                **common,
-            )
+    manifest_row = _task9_manifest_row(context)
+    features = tuple(
+        json.loads(str(manifest_row["selected_features_json"]))
+    )
+    checkpoint, _request, _schedules = _ablation_estimator_authority(
+        context, str(value), features
+    )
     return _publish_single_ablation(
         context,
         started_at=started_at,
         value=str(value),
         estimator_method=str(value),
         budget=budget,
-        scores=scores,
-        cache=cache,
-        schedule_digest=schedule_digest,
+        scores=dict(checkpoint.scores),
+        model_fit_count=checkpoint.logical_unique_coalition_count,
+        coalition_count=checkpoint.logical_unique_coalition_count + 1,
+        logical_evaluation_count=checkpoint.logical_evaluation_count,
+        logical_unique_coalition_count=(
+            checkpoint.logical_unique_coalition_count
+        ),
+        physical_model_fit_count=0,
+        cache_hit_count=0,
+        schedule_digest=checkpoint.schedule_digest,
     )
+
+
+def _ablation_estimator_authority(
+    context: StageContext,
+    method: str,
+    features: tuple[str, ...],
+):
+    """Return a completed checkpoint plus recomputed schedule authority."""
+    budget = max(context.protocol.estimator_budgets)
+    checkpoint = _completed_estimator_checkpoint(
+        context, method, budget, features
+    )
+    estimator_jobs = tuple(
+        job
+        for job in context.status.manifest
+        if job.stage == "estimator"
+        and job.dataset_id == context.job.dataset_id
+        and job.seed == context.job.seed
+        and job.method == method
+        and job.parameters.get("budget") == budget
+    )
+    if len(estimator_jobs) != 1:
+        raise ValueError(
+            "ablation estimator group authority is missing or duplicated"
+        )
+    estimator_context = StageContext(
+        context.protocol,
+        context.layout,
+        estimator_jobs[0],
+        context.status,
+        context.audit,
+    )
+    request = group_request_from_context(
+        estimator_context, _task9_manifest_row(context), features
+    )
+    if __package__:
+        from .icomp2026_estimator_bundle import (
+            _hybrid_schedule_digest,
+            _schedule_authority,
+        )
+    else:
+        from icomp2026_estimator_bundle import (  # type: ignore[no-redef]
+            _hybrid_schedule_digest,
+            _schedule_authority,
+        )
+
+    schedules = _schedule_authority(request)
+    expected_digest = {
+        "exact": None,
+        "random_mc": schedules.random_digest,
+        "mi_correlation_guided": schedules.guided_digest,
+        "hybrid": _hybrid_schedule_digest(
+            feature_count=len(features),
+            random_digest=schedules.random_digest,
+            guided_digest=schedules.guided_digest,
+        ),
+    }[method]
+    if checkpoint.schedule_digest != expected_digest:
+        raise ValueError(
+            "ablation checkpoint schedule digest conflicts with "
+            "deterministic schedule authority"
+        )
+    return checkpoint, request, schedules
 
 
 def _make_job_cache(context: StageContext, X_train, X_val, y_train, y_val):
@@ -2311,7 +2450,12 @@ def _publish_single_ablation(
     estimator_method: str,
     budget: int,
     scores: Mapping[str, int],
-    cache: object,
+    model_fit_count: int,
+    coalition_count: int,
+    logical_evaluation_count: int,
+    logical_unique_coalition_count: int,
+    physical_model_fit_count: int,
+    cache_hit_count: int,
     schedule_digest: str | None = None,
 ) -> ResultRecord:
     axis = str(context.job.parameters["axis"])
@@ -2333,13 +2477,29 @@ def _publish_single_ablation(
             {"feature": feature, "score": int(score)}
             for feature, score in scores.items()
         ],
-        "model_fit_count": cache.model_fit_count,
-        "coalition_count": cache.coalition_count,
+        "model_fit_count": model_fit_count,
+        "coalition_count": coalition_count,
+        "logical_evaluation_count": logical_evaluation_count,
+        "logical_unique_coalition_count": logical_unique_coalition_count,
+        "physical_model_fit_count": physical_model_fit_count,
+        "cache_hit_count": cache_hit_count,
     }
     if schedule_digest is not None:
         document["schedule_digest"] = schedule_digest
+    path = context.layout.root / relpath
+    if path.exists():
+        existing = read_canonical_json(
+            path, context=f"{axis} ablation artifact"
+        )
+        if (
+            not isinstance(existing, Mapping)
+            or existing.get("schedule_digest") != schedule_digest
+        ):
+            raise ValueError(
+                f"{axis} ablation schedule digest is invalid"
+            )
     _publish_idempotent_json(
-        context.layout.root / relpath,
+        path,
         document,
         context=f"{axis} ablation artifact",
     )
@@ -2354,8 +2514,12 @@ def _publish_single_ablation(
             "axis": axis,
             "value": value,
             "budget": budget,
-            "model_fit_count": cache.model_fit_count,
-            "coalition_count": cache.coalition_count,
+            "model_fit_count": model_fit_count,
+            "coalition_count": coalition_count,
+            "logical_evaluation_count": logical_evaluation_count,
+            "logical_unique_coalition_count": logical_unique_coalition_count,
+            "physical_model_fit_count": physical_model_fit_count,
+            "cache_hit_count": cache_hit_count,
         },
         artifacts={"scores": relpath},
         started_at=started_at,
@@ -4611,7 +4775,9 @@ def _validate_nsga2_front_artifact(
         "ref_point", "original_features", "search_features",
         "cardinality_denominator", "validation_front", "validation_hv",
         "hv_history", "converged_gen", "convergence_evaluation_count",
-        "search_runtime_s",
+        "logical_evaluation_count", "unique_subset_count",
+        "memoization_hit_count", "physical_model_fit_count",
+        "cache_hit_count", "search_runtime_s",
     }
     if not isinstance(value, dict) or set(value) != expected:
         raise ValueError("NSGA-II validation-front artifact schema is invalid")
@@ -4675,6 +4841,29 @@ def _validate_nsga2_front_artifact(
         population * (converged_gen + 1),
         name="NSGA-II convergence evaluation count",
     )
+    logical_count = _exact_nonnegative_int(
+        value["logical_evaluation_count"],
+        evaluations,
+        name="NSGA-II logical evaluation count",
+    )
+    unique_count = value["unique_subset_count"]
+    memoization_hits = value["memoization_hit_count"]
+    physical_fits = value["physical_model_fit_count"]
+    cache_hits = value["cache_hit_count"]
+    for name, count in (
+        ("unique subset count", unique_count),
+        ("memoization hit count", memoization_hits),
+        ("physical model-fit count", physical_fits),
+        ("cache-hit count", cache_hits),
+    ):
+        _exact_nonnegative_int(count, count, name=f"NSGA-II {name}")
+    if (
+        logical_count != unique_count + memoization_hits
+        or physical_fits > unique_count
+        or cache_hits > unique_count
+        or physical_fits + cache_hits > unique_count
+    ):
+        raise ValueError("NSGA-II validation-front accounting is invalid")
     _finite_nonnegative(value["search_runtime_s"], name="NSGA-II search runtime")
     return value
 
@@ -4689,6 +4878,7 @@ def _freeze_nsga2_front(
     y_train: object,
     X_val: object,
     y_val: object,
+    data_row: Mapping[str, object],
 ) -> dict[str, object]:
     import numpy as np
 
@@ -4707,21 +4897,38 @@ def _freeze_nsga2_front(
     search_features = _nsga2_search_features(
         job.method, original_features, retained_features
     )
-    result = nsga2_feature_selection(
-        X_train.loc[:, list(search_features)],
-        y_train,
-        X_val.loc[:, list(search_features)],
-        y_val,
-        task=dataset.task,
-        utility=dataset.utility,
-        model_params=context.protocol.model_params,
-        backend=context.protocol.backend,
-        seed=context.job.seed,
-        pop_size=population,
-        max_gen=max_gen,
-        ref_point=_NSGA2_REF_POINT,
-        verbose=False,
-        cardinality_denominator=len(original_features),
+    with _open_selection_cache(
+        variant_context,
+        (X_train, y_train, X_val, y_val),
+        data_row,
+    ) as cache:
+        cache_before = cache.stats
+        result = nsga2_feature_selection(
+            X_train.loc[:, list(search_features)],
+            y_train,
+            X_val.loc[:, list(search_features)],
+            y_val,
+            task=dataset.task,
+            utility=dataset.utility,
+            model_params=context.protocol.model_params,
+            backend=context.protocol.backend,
+            seed=context.job.seed,
+            pop_size=population,
+            max_gen=max_gen,
+            ref_point=_NSGA2_REF_POINT,
+            verbose=False,
+            cardinality_denominator=len(original_features),
+            utility_evaluator=lambda selected: cache.evaluate(
+                set(selected), dataset.utility
+            ),
+        )
+        cache_after = cache.stats
+    physical_model_fit_count = (
+        cache_after.physical_model_fit_count
+        - cache_before.physical_model_fit_count
+    )
+    cache_hit_count = (
+        cache_after.cache_hit_count - cache_before.cache_hit_count
     )
     entries = []
     for mask, objectives in result.pareto_front:
@@ -4759,6 +4966,11 @@ def _freeze_nsga2_front(
         "hv_history": [float(value) for value in result.hv_history],
         "converged_gen": int(result.converged_gen),
         "convergence_evaluation_count": population * (result.converged_gen + 1),
+        "logical_evaluation_count": int(result.logical_evaluation_count),
+        "unique_subset_count": int(result.unique_subset_count),
+        "memoization_hit_count": int(result.memoization_hit_count),
+        "physical_model_fit_count": physical_model_fit_count,
+        "cache_hit_count": cache_hit_count,
         "search_runtime_s": float(result.runtime_s),
     }
     _validate_nsga2_front_artifact(
@@ -4798,6 +5010,7 @@ def _ensure_nsga2_fronts(
             y_train=y_train,
             X_val=X_val,
             y_val=y_val,
+            data_row=row,
         )
     # Re-read and validate both published fronts before any audited test access.
     for job in jobs:
@@ -4828,10 +5041,15 @@ def _validate_nsga2_result(
     expected = {
         "schema_version", "protocol_hash", "job_id", "dataset_id", "seed",
         "variant", "task", "utility", "population", "evaluation_count",
+        "logical_evaluation_count", "unique_subset_count",
+        "memoization_hit_count", "physical_model_fit_count",
+        "cache_hit_count",
         "ref_point", "original_dimension", "search_dimension",
         "dimensional_reduction", "validation_hv", "test_hv",
         "validation_front", "test_front", "convergence_evaluation_count",
-        "final_front_evaluation_count", "evaluation_model_fit_count",
+        "final_front_evaluation_count", "final_front_unique_subset_count",
+        "final_front_memoization_hit_count", "evaluation_model_fit_count",
+        "evaluation_cache_hit_count",
         "minppi_selection_time_s", "search_runtime_s", "evaluation_runtime_s",
         "total_runtime_s",
     }
@@ -4848,19 +5066,52 @@ def _validate_nsga2_result(
         "seed": context.job.seed,
         "population": population,
         "evaluation_count": evaluations,
+        "logical_evaluation_count": evaluations,
+        "unique_subset_count": int(front["unique_subset_count"]),
+        "memoization_hit_count": int(front["memoization_hit_count"]),
+        "physical_model_fit_count": int(front["physical_model_fit_count"]),
+        "cache_hit_count": int(front["cache_hit_count"]),
         "original_dimension": len(original),
         "search_dimension": len(search),
         "convergence_evaluation_count": int(front["convergence_evaluation_count"]),
         "final_front_evaluation_count": len(front["validation_front"]),
-        "evaluation_model_fit_count": sum(
-            bool(entry["selected_features"])
-            for entry in front["validation_front"]
+        "final_front_unique_subset_count": len(
+            {
+                tuple(entry["selected_features"])
+                for entry in front["validation_front"]
+            }
+        ),
+        "final_front_memoization_hit_count": (
+            len(front["validation_front"])
+            - len(
+                {
+                    tuple(entry["selected_features"])
+                    for entry in front["validation_front"]
+                }
+            )
         ),
     }
     for field, expected_value in expected_integer_fields.items():
         _exact_nonnegative_int(
             value[field], expected_value, name=f"NSGA-II result {field}"
         )
+    for field in (
+        "evaluation_model_fit_count",
+        "evaluation_cache_hit_count",
+    ):
+        _exact_nonnegative_int(
+            value[field], value[field], name=f"NSGA-II result {field}"
+        )
+    if (
+        value["evaluation_model_fit_count"]
+        > value["final_front_unique_subset_count"]
+        or value["evaluation_cache_hit_count"]
+        > value["final_front_unique_subset_count"]
+        or value["evaluation_model_fit_count"]
+        + value["evaluation_cache_hit_count"]
+        > value["final_front_unique_subset_count"]
+    ):
+        raise ValueError("NSGA-II final-front accounting is invalid")
     for field in (
         "dimensional_reduction",
         "validation_hv",
@@ -4931,9 +5182,14 @@ def _nsga2_result_record(
 ) -> ResultRecord:
     metric_keys = {
         "population", "evaluation_count", "original_dimension", "search_dimension",
+        "logical_evaluation_count", "unique_subset_count",
+        "memoization_hit_count", "physical_model_fit_count",
+        "cache_hit_count",
         "dimensional_reduction", "validation_hv", "test_hv",
         "convergence_evaluation_count", "final_front_evaluation_count",
-        "evaluation_model_fit_count", "minppi_selection_time_s",
+        "final_front_unique_subset_count",
+        "final_front_memoization_hit_count", "evaluation_model_fit_count",
+        "evaluation_cache_hit_count", "minppi_selection_time_s",
         "search_runtime_s", "evaluation_runtime_s", "total_runtime_s",
     }
     return ResultRecord(
@@ -4974,37 +5230,45 @@ def run_nsga2_job(context: StageContext) -> ResultRecord:
             context, started_at=started_at, relpath=relpath, document=existing
         )
     X_train, y_train, X_val, y_val, row = prepared
-    X_test, y_test = _task9_load_test(
-        context, row, reason="final_nsga2_front_evaluation"
-    )
     X_train_val = pd.concat([X_train, X_val], ignore_index=True)
     y_train_val = np.concatenate([y_train, y_val])
     dataset, _, population, evaluations, _ = _nsga2_authority(context)
     evaluation_started = time.perf_counter()
     test_front = []
-    for entry in front["validation_front"]:
-        utility = evaluate_fixed_subset(
-            X_train_val,
-            y_train_val,
-            X_test,
-            y_test,
-            tuple(entry["selected_features"]),
-            task=dataset.task,
-            utility=dataset.utility,
-            model_params=context.protocol.model_params,
-            backend=context.protocol.backend,
-            seed=context.job.seed,
-        )
-        test_front.append(
-            {
-                "mask": entry["mask"],
-                "selected_features": entry["selected_features"],
-                "objectives": [
-                    entry["objectives"][0],
-                    1.0 - float(np.clip(utility, 0.0, 1.0)),
-                ],
-            }
-        )
+    utility_by_subset: dict[tuple[str, ...], float] = {}
+    with _open_final_test_cache(
+        context,
+        (X_train_val, y_train_val),
+        None,
+        row,
+        reason="final_nsga2_front_evaluation",
+    ) as cache:
+        cache_before = cache.stats
+        for entry in front["validation_front"]:
+            selected = tuple(entry["selected_features"])
+            if selected not in utility_by_subset:
+                utility_by_subset[selected] = cache.evaluate(
+                    set(selected), dataset.utility
+                )
+            utility = utility_by_subset[selected]
+            test_front.append(
+                {
+                    "mask": entry["mask"],
+                    "selected_features": entry["selected_features"],
+                    "objectives": [
+                        entry["objectives"][0],
+                        1.0 - float(np.clip(utility, 0.0, 1.0)),
+                    ],
+                }
+            )
+        cache_after = cache.stats
+    evaluation_model_fit_count = (
+        cache_after.physical_model_fit_count
+        - cache_before.physical_model_fit_count
+    )
+    evaluation_cache_hit_count = (
+        cache_after.cache_hit_count - cache_before.cache_hit_count
+    )
     evaluation_runtime = time.perf_counter() - evaluation_started
     test_hv = _compute_hv(
         np.asarray([entry["objectives"] for entry in test_front], dtype=float),
@@ -5027,6 +5291,11 @@ def run_nsga2_job(context: StageContext) -> ResultRecord:
         "utility": dataset.utility,
         "population": population,
         "evaluation_count": evaluations,
+        "logical_evaluation_count": front["logical_evaluation_count"],
+        "unique_subset_count": front["unique_subset_count"],
+        "memoization_hit_count": front["memoization_hit_count"],
+        "physical_model_fit_count": front["physical_model_fit_count"],
+        "cache_hit_count": front["cache_hit_count"],
         "ref_point": list(_NSGA2_REF_POINT),
         "original_dimension": original_dimension,
         "search_dimension": search_dimension,
@@ -5039,9 +5308,12 @@ def run_nsga2_job(context: StageContext) -> ResultRecord:
         "test_front": test_front,
         "convergence_evaluation_count": front["convergence_evaluation_count"],
         "final_front_evaluation_count": len(front["validation_front"]),
-        "evaluation_model_fit_count": sum(
-            bool(entry["selected_features"]) for entry in front["validation_front"]
+        "final_front_unique_subset_count": len(utility_by_subset),
+        "final_front_memoization_hit_count": (
+            len(front["validation_front"]) - len(utility_by_subset)
         ),
+        "evaluation_model_fit_count": evaluation_model_fit_count,
+        "evaluation_cache_hit_count": evaluation_cache_hit_count,
         "minppi_selection_time_s": selection_time,
         "search_runtime_s": front["search_runtime_s"],
         "evaluation_runtime_s": evaluation_runtime,
@@ -5184,12 +5456,16 @@ def _validated_single_ablation_summary_metrics(
     value: str,
     document: Mapping[str, object],
 ) -> dict[str, object]:
-    fields = {"axis", "value", "budget", "model_fit_count", "coalition_count"}
+    fields = {
+        "axis", "value", "budget", "model_fit_count", "coalition_count",
+        "logical_evaluation_count", "logical_unique_coalition_count",
+        "physical_model_fit_count", "cache_hit_count",
+    }
     if set(metrics) != fields:
         raise ValueError("single ablation ResultRecord metric schema is invalid")
     if metrics["axis"] != axis or metrics["value"] != value or any(
         metrics[field] != document[field]
-        for field in ("budget", "model_fit_count", "coalition_count")
+        for field in fields - {"axis", "value"}
     ):
         raise ValueError("single ablation ResultRecord metrics conflict with artifact")
     return dict(metrics)
@@ -5266,19 +5542,24 @@ def _validate_summary_ablation_artifact(
     document = read_canonical_json(
         context.layout.root / relpath, context=f"{axis} ablation artifact"
     )
-    scheduled = axis == "guidance" or (
-        axis == "dispatcher" and value in {"mi_correlation_guided", "hybrid"}
+    expected_method = "mi_correlation_guided" if axis == "guidance" else value
+    checkpoint, _request, _schedules = _ablation_estimator_authority(
+        context,
+        expected_method,
+        expected_features,
     )
+    scheduled = checkpoint.schedule_digest is not None
     expected_keys = {
         "protocol_hash", "job_id", "dataset_id", "seed", "axis", "value",
         "method", "budget", "schedule_seed", "scores", "model_fit_count",
-        "coalition_count",
+        "coalition_count", "logical_evaluation_count",
+        "logical_unique_coalition_count", "physical_model_fit_count",
+        "cache_hit_count",
     }
     if scheduled:
         expected_keys.add("schedule_digest")
     if not isinstance(document, dict) or set(document) != expected_keys:
         raise ValueError("ablation score artifact schema is invalid")
-    expected_method = "mi_correlation_guided" if axis == "guidance" else value
     identity = {
         "protocol_hash": context.job.protocol_hash,
         "job_id": context.job.job_id,
@@ -5310,34 +5591,35 @@ def _validate_summary_ablation_artifact(
         features.append(entry["feature"])
     if tuple(features) != expected_features or len(set(features)) != len(features):
         raise ValueError("ablation score artifact feature order is invalid")
-    model_fits = document["model_fit_count"]
-    coalitions = document["coalition_count"]
+    counter_fields = (
+        "model_fit_count", "coalition_count", "logical_evaluation_count",
+        "logical_unique_coalition_count", "physical_model_fit_count",
+        "cache_hit_count",
+    )
+    counters = {field: document[field] for field in counter_fields}
     if (
-        isinstance(model_fits, bool)
-        or not isinstance(model_fits, int)
-        or model_fits < 1
-        or isinstance(coalitions, bool)
-        or not isinstance(coalitions, int)
-        or coalitions < model_fits
-        or coalitions > model_fits + 1
+        any(
+            isinstance(item, bool)
+            or not isinstance(item, int)
+            or item < 0
+            for item in counters.values()
+        )
+        or counters["model_fit_count"] > counters["coalition_count"]
+        or counters["logical_unique_coalition_count"]
+        > counters["logical_evaluation_count"]
+        or counters["physical_model_fit_count"]
+        > counters["logical_unique_coalition_count"]
+        or counters["cache_hit_count"]
+        > counters["logical_evaluation_count"]
     ):
         raise ValueError("ablation score artifact counters are invalid")
     if any(
         record.metrics.get(field) != document[field]
-        for field in ("budget", "model_fit_count", "coalition_count")
+        for field in {"budget", *counter_fields}
     ) or record.metrics.get("axis") != axis or record.metrics.get("value") != value:
         raise ValueError("ablation ResultRecord metrics conflict with score artifact")
     if scheduled:
-        from minppi_mofs.min_ppi import (
-            algorithm_b_schedule_digest,
-            make_algorithm_b_perturbation_schedule,
-        )
-
-        expected_digest = algorithm_b_schedule_digest(
-            make_algorithm_b_perturbation_schedule(
-                expected_features, K_adv=budget, seed=context.job.seed
-            )
-        )
+        expected_digest = checkpoint.schedule_digest
         if document["schedule_digest"] != expected_digest:
             raise ValueError("ablation score artifact schedule digest is invalid")
     return document

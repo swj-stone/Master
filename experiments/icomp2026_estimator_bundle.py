@@ -1999,11 +1999,17 @@ class _ProgressCoordinator:
         path: Path,
         sink: Callable[[EstimatorProgressEvent], None],
         previous: EstimatorProgressState | None,
+        build_owner_run_id: str,
+        build_owner_job_id: str,
+        initial_fitted_entry_count: int,
     ) -> None:
         self._request = request
         self._schedules = schedules
         self._path = path
         self._sink = sink
+        self._build_owner_run_id = build_owner_run_id
+        self._build_owner_job_id = build_owner_job_id
+        self._initial_fitted_entry_count = initial_fitted_entry_count
         self._started = time.perf_counter()
         self._last_emit_at = self._started
         self._recent_fit_timestamps: deque[float] = deque(maxlen=200)
@@ -2209,6 +2215,11 @@ class _ProgressCoordinator:
                 last_completed_trial_index=(
                     self._last_completed_trial_index()
                 ),
+                build_owner_run_id=self._build_owner_run_id,
+                build_owner_job_id=self._build_owner_job_id,
+                initial_fitted_entry_count=(
+                    self._initial_fitted_entry_count
+                ),
             ),
         )
         self._sink(event)
@@ -2228,6 +2239,11 @@ class _ProgressCoordinator:
                 event,
                 last_completed_trial_index=(
                     self._last_completed_trial_index()
+                ),
+                build_owner_run_id=self._build_owner_run_id,
+                build_owner_job_id=self._build_owner_job_id,
+                initial_fitted_entry_count=(
+                    self._initial_fitted_entry_count
                 ),
             ),
         )
@@ -2249,6 +2265,7 @@ def ensure_estimator_bundle(
     run_root: Path,
     progress_sink: Callable[[EstimatorProgressEvent], None],
     *,
+    build_owner_job_id: str | None = None,
     fit_hook: Callable[[int], None] | None = None,
 ) -> EstimatorBundle:
     """Return or atomically build one request-bound resumable bundle."""
@@ -2266,7 +2283,21 @@ def ensure_estimator_bundle(
     bundle_path, progress_path, cache_path = _prepare_artifact_paths(
         request, run_root
     )
+    requested_owner_job_id = _validate_sha256(
+        request.digest
+        if build_owner_job_id is None
+        else build_owner_job_id,
+        "build owner job id",
+    )
     previous = _read_progress(progress_path, request, schedules)
+    build_owner_run_id = Path(run_root).name
+    if previous is not None and (
+        previous.build_owner_run_id != build_owner_run_id
+        or previous.initial_fitted_entry_count != 0
+    ):
+        raise ValueError(
+            "estimator progress build provenance conflicts with cold run"
+        )
     completed: EstimatorBundle | None = None
     if bundle_path.exists():
         completed = bundle_from_document(
@@ -2274,6 +2305,14 @@ def ensure_estimator_bundle(
                 bundle_path, context="estimator bundle"
             ),
             request,
+        )
+    if (
+        previous is not None
+        and completed is None
+        and previous.build_owner_job_id != requested_owner_job_id
+    ):
+        raise ValueError(
+            "active estimator resume conflicts with build owner job"
         )
     cache_preexisted = cache_path.exists()
     if completed is not None and not cache_preexisted:
@@ -2333,6 +2372,15 @@ def ensure_estimator_bundle(
                         last_completed_trial_index=(
                             previous.last_completed_trial_index
                         ),
+                        build_owner_run_id=(
+                            previous.build_owner_run_id
+                        ),
+                        build_owner_job_id=(
+                            previous.build_owner_job_id
+                        ),
+                        initial_fitted_entry_count=(
+                            previous.initial_fitted_entry_count
+                        ),
                     ),
                 )
                 progress_sink(complete_event)
@@ -2355,6 +2403,21 @@ def ensure_estimator_bundle(
             path=progress_path,
             sink=progress_sink,
             previous=previous,
+            build_owner_run_id=(
+                build_owner_run_id
+                if previous is None
+                else previous.build_owner_run_id
+            ),
+            build_owner_job_id=(
+                requested_owner_job_id
+                if previous is None
+                else previous.build_owner_job_id
+            ),
+            initial_fitted_entry_count=(
+                store.entry_count
+                if previous is None
+                else previous.initial_fitted_entry_count
+            ),
         )
         if previous is None:
             coordinator.persist(emit_boundary=False)

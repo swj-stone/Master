@@ -17,6 +17,9 @@ _SAFE_DATASET_RE = re.compile(
 _ALGORITHMS = frozenset({"exact", "random", "guided", "complete"})
 _PROGRESS_FIELDS = frozenset(
     {
+        "build_owner_job_id",
+        "build_owner_run_id",
+        "initial_fitted_entry_count",
         "request_digest",
         "schedule_digest",
         "dataset_id",
@@ -151,6 +154,9 @@ class EstimatorProgressState:
 
     event: EstimatorProgressEvent
     last_completed_trial_index: int
+    build_owner_run_id: str
+    build_owner_job_id: str
+    initial_fitted_entry_count: int
 
     def __post_init__(self) -> None:
         if not isinstance(self.event, EstimatorProgressEvent):
@@ -162,16 +168,48 @@ class EstimatorProgressState:
         object.__setattr__(
             self, "last_completed_trial_index", trial_index
         )
+        if (
+            not isinstance(self.build_owner_run_id, str)
+            or _SAFE_DATASET_RE.fullmatch(self.build_owner_run_id) is None
+            or self.build_owner_run_id in {".", ".."}
+        ):
+            raise ValueError("progress build owner run id is invalid")
+        self.build_owner_run_id.encode("utf-8", errors="strict")
+        owner_job_id = _sha256(
+            self.build_owner_job_id, "progress build owner job id"
+        )
+        initial_fitted = _exact_nonnegative_int(
+            self.initial_fitted_entry_count,
+            "progress initial fitted entry count",
+        )
+        object.__setattr__(
+            self, "initial_fitted_entry_count", initial_fitted
+        )
+        object.__setattr__(self, "build_owner_job_id", owner_job_id)
 
 
 def progress_to_document(
     event: EstimatorProgressEvent,
     *,
     last_completed_trial_index: int,
+    build_owner_run_id: str,
+    build_owner_job_id: str,
+    initial_fitted_entry_count: int,
 ) -> dict[str, object]:
     """Return the exact canonical JSON-compatible progress schema."""
-    state = EstimatorProgressState(event, last_completed_trial_index)
+    state = EstimatorProgressState(
+        event=event,
+        last_completed_trial_index=last_completed_trial_index,
+        build_owner_run_id=build_owner_run_id,
+        build_owner_job_id=build_owner_job_id,
+        initial_fitted_entry_count=initial_fitted_entry_count,
+    )
     return {
+        "build_owner_job_id": state.build_owner_job_id,
+        "build_owner_run_id": state.build_owner_run_id,
+        "initial_fitted_entry_count": (
+            state.initial_fitted_entry_count
+        ),
         "request_digest": state.event.request_digest,
         "schedule_digest": state.event.schedule_digest,
         "dataset_id": state.event.dataset_id,
@@ -215,6 +253,11 @@ def progress_from_document(value: object) -> EstimatorProgressState:
     return EstimatorProgressState(
         event=event,
         last_completed_trial_index=value["last_completed_trial_index"],
+        build_owner_run_id=value["build_owner_run_id"],
+        build_owner_job_id=value["build_owner_job_id"],
+        initial_fitted_entry_count=value[
+            "initial_fitted_entry_count"
+        ],
     )
 
 
