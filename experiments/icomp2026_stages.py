@@ -5851,6 +5851,10 @@ def _validated_summary_rows(
                 {
                     "harmful_count", "selection_time_s", "evaluation_time_s",
                     "selection_model_fit_count", "selection_coalition_count",
+                    "selection_logical_evaluation_count",
+                    "selection_logical_unique_coalition_count",
+                    "selection_physical_model_fit_count",
+                    "selection_cache_hit_count",
                     "evaluation_model_fit_count",
                 },
                 context="alpha",
