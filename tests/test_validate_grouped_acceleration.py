@@ -297,7 +297,7 @@ def _scientific_protocol(**changes: object) -> dict[str, object]:
             "mi_correlation_guided",
             "hybrid",
         ],
-        "estimator_budgets": [10, 25, 50, 100, 200],
+        "estimator_budgets": [10, 25, 50, 100],
         "exact_max_features": 16,
         "nsga2": {},
         "removal": {},
@@ -357,7 +357,7 @@ def test_cross_mode_protocol_allows_only_execution_policy_difference() -> None:
     [
         ("alpha_default", 0.9),
         ("exact_max_features", 15),
-        ("estimator_budgets", [10, 25, 50, 100]),
+        ("estimator_budgets", [10, 25, 50, 75]),
         (
             "estimator_methods",
             ["exact", "random_mc", "hybrid"],
@@ -398,7 +398,7 @@ def test_abalone_evidence_requires_all_four_canonical_methods(
         method: str,
         budget: int,
     ) -> dict[str, object]:
-        assert (dataset_id, seed, budget) == ("abalone", 42, 200)
+        assert (dataset_id, seed, budget) == ("abalone", 42, 100)
         calls.append(method)
         return {"scores": {method: 0}}
 
@@ -407,7 +407,7 @@ def test_abalone_evidence_requires_all_four_canonical_methods(
     )
 
     evidence = validation_module._abalone_method_evidence(
-        object(), seed=42, budget=200
+        object(), seed=42, budget=100
     )
 
     assert tuple(evidence) == (
@@ -450,7 +450,7 @@ def test_abalone_evidence_rejects_missing_or_corrupt_required_artifact(
 
     with pytest.raises(ValueError, match=failure):
         validation_module._abalone_method_evidence(
-            object(), seed=42, budget=200
+            object(), seed=42, budget=100
         )
 
 
@@ -468,7 +468,7 @@ def _cold_owner_authority(
         dataset_id=owner_dataset_id,
         seed=owner_seed,
         method="random_mc",
-        parameters={"budget": 200},
+        parameters={"budget": 100},
     )
     hybrid = SimpleNamespace(
         job_id="b" * 64,
@@ -476,7 +476,7 @@ def _cold_owner_authority(
         dataset_id="spambase",
         seed=42,
         method="hybrid",
-        parameters={"budget": 200},
+        parameters={"budget": 100},
     )
     metadata = SimpleNamespace(
         manifest=(owner, hybrid),
@@ -498,7 +498,7 @@ def _cold_owner_authority(
         dataset_id="spambase",
         seed=42,
         methods=("random_mc", "hybrid"),
-        budgets=(200,),
+        budgets=(100,),
     )
     return metadata, progress, request
 

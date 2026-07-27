@@ -1,4 +1,5 @@
 """Benchmark XGBoost on actual Credit-Card-Fraud train split size."""
+
 import numpy as np, pandas as pd, time, xgboost as xgb
 from pathlib import Path
 
@@ -12,8 +13,13 @@ print(f"Credit-Card train: {n_samples} rows × {n_features} features")
 
 # XGBoost with same params as pipeline
 clf = xgb.XGBClassifier(
-    n_estimators=100, max_depth=4, learning_rate=0.1,
-    tree_method="hist", device="cuda", n_jobs=1, verbosity=0,
+    n_estimators=100,
+    max_depth=4,
+    learning_rate=0.1,
+    tree_method="hist",
+    device="cuda",
+    n_jobs=1,
+    verbosity=0,
 )
 
 # Warmup on small subset
@@ -29,6 +35,8 @@ for i in range(15):
     times.append(time.perf_counter() - t0)
 
 times = np.array(times)
-print(f"Credit-Card actual ({n_samples} rows, {n_features}f): "
-      f"median={np.median(times):.4f}s mean={np.mean(times):.4f}s "
-      f"p95={np.percentile(times, 95):.4f}s")
+print(
+    f"Credit-Card actual ({n_samples} rows, {n_features}f): "
+    f"median={np.median(times):.4f}s mean={np.mean(times):.4f}s "
+    f"p95={np.percentile(times, 95):.4f}s"
+)

@@ -114,7 +114,7 @@ def make_real_shared_cache_views(tmp_path):
 
 def test_guided_schedule_uses_independent_feature_streams() -> None:
     schedule = make_nested_guided_schedule(
-        FEATURES, budgets=(10, 25, 50, 100, 200), seed=42
+        FEATURES, budgets=(10, 25, 50, 100), seed=42
     )
     prefix = make_nested_guided_schedule(FEATURES, budgets=(10, 25), seed=42)
 
@@ -564,16 +564,16 @@ def test_guided_checkpoint_rejects_corrupted_trial_before_calls() -> None:
 def test_random_schedule_is_budget_independent_and_prefix_nested() -> None:
     small = make_nested_random_schedule(FEATURES, budgets=(10, 25), seed=42)
     large = make_nested_random_schedule(
-        FEATURES, budgets=(10, 25, 50, 100, 200), seed=42
+        FEATURES, budgets=(10, 25, 50, 100), seed=42
     )
 
     assert small.trials[0] == large.trials[0][:25]
     assert small.trials[1] == large.trials[1][:25]
     assert small.checkpoints == (10, 25)
-    assert large.checkpoints == (10, 25, 50, 100, 200)
+    assert large.checkpoints == (10, 25, 50, 100)
     assert nested_random_schedule_digest(large) == nested_random_schedule_digest(
         make_nested_random_schedule(
-            FEATURES, budgets=(10, 25, 50, 100, 200), seed=42
+            FEATURES, budgets=(10, 25, 50, 100), seed=42
         )
     )
 
@@ -684,7 +684,7 @@ def test_large_feature_space_does_not_require_materializing_all_coalitions() -> 
 def test_checkpoint_evaluation_reuses_each_feature_cursor() -> None:
     features = tuple("abcdefghi")
     schedule = make_nested_random_schedule(
-        features, budgets=(10, 25, 50, 100, 200), seed=42
+        features, budgets=(10, 25, 50, 100), seed=42
     )
     view = RecordingView(
         features,
@@ -693,13 +693,12 @@ def test_checkpoint_evaluation_reuses_each_feature_cursor() -> None:
 
     result = estimate_random_checkpoints(schedule, view)
 
-    assert tuple(result) == (10, 25, 50, 100, 200)
+    assert tuple(result) == (10, 25, 50, 100)
     assert result[10]["a"] == 1
     assert result[25]["a"] == 0
     assert result[50]["a"] == 0
     assert result[100]["a"] == 0
-    assert result[200]["a"] == 0
-    assert view.calls_for("a") == 200
+    assert view.calls_for("a") == 100
 
 
 def test_checkpoint_evaluation_propagates_early_harm_without_extra_calls() -> None:

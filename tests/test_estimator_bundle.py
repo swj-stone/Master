@@ -119,7 +119,7 @@ def stage_context(tmp_path: Path) -> StageContext:
             "mi_correlation_guided",
             "hybrid",
         ),
-        estimator_budgets=(10, 25, 50, 100, 200),
+        estimator_budgets=(10, 25, 50, 100),
         exact_max_features=16,
         nsga2={},
         removal={},
@@ -278,9 +278,9 @@ def bundle(group_request: EstimatorGroupRequest) -> EstimatorBundle:
         schema_version=ESTIMATOR_BUNDLE_SCHEMA_VERSION,
         request_digest=group_request.digest,
         checkpoints=checkpoints,
-        physical_model_fit_count=82,
-        cache_hit_count=401,
-        group_runtime_s=9.0,
+        physical_model_fit_count=42,
+        cache_hit_count=201,
+        group_runtime_s=4.0,
     )
 
 
@@ -295,7 +295,7 @@ def test_group_request_identity_includes_every_frozen_input(
 
     assert request.dataset_id == stage_context.job.dataset_id
     assert request.seed == stage_context.job.seed
-    assert request.budgets == (10, 25, 50, 100, 200)
+    assert request.budgets == (10, 25, 50, 100)
     assert request.backend == "cuda"
     assert request.split_hashes == {
         "train": data_row["train_file_sha256"],
@@ -505,8 +505,8 @@ def test_all_grouped_estimator_jobs_project_two_completed_bundles(
                 == record
             )
 
-    assert projected_count == 35
-    assert len(projected_paths) == 35
+    assert projected_count == 28
+    assert len(projected_paths) == 28
     assert len(bundles_by_digest) == 2
 
 
@@ -566,7 +566,7 @@ def test_group_request_deeply_owns_identity_and_is_mapping_order_independent(
         ("model_params", {"n_estimators": 99}),
         ("backend", "cpu"),
         ("methods", ("random_mc", "hybrid")),
-        ("budgets", (10, 25, 51, 100, 200)),
+        ("budgets", (10, 25, 51, 100)),
         ("exact_max_features", 15),
         ("alpha", 0.9),
         ("checkpoint_every_fits", 51),
@@ -1083,9 +1083,9 @@ def test_checkpoint_rejects_more_unique_coalitions_than_evaluations(
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("physical_model_fit_count", 81),
-        ("cache_hit_count", 400),
-        ("group_runtime_s", 7.9),
+        ("physical_model_fit_count", 39),
+        ("cache_hit_count", 199),
+        ("group_runtime_s", 2.9),
     ],
 )
 def test_bundle_rejects_totals_inconsistent_with_final_components(
@@ -1904,7 +1904,7 @@ def _progress_event(**changes: object) -> EstimatorProgressEvent:
         "feature_index": 37,
         "feature_count": 100,
         "budget": 100,
-        "max_budget": 200,
+        "max_budget": 100,
         "physical_model_fit_count": 8421,
         "cache_hit_count": 3105,
         "elapsed_s": 21 * 60.0,
@@ -1951,7 +1951,7 @@ def test_progress_payload_round_trip_is_exact_and_redacted() -> None:
     assert restored.initial_fitted_entry_count == 0
     line = format_progress(event)
     assert line == (
-        "[madelon seed=42 random] feature 37/100, K=100/200 "
+        "[madelon seed=42 random] feature 37/100, K=100/100 "
         "fits=8421 cache_hits=3105 elapsed=21m ETA=34m"
     )
     assert "label" not in line

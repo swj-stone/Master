@@ -76,7 +76,7 @@ def _protocol(tmp_path: Path, *, execution_mode: str = "legacy") -> ResolvedProt
             "mi_correlation_guided",
             "hybrid",
         ),
-        estimator_budgets=(10, 25, 50, 100, 200),
+        estimator_budgets=(10, 25, 50, 100),
         exact_max_features=16,
         nsga2={
             "variants": ["full", "minppi_prefilter"],

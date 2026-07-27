@@ -30,7 +30,7 @@ alpha:
 
 estimator:
   methods: [exact, random_mc, mi_correlation_guided, hybrid]
-  budgets: [10, 25, 50, 100, 200]
+  budgets: [10, 25, 50, 100]
   exact_max_features: 16
 
 removal:

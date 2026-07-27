@@ -2,6 +2,7 @@
 
 Run: python experiments/estimate_runtime.py
 """
+
 import sys, time, json, hashlib
 from pathlib import Path
 from itertools import combinations
@@ -35,7 +36,7 @@ PER_FIT_S = {
     "crimedata": 0.16,
 }
 
-BUDGETS = [10, 25, 50, 100, 200]
+BUDGETS = [10, 25, 50, 100]
 N_SEEDS = 5
 NSGA2_POP = 40
 NSGA2_EVALS = 800
@@ -101,8 +102,10 @@ def main():
     print("━" * 75)
     print(" STAGE: estimator  (per-seed unique coalitions)")
     print("━" * 75)
-    header = (f"{'Dataset':<22} {'n':>4}  {'Random':>8} {'Guided':>8} "
-              f"{'Exact':>8} {'TotalUniq':>10}  {'s/fit':>6} {'Seed-h':>8}")
+    header = (
+        f"{'Dataset':<22} {'n':>4}  {'Random':>8} {'Guided':>8} "
+        f"{'Exact':>8} {'TotalUniq':>10}  {'s/fit':>6} {'Seed-h':>8}"
+    )
     print(header)
     print("-" * 75)
 
@@ -116,17 +119,23 @@ def main():
         seed_h = fits * fit_s / 3600
         per_seed_fits[ds_name] = fits
         per_seed_hours[ds_name] = seed_h
-        print(f"{ds_name:<22} {c['n_features']:>4}  {c['random_naive']:>8} "
-              f"{c['guided_naive']:>8} {c['exact_unique']:>8} {fits:>10}  "
-              f"{fit_s:>6.2f} {seed_h:>8.2f}")
+        print(
+            f"{ds_name:<22} {c['n_features']:>4}  {c['random_naive']:>8} "
+            f"{c['guided_naive']:>8} {c['exact_unique']:>8} {fits:>10}  "
+            f"{fit_s:>6.2f} {seed_h:>8.2f}"
+        )
 
     total_estimator_seed_h = sum(per_seed_hours.values())
     total_estimator_h = total_estimator_seed_h * N_SEEDS
     print("-" * 75)
-    print(f"{'Estimator (1 seed)':<22} {'':>4}  {'':>8} {'':>8} {'':>8} "
-          f"{'':>10}  {'':>6} {total_estimator_seed_h:>8.2f}")
-    print(f"{'Estimator (5 seeds)':<22} {'':>4}  {'':>8} {'':>8} {'':>8} "
-          f"{'':>10}  {'':>6} {total_estimator_h:>8.2f}")
+    print(
+        f"{'Estimator (1 seed)':<22} {'':>4}  {'':>8} {'':>8} {'':>8} "
+        f"{'':>10}  {'':>6} {total_estimator_seed_h:>8.2f}"
+    )
+    print(
+        f"{'Estimator (5 seeds)':<22} {'':>4}  {'':>8} {'':>8} {'':>8} "
+        f"{'':>10}  {'':>6} {total_estimator_h:>8.2f}"
+    )
     print()
 
     # ---- NSGA-II stage ----
@@ -139,8 +148,12 @@ def main():
         physical = evals_per_ds_seed * 0.5  # 50% memoization hit rate
         ds_h = physical * PER_FIT_S[ds_name] * N_SEEDS / 3600
         nsga2_h += ds_h
-    print(f"  {NSGA2_VARIANTS} variants × {NSGA2_EVALS} evals = {evals_per_ds_seed} per ds/seed")
-    print(f"  50% memoization hit → {evals_per_ds_seed * 0.5:.0f} physical fits per ds/seed")
+    print(
+        f"  {NSGA2_VARIANTS} variants × {NSGA2_EVALS} evals = {evals_per_ds_seed} per ds/seed"
+    )
+    print(
+        f"  50% memoization hit → {evals_per_ds_seed * 0.5:.0f} physical fits per ds/seed"
+    )
     print(f"  7 datasets × {N_SEEDS} seeds: {nsga2_h:.1f} hours")
     print()
 
@@ -203,18 +216,22 @@ def main():
     print()
 
     # ---- Total ----
-    total_h = total_estimator_h + nsga2_h + removal_h + alpha_h + ablation_h + overhead_h
+    total_h = (
+        total_estimator_h + nsga2_h + removal_h + alpha_h + ablation_h + overhead_h
+    )
     print("=" * 75)
-    print(f" ESTIMATED TOTAL: {total_h:.1f} hours ({total_h/24:.1f} days)")
+    print(f" ESTIMATED TOTAL: {total_h:.1f} hours ({total_h / 24:.1f} days)")
     print("=" * 75)
     print()
     print("Breakdown:")
-    print(f"  estimator:   {total_estimator_h:>6.1f}h  ({total_estimator_h/total_h*100:.0f}%)")
-    print(f"  nsga2:       {nsga2_h:>6.1f}h  ({nsga2_h/total_h*100:.0f}%)")
-    print(f"  removal:     {removal_h:>6.1f}h  ({removal_h/total_h*100:.0f}%)")
-    print(f"  alpha:       {alpha_h:>6.1f}h  ({alpha_h/total_h*100:.0f}%)")
-    print(f"  ablation:    {ablation_h:>6.1f}h  ({ablation_h/total_h*100:.0f}%)")
-    print(f"  overhead:    {overhead_h:>6.1f}h  ({overhead_h/total_h*100:.0f}%)")
+    print(
+        f"  estimator:   {total_estimator_h:>6.1f}h  ({total_estimator_h / total_h * 100:.0f}%)"
+    )
+    print(f"  nsga2:       {nsga2_h:>6.1f}h  ({nsga2_h / total_h * 100:.0f}%)")
+    print(f"  removal:     {removal_h:>6.1f}h  ({removal_h / total_h * 100:.0f}%)")
+    print(f"  alpha:       {alpha_h:>6.1f}h  ({alpha_h / total_h * 100:.0f}%)")
+    print(f"  ablation:    {ablation_h:>6.1f}h  ({ablation_h / total_h * 100:.0f}%)")
+    print(f"  overhead:    {overhead_h:>6.1f}h  ({overhead_h / total_h * 100:.0f}%)")
     print()
 
     # ---- Sensitivity to Credit-Card ----
@@ -224,7 +241,7 @@ def main():
 
     # What if Credit-Card is slower?
     for credit_s in [0.60, 0.80, 1.00]:
-        delta = (credit_s - PER_FIT_S["credit_card_fraud"])
+        delta = credit_s - PER_FIT_S["credit_card_fraud"]
         extra = delta * per_seed_fits["credit_card_fraud"] * N_SEEDS / 3600
         print(f"  Credit-Card @ {credit_s:.2f}s/fit: total = {total_h + extra:.1f}h")
 
@@ -234,7 +251,9 @@ def main():
     g200_h = g200_fits * 0.20 * N_SEEDS / 3600
     current_gisette_h = per_seed_hours["gisette"] * N_SEEDS
     delta_g = g200_h - current_gisette_h
-    print(f"  Gisette 100→200feats: adds {delta_g:.1f}h → total = {total_h + delta_g:.1f}h")
+    print(
+        f"  Gisette 100→200feats: adds {delta_g:.1f}h → total = {total_h + delta_g:.1f}h"
+    )
 
     # What if Crimedata is 119 features (per plan)?
     crimedata_119 = count_coalitions(tuple(f"f{i}" for i in range(119)), BUDGETS, 42)
@@ -242,22 +261,26 @@ def main():
     c119_h = c119_fits * 0.17 * N_SEEDS / 3600
     current_crimedata_h = per_seed_hours["crimedata"] * N_SEEDS
     delta_c = c119_h - current_crimedata_h
-    print(f"  Crimedata 100→119feats: adds {delta_c:.1f}h → total = {total_h + delta_c:.1f}h")
+    print(
+        f"  Crimedata 100→119feats: adds {delta_c:.1f}h → total = {total_h + delta_c:.1f}h"
+    )
 
     print()
     print("━" * 75)
     print(" TIMELINE FEASIBILITY (Jul 27 → Aug 5)")
     print("━" * 75)
-    print(f"  Run 1 full:         {total_h:.0f}h (~{total_h/24:.1f} days)")
+    print(f"  Run 1 full:         {total_h:.0f}h (~{total_h / 24:.1f} days)")
     print(f"  Analysis + revise:  1-2 days")
-    print(f"  Run 2 (if needed):  {total_h:.0f}h (~{total_h/24:.1f} days)")
+    print(f"  Run 2 (if needed):  {total_h:.0f}h (~{total_h / 24:.1f} days)")
     print(f"  Final revise:       1 day")
     print(f"  Submit buffer:      0.5 day")
     print()
     total_days = total_h / 24 * 2 + 4.5  # 2 runs + fixed work
-    print(f"  Best case (1 run):  {total_h/24 + 2.5:.1f} days — feasible ✓")
-    print(f"  Worst case (2 runs): {total_days:.1f} days — "
-          f"{'feasible ✓' if total_days <= 9 else 'TIGHT ⚠'}")
+    print(f"  Best case (1 run):  {total_h / 24 + 2.5:.1f} days — feasible ✓")
+    print(
+        f"  Worst case (2 runs): {total_days:.1f} days — "
+        f"{'feasible ✓' if total_days <= 9 else 'TIGHT ⚠'}"
+    )
 
 
 if __name__ == "__main__":

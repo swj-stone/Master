@@ -17,6 +17,7 @@ import os
 import platform
 import re
 import stat
+import time
 import subprocess
 from copy import deepcopy
 from dataclasses import asdict, dataclass
@@ -3040,7 +3041,14 @@ def _atomic_write_text(path: Path, value: str) -> None:
             handle.write(value)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
+        for attempt in range(3):
+            try:
+                os.replace(temporary, path)
+                break
+            except OSError:
+                if attempt == 2:
+                    raise
+                time.sleep(0.5 * (attempt + 1))
         _sync_parent_directory(path.parent)
     finally:
         temporary.unlink(missing_ok=True)

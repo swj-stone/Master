@@ -1,4 +1,5 @@
 """Benchmark XGBoost CUDA fit times for run-time estimation."""
+
 import numpy as np
 import time
 import xgboost as xgb
@@ -14,8 +15,13 @@ def benchmark(label, n_samples, n_features, n_trials=30):
     )
 
     clf = xgb.XGBClassifier(
-        n_estimators=100, max_depth=4, learning_rate=0.1,
-        tree_method="hist", device="cuda", n_jobs=1, verbosity=0,
+        n_estimators=100,
+        max_depth=4,
+        learning_rate=0.1,
+        tree_method="hist",
+        device="cuda",
+        n_jobs=1,
+        verbosity=0,
     )
 
     # warmup
@@ -73,8 +79,10 @@ def main():
     # Also check if scaling is sub-linear due to GPU parallelism
     ratio_5k_20k = med_20k / med_5k if med_5k > 0 else 0
     ratio_20k_50k = med_50k / med_20k if med_20k > 0 else 0
-    print(f"  Scaling: 5k->20k: {ratio_5k_20k:.2f}x (ideal 4x), "
-          f"20k->50k: {ratio_20k_50k:.2f}x (ideal 2.5x)")
+    print(
+        f"  Scaling: 5k->20k: {ratio_5k_20k:.2f}x (ideal 4x), "
+        f"20k->50k: {ratio_20k_50k:.2f}x (ideal 2.5x)"
+    )
 
 
 if __name__ == "__main__":

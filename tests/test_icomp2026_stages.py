@@ -4698,8 +4698,8 @@ def test_removal_plan_freezes_complete_matched_scope_without_test_access(
             None,
             None,
             {
-                budget: {"f": int(budget == 200)}
-                for budget in (10, 25, 50, 100, 200)
+                budget: {"f": int(budget == 100)}
+                for budget in (10, 25, 50, 100)
             },
             {"f": 1},
         ),
@@ -4708,8 +4708,8 @@ def test_removal_plan_freezes_complete_matched_scope_without_test_access(
             None,
             None,
             {
-                budget: {"f": int(budget == 200)}
-                for budget in (10, 25, 50, 100, 200)
+                budget: {"f": int(budget == 100)}
+                for budget in (10, 25, 50, 100)
             },
             {"f": 1},
         ),
@@ -4717,12 +4717,12 @@ def test_removal_plan_freezes_complete_matched_scope_without_test_access(
             76,
             None,
             {
-                budget: {"f": int(budget < 200)}
-                for budget in (10, 25, 50, 100, 200)
+                budget: {"f": int(budget < 100)}
+                for budget in (10, 25, 50, 100)
             },
             {
-                budget: {"f": int(budget == 200)}
-                for budget in (10, 25, 50, 100, 200)
+                budget: {"f": int(budget == 100)}
+                for budget in (10, 25, 50, 100)
             },
             {"f": 0},
         ),
@@ -4735,7 +4735,7 @@ def test_alpha_max_budget_derivation_accepts_full_formal_checkpoint_maps(
     guided_scores: dict[int, dict[str, int]] | None,
     expected: dict[str, int],
 ) -> None:
-    budgets = (10, 25, 50, 100, 200)
+    budgets = (10, 25, 50, 100)
 
     assert stage_module._derive_alpha_max_budget_scores(
         feature_count=feature_count,
@@ -4792,7 +4792,7 @@ def _alpha_coverage_request(feature_count: int) -> EstimatorGroupRequest:
         model_params={"n_estimators": 1},
         backend="cpu",
         methods=("hybrid",),
-        budgets=(10, 25, 50, 100, 200),
+        budgets=(10, 25, 50, 100),
         exact_max_features=20,
         alpha=0.95,
         cache_schema=CACHE_SCHEMA_VERSION,
