@@ -37,6 +37,7 @@ from experiments.icomp2026_progress import (
     format_progress,
     progress_from_document,
     progress_to_document,
+    remaining_physical_fit_upper_bound,
 )
 from minppi_mofs.coalition_cache import (
     CACHE_SCHEMA_VERSION,
@@ -2003,6 +2004,12 @@ def test_eta_uses_exact_recent_physical_fit_throughput(
     expected: float | None,
 ) -> None:
     assert estimate_eta_s(timestamps, remaining) == expected
+
+
+def test_eta_converts_remaining_marginals_to_physical_fit_upper_bound() -> None:
+    assert remaining_physical_fit_upper_bound(0) == 0
+    assert remaining_physical_fit_upper_bound(1) == 2
+    assert remaining_physical_fit_upper_bound(375) == 750
 
 
 @pytest.mark.parametrize(

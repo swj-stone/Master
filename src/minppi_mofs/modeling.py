@@ -130,6 +130,74 @@ def fit_predict(
     return result
 
 
+def fit_predict_checkpoints(
+    X_train: pd.DataFrame,
+    y_train: np.ndarray,
+    X_eval: pd.DataFrame,
+    *,
+    task: str,
+    model_params: Mapping[str, object],
+    checkpoints: Sequence[int],
+    backend: str,
+    seed: int,
+) -> dict[int, np.ndarray]:
+    """Fit the maximum boosting round once and predict at deterministic prefixes.
+
+    XGBoost builds trees sequentially, so the first ``k`` trees of a model
+    trained for ``K >= k`` rounds are the same deterministic model obtained by
+    stopping training after ``k`` rounds.  This boundary is used only for
+    validation calibration; formal experiments still fit the selected frozen
+    round count directly.
+    """
+    rounds = tuple(checkpoints)
+    if (
+        not rounds
+        or tuple(sorted(rounds)) != rounds
+        or len(set(rounds)) != len(rounds)
+        or any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 1
+            for value in rounds
+        )
+    ):
+        raise ValueError("checkpoints must be unique increasing positive integers")
+    params = _validated_policy(
+        task=task, model_params=model_params, backend=backend, seed=seed
+    )
+    if model_params.get("n_estimators") != rounds[-1]:
+        raise ValueError(
+            "model_params n_estimators must equal the largest checkpoint"
+        )
+    train = _validated_frame(X_train, name="X_train")
+    evaluation = _validated_frame(X_eval, name="X_eval")
+    if not tuple(train.columns) or tuple(evaluation.columns) != tuple(train.columns):
+        raise ValueError("non-empty train/evaluation feature columns must match")
+    target = _validated_target(y_train, row_count=len(train), task=task)
+    safe_columns = [f"f{index}" for index in range(train.shape[1])]
+    train = train.set_axis(safe_columns, axis="columns")
+    evaluation = evaluation.set_axis(safe_columns, axis="columns")
+    model = XGBRegressor(**params) if task == "regression" else XGBClassifier(**params)
+    model.fit(train, target)
+    expected_ndim = 1 if task == "regression" else 2
+    predictions: dict[int, np.ndarray] = {}
+    for checkpoint in rounds:
+        raw = (
+            model.predict(evaluation, iteration_range=(0, checkpoint))
+            if task == "regression"
+            else model.predict_proba(
+                evaluation, iteration_range=(0, checkpoint)
+            )
+        )
+        result = np.asarray(raw, dtype=float)
+        if (
+            not np.isfinite(result).all()
+            or result.ndim != expected_ndim
+            or len(result) != len(evaluation)
+        ):
+            raise ValueError("model checkpoint predictions have an invalid shape")
+        predictions[checkpoint] = result
+    return predictions
+
+
 def make_model(
     *,
     task: str,

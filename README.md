@@ -216,3 +216,108 @@ to_student/
 - **DARTS 不收敛**：切到论文 cross-Shapley 文档底部的 Topic 4-lite (NSGA-II 搜架构超参，no DARTS)
 - **会议实验跑不完**：砍数据集到 3 个 (Spambase, Madelon, Credit-Card-Fraud)，baseline 砍到 5 个核心
 - **Theorem 1 (cross-Shapley uniqueness) 证不出**：fallback 为 "well-definedness only"，论文照常发，理论一致性留 future work
+
+## ICOMP 2026 多保真实验流程（2026-07-28）
+
+所有命令都在 `Master` 目录的 PowerShell 中运行。Seed 42 筛选阶段只允许
+使用训练集和验证集；在人工检查 `screen_report.md` 以前，不要启动
+`removal`、`alpha`、`nsga2` 或其他会访问测试集的阶段。
+
+```powershell
+$PY = "..\venv\Scripts\python.exe"
+$ROOT = "results\icomp2026_multifidelity"
+$BOOT = "bootstrap-s42-v1"
+$SMOKE = "policy-smoke-s42-v1"
+$SCREEN = "screen-s42-v1"
+$POLICY = "$ROOT\$BOOT\calibration\model_policy.json"
+```
+
+先完成预处理并校准每个数据集的 XGBoost 轮数：
+
+```powershell
+& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $BOOT
+& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $BOOT --resume
+& $PY -m experiments.calibrate_icomp2026_models --run-root "$ROOT\$BOOT" --config-dir configs --backend cuda --seed 42 --candidate-rounds 10 20 40 100 --output $POLICY
+```
+
+对两个 smoke 数据集验证冻结策略，全程不访问测试集：
+
+```powershell
+& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SMOKE --smoke --model-policy $POLICY
+& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SMOKE --smoke --model-policy $POLICY --resume
+& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SMOKE --smoke --model-policy $POLICY --resume
+```
+
+运行七个数据集的 seed 42 筛选实验并生成方向性报告：
+
+```powershell
+& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SCREEN --model-policy $POLICY --estimator-budgets 2 5
+& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SCREEN --model-policy $POLICY --estimator-budgets 2 5 --resume
+& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SCREEN --model-policy $POLICY --estimator-budgets 2 5 --resume
+& $PY -m experiments.screen_icomp2026_results --run-root "$ROOT\$SCREEN" --config-dir configs --model-policy $POLICY --backend cuda --seed 42 --estimator-budgets 2 5
+```
+
+估计器中断后只需执行以下命令。分组 SQLite 缓存与进度文件会跳过已经完成的
+物理拟合：
+
+```powershell
+& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SCREEN --model-policy $POLICY --estimator-budgets 2 5 --resume
+```
+
+持续查看日志，或列出每个数据集最新的进度文件：
+
+```powershell
+Get-Content "$ROOT\$SCREEN\output.log" -Tail 30 -Wait
+```
+
+```powershell
+Get-ChildItem "$ROOT\$SCREEN\estimator\_bundles" -Recurse -Filter progress.json | Sort-Object LastWriteTime -Descending | Select-Object -First 7 FullName,LastWriteTime
+```
+
+通过验证集冻结门后，方向性 `$SCREEN` 不进入最终主表。使用完整
+`K=10,25,50` 重新运行正式 seed 42，再使用同一模型策略和未改动的 Python
+源码运行剩余四个 seed：
+
+```powershell
+$FORMAL42 = "formal-s42-v1"
+$CONFIRM = "confirm-s123-456-789-1024-v1"
+& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $FORMAL42 --model-policy $POLICY
+& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $FORMAL42 --model-policy $POLICY --resume
+& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $FORMAL42 --model-policy $POLICY --resume
+& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 123 456 789 1024 --backend cuda --run-id $CONFIRM --model-policy $POLICY
+& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 123 456 789 1024 --backend cuda --run-id $CONFIRM --model-policy $POLICY --resume
+& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 123 456 789 1024 --backend cuda --run-id $CONFIRM --model-policy $POLICY --resume
+```
+
+最终索引会拒绝 seed 重叠、模型策略变化、实验设置变化和源代码指纹变化：
+
+```powershell
+& $PY -m experiments.summarize_multifidelity_campaign --shard "$ROOT\$FORMAL42" --shard "$ROOT\$CONFIRM" --output "$ROOT\campaign_index.json"
+```
+
+### 2026-07-28：48 小时正式执行入口
+
+上面的逐 run 命令是旧多保真流程说明。当前 1-GPU、48 小时正式协议和全部
+PowerShell 命令以
+[`ICOMP2026_48H_EXECUTION_FRAMEWORK.md`](ICOMP2026_48H_EXECUTION_FRAMEWORK.md)
+为准。
+
+测试集密封的第一段：
+
+```powershell
+$PY = "..\venv\Scripts\python.exe"
+$OUT = "results\icomp2026_48h"
+$CID = "icomp2026-formal-20260728-v1"
+$POLICY = "results\icomp2026_multifidelity\bootstrap-s42-20260728-v2\calibration\model_policy.json"
+& $PY experiments\run_icomp2026_campaign.py --config-dir configs --output-root $OUT --campaign-id $CID --model-policy $POLICY --through estimator --max-parallel 3
+```
+
+人工检查 seed-42 validation report 后，显式完成全部 P0、统一五种子汇总、排名
+统计和论文图：
+
+```powershell
+& $PY experiments\run_icomp2026_campaign.py --config-dir configs --output-root $OUT --campaign-id $CID --model-policy $POLICY --through summarize --max-parallel 3 --allow-test-access
+```
+
+两条命令都可在中断后原样重输以安全恢复。不要在正式 campaign 创建后修改
+Python/YAML/model policy，也不要复制旧 run 的 cache。

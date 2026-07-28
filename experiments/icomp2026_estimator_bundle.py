@@ -32,10 +32,12 @@ from minppi_mofs.coalition_cache import (
 from minppi_mofs.experiment_protocol import (
     _validate_data_manifest_row,
     atomic_write_json,
+    estimator_budgets_for,
     read_canonical_json,
     resolved_protocol_hash,
 )
 from minppi_mofs.min_ppi import estimate_minppi_exact
+from minppi_mofs.multifidelity import model_params_for
 from minppi_mofs.nested_estimation import (
     NestedProgress,
     NestedGuidedSchedule,
@@ -58,6 +60,7 @@ if __package__:
         estimate_eta_s,
         progress_from_document,
         progress_to_document,
+        remaining_physical_fit_upper_bound,
     )
 else:
     from icomp2026_progress import (  # type: ignore[no-redef]
@@ -66,6 +69,7 @@ else:
         estimate_eta_s,
         progress_from_document,
         progress_to_document,
+        remaining_physical_fit_upper_bound,
     )
 
 if TYPE_CHECKING:
@@ -613,7 +617,8 @@ def group_request_from_context(
         or set(job.parameters) != {"task", "utility", "budget"}
         or job.parameters["task"] != dataset.task
         or job.parameters["utility"] != dataset.utility
-        or job.parameters["budget"] not in protocol.estimator_budgets
+        or job.parameters["budget"]
+        not in estimator_budgets_for(protocol, job.dataset_id)
     ):
         raise ValueError("estimator job conflicts with protocol authority")
     if (
@@ -667,7 +672,9 @@ def group_request_from_context(
     if job not in manifest:
         raise ValueError("estimator job is outside the frozen status manifest")
     protocol_methods = _canonical_methods(protocol.estimator_methods)
-    protocol_budgets = _owned_budgets(protocol.estimator_budgets)
+    protocol_budgets = _owned_budgets(
+        estimator_budgets_for(protocol, job.dataset_id)
+    )
     exact_authorized = (
         len(features) <= protocol.exact_max_features
     )
@@ -738,7 +745,7 @@ def group_request_from_context(
         utility=dataset.utility,
         ordered_features=features,
         split_hashes=split_hashes,
-        model_params=protocol.model_params,
+        model_params=model_params_for(protocol, job.dataset_id),
         backend=protocol.backend,
         methods=methods,
         budgets=budgets,
@@ -2154,7 +2161,8 @@ class _ProgressCoordinator:
             budget = self._budget
             max_budget = self._max_budget
             eta = estimate_eta_s(
-                tuple(self._recent_fit_timestamps), remaining
+                tuple(self._recent_fit_timestamps),
+                remaining_physical_fit_upper_bound(remaining),
             )
         return EstimatorProgressEvent(
             request_digest=self._request.digest,

@@ -25,6 +25,7 @@ from minppi_mofs.experiment_protocol import (
     build_job_manifest,
     canonical_hash,
     create_new_run,
+    estimator_budgets_for,
     freeze_run_metadata,
     load_resolved_protocol,
     open_resumed_run,
@@ -33,7 +34,15 @@ from minppi_mofs.experiment_protocol import (
     read_rich_data_manifest,
     read_result_record,
     resolved_protocol_hash,
+    stage_scope_for,
     upsert_data_manifest,
+)
+from minppi_mofs.multifidelity import (
+    CalibrationRules,
+    CandidateCalibration,
+    DatasetModelPolicy,
+    ModelPolicy,
+    write_model_policy,
 )
 
 
@@ -70,6 +79,8 @@ GLOBAL_CONFIG = {
             "random_matched",
         ],
         "random_repeats": 30,
+        "classification_noninferiority_margin": 0.005,
+        "regression_noninferiority_margin": 0.01,
     },
     "nsga2": {
         "variants": ["full", "minppi_prefilter"],
@@ -144,6 +155,38 @@ def _write_protocol(
     return config_dir
 
 
+def _write_test_model_policy(path: Path) -> ModelPolicy:
+    def rows() -> tuple[CandidateCalibration, ...]:
+        return tuple(
+            CandidateCalibration(
+                n_estimators=rounds,
+                full_utility=0.9,
+                full_utility_loss=0.0,
+                spearman=1.0,
+                winning_agreement=1.0,
+                marginal_sign_agreement=1.0,
+                harmful_recall=1.0,
+                false_harmful_rate=0.0,
+                seconds_per_fit=0.1,
+                physical_fits=10,
+            )
+            for rounds in (10, 20, 40, 100)
+        )
+
+    policy = ModelPolicy(
+        schema_version=1,
+        calibration_seed=42,
+        candidate_rounds=(10, 20, 40, 100),
+        rules=CalibrationRules(),
+        datasets={
+            "spambase": DatasetModelPolicy(40, 100, rows()),
+            "abalone": DatasetModelPolicy(20, 100, rows()),
+        },
+    )
+    write_model_policy(path, policy)
+    return policy
+
+
 def test_load_resolved_protocol_merges_global_and_dataset_configs(
     tmp_path: Path,
 ) -> None:
@@ -170,8 +213,82 @@ def test_load_resolved_protocol_merges_global_and_dataset_configs(
     assert protocol.datasets[1].utility == "r2"
     assert protocol.estimator_budgets == (2,)
     assert protocol.removal["random_repeats"] == 2
+    assert protocol.removal["classification_noninferiority_margin"] == 0.005
+    assert protocol.removal["regression_noninferiority_margin"] == 0.01
     assert protocol.nsga2["population"] == 4
     assert protocol.nsga2["evaluations"] == 8
+
+
+def test_model_policy_is_frozen_into_protocol_and_hash(
+    tmp_path: Path,
+) -> None:
+    config_dir = _write_protocol(tmp_path / "configs")
+    policy_path = tmp_path / "model_policy.json"
+    policy = _write_test_model_policy(policy_path)
+
+    baseline = load_resolved_protocol(
+        config_dir,
+        seeds=(42,),
+        backend="cpu",
+        smoke=False,
+    )
+    calibrated = load_resolved_protocol(
+        config_dir,
+        seeds=(42,),
+        backend="cpu",
+        smoke=False,
+        model_policy_path=policy_path,
+    )
+
+    assert calibrated.model_params["n_estimators"] == 100
+    assert calibrated.model_params_by_dataset["spambase"]["n_estimators"] == 40
+    assert calibrated.model_params_by_dataset["abalone"]["n_estimators"] == 20
+    assert calibrated.model_policy_digest == policy.digest
+    assert resolved_protocol_hash(calibrated) != resolved_protocol_hash(baseline)
+
+
+def test_protocol_rejects_model_policy_for_different_dataset_scope(
+    tmp_path: Path,
+) -> None:
+    config_dir = _write_protocol(tmp_path / "configs")
+    policy_path = tmp_path / "model_policy.json"
+    _write_test_model_policy(policy_path)
+    document = json.loads(policy_path.read_text(encoding="utf-8"))
+    del document["datasets"]["abalone"]
+    atomic_write_json(policy_path, document)
+
+    with pytest.raises(ValueError, match="dataset scope"):
+        load_resolved_protocol(
+            config_dir,
+            seeds=(42,),
+            backend="cpu",
+            smoke=False,
+            model_policy_path=policy_path,
+        )
+
+
+def test_smoke_protocol_projects_full_model_policy_to_smoke_datasets(
+    tmp_path: Path,
+) -> None:
+    global_config = deepcopy(GLOBAL_CONFIG)
+    global_config["smoke"]["datasets"] = ["spambase"]
+    config_dir = _write_protocol(
+        tmp_path / "configs", global_config=global_config
+    )
+    policy_path = tmp_path / "model_policy.json"
+    policy = _write_test_model_policy(policy_path)
+
+    protocol = load_resolved_protocol(
+        config_dir,
+        seeds=(42,),
+        backend="cpu",
+        smoke=True,
+        model_policy_path=policy_path,
+    )
+
+    assert protocol.model_policy_digest == policy.digest
+    assert set(protocol.model_params_by_dataset) == {"spambase"}
+    assert protocol.model_params_by_dataset["spambase"]["n_estimators"] == 40
 
 
 def test_formal_protocol_freezes_grouped_execution(tmp_path: Path) -> None:
@@ -200,6 +317,189 @@ def test_formal_protocol_freezes_grouped_execution(tmp_path: Path) -> None:
     assert formal_protocol.backend == "cuda"
     assert source_protocol.execution == expected
     assert formal_protocol.execution == expected
+
+
+def test_repository_formal_budget_ladders_fit_the_48_hour_campaign() -> None:
+    protocol = load_resolved_protocol(
+        Path(__file__).resolve().parents[1] / "configs",
+        seeds=(42,),
+        backend="cuda",
+        smoke=False,
+    )
+
+    assert protocol.estimator_budgets == (2, 5, 10, 25)
+    assert estimator_budgets_for(protocol, "isolet") == (2, 5, 10)
+    assert estimator_budgets_for(
+        protocol, "credit_card_fraud"
+    ) == (2, 5, 10, 25)
+
+
+def test_decision_protocol_accepts_independent_small_budget_ladder(
+    tmp_path: Path,
+) -> None:
+    config_dir = _write_protocol(tmp_path / "configs")
+
+    screen = load_resolved_protocol(
+        config_dir,
+        seeds=(42,),
+        backend="cuda",
+        smoke=False,
+        estimator_budgets_override=(2, 5),
+    )
+    assert screen.estimator_budgets == (2, 5)
+    assert screen.run_kind == "decision"
+
+    with pytest.raises(ValueError, match="strictly increasing"):
+        load_resolved_protocol(
+            config_dir,
+            seeds=(42,),
+            backend="cuda",
+            smoke=False,
+            estimator_budgets_override=(5, 2),
+        )
+
+
+def test_formal_protocol_supports_frozen_per_dataset_budget_ladders(
+    tmp_path: Path,
+) -> None:
+    global_config = deepcopy(GLOBAL_CONFIG)
+    global_config["estimator"]["budgets_by_dataset"] = {
+        "spambase": [2, 5, 10, 25],
+        "abalone": [2, 5],
+    }
+    config_dir = _write_protocol(
+        tmp_path / "configs", global_config=global_config
+    )
+
+    protocol = load_resolved_protocol(
+        config_dir,
+        seeds=(42,),
+        backend="cuda",
+        smoke=False,
+    )
+
+    assert protocol.run_kind == "formal"
+    assert protocol.estimator_budgets == (2, 5, 10, 25)
+    assert estimator_budgets_for(protocol, "spambase") == (2, 5, 10, 25)
+    assert estimator_budgets_for(protocol, "abalone") == (2, 5)
+    jobs = build_job_manifest(
+        protocol,
+        stages=("estimator",),
+        data_manifest=(
+            {
+                "dataset_id": "spambase",
+                "seed": 42,
+                "selected_feature_count": 10,
+            },
+            {
+                "dataset_id": "abalone",
+                "seed": 42,
+                "selected_feature_count": 8,
+            },
+        ),
+    )
+    assert {
+        job.parameters["budget"]
+        for job in jobs
+        if job.dataset_id == "spambase"
+    } == {2, 5, 10, 25}
+    assert {
+        job.parameters["budget"]
+        for job in jobs
+        if job.dataset_id == "abalone"
+    } == {2, 5}
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        {"spambase": [2, 5]},
+        {"spambase": [5, 2], "abalone": [2, 5]},
+        {"spambase": [2, 50], "abalone": [2, 5]},
+    ],
+)
+def test_formal_per_dataset_budget_ladders_fail_closed(
+    tmp_path: Path,
+    mapping: dict[str, list[int]],
+) -> None:
+    global_config = deepcopy(GLOBAL_CONFIG)
+    global_config["estimator"]["budgets_by_dataset"] = mapping
+    config_dir = _write_protocol(
+        tmp_path / "configs", global_config=global_config
+    )
+
+    with pytest.raises(ValueError, match="budgets_by_dataset"):
+        load_resolved_protocol(
+            config_dir,
+            seeds=(42,),
+            backend="cuda",
+            smoke=False,
+        )
+
+
+def test_formal_stage_scopes_keep_main_tables_five_seed_and_ablations_seed42(
+    tmp_path: Path,
+) -> None:
+    global_config = deepcopy(GLOBAL_CONFIG)
+    global_config["stage_scopes"] = {
+        "alpha": {
+            "datasets": ["spambase", "abalone"],
+            "seeds": [42],
+        },
+        "ablation": {
+            "datasets": ["abalone"],
+            "seeds": [42],
+        },
+    }
+    config_dir = _write_protocol(
+        tmp_path / "configs", global_config=global_config
+    )
+    protocol = load_resolved_protocol(
+        config_dir,
+        seeds=None,
+        backend="cuda",
+        smoke=False,
+    )
+
+    assert stage_scope_for(protocol, "estimator") == (
+        ("spambase", "abalone"),
+        (42, 123),
+    )
+    assert stage_scope_for(protocol, "alpha") == (
+        ("spambase", "abalone"),
+        (42,),
+    )
+    assert stage_scope_for(protocol, "ablation") == (("abalone",), (42,))
+    alpha_jobs = build_job_manifest(protocol, stages=("alpha",))
+    assert {job.seed for job in alpha_jobs} == {42}
+    ablation_jobs = build_job_manifest(
+        protocol,
+        stages=("ablation",),
+        data_manifest=(
+            {
+                "dataset_id": "spambase",
+                "seed": 42,
+                "selected_feature_count": 10,
+            },
+            {
+                "dataset_id": "spambase",
+                "seed": 123,
+                "selected_feature_count": 10,
+            },
+            {
+                "dataset_id": "abalone",
+                "seed": 42,
+                "selected_feature_count": 8,
+            },
+            {
+                "dataset_id": "abalone",
+                "seed": 123,
+                "selected_feature_count": 8,
+            },
+        ),
+    )
+    assert {job.dataset_id for job in ablation_jobs} == {"abalone"}
+    assert {job.seed for job in ablation_jobs} == {42}
 
 
 @pytest.mark.parametrize(
@@ -1217,6 +1517,16 @@ def test_job_manifest_is_deterministic_unique_and_uses_smoke_scope(
         removal={
             "random_repeats": 2,
             "controls": resolved_protocol.removal["controls"],
+            "regression_noninferiority_margin": (
+                resolved_protocol.removal[
+                    "regression_noninferiority_margin"
+                ]
+            ),
+            "classification_noninferiority_margin": (
+                resolved_protocol.removal[
+                    "classification_noninferiority_margin"
+                ]
+            ),
         },
     )
     second = build_job_manifest(

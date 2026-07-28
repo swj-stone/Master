@@ -352,6 +352,128 @@ def test_cross_mode_protocol_allows_only_execution_policy_difference() -> None:
     )
 
 
+def test_reader_accepts_current_optional_protocol_authority(
+    tmp_path: Path,
+) -> None:
+    protocol = _scientific_protocol(
+        model_params_by_dataset={
+            "abalone": {"max_depth": 4, "n_estimators": 40}
+        },
+        model_policy_digest="a" * 64,
+        estimator_budgets_by_dataset={"abalone": [2, 5, 10, 25]},
+        stage_scopes={
+            "alpha": {"datasets": ["abalone"], "seeds": [42]},
+            "ablation": {"datasets": ["abalone"], "seeds": [42]},
+        },
+    )
+    path = tmp_path / "resolved_protocol.yaml"
+    path.write_text(
+        validation_module.yaml.safe_dump(
+            protocol, sort_keys=True, allow_unicode=True
+        ),
+        encoding="utf-8",
+    )
+
+    loaded, digest = validation_module._read_resolved_protocol(tmp_path)
+
+    assert loaded == protocol
+    assert digest == validation_module.canonical_hash(protocol)
+
+
+def test_group_request_uses_dataset_specific_model_and_budget_authority() -> None:
+    metadata = SimpleNamespace(
+        protocol_hash="a" * 64,
+        protocol={
+            "execution": {
+                "mode": "grouped_nested_v1",
+                "cache_schema": "coalition_utility_v1",
+                "checkpoint_every_fits": 10,
+                "progress_every_seconds": 5,
+            },
+            "estimator_methods": [
+                "exact",
+                "random_mc",
+                "mi_correlation_guided",
+                "hybrid",
+            ],
+            "exact_max_features": 16,
+            "alpha_default": 0.95,
+        },
+        execution_mode="grouped_nested_v1",
+        backend="cuda",
+        model_params={"max_depth": 4, "n_estimators": 100},
+        model_params_by_dataset={
+            "isolet": {"max_depth": 4, "n_estimators": 20}
+        },
+        budgets=(10, 25, 50),
+        budgets_by_dataset={"isolet": (2, 5, 10)},
+        datasets={"isolet": {"task": "multiclass", "utility": "ovr_auc"}},
+        rows={
+            ("isolet", 42): {
+                "selected_features_json": '["f0", "f1"]',
+                "train_file_sha256": "b" * 64,
+                "val_file_sha256": "c" * 64,
+            }
+        },
+    )
+
+    request = validation_module._group_request_from_metadata(
+        metadata, dataset_id="isolet", seed=42
+    )
+
+    assert request.model_params == {"max_depth": 4, "n_estimators": 20}
+    assert request.budgets == (2, 5, 10)
+
+
+def test_protocol_equivalence_compares_target_dataset_effective_authority() -> None:
+    datasets = [
+        {
+            "dataset_id": "abalone",
+            "task": "regression",
+            "utility": "r2",
+        },
+        {
+            "dataset_id": "isolet",
+            "task": "multiclass",
+            "utility": "ovr_auc",
+        },
+    ]
+    legacy = _scientific_protocol(
+        datasets=datasets,
+        model_params_by_dataset={
+            "abalone": {"max_depth": 4, "n_estimators": 40},
+            "isolet": {"max_depth": 4, "n_estimators": 20},
+        },
+        estimator_budgets_by_dataset={
+            "abalone": [2, 5, 10, 25],
+            "isolet": [2, 5, 10],
+        },
+    )
+    candidate = _scientific_protocol(
+        datasets=datasets[:1],
+        model_params_by_dataset={
+            "abalone": {"max_depth": 4, "n_estimators": 40}
+        },
+        estimator_budgets_by_dataset={"abalone": [2, 5, 10, 25]},
+        execution={
+            "mode": "grouped_nested_v1",
+            "cache_schema": "coalition_utility_v1",
+            "checkpoint_every_fits": 10,
+            "progress_every_seconds": 5,
+        },
+    )
+
+    validation_module._validate_scientific_protocol_equivalence(
+        legacy, candidate, dataset_id="abalone"
+    )
+
+    candidate["estimator_budgets_by_dataset"]["abalone"] = [2, 5, 10]
+    with pytest.raises(ValueError, match="scientific protocol"):
+        validation_module._validate_scientific_protocol_equivalence(
+            legacy, candidate, dataset_id="abalone"
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

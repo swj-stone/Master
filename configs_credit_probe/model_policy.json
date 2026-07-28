@@ -1,0 +1,74 @@
+{
+  "calibration_seed": 42,
+  "candidate_rounds": [
+    10,
+    20,
+    40,
+    100
+  ],
+  "datasets": {
+    "credit_card_fraud": {
+      "calibrations": [
+        {
+          "false_harmful_rate": 0.0,
+          "full_utility": 0.98228390716001,
+          "full_utility_loss": 0.009336451745,
+          "harmful_recall": 1.0,
+          "marginal_sign_agreement": 0.5172413793103449,
+          "n_estimators": 10,
+          "physical_fits": 117,
+          "seconds_per_fit": 0.06853880897446926,
+          "spearman": 0.710273476064,
+          "winning_agreement": 0.9829059829059829
+        },
+        {
+          "false_harmful_rate": 0.0,
+          "full_utility": 0.9888537194153117,
+          "full_utility_loss": 0.00276663949,
+          "harmful_recall": 1.0,
+          "marginal_sign_agreement": 0.6379310344827587,
+          "n_estimators": 20,
+          "physical_fits": 117,
+          "seconds_per_fit": 0.13707761794893852,
+          "spearman": 0.842235010265,
+          "winning_agreement": 0.9914529914529915
+        },
+        {
+          "false_harmful_rate": 0.0,
+          "full_utility": 0.9910869268805775,
+          "full_utility_loss": 0.000533432024,
+          "harmful_recall": 1.0,
+          "marginal_sign_agreement": 0.6896551724137931,
+          "n_estimators": 40,
+          "physical_fits": 117,
+          "seconds_per_fit": 0.27415523589787705,
+          "spearman": 0.930727270003,
+          "winning_agreement": 0.9914529914529915
+        },
+        {
+          "false_harmful_rate": 0.0,
+          "full_utility": 0.9916203589048644,
+          "full_utility_loss": 0.0,
+          "harmful_recall": 1.0,
+          "marginal_sign_agreement": 1.0,
+          "n_estimators": 100,
+          "physical_fits": 117,
+          "seconds_per_fit": 0.6853880897446927,
+          "spearman": 1.0,
+          "winning_agreement": 1.0
+        }
+      ],
+      "reference_n_estimators": 100,
+      "selected_n_estimators": 100
+    }
+  },
+  "rules": {
+    "max_false_harmful_rate": 0.02,
+    "max_full_utility_loss": 0.005,
+    "min_harmful_recall": 0.9,
+    "min_marginal_sign_agreement": 0.9,
+    "min_spearman": 0.95,
+    "min_winning_agreement": 0.95
+  },
+  "schema_version": 1
+}

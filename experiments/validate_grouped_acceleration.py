@@ -68,14 +68,20 @@ _PROTOCOL_KEYS = frozenset(
         "smoke",
     }
 )
+_PROTOCOL_OPTIONAL_KEYS = frozenset(
+    {
+        "model_params_by_dataset",
+        "model_policy_digest",
+        "estimator_budgets_by_dataset",
+        "stage_scopes",
+    }
+)
 _TARGET_SCIENTIFIC_PROTOCOL_FIELDS = (
     "protocol_version",
     "backend",
-    "model_params",
     "alpha_default",
     "alpha_grid",
     "estimator_methods",
-    "estimator_budgets",
     "exact_max_features",
     "nsga2",
     "removal",
@@ -100,7 +106,9 @@ class RunMetadata:
     execution_mode: str
     backend: str
     model_params: Mapping[str, object]
+    model_params_by_dataset: Mapping[str, Mapping[str, object]]
     budgets: tuple[int, ...]
+    budgets_by_dataset: Mapping[str, tuple[int, ...]]
     datasets: Mapping[str, Mapping[str, object]]
     rows: Mapping[tuple[str, int], Mapping[str, str]]
     manifest: tuple[object, ...]
@@ -398,10 +406,11 @@ def _read_resolved_protocol(root: Path) -> tuple[dict[str, object], str]:
         value = yaml.safe_load(text)
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
         raise ValueError("resolved protocol is missing or malformed") from exc
+    required_keys = _PROTOCOL_KEYS - {"execution"}
     if (
         not isinstance(value, dict)
-        or set(value)
-        not in {_PROTOCOL_KEYS, _PROTOCOL_KEYS - {"execution"}}
+        or not required_keys.issubset(value)
+        or not set(value).issubset(_PROTOCOL_KEYS | _PROTOCOL_OPTIONAL_KEYS)
         or yaml.safe_dump(value, sort_keys=True, allow_unicode=True) != text
     ):
         raise ValueError("resolved protocol is not canonical")
@@ -551,6 +560,57 @@ def read_run_metadata(root: Path) -> RunMetadata:
         ):
             raise ValueError("resolved protocol dataset authority is invalid")
         datasets[dataset["dataset_id"]] = dataset
+    dataset_ids = set(datasets)
+    model_mapping_value = protocol.get("model_params_by_dataset")
+    if model_mapping_value is None:
+        model_params_by_dataset = {
+            dataset_id: dict(model_params) for dataset_id in dataset_ids
+        }
+    elif (
+        not isinstance(model_mapping_value, dict)
+        or set(model_mapping_value) != dataset_ids
+        or any(
+            not isinstance(value, dict) or not value
+            for value in model_mapping_value.values()
+        )
+    ):
+        raise ValueError("resolved protocol dataset model authority is invalid")
+    else:
+        model_params_by_dataset = {
+            dataset_id: dict(value)
+            for dataset_id, value in model_mapping_value.items()
+        }
+    policy_digest = protocol.get("model_policy_digest")
+    if policy_digest is not None:
+        _sha256(policy_digest, "model policy digest")
+    budget_mapping_value = protocol.get("estimator_budgets_by_dataset")
+    if budget_mapping_value is None:
+        budgets_by_dataset = {
+            dataset_id: tuple(budgets_value) for dataset_id in dataset_ids
+        }
+    elif (
+        not isinstance(budget_mapping_value, dict)
+        or set(budget_mapping_value) != dataset_ids
+    ):
+        raise ValueError("resolved protocol dataset budget authority is invalid")
+    else:
+        budgets_by_dataset: dict[str, tuple[int, ...]] = {}
+        for dataset_id, values in budget_mapping_value.items():
+            if (
+                not isinstance(values, list)
+                or not values
+                or any(
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or value < 1
+                    for value in values
+                )
+                or tuple(values) != tuple(sorted(set(values)))
+            ):
+                raise ValueError(
+                    "resolved protocol dataset budget authority is invalid"
+                )
+            budgets_by_dataset[dataset_id] = tuple(values)
     rows = _read_data_rows(
         run_root, protocol=protocol, protocol_hash=protocol_hash
     )
@@ -576,7 +636,9 @@ def read_run_metadata(root: Path) -> RunMetadata:
         execution_mode=execution_mode,
         backend="cuda",
         model_params=dict(model_params),
+        model_params_by_dataset=model_params_by_dataset,
         budgets=tuple(budgets_value),
+        budgets_by_dataset=budgets_by_dataset,
         datasets=datasets,
         rows=rows,
         manifest=manifest,
@@ -713,12 +775,36 @@ def _scientific_protocol_projection(
         raise ValueError(
             "target scientific protocol authority is incomplete"
         )
+    model_mapping = protocol.get("model_params_by_dataset")
+    if model_mapping is None:
+        effective_model_params = protocol.get("model_params")
+    elif isinstance(model_mapping, Mapping):
+        effective_model_params = model_mapping.get(dataset_id)
+    else:
+        effective_model_params = None
+    budget_mapping = protocol.get("estimator_budgets_by_dataset")
+    if budget_mapping is None:
+        effective_budgets = protocol.get("estimator_budgets")
+    elif isinstance(budget_mapping, Mapping):
+        effective_budgets = budget_mapping.get(dataset_id)
+    else:
+        effective_budgets = None
+    if (
+        not isinstance(effective_model_params, Mapping)
+        or not isinstance(effective_budgets, list)
+        or not effective_budgets
+    ):
+        raise ValueError(
+            "target dataset model or budget authority is missing"
+        )
     return {
         **{
             key: protocol[key]
             for key in _TARGET_SCIENTIFIC_PROTOCOL_FIELDS
         },
         "dataset": dict(target_datasets[0]),
+        "effective_model_params": dict(effective_model_params),
+        "effective_estimator_budgets": list(effective_budgets),
     }
 
 
@@ -759,8 +845,10 @@ def _validate_cross_run_pair(
     if (
         legacy.backend != candidate.backend
         or legacy.backend != "cuda"
-        or dict(legacy.model_params) != dict(candidate.model_params)
-        or legacy.budgets != candidate.budgets
+        or dict(legacy.model_params_by_dataset[dataset_id])
+        != dict(candidate.model_params_by_dataset[dataset_id])
+        or legacy.budgets_by_dataset[dataset_id]
+        != candidate.budgets_by_dataset[dataset_id]
     ):
         raise ValueError("legacy/candidate model, budget, or CUDA authority differs")
     legacy_dataset = legacy.datasets.get(dataset_id)
@@ -845,10 +933,10 @@ def _group_request_from_metadata(
             "train": row["train_file_sha256"],
             "validation": row["val_file_sha256"],
         },
-        model_params=metadata.model_params,
+        model_params=metadata.model_params_by_dataset[dataset_id],
         backend=metadata.backend,
         methods=methods,
-        budgets=metadata.budgets,
+        budgets=metadata.budgets_by_dataset[dataset_id],
         exact_max_features=exact_max_features,
         alpha=protocol.get("alpha_default"),
         cache_schema=execution.get("cache_schema"),
@@ -1076,7 +1164,7 @@ def _derived_removal_evidence(
         retained,
         task=str(dataset["task"]),
         utility=str(dataset["utility"]),
-        model_params=metadata.model_params,
+        model_params=metadata.model_params_by_dataset[dataset_id],
         backend=metadata.backend,
         seed=seed,
     )
@@ -1089,7 +1177,7 @@ def _derived_removal_evidence(
 
 def _isolet_digests(metadata: RunMetadata) -> dict[str, str]:
     dataset_id, seed = "isolet", 42
-    budget = max(metadata.budgets)
+    budget = max(metadata.budgets_by_dataset[dataset_id])
     jobs = tuple(
         job
         for job in metadata.manifest
@@ -1187,7 +1275,9 @@ def build_acceptance_report(
     abalone_exact: dict[int, Mapping[str, int]] = {}
     abalone_legacy: dict[int, Mapping[str, int]] = {}
     abalone_candidate: dict[int, Mapping[str, int]] = {}
-    abalone_budget = max(legacy["abalone"].budgets)
+    abalone_budget = max(
+        legacy["abalone"].budgets_by_dataset["abalone"]
+    )
     for seed in _ABALONE_SEEDS:
         legacy_methods = _abalone_method_evidence(
             legacy["abalone"], seed=seed, budget=abalone_budget
@@ -1221,7 +1311,7 @@ def build_acceptance_report(
     for dataset_id in ("spambase", "madelon"):
         legacy_metadata = legacy[dataset_id]
         candidate_metadata = candidate[dataset_id]
-        budget = max(legacy_metadata.budgets)
+        budget = max(legacy_metadata.budgets_by_dataset[dataset_id])
         legacy_hybrid = _score_evidence(
             legacy_metadata,
             dataset_id=dataset_id,

@@ -30,7 +30,15 @@ alpha:
 
 estimator:
   methods: [exact, random_mc, mi_correlation_guided, hybrid]
-  budgets: [10, 25, 50, 100]
+  budgets: [10, 25, 50]
+  budgets_by_dataset:
+    spambase: [2, 5, 10, 25]
+    madelon: [2, 5, 10, 25]
+    isolet: [2, 5, 10]
+    gisette: [2, 5, 10, 25]
+    credit_card_fraud: [2, 5, 10, 25]
+    crimedata: [2, 5, 10, 25]
+    abalone: [2, 5, 10, 25]
   exact_max_features: 16
 
 removal:
@@ -42,6 +50,8 @@ removal:
     - banzhaf_bottom
     - random_matched
   random_repeats: 30
+  classification_noninferiority_margin: 0.005
+  regression_noninferiority_margin: 0.01
 
 nsga2:
   variants: [full, minppi_prefilter]
@@ -53,6 +63,25 @@ ablations:
   utility: [accuracy, ovr_auc]
   guidance: [random, mi, correlation, mi_correlation]
   dispatcher: [exact, random_mc, mi_correlation_guided, hybrid]
+
+stage_scopes:
+  alpha:
+    datasets:
+      - spambase
+      - madelon
+      - isolet
+      - gisette
+      - credit_card_fraud
+      - crimedata
+      - abalone
+    seeds: [42]
+  ablation:
+    datasets:
+      - madelon
+      - isolet
+      - credit_card_fraud
+      - abalone
+    seeds: [42]
 
 smoke:
   datasets: [spambase, abalone]

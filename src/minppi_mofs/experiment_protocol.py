@@ -112,6 +112,9 @@ _GLOBAL_KEYS = frozenset(
         "smoke",
     }
 )
+_GLOBAL_OPTIONAL_KEYS = frozenset({"stage_scopes"})
+_SCOPED_STAGES = ("alpha", "ablation")
+_STAGE_SCOPE_KEYS = frozenset({"datasets", "seeds"})
 _EXECUTION_KEYS = frozenset(
     {
         "mode",
@@ -125,7 +128,15 @@ _MODEL_KEYS = frozenset(
 )
 _ALPHA_KEYS = frozenset({"default", "grid"})
 _ESTIMATOR_KEYS = frozenset({"methods", "budgets", "exact_max_features"})
-_REMOVAL_KEYS = frozenset({"controls", "random_repeats"})
+_ESTIMATOR_OPTIONAL_KEYS = frozenset({"budgets_by_dataset"})
+_REMOVAL_KEYS = frozenset(
+    {
+        "controls",
+        "random_repeats",
+        "classification_noninferiority_margin",
+        "regression_noninferiority_margin",
+    }
+)
 _NSGA2_KEYS = frozenset(
     {"variants", "population", "evaluations", "ref_point"}
 )
@@ -195,6 +206,10 @@ class ResolvedProtocol:
     removal: dict[str, object]
     ablations: dict[str, object]
     smoke: dict[str, object]
+    model_params_by_dataset: dict[str, dict[str, object]] | None = None
+    model_policy_digest: str | None = None
+    estimator_budgets_by_dataset: dict[str, tuple[int, ...]] | None = None
+    stage_scopes: dict[str, dict[str, tuple[object, ...]]] | None = None
 
 
 @dataclass(frozen=True)
@@ -783,6 +798,78 @@ def resolved_protocol_hash(protocol: ResolvedProtocol) -> str:
     return _protocol_hash(protocol)
 
 
+def estimator_budgets_for(
+    protocol: ResolvedProtocol, dataset_id: str
+) -> tuple[int, ...]:
+    """Return the frozen nested estimator ladder for one dataset."""
+    if not isinstance(protocol, ResolvedProtocol):
+        raise TypeError("protocol must be a ResolvedProtocol")
+    if not isinstance(dataset_id, str) or not dataset_id:
+        raise ValueError("dataset_id must be a non-empty string")
+    if dataset_id not in {
+        dataset.dataset_id for dataset in protocol.datasets
+    }:
+        raise ValueError(f"dataset {dataset_id!r} is outside protocol scope")
+    mapping = protocol.estimator_budgets_by_dataset
+    budgets = (
+        protocol.estimator_budgets
+        if mapping is None
+        else mapping.get(dataset_id)
+    )
+    if (
+        not isinstance(budgets, tuple)
+        or not budgets
+        or tuple(sorted(set(budgets))) != budgets
+        or any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 1
+            for value in budgets
+        )
+    ):
+        raise ValueError(
+            f"protocol estimator budgets are invalid for {dataset_id}"
+        )
+    return budgets
+
+
+def stage_scope_for(
+    protocol: ResolvedProtocol, stage: str
+) -> tuple[tuple[str, ...], tuple[int, ...]]:
+    """Return frozen dataset IDs and seeds for one stage."""
+    if not isinstance(protocol, ResolvedProtocol):
+        raise TypeError("protocol must be a ResolvedProtocol")
+    if not isinstance(stage, str) or not stage:
+        raise ValueError("stage must be a non-empty string")
+    full_datasets = tuple(
+        dataset.dataset_id for dataset in protocol.datasets
+    )
+    scopes = protocol.stage_scopes
+    if scopes is None or stage not in scopes:
+        return full_datasets, protocol.seeds
+    scope = scopes[stage]
+    if not isinstance(scope, dict) or set(scope) != {"datasets", "seeds"}:
+        raise ValueError(f"protocol stage scope is invalid for {stage}")
+    datasets = scope["datasets"]
+    seeds = scope["seeds"]
+    if (
+        not isinstance(datasets, tuple)
+        or not datasets
+        or len(set(datasets)) != len(datasets)
+        or not all(isinstance(dataset_id, str) for dataset_id in datasets)
+        or not isinstance(seeds, tuple)
+        or not seeds
+        or len(set(seeds)) != len(seeds)
+        or not all(
+            isinstance(seed, int) and not isinstance(seed, bool)
+            for seed in seeds
+        )
+    ):
+        raise ValueError(f"protocol stage scope is invalid for {stage}")
+    return (
+        tuple(item for item in datasets if item in full_datasets),
+        tuple(seed for seed in seeds if seed in protocol.seeds),
+    )
+
+
 def create_new_run(
     output_root: Path,
     run_id: str | None,
@@ -1229,10 +1316,13 @@ def build_job_manifest(
             for dataset in protocol.datasets:
                 for seed in protocol.seeds:
                     count = selected_features[(dataset.dataset_id, seed)]
+                    dataset_budgets = estimator_budgets_for(
+                        protocol, dataset.dataset_id
+                    )
                     for method in protocol.estimator_methods:
                         if method == "exact" and count > protocol.exact_max_features:
                             continue
-                        for budget in protocol.estimator_budgets:
+                        for budget in dataset_budgets:
                             jobs.append(
                                 _make_job(
                                     protocol_hash,
@@ -1271,8 +1361,13 @@ def build_job_manifest(
                             )
                         )
         elif stage == "alpha":
-            for dataset in protocol.datasets:
-                for seed in protocol.seeds:
+            scoped_ids, scoped_seeds = stage_scope_for(protocol, stage)
+            for dataset in (
+                item
+                for item in protocol.datasets
+                if item.dataset_id in scoped_ids
+            ):
+                for seed in scoped_seeds:
                     plan = _make_job(
                         protocol_hash,
                         stage,
@@ -1318,8 +1413,13 @@ def build_job_manifest(
         elif stage == "ablation":
             if selected_features is None:
                 raise AssertionError("ablation data manifest was not loaded")
-            for dataset in protocol.datasets:
-                for seed in protocol.seeds:
+            scoped_ids, scoped_seeds = stage_scope_for(protocol, stage)
+            for dataset in (
+                item
+                for item in protocol.datasets
+                if item.dataset_id in scoped_ids
+            ):
+                for seed in scoped_seeds:
                     for axis in sorted(protocol.ablations):
                         if axis == "utility" and dataset.dataset_id != "isolet":
                             continue
@@ -3074,11 +3174,24 @@ def load_resolved_protocol(
     seeds: tuple[int, ...] | None,
     backend: str | None,
     smoke: bool,
+    model_policy_path: Path | None = None,
+    estimator_budgets_override: tuple[int, ...] | None = None,
 ) -> ResolvedProtocol:
     """Load, merge, and strictly validate the ICOMP 2026 protocol."""
     config_dir = Path(config_dir)
     global_config = _read_yaml(config_dir / "icomp2026_pipeline.yaml")
-    _expect_exact_keys(global_config, _GLOBAL_KEYS, "global protocol")
+    global_keys = set(global_config)
+    if (
+        not _GLOBAL_KEYS.issubset(global_keys)
+        or global_keys - _GLOBAL_KEYS - _GLOBAL_OPTIONAL_KEYS
+    ):
+        missing = sorted(_GLOBAL_KEYS - global_keys)
+        extra = sorted(
+            global_keys - _GLOBAL_KEYS - _GLOBAL_OPTIONAL_KEYS
+        )
+        raise ValueError(
+            f"global protocol keys mismatch; missing={missing}, extra={extra}"
+        )
 
     protocol_version = _nonempty_string(
         global_config["protocol_version"], "protocol_version"
@@ -3171,6 +3284,27 @@ def load_resolved_protocol(
     model = _mapping(global_config["model"], "model")
     _expect_exact_keys(model, _MODEL_KEYS, "model")
     model_params = _validate_model(model)
+    model_params_by_dataset = {
+        dataset_id: dict(model_params) for dataset_id in loaded_ids
+    }
+    model_policy_digest: str | None = None
+    if model_policy_path is not None:
+        from minppi_mofs.multifidelity import load_model_policy
+
+        model_policy = load_model_policy(
+            Path(model_policy_path),
+            expected_datasets=configured_ids if smoke else loaded_ids,
+        )
+        model_params_by_dataset = {
+            dataset_id: {
+                **model_params,
+                "n_estimators": (
+                    model_policy.datasets[dataset_id].selected_n_estimators
+                ),
+            }
+            for dataset_id in loaded_ids
+        }
+        model_policy_digest = model_policy.digest
 
     alpha = _mapping(global_config["alpha"], "alpha")
     _expect_exact_keys(alpha, _ALPHA_KEYS, "alpha")
@@ -3184,7 +3318,20 @@ def load_resolved_protocol(
     _ensure_unique(alpha_grid, "duplicate alpha values")
 
     estimator = _mapping(global_config["estimator"], "estimator")
-    _expect_exact_keys(estimator, _ESTIMATOR_KEYS, "estimator")
+    estimator_keys = set(estimator)
+    if (
+        not _ESTIMATOR_KEYS.issubset(estimator_keys)
+        or estimator_keys
+        - _ESTIMATOR_KEYS
+        - _ESTIMATOR_OPTIONAL_KEYS
+    ):
+        missing = sorted(_ESTIMATOR_KEYS - estimator_keys)
+        extra = sorted(
+            estimator_keys - _ESTIMATOR_KEYS - _ESTIMATOR_OPTIONAL_KEYS
+        )
+        raise ValueError(
+            f"estimator keys mismatch; missing={missing}, extra={extra}"
+        )
     estimator_methods = _string_tuple(
         estimator["methods"], "estimator.methods"
     )
@@ -3196,6 +3343,34 @@ def load_resolved_protocol(
         estimator["budgets"], "estimator.budgets"
     )
     _ensure_unique(configured_budgets, "duplicate estimator budgets")
+    if tuple(sorted(configured_budgets)) != configured_budgets:
+        raise ValueError("estimator.budgets must be strictly increasing")
+    configured_budgets_by_dataset: dict[str, tuple[int, ...]] | None = None
+    if "budgets_by_dataset" in estimator:
+        raw_mapping = _mapping(
+            estimator["budgets_by_dataset"],
+            "estimator.budgets_by_dataset",
+        )
+        if set(raw_mapping) != set(configured_ids):
+            raise ValueError(
+                "estimator.budgets_by_dataset must exactly match datasets"
+            )
+        configured_budgets_by_dataset = {}
+        for dataset_id in configured_ids:
+            ladder = _positive_int_tuple(
+                raw_mapping[dataset_id],
+                f"estimator.budgets_by_dataset.{dataset_id}",
+            )
+            if (
+                not ladder
+                or tuple(sorted(set(ladder))) != ladder
+                or ladder[-1] > configured_budgets[-1]
+            ):
+                raise ValueError(
+                    "estimator.budgets_by_dataset ladders must be unique, "
+                    "strictly increasing, and not exceed estimator.budgets"
+                )
+            configured_budgets_by_dataset[dataset_id] = ladder
     exact_max_features = _positive_int(
         estimator["exact_max_features"], "estimator.exact_max_features"
     )
@@ -3203,7 +3378,52 @@ def load_resolved_protocol(
         smoke_config["estimator_budgets"], "smoke.estimator_budgets"
     )
     _ensure_unique(smoke_budgets, "duplicate smoke estimator budgets")
-    estimator_budgets = smoke_budgets if smoke else configured_budgets
+    if estimator_budgets_override is not None:
+        if smoke:
+            raise ValueError(
+                "estimator budget override is not allowed in smoke mode"
+            )
+        overridden_budgets = _positive_int_tuple(
+            estimator_budgets_override, "estimator budgets override"
+        )
+        _ensure_unique(overridden_budgets, "duplicate estimator budget overrides")
+        if (
+            not overridden_budgets
+            or tuple(sorted(overridden_budgets)) != overridden_budgets
+        ):
+            raise ValueError(
+                "decision estimator budgets must be strictly increasing"
+            )
+        if overridden_budgets[-1] > configured_budgets[-1]:
+            raise ValueError(
+                "decision estimator budgets cannot exceed the formal maximum"
+            )
+        estimator_budgets_by_dataset = {
+            dataset_id: overridden_budgets for dataset_id in loaded_ids
+        }
+    else:
+        if smoke:
+            estimator_budgets_by_dataset = {
+                dataset_id: smoke_budgets for dataset_id in loaded_ids
+            }
+        elif configured_budgets_by_dataset is not None:
+            estimator_budgets_by_dataset = {
+                dataset_id: configured_budgets_by_dataset[dataset_id]
+                for dataset_id in loaded_ids
+            }
+        else:
+            estimator_budgets_by_dataset = {
+                dataset_id: configured_budgets for dataset_id in loaded_ids
+            }
+    estimator_budgets = tuple(
+        sorted(
+            {
+                budget
+                for ladder in estimator_budgets_by_dataset.values()
+                for budget in ladder
+            }
+        )
+    )
 
     removal = _mapping(global_config["removal"], "removal")
     _expect_exact_keys(removal, _REMOVAL_KEYS, "removal")
@@ -3219,6 +3439,14 @@ def load_resolved_protocol(
     removal_resolved: dict[str, object] = {
         "controls": controls,
         "random_repeats": random_repeats,
+        "classification_noninferiority_margin": _fraction(
+            removal["classification_noninferiority_margin"],
+            "removal.classification_noninferiority_margin",
+        ),
+        "regression_noninferiority_margin": _fraction(
+            removal["regression_noninferiority_margin"],
+            "removal.regression_noninferiority_margin",
+        ),
     }
 
     nsga2 = _mapping(global_config["nsga2"], "nsga2")
@@ -3266,6 +3494,51 @@ def load_resolved_protocol(
             raise ValueError(f"ablations.{key} must not be empty")
         _ensure_unique(values, f"duplicate ablations.{key} values")
 
+    stage_scopes_resolved: (
+        dict[str, dict[str, tuple[object, ...]]] | None
+    ) = None
+    if not smoke and "stage_scopes" in global_config:
+        raw_scopes = _mapping(
+            global_config["stage_scopes"], "stage_scopes"
+        )
+        if set(raw_scopes) != set(_SCOPED_STAGES):
+            raise ValueError(
+                "stage_scopes must contain exactly alpha and ablation"
+            )
+        stage_scopes_resolved = {}
+        for stage in _SCOPED_STAGES:
+            raw_scope = _mapping(raw_scopes[stage], f"stage_scopes.{stage}")
+            _expect_exact_keys(
+                raw_scope, _STAGE_SCOPE_KEYS, f"stage_scopes.{stage}"
+            )
+            scope_datasets = _dataset_id_tuple(
+                raw_scope["datasets"], f"stage_scopes.{stage}.datasets"
+            )
+            scope_seeds = _positive_int_tuple(
+                raw_scope["seeds"], f"stage_scopes.{stage}.seeds"
+            )
+            _ensure_unique(
+                scope_datasets,
+                f"duplicate stage_scopes.{stage}.datasets",
+            )
+            _ensure_unique(
+                scope_seeds,
+                f"duplicate stage_scopes.{stage}.seeds",
+            )
+            if (
+                not scope_datasets
+                or not scope_seeds
+                or not set(scope_datasets).issubset(configured_ids)
+                or not set(scope_seeds).issubset(configured_seeds)
+            ):
+                raise ValueError(
+                    f"stage_scopes.{stage} is outside configured datasets/seeds"
+                )
+            stage_scopes_resolved[stage] = {
+                "datasets": scope_datasets,
+                "seeds": scope_seeds,
+            }
+
     smoke_resolved: dict[str, object] = {
         "datasets": smoke_ids,
         "seeds": smoke_seeds,
@@ -3283,7 +3556,15 @@ def load_resolved_protocol(
 
     return ResolvedProtocol(
         protocol_version=protocol_version,
-        run_kind="smoke" if smoke else "formal",
+        run_kind=(
+            "smoke"
+            if smoke
+            else (
+                "decision"
+                if estimator_budgets_override is not None
+                else "formal"
+            )
+        ),
         datasets=datasets,
         seeds=selected_seeds,
         backend=selected_backend,
@@ -3298,6 +3579,10 @@ def load_resolved_protocol(
         removal=removal_resolved,
         ablations=ablations_resolved,
         smoke=smoke_resolved,
+        model_params_by_dataset=model_params_by_dataset,
+        model_policy_digest=model_policy_digest,
+        estimator_budgets_by_dataset=estimator_budgets_by_dataset,
+        stage_scopes=stage_scopes_resolved,
     )
 
 

@@ -77,6 +77,7 @@ from minppi_mofs.experiment_protocol import (  # noqa: E402
     atomic_write_json,
     build_job_manifest,
     create_new_run,
+    estimator_budgets_for,
     freeze_run_metadata,
     load_resolved_protocol,
     open_resumed_run,
@@ -115,6 +116,9 @@ def project_isolet_utility_pair_protocol(
         protocol,
         datasets=isolet,
         seeds=(42,),
+        estimator_budgets_by_dataset={
+            "isolet": estimator_budgets_for(protocol, "isolet")
+        },
     )
     _validate_scope_protocol(projected)
     return projected
@@ -255,7 +259,9 @@ def _validate_utility_pair_result(
     context: stage_module.StageContext,
     record: ResultRecord,
 ) -> None:
-    budget = max(context.protocol.estimator_budgets)
+    budget = max(
+        estimator_budgets_for(context.protocol, context.job.dataset_id)
+    )
     group_id = f"utility:isolet:s42:b{budget}"
     relpath = f"ablation/isolet/s42/utility/paired/b{budget}/scores.json"
     expected_metric_keys = {

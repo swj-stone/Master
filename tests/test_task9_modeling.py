@@ -126,6 +126,57 @@ def test_fit_predict_sanitizes_xgboost_forbidden_feature_names(fake_xgboost) -> 
     assert _Classifier.instances[0].fit_columns == ("f0", "f1")
 
 
+def test_checkpoint_predictions_match_independent_boosting_prefixes() -> None:
+    from minppi_mofs.modeling import (
+        fit_predict,
+        fit_predict_checkpoints,
+    )
+
+    rng = np.random.default_rng(7)
+    X = pd.DataFrame(rng.normal(size=(80, 4)), columns=list("abcd"))
+    y = (X["a"].to_numpy() + 0.2 * X["b"].to_numpy() > 0).astype(int)
+    train = X.iloc[:60]
+    evaluation = X.iloc[60:]
+    params = {
+        "n_estimators": 4,
+        "max_depth": 2,
+        "learning_rate": 0.1,
+        "n_jobs": 1,
+    }
+
+    checkpoints = fit_predict_checkpoints(
+        train,
+        y[:60],
+        evaluation,
+        task="binary",
+        model_params=params,
+        checkpoints=(2, 4),
+        backend="cpu",
+        seed=11,
+    )
+    independently_fitted = {
+        rounds: fit_predict(
+            train,
+            y[:60],
+            evaluation,
+            task="binary",
+            model_params={**params, "n_estimators": rounds},
+            backend="cpu",
+            seed=11,
+        )
+        for rounds in (2, 4)
+    }
+
+    assert tuple(checkpoints) == (2, 4)
+    for rounds in checkpoints:
+        assert np.allclose(
+            checkpoints[rounds],
+            independently_fitted[rounds],
+            rtol=0.0,
+            atol=1e-12,
+        )
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [

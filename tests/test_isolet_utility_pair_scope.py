@@ -582,6 +582,9 @@ def test_real_repository_config_projects_to_canonical_isolet_scope() -> None:
         projected,
         datasets=loaded.datasets,
         seeds=loaded.seeds,
+        estimator_budgets_by_dataset=(
+            loaded.estimator_budgets_by_dataset
+        ),
     ) == loaded
     assert len(manifest) == 4
     assert {job.protocol_hash for job in manifest} == {

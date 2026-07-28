@@ -34,6 +34,17 @@ def _standard_library_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--seeds", type=int, nargs="+")
     parser.add_argument("--backend", choices=("cpu", "cuda"))
+    parser.add_argument(
+        "--model-policy",
+        type=Path,
+        help="frozen per-dataset model calibration policy",
+    )
+    parser.add_argument(
+        "--estimator-budgets",
+        type=int,
+        nargs="+",
+        help="configured budget prefix for a provisional decision run",
+    )
     parser.add_argument("--run-id")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--resume", action="store_true")
@@ -263,6 +274,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         seeds=None if args.seeds is None else tuple(args.seeds),
         backend=args.backend,
         smoke=args.smoke,
+        model_policy_path=args.model_policy,
+        estimator_budgets_override=(
+            None
+            if args.estimator_budgets is None
+            else tuple(args.estimator_budgets)
+        ),
     )
     if args.resume:
         layout = open_resumed_run(

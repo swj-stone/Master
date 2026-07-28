@@ -291,6 +291,22 @@ def estimate_eta_s(
     return eta
 
 
+def remaining_physical_fit_upper_bound(
+    remaining_marginal_trials: int,
+) -> int:
+    """Convert pending marginals to their cache-cold physical-fit upper bound.
+
+    A marginal compares one coalition without the feature and one with it, so
+    an uncached trial can require two physical model fits.  Cache reuse and
+    harmful absorbing-state exits can only lower this bound.
+    """
+    remaining = _exact_nonnegative_int(
+        remaining_marginal_trials,
+        "remaining marginal trials",
+    )
+    return 2 * remaining
+
+
 def _format_duration(seconds: float) -> str:
     rounded = int(round(seconds))
     if rounded < 60:
@@ -347,4 +363,5 @@ __all__ = [
     "format_progress",
     "progress_from_document",
     "progress_to_document",
+    "remaining_physical_fit_upper_bound",
 ]

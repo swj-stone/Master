@@ -35,6 +35,7 @@ from minppi_mofs.experiment_protocol import (
     StatusStore,
     assert_stage_complete,
     atomic_write_json,
+    estimator_budgets_for,
     preflight_data_manifest,
     publish_json_exclusive,
     read_canonical_json,
@@ -44,6 +45,7 @@ from minppi_mofs.experiment_protocol import (
     upsert_data_manifest,
 )
 from minppi_mofs.modeling import evaluate_fixed_subset, fit_predict as fit_predict
+from minppi_mofs.multifidelity import model_params_for
 from minppi_mofs.baselines.nsga2_fs import (
     _compute_hv,
     _converged_gen,
@@ -853,7 +855,7 @@ def _cache_identity_from_validated_frames(
         ordered_features=tuple(str(feature) for feature in X_train.columns),
         task=str(row["task"]),
         class_labels=class_labels,
-        model_params=context.protocol.model_params,
+        model_params=model_params_for(context.protocol, context.job.dataset_id),
         backend=context.protocol.backend,
         model_seed=context.job.seed,
         library_versions=_coalition_library_versions(),
@@ -999,7 +1001,9 @@ def _open_shared_baseline_utility(
             y,
             task=dataset.task,
             utility=dataset.utility,
-            model_params=context.protocol.model_params,
+            model_params=model_params_for(
+                context.protocol, context.job.dataset_id
+            ),
             backend=context.protocol.backend,
             seed=context.job.seed,
             store=store,
@@ -1315,7 +1319,9 @@ def _run_legacy_estimator_job(context: StageContext) -> ResultRecord:
     budget = context.job.parameters["budget"]
     if isinstance(budget, bool) or not isinstance(budget, int) or budget < 1:
         raise ValueError("estimator budget must be a positive integer")
-    if budget not in context.protocol.estimator_budgets:
+    if budget not in estimator_budgets_for(
+        context.protocol, context.job.dataset_id
+    ):
         raise ValueError("estimator budget is outside protocol authority")
     method = context.job.method
     if method not in {"exact", "random_mc", "mi_correlation_guided", "hybrid"}:
@@ -1337,7 +1343,7 @@ def _run_legacy_estimator_job(context: StageContext) -> ResultRecord:
             task=dataset.task,
             seed=context.job.seed,
         )
-    model_params = dict(context.protocol.model_params)
+    model_params = model_params_for(context.protocol, context.job.dataset_id)
     model_params["tree_method"] = "hist"
     model_params["device"] = "cuda" if context.protocol.backend == "cuda" else "cpu"
     cache = AccFullCache(
@@ -1504,7 +1510,10 @@ def _completed_estimator_checkpoint(
     if (
         isinstance(budget, bool)
         or not isinstance(budget, int)
-        or budget not in context.protocol.estimator_budgets
+        or budget
+        not in estimator_budgets_for(
+            context.protocol, context.job.dataset_id
+        )
     ):
         raise ValueError("estimator checkpoint budget is invalid")
     protocol_hash = resolved_protocol_hash(context.protocol)
@@ -1926,7 +1935,9 @@ def _run_utility_ablation(context: StageContext) -> ResultRecord:
     value = context.job.parameters["value"]
     if value not in {"accuracy", "ovr_auc"}:
         raise ValueError("utility ablation value is not frozen")
-    budget = max(context.protocol.estimator_budgets)
+    budget = max(
+        estimator_budgets_for(context.protocol, context.job.dataset_id)
+    )
     group_id = f"utility:{context.job.dataset_id}:s{context.job.seed}:b{budget}"
     relpath = (
         f"ablation/{context.job.dataset_id}/s{context.job.seed}/"
@@ -1940,7 +1951,9 @@ def _run_utility_ablation(context: StageContext) -> ResultRecord:
         plan = make_shared_coalition_plan(
             tuple(X_train.columns), K=budget, per_coalition=5, seed=context.job.seed
         )
-        model_params = dict(context.protocol.model_params)
+        model_params = model_params_for(
+            context.protocol, context.job.dataset_id
+        )
         model_params["tree_method"] = "hist"
         model_params["device"] = (
             "cuda" if context.protocol.backend == "cuda" else "cpu"
@@ -2238,7 +2251,9 @@ def _run_guidance_ablation(context: StageContext) -> ResultRecord:
     allowed = {"random", "mi", "correlation", "mi_correlation"}
     if value not in allowed:
         raise ValueError("guidance ablation value is not frozen")
-    budget = max(context.protocol.estimator_budgets)
+    budget = max(
+        estimator_budgets_for(context.protocol, context.job.dataset_id)
+    )
     manifest_row = _task9_manifest_row(context)
     features = tuple(
         json.loads(str(manifest_row["selected_features_json"]))
@@ -2334,7 +2349,9 @@ def _run_dispatcher_ablation(context: StageContext) -> ResultRecord:
         for job in context.status.manifest
     ):
         raise ValueError("exact dispatcher job is absent from the manifest")
-    budget = max(context.protocol.estimator_budgets)
+    budget = max(
+        estimator_budgets_for(context.protocol, context.job.dataset_id)
+    )
     manifest_row = _task9_manifest_row(context)
     features = tuple(
         json.loads(str(manifest_row["selected_features_json"]))
@@ -2367,7 +2384,9 @@ def _ablation_estimator_authority(
     features: tuple[str, ...],
 ):
     """Return a completed checkpoint plus recomputed schedule authority."""
-    budget = max(context.protocol.estimator_budgets)
+    budget = max(
+        estimator_budgets_for(context.protocol, context.job.dataset_id)
+    )
     checkpoint = _completed_estimator_checkpoint(
         context, method, budget, features
     )
@@ -2427,7 +2446,7 @@ def _ablation_estimator_authority(
 def _make_job_cache(context: StageContext, X_train, X_val, y_train, y_val):
     from minppi_mofs.voting_game import AccFullCache
 
-    model_params = dict(context.protocol.model_params)
+    model_params = model_params_for(context.protocol, context.job.dataset_id)
     model_params["tree_method"] = "hist"
     model_params["device"] = "cuda" if context.protocol.backend == "cuda" else "cpu"
     return AccFullCache(
@@ -3029,13 +3048,71 @@ def _removal_plan_relpath(context: StageContext) -> str:
     return f"removal/{context.job.dataset_id}/s{context.job.seed}/selection_plan.json"
 
 
+def _removal_safety_gate(
+    *,
+    task: str,
+    full_validation_utility: float,
+    raw_prefilter_validation_utility: float,
+    raw_harmful_features: Sequence[str],
+    classification_margin: float,
+    regression_margin: float,
+    validation_model_fit_count: int,
+) -> dict[str, object]:
+    import math
+
+    if task in {"binary", "multiclass"}:
+        margin = classification_margin
+    elif task == "regression":
+        margin = regression_margin
+    else:
+        raise ValueError("removal safety gate task is invalid")
+    values = (
+        full_validation_utility,
+        raw_prefilter_validation_utility,
+        margin,
+    )
+    if any(
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        for value in values
+    ) or not 0.0 < float(margin) < 1.0:
+        raise ValueError("removal safety gate utilities or margin are invalid")
+    raw = list(raw_harmful_features)
+    if (
+        len(raw) != len(set(raw))
+        or any(not isinstance(feature, str) or not feature for feature in raw)
+        or isinstance(validation_model_fit_count, bool)
+        or not isinstance(validation_model_fit_count, int)
+        or validation_model_fit_count < 0
+    ):
+        raise ValueError("removal safety gate feature or fit authority is invalid")
+    delta = float(raw_prefilter_validation_utility) - float(
+        full_validation_utility
+    )
+    accepted = delta >= -float(margin) - 1e-12
+    return {
+        "accepted": accepted,
+        "noninferiority_margin": float(margin),
+        "full_validation_utility": float(full_validation_utility),
+        "raw_prefilter_validation_utility": float(
+            raw_prefilter_validation_utility
+        ),
+        "delta_utility": delta,
+        "raw_harmful_features": raw,
+        "safe_harmful_features": raw if accepted else [],
+        "validation_model_fit_count": validation_model_fit_count,
+    }
+
+
 def _validate_removal_plan(context: StageContext, document: object) -> dict[str, object]:
     import numpy as np
 
     expected_keys = {
         "schema_version", "protocol_hash", "job_id", "dataset_id", "seed",
-        "task", "utility", "alpha", "budget", "features", "k", "methods",
-        "scores", "selection_model_fit_count", "selection_coalition_count",
+        "task", "utility", "alpha", "budget", "features", "raw_k", "k",
+        "safety_gate", "methods", "scores", "selection_model_fit_count",
+        "selection_coalition_count",
     }
     if not isinstance(document, dict) or set(document) != expected_keys:
         raise ValueError("removal selection plan schema is invalid")
@@ -3049,7 +3126,12 @@ def _validate_removal_plan(context: StageContext, document: object) -> dict[str,
         or document["task"] != dataset.task
         or document["utility"] != dataset.utility
         or document["alpha"] != context.protocol.alpha_default
-        or document["budget"] != max(context.protocol.estimator_budgets)
+        or document["budget"]
+        != max(
+            estimator_budgets_for(
+                context.protocol, context.job.dataset_id
+            )
+        )
     ):
         raise ValueError("removal selection plan identity is invalid")
     features_value = document["features"]
@@ -3067,6 +3149,59 @@ def _validate_removal_plan(context: StageContext, document: object) -> dict[str,
     k = document["k"]
     if isinstance(k, bool) or not isinstance(k, int) or not 0 <= k <= len(features):
         raise ValueError("removal plan k is invalid")
+    raw_k = document["raw_k"]
+    if (
+        isinstance(raw_k, bool)
+        or not isinstance(raw_k, int)
+        or not 0 <= raw_k <= len(features)
+    ):
+        raise ValueError("removal plan raw k is invalid")
+    safety = document["safety_gate"]
+    expected_safety_keys = {
+        "accepted",
+        "noninferiority_margin",
+        "full_validation_utility",
+        "raw_prefilter_validation_utility",
+        "delta_utility",
+        "raw_harmful_features",
+        "safe_harmful_features",
+        "validation_model_fit_count",
+    }
+    if not isinstance(safety, dict) or set(safety) != expected_safety_keys:
+        raise ValueError("removal safety gate schema is invalid")
+    expected_margin = float(
+        context.protocol.removal[
+            "regression_noninferiority_margin"
+            if dataset.task == "regression"
+            else "classification_noninferiority_margin"
+        ]
+    )
+    expected_safety = _removal_safety_gate(
+        task=dataset.task,
+        full_validation_utility=safety["full_validation_utility"],
+        raw_prefilter_validation_utility=safety[
+            "raw_prefilter_validation_utility"
+        ],
+        raw_harmful_features=safety["raw_harmful_features"],
+        classification_margin=float(
+            context.protocol.removal[
+                "classification_noninferiority_margin"
+            ]
+        ),
+        regression_margin=float(
+            context.protocol.removal[
+                "regression_noninferiority_margin"
+            ]
+        ),
+        validation_model_fit_count=safety["validation_model_fit_count"],
+    )
+    if safety != expected_safety or safety["noninferiority_margin"] != expected_margin:
+        raise ValueError("removal safety gate decision is invalid")
+    if (
+        raw_k != len(safety["raw_harmful_features"])
+        or k != len(safety["safe_harmful_features"])
+    ):
+        raise ValueError("removal safety gate counts conflict with the plan")
     methods = document["methods"]
     if not isinstance(methods, list) or [item.get("method") if isinstance(item, dict) else None for item in methods] != list(_REMOVAL_METHODS):
         raise ValueError("removal plan methods are incomplete or out of order")
@@ -3145,7 +3280,10 @@ def _validate_removal_plan(context: StageContext, document: object) -> dict[str,
             raise ValueError("removal plan scores must be finite")
     minppi_values = {item["feature"]: item["score"] for item in score_groups[0]["values"]}
     expected_harmful = [feature for feature in features if minppi_values[feature] == -1]
-    if len(expected_harmful) != k or expected_harmful != minppi_removed:
+    if (
+        expected_harmful != safety["raw_harmful_features"]
+        or safety["safe_harmful_features"] != minppi_removed
+    ):
         raise ValueError("removal plan harmful set conflicts with MinPPI scores")
     methods_by_name = {item["method"]: item for item in methods}
     feature_index = {feature: position for position, feature in enumerate(features)}
@@ -3175,8 +3313,9 @@ def _validate_removal_plan(context: StageContext, document: object) -> dict[str,
     for field in ("selection_model_fit_count", "selection_coalition_count"):
         if isinstance(document[field], bool) or not isinstance(document[field], int) or document[field] < 0:
             raise ValueError("removal plan cost counters are invalid")
-    if document["selection_model_fit_count"] != sum(
-        item["model_fit_count"] for item in methods
+    if document["selection_model_fit_count"] != (
+        safety["validation_model_fit_count"]
+        + sum(item["model_fit_count"] for item in methods)
     ) or document["selection_coalition_count"] != sum(
         item["coalition_count"] for item in methods
     ):
@@ -3220,6 +3359,9 @@ def _removal_selection_metrics(
         "selection_time_s": sum(float(times[method]) for method in _REMOVAL_METHODS),
         "selection_model_fit_count": int(document["selection_model_fit_count"]),
         "selection_coalition_count": int(document["selection_coalition_count"]),
+        "safety_validation_model_fit_count": int(
+            document["safety_gate"]["validation_model_fit_count"]
+        ),
     }
     for method in _REMOVAL_METHODS:
         metrics[f"{method}_selection_time_s"] = float(times[method])
@@ -3296,7 +3438,9 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
         _load_prepared_train_validation(context)
     )
     features = tuple(X_train.columns)
-    budget = max(context.protocol.estimator_budgets)
+    budget = max(
+        estimator_budgets_for(context.protocol, context.job.dataset_id)
+    )
     selection_times = {method: 0.0 for method in _REMOVAL_METHODS}
     minppi_started = time.perf_counter()
     checkpoint = _completed_estimator_checkpoint(
@@ -3304,7 +3448,50 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
     )
     minppi = dict(checkpoint.scores)
     ordered_minppi = _task9_scores(minppi, features)
-    harmful = [feature for feature in features if float(minppi[feature]) == -1.0]
+    raw_harmful = [
+        feature for feature in features if float(minppi[feature]) == -1.0
+    ]
+    raw_retained = tuple(
+        feature for feature in features if feature not in set(raw_harmful)
+    )
+    validation_cache: dict[tuple[str, ...], float] = {}
+
+    def validation_utility(subset: tuple[str, ...]) -> float:
+        if subset not in validation_cache:
+            validation_cache[subset] = evaluate_fixed_subset(
+                X_train,
+                y_train,
+                X_val,
+                y_val,
+                subset,
+                task=dataset.task,
+                utility=dataset.utility,
+                model_params=model_params_for(
+                    context.protocol, context.job.dataset_id
+                ),
+                backend=context.protocol.backend,
+                seed=context.job.seed,
+            )
+        return validation_cache[subset]
+
+    safety_gate = _removal_safety_gate(
+        task=dataset.task,
+        full_validation_utility=validation_utility(features),
+        raw_prefilter_validation_utility=validation_utility(raw_retained),
+        raw_harmful_features=raw_harmful,
+        classification_margin=float(
+            context.protocol.removal[
+                "classification_noninferiority_margin"
+            ]
+        ),
+        regression_margin=float(
+            context.protocol.removal[
+                "regression_noninferiority_margin"
+            ]
+        ),
+        validation_model_fit_count=sum(bool(key) for key in validation_cache),
+    )
+    harmful = list(safety_gate["safe_harmful_features"])
     k = len(harmful)
     selection_times["minppi"] = time.perf_counter() - minppi_started
     diagnostics: dict[str, dict[str, int]] = {}
@@ -3321,7 +3508,9 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
         kwargs: dict[str, object] = dict(
             task=dataset.task,
             utility=dataset.utility,
-            model_params=context.protocol.model_params,
+            model_params=model_params_for(
+                context.protocol, context.job.dataset_id
+            ),
             backend=context.protocol.backend,
             seed=context.job.seed,
             diagnostics=diag,
@@ -3430,7 +3619,9 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
         "alpha": context.protocol.alpha_default,
         "budget": budget,
         "features": list(features),
+        "raw_k": len(raw_harmful),
         "k": k,
+        "safety_gate": safety_gate,
         "methods": methods,
         "scores": [
             {"method": "minppi", "values": ordered_minppi},
@@ -3439,7 +3630,10 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
                 for method in ("shap_bottom", "minshap_bottom", "banzhaf_bottom")
             ],
         ],
-        "selection_model_fit_count": int(baseline_fit_count),
+        "selection_model_fit_count": int(
+            baseline_fit_count
+            + safety_gate["validation_model_fit_count"]
+        ),
         "selection_coalition_count": int(
             checkpoint.logical_unique_coalition_count
             + baseline_coalitions
@@ -3480,6 +3674,7 @@ def _task9_plan_result(context: StageContext, *, stage: str) -> ResultRecord:
             "selection_time_s",
             "selection_model_fit_count",
             "selection_coalition_count",
+            "safety_validation_model_fit_count",
             *(
                 f"{method}_{suffix}"
                 for method in _REMOVAL_METHODS
@@ -3814,7 +4009,9 @@ def _run_removal_evaluation(context: StageContext) -> ResultRecord:
             utility_cache[key] = evaluate_fixed_subset(
                 X_train_val, y_train_val, X_test, y_test, key,
                 task=dataset.task, utility=dataset.utility,
-                model_params=context.protocol.model_params,
+                model_params=model_params_for(
+                    context.protocol, context.job.dataset_id
+                ),
                 backend=context.protocol.backend, seed=context.job.seed,
             )
         return utility_cache[key]
@@ -3929,7 +4126,9 @@ def _alpha_estimator_authority(
     features: tuple[str, ...],
 ):
     """Bind alpha work to the completed maximum-budget grouped schedule."""
-    budget = max(context.protocol.estimator_budgets)
+    budget = max(
+        estimator_budgets_for(context.protocol, context.job.dataset_id)
+    )
     checkpoint = _completed_estimator_checkpoint(
         context, "hybrid", budget, features
     )
@@ -4016,7 +4215,12 @@ def _validate_alpha_plan(context: StageContext, value: object) -> dict[str, obje
         or value["seed"] != context.job.seed
         or value["task"] != dataset.task
         or value["utility"] != dataset.utility
-        or value["budget"] != max(context.protocol.estimator_budgets)
+        or value["budget"]
+        != max(
+            estimator_budgets_for(
+                context.protocol, context.job.dataset_id
+            )
+        )
     ):
         raise ValueError("alpha selection plan identity is invalid")
     features_value = value["features"]
@@ -4245,7 +4449,9 @@ def _run_alpha_plan(context: StageContext) -> ResultRecord:
         _load_prepared_train_validation(context)
     )
     features = tuple(X_train.columns)
-    budget = max(context.protocol.estimator_budgets)
+    budget = max(
+        estimator_budgets_for(context.protocol, context.job.dataset_id)
+    )
     checkpoint, request, schedules = _alpha_estimator_authority(
         context, data_row, features
     )
@@ -4514,7 +4720,9 @@ def _run_alpha_evaluation(context: StageContext) -> ResultRecord:
             cache[key] = evaluate_fixed_subset(
                 X_train_val, y_train_val, X_test, y_test, key,
                 task=dataset.task, utility=dataset.utility,
-                model_params=context.protocol.model_params,
+                model_params=model_params_for(
+                    context.protocol, context.job.dataset_id
+                ),
                 backend=context.protocol.backend, seed=context.job.seed,
             )
         return cache[key]
@@ -4910,7 +5118,9 @@ def _freeze_nsga2_front(
             y_val,
             task=dataset.task,
             utility=dataset.utility,
-            model_params=context.protocol.model_params,
+            model_params=model_params_for(
+                context.protocol, context.job.dataset_id
+            ),
             backend=context.protocol.backend,
             seed=context.job.seed,
             pop_size=population,
@@ -5520,7 +5730,9 @@ def _validate_summary_ablation_artifact(
     """Match Task 8's single-ablation artifact contract without split access."""
     axis = str(context.job.parameters["axis"])
     value = str(context.job.parameters["value"])
-    budget = max(context.protocol.estimator_budgets)
+    budget = max(
+        estimator_budgets_for(context.protocol, context.job.dataset_id)
+    )
     if axis == "utility":
         group_id = f"utility:{context.job.dataset_id}:s{context.job.seed}:b{budget}"
         relpath = (
@@ -5791,6 +6003,38 @@ def _validated_summary_rows(
                     raise ValueError("removal plan result artifact path is invalid")
                 if int(plan["k"]) < 0:
                     raise ValueError("validated removal plan k is invalid")
+                safety = plan["safety_gate"]
+                raw_rows.extend(
+                    _numeric_metrics(
+                        context=item,
+                        sequence=sequence,
+                        method="minppi_safety_gate",
+                        parameter="validation_noninferiority",
+                        trial=0,
+                        metrics={
+                            "raw_harmful_count": int(plan["raw_k"]),
+                            "safe_harmful_count": int(plan["k"]),
+                            "safety_gate_pass": int(
+                                bool(safety["accepted"])
+                            ),
+                            "validation_full_utility": safety[
+                                "full_validation_utility"
+                            ],
+                            "validation_prefilter_utility": safety[
+                                "raw_prefilter_validation_utility"
+                            ],
+                            "validation_delta_utility": safety[
+                                "delta_utility"
+                            ],
+                            "validation_noninferiority_margin": safety[
+                                "noninferiority_margin"
+                            ],
+                            "safety_validation_model_fit_count": safety[
+                                "validation_model_fit_count"
+                            ],
+                        },
+                    )
+                )
                 continue
             relpath = _removal_result_relpath(item)
             if record.artifacts != {"results": relpath}:

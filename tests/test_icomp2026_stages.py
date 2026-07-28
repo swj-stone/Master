@@ -3335,6 +3335,9 @@ def _tiny_ablation_setup(tmp_path: Path, smoke_protocol):
             "learning_rate": 0.3,
             "n_jobs": 1,
         },
+        estimator_budgets_by_dataset={
+            "isolet": smoke_protocol.estimator_budgets
+        },
     )
     manifest = build_job_manifest(
         protocol,
@@ -4317,6 +4320,11 @@ def _patch_task9_selection(
     monkeypatch.setattr(stage_module, "_load_prepared_train_validation", loader)
     monkeypatch.setattr(
         stage_module,
+        "evaluate_fixed_subset",
+        lambda *_args, **_kwargs: 0.9,
+    )
+    monkeypatch.setattr(
+        stage_module,
         "_task9_manifest_row",
         lambda context: {
             "dataset_id": context.job.dataset_id,
@@ -4436,6 +4444,93 @@ def _patch_task9_selection(
         monkeypatch, tuple(X_train.columns), calls=calls
     )
     return X_train, y_train, X_val, y_val, calls
+
+
+@pytest.mark.parametrize(
+    ("task", "selected", "accepted", "margin"),
+    [
+        ("binary", 0.895, True, 0.005),
+        ("multiclass", 0.8949, False, 0.005),
+        ("regression", 0.89, True, 0.01),
+        ("regression", 0.8899, False, 0.01),
+    ],
+)
+def test_removal_safety_gate_uses_task_specific_validation_noninferiority(
+    task: str,
+    selected: float,
+    accepted: bool,
+    margin: float,
+) -> None:
+    decision = stage_module._removal_safety_gate(
+        task=task,
+        full_validation_utility=0.9,
+        raw_prefilter_validation_utility=selected,
+        raw_harmful_features=("f1", "f3"),
+        classification_margin=0.005,
+        regression_margin=0.01,
+        validation_model_fit_count=2,
+    )
+
+    assert decision["accepted"] is accepted
+    assert decision["noninferiority_margin"] == margin
+    assert decision["raw_harmful_features"] == ["f1", "f3"]
+    assert decision["safe_harmful_features"] == (
+        ["f1", "f3"] if accepted else []
+    )
+
+
+def test_removal_plan_falls_back_to_full_when_raw_prefilter_fails_validation(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    layout, _, contexts = _task9_contexts(
+        tmp_path, smoke_protocol, "removal"
+    )
+    context = next(
+        item for item in contexts if item.job.method == "selection_plan"
+    )
+    X_train, _, _, _, _ = _patch_task9_selection(monkeypatch)
+    from minppi_mofs.baselines import banzhaf_fs, min_shap, shap_top_k
+
+    monkeypatch.setattr(
+        stage_module,
+        "evaluate_fixed_subset",
+        lambda _X_train, _y_train, _X_val, _y_val, features, **_kwargs: (
+            0.9 if len(features) == len(X_train.columns) else 0.89
+        ),
+    )
+    for module, name in (
+        (shap_top_k, "compute_shap_topk_importance"),
+        (min_shap, "compute_minshap_importance"),
+        (banzhaf_fs, "compute_banzhaf_importance"),
+    ):
+        monkeypatch.setattr(
+            module,
+            name,
+            lambda *args, diagnostics, **kwargs: diagnostics.update(
+                model_fit_count=1, coalition_count=1
+            )
+            or {"f0": 4.0, "f1": 1.0, "f2": 3.0, "f3": 2.0},
+        )
+
+    record = stage_module.run_removal_job(context)
+    document = json.loads(
+        (layout.root / record.artifacts["selection_plan"]).read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert document["safety_gate"]["accepted"] is False
+    assert document["safety_gate"]["raw_harmful_features"] == ["f1", "f3"]
+    assert document["safety_gate"]["safe_harmful_features"] == []
+    assert document["safety_gate"]["delta_utility"] == pytest.approx(-0.01)
+    assert document["raw_k"] == 2
+    assert document["k"] == 0
+    minppi = next(
+        item for item in document["methods"] if item["method"] == "minppi"
+    )
+    assert minppi["trials"][0]["retained_features"] == list(X_train.columns)
 
 
 def test_removal_uses_completed_max_budget_hybrid_without_recomputation(
@@ -6851,6 +6946,21 @@ def test_cli_declares_exact_stages_and_resume_requires_run_id() -> None:
     parser = build_parser()
     stage_action = next(action for action in parser._actions if action.dest == "stage")
     assert tuple(stage_action.choices) == ("all",) + STAGE_ORDER
+    parsed = parser.parse_args(
+        [
+            "--stage",
+            "validate",
+            "--model-policy",
+            "results/calibration/model_policy.json",
+            "--estimator-budgets",
+            "10",
+            "25",
+        ]
+    )
+    assert parsed.model_policy == Path(
+        "results/calibration/model_policy.json"
+    )
+    assert parsed.estimator_budgets == [10, 25]
 
     with pytest.raises(SystemExit) as raised:
         main(["--stage", "validate", "--resume"])
@@ -7596,13 +7706,12 @@ def test_ablation_artifact_outcomes_are_published_to_raw_and_aggregate_tables(
     }
 
 
-@pytest.mark.parametrize("stage", ("removal", "alpha"))
-def test_summary_validates_but_does_not_publish_internal_selection_plan_metrics(
+def test_summary_does_not_publish_internal_alpha_selection_plan_metrics(
     tmp_path: Path,
     smoke_protocol,
     monkeypatch: pytest.MonkeyPatch,
-    stage: str,
 ) -> None:
+    stage = "alpha"
     dataset = smoke_protocol.datasets[0].dataset_id
     seed = smoke_protocol.seeds[0]
     job = JobSpec(
@@ -7632,14 +7741,84 @@ def test_summary_validates_but_does_not_publish_internal_selection_plan_metrics(
         artifacts={"selection_plan": relpath},
     )
     monkeypatch.setattr(stage_module, "read_result_record", lambda *args: record)
-    if stage == "removal":
-        monkeypatch.setattr(stage_module, "_read_removal_plan", lambda *args: {"k": 0})
-    else:
-        monkeypatch.setattr(stage_module, "_read_alpha_plan", lambda *args: {})
+    monkeypatch.setattr(stage_module, "_read_alpha_plan", lambda *args: {})
 
     raw_rows, front_rows = stage_module._validated_summary_rows(context)
 
     assert raw_rows == []
+    assert front_rows == []
+
+
+def test_summary_publishes_validation_only_removal_safety_evidence(
+    tmp_path: Path,
+    smoke_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = smoke_protocol.datasets[0].dataset_id
+    seed = smoke_protocol.seeds[0]
+    job = JobSpec(
+        "job-removal-safety-plan",
+        "a" * 64,
+        "removal",
+        dataset,
+        seed,
+        "selection_plan",
+        {},
+        (),
+        "raw_metrics/removal/plan.json",
+    )
+    layout = create_new_run(
+        tmp_path / "results", "removal-safety-summary", smoke_protocol
+    )
+    status = StatusStore(layout, (job,))
+    context = StageContext(
+        smoke_protocol,
+        layout,
+        job,
+        status,
+        AuditLog.from_manifest(layout.audit_path, (job,)),
+    )
+    record = replace(
+        _result(job),
+        artifacts={
+            "selection_plan": (
+                f"removal/{dataset}/s{seed}/selection_plan.json"
+            )
+        },
+    )
+    monkeypatch.setattr(
+        stage_module, "read_result_record", lambda *args: record
+    )
+    monkeypatch.setattr(
+        stage_module,
+        "_read_removal_plan",
+        lambda *args: {
+            "raw_k": 2,
+            "k": 0,
+            "safety_gate": {
+                "accepted": False,
+                "noninferiority_margin": 0.005,
+                "full_validation_utility": 0.9,
+                "raw_prefilter_validation_utility": 0.89,
+                "delta_utility": -0.01,
+                "validation_model_fit_count": 2,
+            },
+        },
+    )
+
+    raw_rows, front_rows = stage_module._validated_summary_rows(context)
+
+    metrics = {row["metric"]: row["value"] for row in raw_rows}
+    assert metrics == {
+        "raw_harmful_count": 2.0,
+        "safe_harmful_count": 0.0,
+        "safety_gate_pass": 0.0,
+        "validation_full_utility": 0.9,
+        "validation_prefilter_utility": 0.89,
+        "validation_delta_utility": -0.01,
+        "validation_noninferiority_margin": 0.005,
+        "safety_validation_model_fit_count": 2.0,
+    }
     assert front_rows == []
 
 

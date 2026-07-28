@@ -1,0 +1,57 @@
+protocol_version: "1.0"
+
+datasets:
+  - credit_card_fraud
+
+seeds: [42, 123, 456, 789, 1024]
+backend: cpu
+
+execution:
+  mode: grouped_nested_v1
+  cache_schema: coalition_utility_v1
+  checkpoint_every_fits: 50
+  progress_every_seconds: 30
+
+model:
+  n_estimators: 100
+  max_depth: 4
+  learning_rate: 0.1
+  n_jobs: 1
+
+alpha:
+  default: 0.95
+  grid: [0.85, 0.90, 0.95, 0.99]
+
+estimator:
+  methods: [exact, random_mc, mi_correlation_guided, hybrid]
+  budgets: [10, 25, 50]
+  exact_max_features: 16
+
+removal:
+  controls:
+    - full
+    - minppi
+    - shap_bottom
+    - minshap_bottom
+    - banzhaf_bottom
+    - random_matched
+  random_repeats: 30
+
+nsga2:
+  variants: [full, minppi_prefilter]
+  population: 40
+  evaluations: 800
+  ref_point: [1.1, 1.1]
+
+ablations:
+  utility: [accuracy, ovr_auc]
+  guidance: [random, mi, correlation, mi_correlation]
+  dispatcher: [exact, random_mc, mi_correlation_guided, hybrid]
+
+smoke:
+  datasets: [credit_card_fraud]
+  seeds: [42]
+  estimator_budgets: [2]
+  random_repeats: 2
+  nsga2_population: 4
+  nsga2_evaluations: 8
