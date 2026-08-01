@@ -15,7 +15,7 @@ Usage (standalone)::
                                      task="binary", seed=42)
     # result is an NSGA2Result dataclass with pareto_front, hv, etc.
 
-Usage (ranking — for run_main_table.py compatibility)::
+Usage (ranking adapter)::
 
     from minppi_mofs.baselines.nsga2_fs import nsga2_ranking
     ranking = nsga2_ranking(X, y, task="binary", seed=42)
@@ -23,7 +23,7 @@ Usage (ranking — for run_main_table.py compatibility)::
 
 Run (stand-alone)::
 
-    python src/minppi_mofs/baselines/nsga2_fs.py
+    ../venv/Scripts/python.exe src/minppi_mofs/baselines/nsga2_fs.py
 """
 
 from __future__ import annotations
@@ -482,7 +482,7 @@ def nsga2_feature_selection(
 
 
 # ---------------------------------------------------------------------------
-# Ranking adapter for run_main_table.py compatibility
+# Ranking adapter for callers that require one score per feature
 # ---------------------------------------------------------------------------
 
 

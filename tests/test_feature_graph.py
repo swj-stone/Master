@@ -7,7 +7,7 @@ verify structural invariants and determinism.
 
 Run::
 
-    python -m pytest tests/test_feature_graph.py -v
+    ../venv/Scripts/python.exe -m pytest tests/test_feature_graph.py -v
 """
 
 from __future__ import annotations

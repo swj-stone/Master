@@ -1,12 +1,12 @@
 """
 Quick-test: NSGA-II baseline only — single dataset, single seed.
 
-Use before launching the full ``run_main_table.py`` (which takes 4-5 h)
+Use as a focused NSGA-II regression check before launching the formal pipeline.
 to verify that the NSGA-II baseline works correctly on real data.
 
 Run::
 
-    python -u tests/test_nsga2_quick.py
+    ../venv/Scripts/python.exe -u tests/test_nsga2_quick.py
 """
 
 from __future__ import annotations
@@ -215,7 +215,7 @@ def main() -> None:
     for i, (feat, val) in enumerate(ranking[:10], 1):
         print(f"    {i:2d}. {feat:30s}  {val:.6f}")
 
-    print("\nAll OK — ready for run_main_table.py.")
+    print("\nAll OK — NSGA-II focused checks passed.")
 
 
 if __name__ == "__main__":

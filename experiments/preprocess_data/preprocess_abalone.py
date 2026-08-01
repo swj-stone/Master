@@ -7,7 +7,7 @@ Source: Vector-s-Lab mirror (GitHub).
 Output: ``data/raw/abalone.csv`` only.
 
 Run:
-    python experiments/preprocess_data/preprocess_abalone.py
+    ../venv/Scripts/python.exe experiments/preprocess_data/preprocess_abalone.py
 """
 
 from __future__ import annotations

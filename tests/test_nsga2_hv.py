@@ -4,7 +4,7 @@ convergence metric in ``nsga2_fs``.
 
 Run::
 
-    python -m pytest tests/test_nsga2_hv.py -v
+    ../venv/Scripts/python.exe -m pytest tests/test_nsga2_hv.py -v
 """
 
 from __future__ import annotations

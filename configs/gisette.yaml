@@ -2,6 +2,8 @@ dataset:
   id: gisette
   display_name: Gisette
   raw_path: data/raw/gisette.csv
+  raw_sha256: 02b8d81c00ed14e65310e9c57ec8ec34deaed237eb04117ba545c41ceef4ed6a
+  raw_byte_count: 192231337
   target: label
   task: binary
   utility: roc_auc

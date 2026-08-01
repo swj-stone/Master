@@ -1,4 +1,4 @@
-"""
+r"""
 Tests for MI-correlation guidance and its deprecated compatibility aliases.
 
 Covers:
@@ -11,7 +11,7 @@ Covers:
 
 Run::
 
-    pytest tests/test_shapg_integration.py -v
+    ..\venv\Scripts\python.exe -m pytest tests/test_shapg_integration.py -v
 """
 
 from __future__ import annotations

@@ -1,323 +1,275 @@
-# 项目入口
+# MinPPI-MOFS：ICOMP 2026 可复现实验项目
 
-## 研究方向
+本目录实现 Min-Marginal Power Indices（MinPPI）及其 ICOMP 2026 实验协议。MinPPI 在效用阈值投票博弈中考察特征的最坏边际贡献，将特征划分为有害、无影响或决定性，并验证其作为多目标特征选择预过滤器的作用。
 
-**会议论文 (ICOMP 2026)**: MinPPI-MOFS —— 把 voting game + 最小边际算子 + SHAP 引导的 NSGA-II 整合为多目标特征选择方法，ShapG 作为重要性 baseline 与组件。
+## 当前状态
 
-**硕士论文**: 在会议方法基础上推广到 **bipartite (feature × architecture) factored game**，引入 **cross-Shapley** 交互值 + 现代 DARTS 进行特征选择与神经架构联合优化。
+- `results/` 为空：正式五种子实验必须从头重新运行。
+- 当前仓库没有能够支持论文数值结论的正式 provenance bundle。
+- `conference-paper/figures/` 中的三张 PDF 仅作为历史草稿保留；当前论文正文不引用它们。它们不得视为本次正式结果，也不得在重新汇总前重新接入论文。
+- 只有新的 formal campaign 生成完整 summary bundle 且报告 `publication_allowed: true` 后，才允许把对应表格和图片写入论文。
+- 本次整理不启动校准、smoke 或正式实验。
 
-## 关键截止日期
+## 权威边界
 
-| 日期 | 事件 |
-|------|------|
-| 2026-06-21 | ICOMP 摘要截止 |
-| 2026-07-21 | ICOMP 全文截止（建议 07-20 提交，留 1 天缓冲） |
-| 2026-08-上旬 | 论文工作启动 |
-| 2026-11-11~13 | ICOMP 会议（卡萨布兰卡，摩洛哥） |
-| 2027-05 | 硕士论文提交 |
+| 内容 | 唯一真源 |
+|---|---|
+| 数据集、划分、效用 | `configs/<dataset>.yaml` |
+| seeds、预算、alpha、消融、NSGA-II | `configs/icomp2026_pipeline.yaml` |
+| 执行和恢复语义 | `experiments/run_icomp2026_pipeline.py`、`experiments/run_icomp2026_campaign.py` |
+| 正式完成状态 | 新 campaign 的 manifest、audit、canonical metrics 和 summary manifest |
+| 论文图 | 同一正式 campaign 的 `figures/paper/` |
 
-## 文件结构
+`demos/`、`thesis/` 和 `configs_credit_probe/` 被保留为辅助研究材料，但不属于正式 ICOMP 证据链。旧式单脚本实验也不得替代 manifest 管线。
 
-```
-to_student/
-├── README.md                            ← 本文件
-├── conference-paper/
-│   ├── spec.md                          会议论文规格（数据集、baseline、消融）
-│   └── method-skeleton.md               §4 数学骨架（LaTeX 起稿大纲）
-├── thesis/
-│   ├── overview.md                      论文整体规划与时间表
-│   └── cross-shapley.md                 论文理论核心：cross-Shapley 框架
-└── demos/
-    ├── minppi_demo.py                   会议 §4 Lemma 1 + Theorem 1 实证
-    ├── algorithm_b_demo.py              会议 §4.3 算法 A vs B 对比
-    └── cross_shapley_demo.py            论文 bipartite cross-Shapley 实证
-```
+## 冻结协议摘要
 
-## 阅读顺序
+- 数据集：Spambase、Madelon、ISOLET、Gisette、Credit-Card-Fraud、Communities & Crime、Abalone。
+- 每个数据集 YAML 登记 raw CSV 的 SHA-256 与字节数；validate 在写出任何 authority 前必须精确匹配。
+- seeds：`42, 123, 456, 789, 1024`。
+- 划分：train/validation/test = `0.64/0.16/0.20`；分类任务分层划分。
+- 预处理：只在训练集拟合标准化与 MI 过滤；最多保留 100 个特征。
+- 模型：所有分类任务统一使用 XGBoost 概率输出，再由 `utility` 选择指标。
+- 正式效用：二分类为 ROC-AUC，ISOLET 为 OVR-AUC，回归为 R²；accuracy 只用于 ISOLET utility ablation。
+- 默认 `alpha=0.95`，扫描集合为 `{0.85, 0.90, 0.95, 0.99}`。
+- alpha 和 ablation 阶段只运行 seed 42；estimator、removal 和 NSGA-II 使用五个 seeds。
+- YAML 的可移植默认 backend 是 CPU；正式 campaign 入口当前显式使用 CUDA。
 
-1. 本文件 (README.md)
-2. `conference-paper/spec.md` —— 知道论文要做什么
-3. `conference-paper/method-skeleton.md` —— 知道论文 §4 怎么写
-4. 跑一遍 `demos/minppi_demo.py` 和 `demos/algorithm_b_demo.py` —— 看实证
-5. `thesis/overview.md` —— 知道毕业论文怎么接上
-6. `thesis/cross-shapley.md` —— 知道毕业论文的理论核心
-7. 跑 `demos/cross_shapley_demo.py` —— 看 bipartite 推广
+任何协议变更都必须先修改 `configs/`，然后以新 run ID 创建新实验。不要在已创建的 run 上修改 Python、YAML 或 model policy。
 
-## 会议论文写作时间表
+## 目录结构
 
-| 周 | 任务 |
-|----|------|
-| W1 (05/28-06/03) | 跑 baseline (ShapG, MinShap, Powershap, Karavas-Banzhaf) 在 5 数据集上 |
-| W2 (06/04-06/10) | 主实验全表 (5 数据集 × 5 seeds × 7 方法)；起 §1-§3 写作 |
-| W3 (06/11-06/17) | preliminary results 整理；起 §4 + §5；摘要写作 |
-| W3 末 | **06-21 摘要提交** |
-| W4 (06/22-06/28) | 完整消融实验；§6 实验章节 |
-| W5 (06/29-07/05) | §2 Related Work；§7 Conclusion；所有 figures |
-| W6 (07/06-07/12) | Full draft；internal review |
-| W7 (07/13-07/19) | 修订；格式检查 |
-| **07-20** | **提交（不要拖到 07-21）** |
-
-## 已经完成的实证（直接进会议论文 §4 + §5）
-
-会议论文的核心实证已经全部跑通，**不需要再做新实验**就能写 §4 + §5：
-
-| 命题 | 实证文件 | 结论 |
-|------|---------|------|
-| Lemma 1 (Boundedness) | `demos/minppi_demo.py` Examples 1-3 | MinSS ∈ {-1, 0, +1} 全程成立 |
-| Theorem 1 (3-way classification) | `demos/minppi_demo.py` Examples 1-2 | Decisive / Harmful / Neutral 三分类成立 |
-| Theorem 1 caveat | `demos/minppi_demo.py` Example 2 | "在每个 winning 中 ≠ MinSS=+1" 反例展示 |
-| Proposition 1 (Algorithm A Hoeffding bound) | `demos/minppi_demo.py` Example 4 | 理论与实测吻合 |
-| Algorithm B vs A 对比 | `demos/algorithm_b_demo.py` | 38× sample efficiency @ K=1 |
-| Algorithm B 鲁棒性 | `demos/algorithm_b_demo.py` | σ 噪声下 graceful degradation |
-
-## 必读论文（按优先级）
-
-**P0 (核心理论靠山)**:
-1. **Rabitti & Borgonovo (2019)** "A Shapley-Owen Index for Interaction Quantification." *SIAM/ASA JUQ* 7(3): 1060–1075.
-2. **Grabisch & Roubens (1999)** "An axiomatic approach to the concept of interaction among players in cooperative games." *Int. J. Game Theory* 28: 547–565.
-
-**P1 (会议 §4.3 近似算法)**:
-3. **Muschalik et al. (2024)** "KernelSHAP-IQ: Weighted Least-Square Optimization for Shapley Interactions" — arXiv:2405.10852
-4. **Tsai et al. (2023)** "Faith-Shap: The Faithful Shapley Interaction Index" — *JMLR* 24
-5. **Song, Nelson, Staum (2016)** "Shapley Effects for Global Sensitivity Analysis" — *SIAM/ASA JUQ* 4
-
-**P2 (会议 baseline 定位)**:
-6. Zheng & Raskutti (2026) "MinShap" — arXiv:2604.15107
-7. Karavas (2017) "Feature importance scores and lossless feature pruning using Banzhaf power indices" — arXiv:1711.04992
-8. Verhaeghe et al. (2022) "Powershap" — *ECML PKDD*
-9. **Zhao, Liu, Parilina (2025)** "ShapG" — *EAAI* 148
-
-**P3 (论文 NAS+FS, 8 月开始)**:
-10. EL-DARTS (2026) —— 推荐的 DARTS 现代稳定版
-11. DASH —— 快速 architecture-only 搜索
-12. PC-DARTS / DARTS- / FairDARTS —— 标准稳定化变体
-
-## 写作硬注意事项
-
-1. **WVG-FS 的加性近似缺陷** —— 在会议论文 §4.5 显式说明如何规避（用 NSGA-II fitness 替代加性近似）
-2. **§4.6 spurious interactions** —— Rabitti-Borgonovo §7.3 警告必须正面回应，审稿人必问
-3. **Theorem 1 的 caveat** —— "在每个 winning 中 ≠ MinSS=+1"，必须在论文中明确说明（demo Example 2 已经实证）
-4. **MinShap 是近期预印本** —— 引用为 inspiration，不依赖其结论
-5. **DARTS 用现代稳定版** —— 不要用 2019 vanilla DARTS，要用 PC-DARTS + DARTS- 或 EL-DARTS 或 DASH
-6. **所有论文图片统一使用 PDF 格式** —— matplotlib 用 `savefig(..., format='pdf')` 或 `.pdf` 后缀；不要用 PNG/JPG 等位图格式（会议论文与毕业论文都遵守）
-
-## 代码标准与风格
-
-**语言与环境**:
-- Python 3.10+，所有公开 API（函数、方法、类）必须有 type hints
-- 自行配置开发环境（conda / venv / uv 等任选），依赖锁定在 `requirements.txt` 或 `environment.yml` 中
-- 所有 demo 与实验脚本必须可在干净 Python 环境下通过 `python <script>.py` 复现
-
-**项目目录结构** —— 顶层目录平级：
-
-```
-to_student/
-├── README.md
-├── pyproject.toml         # 项目元数据 + 可安装包定义
-├── requirements.txt       # 运行时依赖
-├── conference-paper/      # 会议论文写作
-├── thesis/                # 毕业论文写作
-├── demos/                 # 教学性 demo（已有 3 个）
-├── src/                   # 源代码（importable package）
-├── configs/               # 实验配置（YAML / JSON）
-├── data/                  # 数据集（gitignored）
-├── experiments/           # 实验入口脚本
-├── tests/                 # 单元测试
-└── results/               # 实验产物（gitignored）
+```text
+Master/
+├── configs/                  正式协议
+├── data/raw/                 七个原始 CSV（不提交 Git）
+├── experiments/              校准、管线、campaign、监测和汇总
+├── src/minppi_mofs/          核心算法库
+├── tests/                    自动化测试
+├── conference-paper/         论文源文件与图同步工具
+├── demos/                    非正式教学验证
+├── thesis/                   非正式硕士论文研究草稿
+├── configs_credit_probe/     非正式 Credit-Card 探测配置
+└── results/                  可恢复实验产物（不提交 Git）
 ```
 
-**各目录职责**：
-- `src/` —— 可导入的源码包，按功能拆子模块（如 `src/<pkg>/voting_game.py`, `nsga2.py`, `shapg_integration.py`, `cross_shapley.py`, `baselines/`）。建议用 `pyproject.toml` 注册为 editable package：`pip install -e .`
-- `configs/` —— 实验配置（YAML / JSON），**不是代码**，按数据集 / 实验维度组织
-- `data/` —— 数据集（raw + processed），gitignored，README 文档化下载与预处理方式
-- `experiments/` —— 实验入口脚本，`import` `src/` 的模块，读 `configs/` 的配置，写结果到 `results/`
-- `demos/` —— 教学性 demo（现有 3 个保留），新 demo 沿用现有结构
-- `tests/` —— 单元测试
-- `results/` —— 实验输出（figures / tables / logs），gitignored
+`data/processed` 和 `data/processed_v2` 不属于正式协议。正式 preprocess 阶段直接读取 `data/raw`，并把每次划分写入对应 run 目录。
 
-**代码组织规则**：
-- 代码必须**模块化**：单一职责，函数与类粒度合理，避免几百行的大函数
-- 代码必须**可读性强**：清晰命名、合理注释、避免魔法数与隐式状态
-- **不使用 Jupyter notebook** —— 所有探索、实验、出图统一用 `.py` 脚本；交互式调试用 IPython 或 IDE 调试器，但提交的代码必须是 `.py`
+## 使用现有虚拟环境
 
-**格式化与 lint**:
-- 格式化用 `ruff format`（或 `black`，二选一项目内统一）
-- Lint 用 `ruff check`，提交前必须 0 warning
-- import 顺序：stdlib → 第三方 → 本项目，每组内按字母排序（`ruff` 默认）
-
-**文档**:
-- 所有公开函数/类必须有 docstring（NumPy 风格或 Google 风格，项目内统一）
-- 模块顶部必须有模块级 docstring，简短说明用途 + 运行命令（参考 `demos/minppi_demo.py` 头部）
-- 数学符号在 docstring 中尽量与论文一致（如 `phi_{i,o}`, `MinSS`, `v_alpha`）
-
-**随机性与可复现**:
-- 所有随机性必须通过显式 seed 控制：`rng = np.random.default_rng(seed)`，不要用全局 `np.random.*`
-- 实验脚本必须接受 `--seed` 参数或在文件顶部固定 seed
-- 用到的库版本写进 `requirements.txt` 或 `environment.yml`
-
-**Demo / 实验代码**:
-- 新 demo 沿用 `demos/minppi_demo.py` / `demos/algorithm_b_demo.py` 的结构：
-  - 顶部 module docstring + 运行命令
-  - 用 `banner()` 之类的辅助函数分节输出
-  - 关键性质用 `assert` 显式验证（如 `assert min_ss in {-1, 0, 1}, "Lemma 1 violated"`）
-  - 输出末尾给一句"Observation / Implication"说明结果对论文的含义
-- 数据规模优先小而可复现，不要为了规模牺牲调试可读性
-
-**实验结果管理**（W2 之后）:
-- 实验配置外置（YAML 或 argparse），不要硬编码超参
-- 结果保存时附带 metadata：配置 hash、seed、git commit、时间戳
-- 大规模实验产物（模型权重、中间结果）不进 git，进 `.gitignore` 并文档化存储位置
-
-### ICOMP 2026 estimator execution and accounting
-
-- `execution.mode: legacy` runs every estimator projection independently and
-  retains the historical ResultRecord/table schema. The production protocol
-  uses `execution.mode: grouped_nested_v1`: one immutable bundle is built for
-  each dataset/seed authority and canonical method/budget jobs are projections
-  of its validated checkpoints.
-- Grouped budgets are nested prefixes of the frozen maximum-budget schedule.
-  A smaller budget means the deterministic prefix ending at that checkpoint;
-  it is not a separately randomized or independently fitted estimator run.
-- `model_fit_count` remains the backward-compatible logical count of unique
-  nonempty coalitions, and equals `logical_unique_coalition_count`.
-  `logical_evaluation_count` counts scheduled algorithm evaluations.
-  `physical_model_fit_count`, `cache_hit_count`, and `runtime_s` are
-  method/budget projection counters and component wall time.
-- Complete-bundle cost is reported separately as
-  `group_physical_model_fit_count`, `group_cache_hit_count`, and
-  `group_runtime_s`. Summary tables emit that scope once under
-  `__deduplicated_group_physical__` for each `group_request_digest`; totals
-  must sum those digest-deduplicated rows, never every projected job.
-- The source configuration keeps its CPU default. Every smoke or formal GPU
-  invocation must explicitly pass `--backend cuda`; do not infer or silently
-  select CUDA.
-- A run freezes its resolved protocol and source identity. After any source
-  change, create a new run ID instead of resuming, deleting, or overwriting an
-  existing run directory.
-- `icomp2026-formal-20260723` is a stopped, read-only legacy run. Never open,
-  resume, mutate, or mix its artifacts/tables with grouped results. A grouped
-  formal run requires a new run ID and its own complete publication lineage.
-
-**图片**:
-- 所有论文图片用 PDF 格式（见上一节第 6 条）
-- matplotlib 出图统一字体大小，与论文正文协调
-- 出图脚本必须可独立运行重生成图片，不依赖 notebook 状态
-
-## 算力
-
-- **3× H100** 可用
-- 会议论文主要 CPU-bound (XGBoost fitness)，H100 用来**并行扫描** (data × seed × method 矩阵)
-- 论文 Phase B 起 GPU-bound (DARTS supernet 训练)，3 张 H100 用得满
-- 会议阶段可以留 1 张 H100 做 FT-Transformer + DeepSHAP 作为重要性替代实验
-
-## 遇到困难时的 fallback
-
-- **数学卡住**：与导师讨论，特别是 cross-Shapley 的 A4 公理 reformulation
-- **DARTS 不收敛**：切到论文 cross-Shapley 文档底部的 Topic 4-lite (NSGA-II 搜架构超参，no DARTS)
-- **会议实验跑不完**：砍数据集到 3 个 (Spambase, Madelon, Credit-Card-Fraud)，baseline 砍到 5 个核心
-- **Theorem 1 (cross-Shapley uniqueness) 证不出**：fallback 为 "well-definedness only"，论文照常发，理论一致性留 future work
-
-## ICOMP 2026 多保真实验流程（2026-07-28）
-
-所有命令都在 `Master` 目录的 PowerShell 中运行。Seed 42 筛选阶段只允许
-使用训练集和验证集；在人工检查 `screen_report.md` 以前，不要启动
-`removal`、`alpha`、`nsga2` 或其他会访问测试集的阶段。
+以下命令均在 `Master` 目录的 PowerShell 中执行，并且只使用项目相邻的现有 `venv` 解释器；不调用系统 Python、Conda base 或其他外部解释器。
 
 ```powershell
-$PY = "..\venv\Scripts\python.exe"
-$ROOT = "results\icomp2026_multifidelity"
+$PY = (Resolve-Path "../venv/Scripts/python.exe").Path
+& $PY -c "import sys; print(sys.executable); print(sys.version)"
+& $PY -m pip install --upgrade pip
+& $PY -m pip install --no-build-isolation -r requirements.txt
+```
+
+支持 Python 3.12 及以上；推荐使用 Python 3.13。`pyproject.toml` 是依赖版本唯一真源，`requirements.txt` 只提供开发环境安装入口。
+
+### 安装验收
+
+```powershell
+$PY = (Resolve-Path "../venv/Scripts/python.exe").Path
+& $PY -m pip check
+& $PY -c "import minppi_mofs; print('import OK')"
+New-Item -ItemType Directory -Force -Path .pytest-tmp | Out-Null
+& $PY -m pytest tests -q -p no:cacheprovider --basetemp .pytest-tmp
+& $PY -m ruff check src experiments tests conference-paper/sync_figures.py
+```
+
+## 两组式完整执行
+
+正式入口把五个 seeds 固定分为 `(42,123)`、`(456,789)` 和 `(1024)` 三个 shard。`--max-parallel 3` 是当前单 GPU、两天目标的候选配置，不是完成时长保证。一次只能启动一个 campaign 进程，不要同时手工启动其他 GPU/model 命令。
+
+所有命令都从 `Master` 目录执行，并通过同一个相邻 `venv`。下面的函数会在任一 Python 子命令返回非零时立即停止，防止带着不完整的上游产物继续运行。
+
+### 第一组：原始数据、校准、smoke 与密封 estimator
+
+第一组显式运行七个数据获取脚本。它们只创建或复核 `data/raw/*.csv`，不生成正式划分；正式的 train/validation/test 划分仍由 manifest 管线在各 run 内完成。随后以 seed 42 校准模型、运行独立 smoke，最后让正式五种子 campaign 只运行到 estimator，held-out test 保持密封。
+
+```powershell
+$ErrorActionPreference = "Stop"
+$PY = (Resolve-Path "../venv/Scripts/python.exe").Path
+$OUT = "results\icomp2026_formal"
 $BOOT = "bootstrap-s42-v1"
-$SMOKE = "policy-smoke-s42-v1"
-$SCREEN = "screen-s42-v1"
-$POLICY = "$ROOT\$BOOT\calibration\model_policy.json"
+$SMOKE = "smoke-s42-v1"
+$CID = "icomp2026-formal-v1"
+$POLICY = "$OUT\$BOOT\calibration\model_policy.json"
+
+function Invoke-ProjectPython {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    Write-Host "`n> $PY $($Arguments -join ' ')" -ForegroundColor Cyan
+    & $PY @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "project Python failed with exit $LASTEXITCODE"
+    }
+}
+
+Invoke-ProjectPython -Arguments @("-m", "pip", "check")
+Invoke-ProjectPython -Arguments @("-c", "import minppi_mofs; print('import OK')")
+New-Item -ItemType Directory -Force -Path .pytest-tmp | Out-Null
+Invoke-ProjectPython -Arguments @("-m", "pytest", "tests", "-q", "-p", "no:cacheprovider", "--basetemp", ".pytest-tmp\group1-$PID")
+Invoke-ProjectPython -Arguments @("-m", "ruff", "check", "src", "experiments", "tests", "conference-paper/sync_figures.py")
+
+Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_abalone.py")
+Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_Credit-Card-Fraud.py")
+Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_crimedata.py")
+Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_Gisette.py")
+Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_ISOLET.py")
+Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_Madelon.py")
+Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_Spambase.py")
+Get-FileHash -Algorithm SHA256 data\raw\*.csv | Sort-Object Path
+
+$ValidateArguments = @(
+    "experiments\run_icomp2026_pipeline.py", "--stage", "validate",
+    "--config-dir", "configs", "--output-root", $OUT, "--seeds", "42",
+    "--backend", "cuda", "--run-id", $BOOT
+)
+if (Test-Path "$OUT\$BOOT") { $ValidateArguments += "--resume" }
+Invoke-ProjectPython -Arguments $ValidateArguments
+Invoke-ProjectPython -Arguments @(
+    "experiments\run_icomp2026_pipeline.py", "--stage", "preprocess",
+    "--config-dir", "configs", "--output-root", $OUT, "--seeds", "42",
+    "--backend", "cuda", "--run-id", $BOOT, "--resume"
+)
+
+if (-not (Test-Path $POLICY)) {
+    Invoke-ProjectPython -Arguments @(
+        "experiments\calibrate_icomp2026_models.py", "--run-root", "$OUT\$BOOT",
+        "--config-dir", "configs", "--backend", "cuda", "--seed", "42",
+        "--candidate-rounds", "10", "20", "40", "100", "--output", $POLICY
+    )
+} else {
+    Write-Host "Using existing frozen model policy: $POLICY" -ForegroundColor Yellow
+}
+
+$SmokeArguments = @(
+    "experiments\run_icomp2026_pipeline.py", "--stage", "all",
+    "--config-dir", "configs", "--output-root", $OUT, "--seeds", "42",
+    "--backend", "cuda", "--run-id", $SMOKE, "--smoke",
+    "--model-policy", $POLICY
+)
+if (Test-Path "$OUT\$SMOKE") { $SmokeArguments += "--resume" }
+Invoke-ProjectPython -Arguments $SmokeArguments
+
+Invoke-ProjectPython -Arguments @(
+    "experiments\run_icomp2026_campaign.py", "--config-dir", "configs",
+    "--output-root", $OUT, "--campaign-id", $CID,
+    "--model-policy", $POLICY, "--through", "estimator",
+    "--max-parallel", "3"
+)
+Invoke-ProjectPython -Arguments @(
+    "experiments\screen_icomp2026_results.py",
+    "--run-root", "$OUT\$CID-s42-123", "--config-dir", "configs",
+    "--model-policy", $POLICY, "--backend", "cuda", "--seed", "42",
+    "--output-dir", "$OUT\$CID\screening"
+)
 ```
 
-先完成预处理并校准每个数据集的 XGBoost 轮数：
+第一组中断后，原样重输整个代码块即可：bootstrap 与 smoke 会根据目录是否存在显式恢复，campaign 会对已有 shard 自动恢复。最后检查 `results\icomp2026_formal\icomp2026-formal-v1\screening\screen_report.md`；它是 seed-42 的 validation-only 方向筛查，不是论文结果。不要删除成功 shard、替换 model policy、升级当前 venv/显卡驱动或复制其他 run 的 cache；科学环境摘要发生变化时 resume 会拒绝继续。
+
+第一组长任务启动后，可在另一个位于 `Master` 的 PowerShell 终端执行一次性快照：
 
 ```powershell
-& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $BOOT
-& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $BOOT --resume
-& $PY -m experiments.calibrate_icomp2026_models --run-root "$ROOT\$BOOT" --config-dir configs --backend cuda --seed 42 --candidate-rounds 10 20 40 100 --output $POLICY
+$PY = (Resolve-Path "../venv/Scripts/python.exe").Path
+& $PY experiments\monitor_icomp2026_campaign.py --output-root results\icomp2026_formal --campaign-id icomp2026-formal-v1 --group initial
 ```
 
-对两个 smoke 数据集验证冻结策略，全程不访问测试集：
+### 第二组：held-out test、统一汇总、正式图与论文编译
+
+只有确认第一组验证集方向合理后，才运行第二组。该命令显式开放 removal、alpha 与 NSGA-II 的注册 held-out-test 访问，完成 ablation、唯一 campaign 汇总以及三张正式图。同步器只接受同一 publication-eligible campaign 的精确 PDF/hash bundle。
 
 ```powershell
-& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SMOKE --smoke --model-policy $POLICY
-& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SMOKE --smoke --model-policy $POLICY --resume
-& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SMOKE --smoke --model-policy $POLICY --resume
+$ErrorActionPreference = "Stop"
+$PY = (Resolve-Path "../venv/Scripts/python.exe").Path
+$OUT = "results\icomp2026_formal"
+$CID = "icomp2026-formal-v1"
+$POLICY = "$OUT\bootstrap-s42-v1\calibration\model_policy.json"
+$FIGURES = "$OUT\$CID\figures\paper"
+
+function Invoke-ProjectPython {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    Write-Host "`n> $PY $($Arguments -join ' ')" -ForegroundColor Cyan
+    & $PY @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "project Python failed with exit $LASTEXITCODE"
+    }
+}
+
+Invoke-ProjectPython -Arguments @(
+    "experiments\run_icomp2026_campaign.py", "--config-dir", "configs",
+    "--output-root", $OUT, "--campaign-id", $CID,
+    "--model-policy", $POLICY, "--through", "summarize",
+    "--max-parallel", "3", "--allow-test-access"
+)
+Invoke-ProjectPython -Arguments @(
+    "conference-paper\sync_figures.py", "--source", $FIGURES, "--check"
+)
+Invoke-ProjectPython -Arguments @(
+    "conference-paper\sync_figures.py", "--source", $FIGURES,
+    "--dest", "conference-paper\figures"
+)
+
+Push-Location conference-paper\paper
+try {
+    & pdflatex -halt-on-error icomp2026_conference.tex
+    if ($LASTEXITCODE -ne 0) { throw "first pdflatex pass failed" }
+    & bibtex icomp2026_conference
+    if ($LASTEXITCODE -ne 0) { throw "bibtex failed" }
+    & pdflatex -halt-on-error icomp2026_conference.tex
+    if ($LASTEXITCODE -ne 0) { throw "second pdflatex pass failed" }
+    & pdflatex -halt-on-error icomp2026_conference.tex
+    if ($LASTEXITCODE -ne 0) { throw "final pdflatex pass failed" }
+} finally {
+    Pop-Location
+}
 ```
 
-运行七个数据集的 seed 42 筛选实验并生成方向性报告：
+第二组中断后也原样重输该代码块；campaign 会继续未完成 job，已验证成功的 job 不会重算。第二组一次性快照为：
 
 ```powershell
-& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SCREEN --model-policy $POLICY --estimator-budgets 2 5
-& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SCREEN --model-policy $POLICY --estimator-budgets 2 5 --resume
-& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SCREEN --model-policy $POLICY --estimator-budgets 2 5 --resume
-& $PY -m experiments.screen_icomp2026_results --run-root "$ROOT\$SCREEN" --config-dir configs --model-policy $POLICY --backend cuda --seed 42 --estimator-budgets 2 5
+$PY = (Resolve-Path "../venv/Scripts/python.exe").Path
+& $PY experiments\monitor_icomp2026_campaign.py --output-root results\icomp2026_formal --campaign-id icomp2026-formal-v1 --group downstream
 ```
 
-估计器中断后只需执行以下命令。分组 SQLite 缓存与进度文件会跳过已经完成的
-物理拟合：
+若需要持续监测，在对应一次性命令末尾增加 `--watch --interval-seconds 300`。按 `Ctrl+C` 只结束只读监测器，不会终止实验。
 
-```powershell
-& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $SCREEN --model-policy $POLICY --estimator-budgets 2 5 --resume
+### 论文 Overview 图契约
+
+文章中标题为 “Overview of MinPPI” 的图由 `fig1_overview.pdf` 承载，不是 `fig3_prefilter.pdf`。它使用 2 行 × 3 列布局：第一行依次为构造投票博弈的 MinSS 分类、与当前扰动核一致的条件性 Algorithm A/B 解析曲线、Madelon 与 Credit-Card-Fraud 的 seed-42 held-out Pareto fronts 和四个注册 alpha 点；第二行只放各自图例/代码说明。正式生成会从 `raw_metrics.csv` 验证 alpha 确实来自 seed 42、trial 0 和完整 `{0.85,0.90,0.95,0.99}` 网格。Smoke 不包含这两个目标数据集，因此第三个面板只显示 scope 占位说明，不能替代正式图。
+
+面板 (b) 仅是明确标注 oracle-guidance 条件的构造博弈说明，不证明数据集无关的样本复杂度优势，也不使用旧草稿中不可复现的 `38×` 表述。`fig3_prefilter.pdf` 保持独立的 1 行 × 2 列职责，只比较 held-out hypervolume 与 convergence evaluations。
+
+## 正式结果验收
+
+只有同时满足以下条件，才能把结果写入论文：
+
+1. 三个 shard 的 canonical seed 并集恰为五个 seeds，且没有重叠。
+2. 所有必需 job 成功；没有未解决的 failed、pending、running 或未批准 skipped job。
+3. protocol evidence、source fingerprint、model-policy digest、raw-authority digest 和 scientific-environment digest 在全部 shard 中一致。
+4. 每个 shard 的冻结元数据 marker、精确 artifact 集合及哈希、协议/环境绑定均有效。
+5. campaign summary manifest 报告 `publication_allowed: true`。
+6. `raw_metrics.csv`、`aggregate_metrics.csv`、`paired_comparisons.csv`、`plot_sources.csv`、LaTeX macros 与 provenance/manifest 属于同一个 summary bundle。
+7. 三张论文图从该 bundle 重新生成；Overview 图的 alpha raw seed authority 与 seed-42 fronts 完整，并通过 campaign 摘要、manifest、PDF magic、长度和 SHA-256 同步检查。
+
+## 辅助材料
+
+- `configs_credit_probe/`：单数据集方向性探测，配置不完整且不能替代七数据集 formal policy。
+- `demos/`：算法性质和教学示例，不产生论文正式指标。
+- `thesis/`：硕士论文未来研究草稿，包含尚未验证的计划性内容。
+- `experiments/README.md`：正式执行器、恢复和输出契约的开发者说明。
+- `configs/README.md`：正式配置字段及作用域说明。
+
+## 引用
+
+```bibtex
+@inproceedings{minppi2026,
+  title     = {Min-Marginal Power Indices for Multi-Objective Feature Selection},
+  author    = {Anonymous},
+  booktitle = {ICOMP},
+  year      = {2026},
+  note      = {Manuscript in preparation}
+}
 ```
-
-持续查看日志，或列出每个数据集最新的进度文件：
-
-```powershell
-Get-Content "$ROOT\$SCREEN\output.log" -Tail 30 -Wait
-```
-
-```powershell
-Get-ChildItem "$ROOT\$SCREEN\estimator\_bundles" -Recurse -Filter progress.json | Sort-Object LastWriteTime -Descending | Select-Object -First 7 FullName,LastWriteTime
-```
-
-通过验证集冻结门后，方向性 `$SCREEN` 不进入最终主表。使用完整
-`K=10,25,50` 重新运行正式 seed 42，再使用同一模型策略和未改动的 Python
-源码运行剩余四个 seed：
-
-```powershell
-$FORMAL42 = "formal-s42-v1"
-$CONFIRM = "confirm-s123-456-789-1024-v1"
-& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $FORMAL42 --model-policy $POLICY
-& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $FORMAL42 --model-policy $POLICY --resume
-& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 42 --backend cuda --run-id $FORMAL42 --model-policy $POLICY --resume
-& $PY -m experiments.run_icomp2026_pipeline --stage validate --config-dir configs --output-root $ROOT --seeds 123 456 789 1024 --backend cuda --run-id $CONFIRM --model-policy $POLICY
-& $PY -m experiments.run_icomp2026_pipeline --stage preprocess --config-dir configs --output-root $ROOT --seeds 123 456 789 1024 --backend cuda --run-id $CONFIRM --model-policy $POLICY --resume
-& $PY -m experiments.run_icomp2026_pipeline --stage estimator --config-dir configs --output-root $ROOT --seeds 123 456 789 1024 --backend cuda --run-id $CONFIRM --model-policy $POLICY --resume
-```
-
-最终索引会拒绝 seed 重叠、模型策略变化、实验设置变化和源代码指纹变化：
-
-```powershell
-& $PY -m experiments.summarize_multifidelity_campaign --shard "$ROOT\$FORMAL42" --shard "$ROOT\$CONFIRM" --output "$ROOT\campaign_index.json"
-```
-
-### 2026-07-28：48 小时正式执行入口
-
-上面的逐 run 命令是旧多保真流程说明。当前 1-GPU、48 小时正式协议和全部
-PowerShell 命令以
-[`ICOMP2026_48H_EXECUTION_FRAMEWORK.md`](ICOMP2026_48H_EXECUTION_FRAMEWORK.md)
-为准。
-
-测试集密封的第一段：
-
-```powershell
-$PY = "..\venv\Scripts\python.exe"
-$OUT = "results\icomp2026_48h"
-$CID = "icomp2026-formal-20260728-v1"
-$POLICY = "results\icomp2026_multifidelity\bootstrap-s42-20260728-v2\calibration\model_policy.json"
-& $PY experiments\run_icomp2026_campaign.py --config-dir configs --output-root $OUT --campaign-id $CID --model-policy $POLICY --through estimator --max-parallel 3
-```
-
-人工检查 seed-42 validation report 后，显式完成全部 P0、统一五种子汇总、排名
-统计和论文图：
-
-```powershell
-& $PY experiments\run_icomp2026_campaign.py --config-dir configs --output-root $OUT --campaign-id $CID --model-policy $POLICY --through summarize --max-parallel 3 --allow-test-access
-```
-
-两条命令都可在中断后原样重输以安全恢复。不要在正式 campaign 创建后修改
-Python/YAML/model policy，也不要复制旧 run 的 cache。

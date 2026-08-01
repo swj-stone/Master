@@ -21,7 +21,7 @@ Usage::
 
 Run (stand-alone)::
 
-    python src/minppi_mofs/baselines/shapg.py
+    ../venv/Scripts/python.exe src/minppi_mofs/baselines/shapg.py
 """
 
 from __future__ import annotations

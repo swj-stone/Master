@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import asdict, replace
@@ -10,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+import yaml
 
 from minppi_mofs.experiment_protocol import (
     DatasetSpec,
@@ -27,20 +29,13 @@ from minppi_mofs.experiment_protocol import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-TASK9_CONFIGS = (
-    PROJECT_ROOT
-    / ".superpowers"
-    / "sdd"
-    / "2026-07-26-cross-stage-acceleration-validation"
-    / "task9-configs"
-)
-
-
 def _protocol(tmp_path: Path, *, execution_mode: str = "legacy") -> ResolvedProtocol:
     dataset = DatasetSpec(
         dataset_id="isolet",
         display_name="ISOLET",
         raw_path=tmp_path / "isolet.csv",
+        raw_sha256="0" * 64,
+        raw_byte_count=1,
         target="letter",
         task="multiclass",
         utility="ovr_auc",
@@ -114,6 +109,38 @@ def _protocol(tmp_path: Path, *, execution_mode: str = "legacy") -> ResolvedProt
             "nsga2_evaluations": 8,
         },
     )
+
+
+def _write_formal_scoped_config(
+    tmp_path: Path,
+    *,
+    dataset_id: str,
+) -> Path:
+    """Derive a one-dataset formal config from the repository authority."""
+    config_dir = tmp_path / f"formal-{dataset_id}-s42"
+    config_dir.mkdir()
+    shutil.copy2(PROJECT_ROOT / "configs" / "icomp2026_pipeline.yaml", config_dir)
+    shutil.copy2(PROJECT_ROOT / "configs" / f"{dataset_id}.yaml", config_dir)
+
+    pipeline_path = config_dir / "icomp2026_pipeline.yaml"
+    pipeline = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
+    pipeline["datasets"] = [dataset_id]
+    pipeline["seeds"] = [42]
+    pipeline["backend"] = "cuda"
+    pipeline["estimator"]["budgets_by_dataset"] = {
+        dataset_id: pipeline["estimator"]["budgets_by_dataset"][dataset_id]
+    }
+    pipeline["stage_scopes"] = {
+        stage: {"datasets": [dataset_id], "seeds": [42]}
+        for stage in pipeline["stage_scopes"]
+    }
+    pipeline["smoke"]["datasets"] = [dataset_id]
+    pipeline["smoke"]["seeds"] = [42]
+    pipeline_path.write_text(
+        yaml.safe_dump(pipeline, sort_keys=False),
+        encoding="utf-8",
+    )
+    return config_dir
 
 
 def _selected_counts() -> tuple[dict[str, object], ...]:
@@ -592,10 +619,13 @@ def test_real_repository_config_projects_to_canonical_isolet_scope() -> None:
     }
 
 
-def test_real_task9_scoped_config_projection_is_identity() -> None:
+def test_real_task9_scoped_config_projection_is_identity(
+    tmp_path: Path,
+) -> None:
     module = importlib.import_module("experiments.run_isolet_utility_pair")
+    config_dir = _write_formal_scoped_config(tmp_path, dataset_id="isolet")
     loaded = load_resolved_protocol(
-        TASK9_CONFIGS / "grouped-isolet-s42",
+        config_dir,
         seeds=(42,),
         backend="cuda",
         smoke=False,
@@ -614,11 +644,12 @@ def test_real_config_without_isolet_fails_before_run_directory_creation(
 ) -> None:
     module = importlib.import_module("experiments.run_isolet_utility_pair")
     output_root = tmp_path / "must-not-exist"
+    config_dir = _write_formal_scoped_config(tmp_path, dataset_id="abalone")
 
     exit_code = module.main(
         [
             "--config-dir",
-            str(TASK9_CONFIGS / "grouped-abalone"),
+            str(config_dir),
             "--output-root",
             str(output_root),
             "--run-id",

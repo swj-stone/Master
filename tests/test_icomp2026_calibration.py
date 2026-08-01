@@ -158,6 +158,8 @@ def test_checkpoint_calibration_fits_each_nonempty_coalition_once() -> None:
         dataset_id="toy",
         display_name="Toy",
         raw_path=Path("toy.csv"),
+        raw_sha256="0" * 64,
+        raw_byte_count=1,
         target="target",
         task="binary",
         utility="accuracy",

@@ -7,7 +7,7 @@ Source: OpenML name="isolet", version=1.
 Output: ``data/raw/isolet.csv`` only.
 
 Run:
-    python experiments/preprocess_data/preprocess_ISOLET.py
+    ../venv/Scripts/python.exe experiments/preprocess_data/preprocess_ISOLET.py
 """
 
 from __future__ import annotations

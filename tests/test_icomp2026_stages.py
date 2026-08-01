@@ -877,16 +877,21 @@ def _synthetic_stage_protocol(tmp_path: Path, smoke_protocol):
     }
     spambase.to_csv(raw_paths["spambase"], index=False)
     abalone.to_csv(raw_paths["abalone"], index=False)
-    datasets = tuple(
-        replace(
-            dataset,
-            raw_path=raw_paths[dataset.dataset_id],
-            max_features=2,
-            variance_threshold=0.0,
+    datasets = []
+    for dataset in smoke_protocol.datasets:
+        raw_path = raw_paths[dataset.dataset_id]
+        raw_payload = raw_path.read_bytes()
+        datasets.append(
+            replace(
+                dataset,
+                raw_path=raw_path,
+                raw_sha256=hashlib.sha256(raw_payload).hexdigest(),
+                raw_byte_count=len(raw_payload),
+                max_features=2,
+                variance_threshold=0.0,
+            )
         )
-        for dataset in smoke_protocol.datasets
-    )
-    return replace(smoke_protocol, datasets=datasets), raw_paths
+    return replace(smoke_protocol, datasets=tuple(datasets)), raw_paths
 
 
 def test_real_validate_stage_writes_structured_checks_and_requires_raw_cache(
@@ -915,6 +920,26 @@ def test_real_validate_stage_writes_structured_checks_and_requires_raw_cache(
     raw_paths["spambase"].unlink()
     with pytest.raises(FileNotFoundError, match="spambase|raw"):
         stage_module.run_validate_job(context)
+
+
+def test_validate_rejects_raw_cache_outside_registered_snapshot(
+    tmp_path: Path, smoke_protocol
+) -> None:
+    protocol, raw_paths = _synthetic_stage_protocol(tmp_path, smoke_protocol)
+    raw_paths["spambase"].write_bytes(
+        raw_paths["spambase"].read_bytes() + b"\n"
+    )
+    layout = create_new_run(tmp_path / "results", "unregistered-raw", protocol)
+    freeze_run_metadata(layout, protocol, project_root=Path(__file__).parents[1])
+    manifest = build_job_manifest(protocol, stages=("validate",))
+    status = StatusStore(layout, manifest)
+    context = _contexts(protocol, layout, manifest, status)[0]
+
+    with pytest.raises(RuntimeError, match="registered raw snapshot"):
+        stage_module.run_validate_job(context)
+
+    assert not (layout.root / "validate" / "raw_authority.json").exists()
+    assert not (layout.root / "validate" / "validation_checks.json").exists()
 
 
 def test_real_validate_stage_rejects_forged_task_utility_pair(

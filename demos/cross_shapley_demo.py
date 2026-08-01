@@ -1,4 +1,5 @@
-"""
+"""Non-formal master-thesis demo; it is outside the ICOMP evidence chain.
+
 Cross-Shapley demo: bipartite Shapley interaction value φ_{i,o}^{cross}
 for a 5-feature × 3-architecture-operation toy problem.
 
@@ -25,7 +26,7 @@ What the cross-Shapley matrix should reveal:
       (linear features don't gain from added ops)
 
 Run:
-    python cross_shapley_demo.py
+    ../venv/Scripts/python.exe demos/cross_shapley_demo.py
 """
 
 from __future__ import annotations

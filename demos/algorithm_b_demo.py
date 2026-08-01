@@ -1,8 +1,10 @@
-"""
-Algorithm B (ShapG-guided adversarial search) vs Algorithm A (random MC).
+"""Non-formal teaching demo; it does not produce ICOMP experiment evidence.
+
+Algorithm B (MI-correlation-guided adversarial search) vs Algorithm A
+(random MC).
 
 Tests the core algorithmic contribution of §4.3.2 of the ICOMP 2026 paper:
-when a feature is harmful only in rare contexts (small p_neg), ShapG-guided
+when a feature is harmful only in rare contexts (small p_neg), correlation-guided
 adversarial search detects it with O(1) samples, while random MC needs
 O(1/p_neg).
 
@@ -10,11 +12,11 @@ Setup: same engineered voting game as Example 2 in minppi_demo.py.
        Target = f_1, true MinSS = -1.
        Witness: v({0,2}) = 1, v({0,1,2}) = 0.
 
-The correlation matrix W (which would come from ShapG on real data) encodes
+The hand-crafted correlation matrix W encodes
 the structural conflict between f_1 and {f_0, f_2}.
 
 Run:
-    python algorithm_b_demo.py
+    ../venv/Scripts/python.exe demos/algorithm_b_demo.py
 """
 
 from __future__ import annotations
@@ -51,16 +53,17 @@ def v_alpha(S: Iterable[int]) -> int:
 
 
 # ---------------------------------------------------------------------------
-# ShapG-style correlation matrix W
+# Hand-crafted feature-correlation matrix W
 # ---------------------------------------------------------------------------
-# In practice this comes from ShapG (Zhao et al. 2025) on real data:
+# In the formal method this signal is built from training-only MI and
+# feature correlation:
 #   builder = GraphBuilder()
 #   G = builder.from_correlation(data, threshold=...)
 #   W = nx.to_numpy_array(G, weight='weight')
 #
 # Here we hardcode it to reflect the structural conflict in our engineered v_α:
 # f_1 is harmful exactly when paired with f_0 AND f_2 (the witness S = {0, 2}).
-# A correct ShapG output should therefore show f_1 most strongly correlated
+# A useful guidance signal should therefore show f_1 most strongly correlated
 # with f_0 and f_2.
 W_DEMO = np.array(
     [
@@ -95,7 +98,7 @@ def algorithm_a(target: int, K: int, rng: np.random.Generator) -> Tuple[int, int
 
 
 # ---------------------------------------------------------------------------
-# Algorithm B: ShapG-guided adversarial search
+# Algorithm B: MI-correlation-guided adversarial search
 # ---------------------------------------------------------------------------
 def algorithm_b(
     target: int,
@@ -104,7 +107,7 @@ def algorithm_b(
     rng: np.random.Generator,
     k_seed: int = 2,
 ) -> Tuple[int, int]:
-    """ShapG-guided search; return (min_marginal, samples_used)."""
+    """MI-correlation-guided search; return marginal and sample count."""
     other_with_corr = sorted(
         [(j, W[target, j]) for j in range(N) if j != target],
         key=lambda x: -x[1],
@@ -146,13 +149,13 @@ def banner(s: str) -> None:
 
 
 def main() -> None:
-    banner("Algorithm B (ShapG-guided) vs Algorithm A (random MC)")
+    banner("Algorithm B (MI-correlation-guided) vs Algorithm A (random MC)")
     print()
     print("v_α: 13 winning coalitions on N = {0,1,2,3,4}")
     print(f"Target: f_{TARGET}  (true MinSS = -1; harmful witness at S = {{0, 2}})")
     print()
 
-    print("Correlation matrix W (ShapG proxy):")
+    print("Hand-crafted correlation matrix W:")
     print("       " + "  ".join(f"f_{j:>3}" for j in range(N)))
     for i in range(N):
         row = "  ".join(f"{W_DEMO[i, j]:>4.2f}" for j in range(N))
@@ -174,7 +177,7 @@ def main() -> None:
     )
     print("Seed evaluation:")
     print(f"   v({{0,1,2}}) - v({{0,2}}) = {v_alpha({0, 1, 2}) - v_alpha({0, 2})}")
-    print("   ⟹ DETECTED at K=1 (deterministic, given correct ShapG W) ✓")
+    print("   ⟹ DETECTED at K=1 (deterministic, given useful guidance W) ✓")
     print()
 
     # ----- main comparison: detection rate -----
@@ -216,7 +219,7 @@ def main() -> None:
     print()
 
     # ----- robustness: what if W is noisy / wrong? -----
-    banner("Robustness check: what if ShapG correlation matrix W is noisy?")
+    banner("Robustness check: what if correlation guidance W is noisy?")
     print()
     print("Replace W with W_noisy = W + Gaussian(0, σ²), clipped to [0,1]")
     print("σ ∈ {0.05, 0.15, 0.30, 0.50}, K = 5, 500 trials per σ")
@@ -258,8 +261,8 @@ def main() -> None:
     print("the top-2 neighbors of f_1 remain robust under bounded perturbation.")
     print()
     print("Implication for §4.3:")
-    print("  Algorithm B's efficiency depends on ShapG W being approximately correct.")
-    print("  Even noisy ShapG dominates uniform random sampling for sparse harmful.")
+    print("  Algorithm B's efficiency depends on W being approximately correct.")
+    print("  Even noisy guidance can outperform uniform sampling in this toy game.")
 
 
 if __name__ == "__main__":

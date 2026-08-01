@@ -1,16 +1,16 @@
-"""
+r"""
 Tests for ``minppi_mofs.voting_game`` — boundary cases, caching, non-monotonicity.
 
 Covers:
 - AccFullCache correctness (caching, empty-set handling, full-feature AUC)
 - compute_v_alpha binary output
 - classify_minppi label mapping
-- Non-monotonicity demonstration (Remark 2 in method-skeleton.md)
+- Non-monotonicity behavior
 - Edge cases: single feature, subset reordering, cache reuse
 
 Run::
 
-    pytest tests/test_voting_game.py -v
+    ..\venv\Scripts\python.exe -m pytest tests/test_voting_game.py -v
 """
 
 from __future__ import annotations

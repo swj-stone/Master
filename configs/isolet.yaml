@@ -2,6 +2,8 @@ dataset:
   id: isolet
   display_name: ISOLET
   raw_path: data/raw/isolet.csv
+  raw_sha256: 7113075d4802471d595540ea5161978fd76cd892b58d96ce26d535e837dda200
+  raw_byte_count: 32685013
   target: letter
   task: multiclass
   utility: ovr_auc

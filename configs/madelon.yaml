@@ -2,6 +2,8 @@ dataset:
   id: madelon
   display_name: Madelon
   raw_path: data/raw/madelon.csv
+  raw_sha256: ac9cb79fe194a9032496d92160a679bf2b2dedf6a0d946962116864abdb77357
+  raw_byte_count: 7810193
   target: label
   task: binary
   utility: roc_auc

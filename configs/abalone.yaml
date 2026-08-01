@@ -2,6 +2,8 @@ dataset:
   id: abalone
   display_name: Abalone
   raw_path: data/raw/abalone.csv
+  raw_sha256: 81c45a0cf2d6244fc158cc18ccddf7f133509fe9820cfa85514699d83c006e40
+  raw_byte_count: 196146
   target: Rings
   task: regression
   utility: r2

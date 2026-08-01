@@ -2,6 +2,8 @@ dataset:
   id: spambase
   display_name: Spambase
   raw_path: data/raw/spambase.csv
+  raw_sha256: 9c4af29aa3b36519a8686fb9dc9b8dc0784d9686079c2945efeb298829d727e1
+  raw_byte_count: 1111924
   target: is_spam
   task: binary
   utility: roc_auc

@@ -1,5 +1,7 @@
 # Cross-Shapley Framework — 论文理论核心
 
+> **范围说明：** 这是尚待证明和实验验证的硕士论文理论草稿，不是 ICOMP 2026 方法、实现或正式证据。
+
 把单层 Shapley 推广到 **factored game** $v: 2^{N_1} \times 2^{N_2} \to \mathbb{R}$ 上的 cross-Shapley interaction value。这是论文的核心理论对象。
 
 ---

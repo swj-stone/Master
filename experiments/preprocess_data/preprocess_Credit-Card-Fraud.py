@@ -7,7 +7,7 @@ Source: OpenML name="creditcard".
 Output: ``data/raw/credit_card_fraud.csv`` only.
 
 Run:
-    python experiments/preprocess_data/preprocess_Credit-Card-Fraud.py
+    ../venv/Scripts/python.exe experiments/preprocess_data/preprocess_Credit-Card-Fraud.py
 """
 
 from __future__ import annotations

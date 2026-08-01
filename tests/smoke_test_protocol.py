@@ -10,7 +10,7 @@ Checks:
   6. Different seeds produce different splits.
 
 Run:
-    python tests/smoke_test_protocol.py
+    ../venv/Scripts/python.exe tests/smoke_test_protocol.py
 """
 
 from __future__ import annotations

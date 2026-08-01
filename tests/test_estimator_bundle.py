@@ -84,6 +84,8 @@ def stage_context(tmp_path: Path) -> StageContext:
         dataset_id="spambase",
         display_name="Spambase",
         raw_path=Path("data/raw/spambase.csv"),
+        raw_sha256="0" * 64,
+        raw_byte_count=1,
         target="spam",
         task="binary",
         utility="roc_auc",

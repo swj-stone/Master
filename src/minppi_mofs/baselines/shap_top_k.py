@@ -14,7 +14,7 @@ Usage::
 
 Run (stand-alone)::
 
-    python src/minppi_mofs/baselines/shap_top_k.py
+    ../venv/Scripts/python.exe src/minppi_mofs/baselines/shap_top_k.py
 """
 
 from __future__ import annotations

@@ -42,6 +42,7 @@ from minppi_mofs.experiment_protocol import (
     read_rich_data_manifest,
     read_result_record,
     resolved_protocol_hash,
+    scientific_environment_digest,
     upsert_data_manifest,
 )
 from minppi_mofs.modeling import evaluate_fixed_subset, fit_predict as fit_predict
@@ -326,10 +327,20 @@ def run_validate_job(context: StageContext) -> ResultRecord:
                 f"{dataset.raw_path}"
             )
         raw_payload = dataset.raw_path.read_bytes()
-        raw_authority[dataset.dataset_id] = {
+        observed_identity = {
             "byte_count": len(raw_payload),
             "sha256": hashlib.sha256(raw_payload).hexdigest(),
         }
+        expected_identity = {
+            "byte_count": dataset.raw_byte_count,
+            "sha256": dataset.raw_sha256,
+        }
+        if observed_identity != expected_identity:
+            raise RuntimeError(
+                "configured raw cache does not match the registered raw snapshot "
+                f"for {dataset.dataset_id}"
+            )
+        raw_authority[dataset.dataset_id] = observed_identity
         raw_datasets.append(dataset.dataset_id)
     if not context.layout.root.is_dir() or not os.access(context.layout.root, os.W_OK):
         raise PermissionError(f"run directory is not writable: {context.layout.root}")
@@ -361,6 +372,15 @@ def run_validate_job(context: StageContext) -> ResultRecord:
     _validate_xgboost_build_info(
         environment["xgboost_build_info"], context.protocol.backend
     )
+    frozen_environment_digest = environment.get(
+        "scientific_environment_sha256"
+    )
+    if (
+        not isinstance(frozen_environment_digest, str)
+        or scientific_environment_digest(environment)
+        != frozen_environment_digest
+    ):
+        raise ValueError("frozen scientific environment digest is invalid")
 
     required_executors = {"validate", "preprocess"}
     required_executors.update(job.stage for job in context.status.manifest)

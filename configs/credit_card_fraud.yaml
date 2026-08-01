@@ -2,6 +2,8 @@ dataset:
   id: credit_card_fraud
   display_name: Credit-Card-Fraud
   raw_path: data/raw/credit_card_fraud.csv
+  raw_sha256: 5ac0db239c79b8234914ac04242b5a864cd34cd9c4e73526ed3808185285e335
+  raw_byte_count: 148701764
   target: Class
   task: binary
   utility: roc_auc

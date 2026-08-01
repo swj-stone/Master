@@ -1,5 +1,6 @@
-"""
-MinPPI demo: empirical verification of Lemma 1 + Theorem 1 from §4 of the
+"""Non-formal teaching demo; it does not produce ICOMP experiment evidence.
+
+Empirical verification of Lemma 1 + Theorem 1 from §4 of the
 ICOMP 2026 paper "Min-Marginal Power Indices for Multi-Objective Feature
 Selection: A Voting-Game Approach".
 
@@ -18,7 +19,7 @@ Verifies:
   - The naive equivalence "in every winning coalition ⟺ MinSS = +1" FAILS
 
 Run:
-    python minppi_demo.py
+    ../venv/Scripts/python.exe demos/minppi_demo.py
 """
 
 from __future__ import annotations
@@ -322,7 +323,7 @@ def example_4_alg_a_bias() -> None:
     print("Observation: theory and empirical match within sampling noise. ✓")
     print("Implication: when p_- is small (rare harmful contexts), random MC needs")
     print("             many samples to detect. This motivates Algorithm B")
-    print("             (ShapG-guided adversarial search) in §4.3.2.")
+    print("             (MI-correlation-guided adversarial search) in §4.3.2.")
 
 
 # ---------------------------------------------------------------------------

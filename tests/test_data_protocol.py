@@ -8,7 +8,7 @@ are included.
 
 Run::
 
-    python -m pytest tests/test_data_protocol.py -v
+    ../venv/Scripts/python.exe -m pytest tests/test_data_protocol.py -v
 """
 
 from __future__ import annotations

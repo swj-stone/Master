@@ -22,10 +22,12 @@ from minppi_mofs.experiment_protocol import (
     assert_stage_complete,
     atomic_write_json,
     build_job_manifest,
+    canonical_hash,
     load_resolved_protocol,
     open_resumed_run,
     read_canonical_json,
     read_data_manifest,
+    scientific_environment_digest,
 )
 
 
@@ -44,6 +46,8 @@ class ShardRecord:
     model_policy_digest: str
     evidence_digest: str
     source_files_digest: str
+    raw_authority_digest: str
+    scientific_environment_digest: str
     complete: bool
 
     def __post_init__(self) -> None:
@@ -54,6 +58,8 @@ class ShardRecord:
             "model_policy_digest",
             "evidence_digest",
             "source_files_digest",
+            "raw_authority_digest",
+            "scientific_environment_digest",
         ):
             if not isinstance(getattr(self, field), str) or not _SHA256.fullmatch(
                 getattr(self, field)
@@ -155,6 +161,12 @@ def validate_campaign_shards(
         raise ValueError("campaign shards use different scientific evidence")
     if len({item.source_files_digest for item in records}) != 1:
         raise ValueError("campaign shards use different source fingerprints")
+    if len({item.raw_authority_digest for item in records}) != 1:
+        raise ValueError("campaign shards use different raw authority digests")
+    if len({item.scientific_environment_digest for item in records}) != 1:
+        raise ValueError(
+            "campaign shards use different scientific environment digests"
+        )
     return records
 
 
@@ -621,6 +633,10 @@ def build_campaign_summary(
         "test_partition_read_by_summary": False,
         "seeds": sorted(_EXPECTED_SEEDS),
         "shards": [str(record.root) for record in records],
+        "raw_authority_digest": records[0].raw_authority_digest,
+        "scientific_environment_digest": (
+            records[0].scientific_environment_digest
+        ),
         "skipped_jobs": skipped_jobs,
         "row_counts": {
             name: len(tables[name])
@@ -660,6 +676,12 @@ def _read_yaml_mapping(path: Path) -> dict[str, object]:
 def read_shard_record(root: Path) -> ShardRecord:
     """Read one shard's frozen metadata and estimator completion state."""
     shard_root = Path(root)
+    marker = read_canonical_json(
+        shard_root / "metadata_complete.json",
+        context="metadata completion marker",
+    )
+    if not isinstance(marker, dict) or marker.get("schema_version") != 1:
+        raise ValueError("metadata completion marker is invalid")
     protocol = _read_yaml_mapping(shard_root / "resolved_protocol.yaml")
     fingerprint = read_canonical_json(
         shard_root / "source_fingerprint.json",
@@ -678,12 +700,28 @@ def read_shard_record(root: Path) -> ShardRecord:
     ):
         raise ValueError("frozen shard protocol lacks campaign identity")
     dataset_ids: list[str] = []
+    expected_raw_authority: dict[str, dict[str, object]] = {}
     for dataset in datasets_value:
-        if not isinstance(dataset, dict) or not isinstance(
-            dataset.get("dataset_id"), str
+        if not isinstance(dataset, dict):
+            raise ValueError("frozen shard dataset scope is invalid")
+        dataset_id = dataset.get("dataset_id")
+        raw_sha256 = dataset.get("raw_sha256")
+        raw_byte_count = dataset.get("raw_byte_count")
+        if (
+            not isinstance(dataset_id, str)
+            or not isinstance(raw_sha256, str)
+            or _SHA256.fullmatch(raw_sha256) is None
+            or isinstance(raw_byte_count, bool)
+            or not isinstance(raw_byte_count, int)
+            or raw_byte_count <= 0
+            or dataset_id in expected_raw_authority
         ):
             raise ValueError("frozen shard dataset scope is invalid")
-        dataset_ids.append(dataset["dataset_id"])
+        dataset_ids.append(dataset_id)
+        expected_raw_authority[dataset_id] = {
+            "byte_count": raw_byte_count,
+            "sha256": raw_sha256,
+        }
     seeds = tuple(seeds_value)
     protocol_hash = fingerprint.get("protocol_hash")
     source_files = fingerprint.get("files")
@@ -693,6 +731,74 @@ def read_shard_record(root: Path) -> ShardRecord:
         or not isinstance(source_files, dict)
     ):
         raise ValueError("source fingerprint is invalid")
+    if canonical_hash(protocol) != protocol_hash:
+        raise ValueError("resolved protocol content does not match its protocol hash")
+    if marker.get("protocol_hash") != protocol_hash:
+        raise ValueError("metadata completion marker protocol hash is invalid")
+    artifact_hashes = marker.get("artifacts")
+    expected_artifacts = {
+        "resolved_protocol.yaml",
+        "environment.json",
+        "source_fingerprint.json",
+        "configs_frozen/icomp2026_pipeline.resolved.yaml",
+        *(f"configs_frozen/{dataset_id}.yaml" for dataset_id in dataset_ids),
+    }
+    if (
+        not isinstance(artifact_hashes, dict)
+        or set(artifact_hashes) != expected_artifacts
+        or any(
+            not isinstance(digest, str) or _SHA256.fullmatch(digest) is None
+            for digest in artifact_hashes.values()
+        )
+    ):
+        raise ValueError("metadata completion marker artifact set is invalid")
+    resolved_shard_root = shard_root.resolve()
+    for relative, expected_digest in artifact_hashes.items():
+        artifact_path = shard_root / relative
+        try:
+            artifact_path.resolve().relative_to(resolved_shard_root)
+        except ValueError as exc:
+            raise ValueError("frozen metadata artifact escapes the shard") from exc
+        if artifact_path.is_symlink() or not artifact_path.is_file():
+            raise ValueError(f"frozen metadata artifact is invalid: {relative}")
+        actual_digest = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+        if actual_digest != expected_digest:
+            raise ValueError(f"frozen metadata artifact was changed: {relative}")
+    raw_authority = read_canonical_json(
+        shard_root / "validate" / "raw_authority.json",
+        context="raw authority",
+    )
+    if (
+        not isinstance(raw_authority, dict)
+        or set(raw_authority) != {"protocol_hash", "datasets"}
+        or raw_authority.get("protocol_hash") != protocol_hash
+        or raw_authority.get("datasets") != expected_raw_authority
+    ):
+        raise ValueError("raw authority does not match the frozen protocol")
+    raw_authority_digest = _canonical_digest(expected_raw_authority)
+    environment = read_canonical_json(
+        shard_root / "environment.json",
+        context="scientific environment",
+    )
+    if not isinstance(environment, dict):
+        raise ValueError("scientific environment is invalid")
+    frozen_environment_digest = environment.get(
+        "scientific_environment_sha256"
+    )
+    try:
+        calculated_environment_digest = scientific_environment_digest(
+            environment
+        )
+    except ValueError as exc:
+        raise ValueError("scientific environment is invalid") from exc
+    if (
+        not isinstance(frozen_environment_digest, str)
+        or _SHA256.fullmatch(frozen_environment_digest) is None
+        or calculated_environment_digest != frozen_environment_digest
+        or marker.get("scientific_environment_sha256")
+        != frozen_environment_digest
+    ):
+        raise ValueError("scientific environment digest is invalid")
     evidence = {
         key: value
         for key, value in protocol.items()
@@ -717,6 +823,8 @@ def read_shard_record(root: Path) -> ShardRecord:
         model_policy_digest=policy_digest,
         evidence_digest=_canonical_digest(evidence),
         source_files_digest=_canonical_digest(source_files),
+        raw_authority_digest=raw_authority_digest,
+        scientific_environment_digest=frozen_environment_digest,
         complete=complete,
     )
 
@@ -734,6 +842,10 @@ def build_campaign_index(
         "model_policy_digest": records[0].model_policy_digest,
         "evidence_digest": records[0].evidence_digest,
         "source_files_digest": records[0].source_files_digest,
+        "raw_authority_digest": records[0].raw_authority_digest,
+        "scientific_environment_digest": (
+            records[0].scientific_environment_digest
+        ),
         "shards": [
             {
                 **asdict(record),

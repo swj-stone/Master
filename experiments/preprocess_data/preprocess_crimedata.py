@@ -7,7 +7,7 @@ Source: shapG mirror (GitHub).
 Output: ``data/raw/crimedata.csv`` only.
 
 Run:
-    python experiments/preprocess_data/preprocess_crimedata.py
+    ../venv/Scripts/python.exe experiments/preprocess_data/preprocess_crimedata.py
 """
 
 from __future__ import annotations

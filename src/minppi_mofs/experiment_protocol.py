@@ -72,6 +72,19 @@ _ALLOWED_TEST_ACCESS = frozenset(
     }
 )
 _AUDIT_SCHEMA_VERSION = 1
+_SCIENTIFIC_ENVIRONMENT_KEYS = (
+    "python",
+    "numpy",
+    "pandas",
+    "scikit_learn",
+    "xgboost",
+    "xgboost_build_info",
+    "cuda_build_info",
+    "cuda_driver",
+    "os",
+    "backend",
+)
+_VOLATILE_XGBOOST_BUILD_KEYS = frozenset({"libxgboost"})
 _DATA_MANIFEST_FIELDS = (
     "protocol_hash", "job_id", "dataset_id", "seed", "task", "utility",
     "target", "raw_file_sha256", "raw_row_count", "raw_feature_count",
@@ -153,7 +166,16 @@ _SMOKE_KEYS = frozenset(
 )
 _DATASET_FILE_KEYS = frozenset({"dataset", "preprocessing", "split"})
 _DATASET_KEYS = frozenset(
-    {"id", "display_name", "raw_path", "target", "task", "utility"}
+    {
+        "id",
+        "display_name",
+        "raw_path",
+        "raw_sha256",
+        "raw_byte_count",
+        "target",
+        "task",
+        "utility",
+    }
 )
 _PREPROCESSING_KEYS = frozenset({"max_features", "variance_threshold"})
 _SPLIT_KEYS = frozenset({"train_frac", "val_frac", "test_frac"})
@@ -166,6 +188,8 @@ class DatasetSpec:
     dataset_id: str
     display_name: str
     raw_path: Path
+    raw_sha256: str
+    raw_byte_count: int
     target: str
     task: str
     utility: str
@@ -954,11 +978,12 @@ def freeze_run_metadata(
         sort_keys=True,
         allow_unicode=True,
     )
+    environment = _capture_environment(protocol.backend)
+    environment_digest = scientific_environment_digest(environment)
+    environment["scientific_environment_sha256"] = environment_digest
     text_artifacts = {
         layout.root / "resolved_protocol.yaml": resolved_yaml,
-        layout.root / "environment.json": _json_text(
-            _capture_environment(protocol.backend)
-        ),
+        layout.root / "environment.json": _json_text(environment),
         layout.root / "source_fingerprint.json": _json_text(
             capture_source_fingerprint(project_root, protocol)
         ),
@@ -1001,6 +1026,7 @@ def freeze_run_metadata(
         {
             "schema_version": 1,
             "protocol_hash": _protocol_hash(protocol),
+            "scientific_environment_sha256": environment_digest,
             "artifacts": artifact_hashes,
         },
     )
@@ -1021,11 +1047,34 @@ def open_resumed_run(
 
     _validate_frozen_metadata(layout, protocol)
     protocol_path = layout.root / "resolved_protocol.yaml"
+    environment_path = layout.root / "environment.json"
     fingerprint_path = layout.root / "source_fingerprint.json"
 
     frozen_protocol = _read_yaml(protocol_path)
     if canonical_hash(frozen_protocol) != _protocol_hash(protocol):
         raise RuntimeError("resolved protocol drift prevents resume")
+
+    try:
+        frozen_environment = json.loads(
+            environment_path.read_text(encoding="utf-8")
+        )
+        frozen_environment_digest = frozen_environment[
+            "scientific_environment_sha256"
+        ]
+    except (json.JSONDecodeError, OSError, KeyError, TypeError) as exc:
+        raise RuntimeError("scientific environment metadata is invalid") from exc
+    if (
+        not isinstance(frozen_environment_digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", frozen_environment_digest) is None
+        or scientific_environment_digest(frozen_environment)
+        != frozen_environment_digest
+    ):
+        raise RuntimeError("scientific environment metadata is invalid")
+    current_environment_digest = scientific_environment_digest(
+        _capture_environment(protocol.backend)
+    )
+    if current_environment_digest != frozen_environment_digest:
+        raise RuntimeError("scientific environment drift prevents resume")
 
     try:
         frozen_fingerprint = json.loads(
@@ -1111,6 +1160,14 @@ def _validate_frozen_metadata(
         raise RuntimeError("metadata completion marker is invalid")
     if marker.get("protocol_hash") != _protocol_hash(protocol):
         raise RuntimeError("resolved protocol drift prevents resume")
+    if (
+        not isinstance(marker.get("scientific_environment_sha256"), str)
+        or re.fullmatch(
+            r"[0-9a-f]{64}", marker["scientific_environment_sha256"]
+        )
+        is None
+    ):
+        raise RuntimeError("metadata completion marker is invalid")
     artifacts = marker.get("artifacts")
     if not isinstance(artifacts, dict) or not all(
         isinstance(relative, str) and isinstance(digest, str)
@@ -1139,6 +1196,18 @@ def _validate_frozen_metadata(
         actual_digest = hashlib.sha256(path.read_bytes()).hexdigest()
         if actual_digest != expected_digest:
             raise RuntimeError(f"frozen metadata artifact was changed: {relative}")
+    try:
+        environment = json.loads(
+            (layout.root / "environment.json").read_text(encoding="utf-8")
+        )
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("metadata completion marker is invalid") from exc
+    if (
+        not isinstance(environment, dict)
+        or marker["scientific_environment_sha256"]
+        != environment.get("scientific_environment_sha256")
+    ):
+        raise RuntimeError("metadata completion marker is invalid")
 
 
 def _require_direct_child(parent: Path, candidate: Path, context: str) -> None:
@@ -1174,12 +1243,42 @@ def _json_safe(value: object) -> object:
     return value
 
 
+def scientific_environment_digest(environment: Mapping[str, object]) -> str:
+    """Hash stable scientific/runtime identity, excluding locality metadata."""
+    if not isinstance(environment, Mapping):
+        raise ValueError("scientific environment must be a mapping")
+    missing = [
+        key for key in _SCIENTIFIC_ENVIRONMENT_KEYS if key not in environment
+    ]
+    if missing:
+        raise ValueError(
+            f"scientific environment is missing required keys: {missing}"
+        )
+    build_info = environment["xgboost_build_info"]
+    if not isinstance(build_info, Mapping):
+        raise ValueError("xgboost build information must be a mapping")
+    stable_build_info = {
+        str(key): value
+        for key, value in build_info.items()
+        if str(key).casefold() not in _VOLATILE_XGBOOST_BUILD_KEYS
+    }
+    identity = {
+        key: environment[key]
+        for key in _SCIENTIFIC_ENVIRONMENT_KEYS
+        if key != "xgboost_build_info"
+    }
+    identity["xgboost_build_info"] = stable_build_info
+    return canonical_hash(_json_safe(identity))
+
+
 def _dataset_payload(dataset: DatasetSpec) -> dict[str, object]:
     return {
         "dataset": {
             "id": dataset.dataset_id,
             "display_name": dataset.display_name,
             "raw_path": str(dataset.raw_path),
+            "raw_sha256": dataset.raw_sha256,
+            "raw_byte_count": dataset.raw_byte_count,
             "target": dataset.target,
             "task": dataset.task,
             "utility": dataset.utility,
@@ -3630,6 +3729,16 @@ def _load_dataset_spec(config_dir: Path, expected_id: str) -> DatasetSpec:
     raw_path = Path(raw_path_text)
     if not raw_path.is_absolute():
         raw_path = (config_dir.parent / raw_path).resolve()
+    raw_sha256 = _nonempty_string(
+        dataset["raw_sha256"], f"{expected_id}.dataset.raw_sha256"
+    )
+    if re.fullmatch(r"[0-9a-f]{64}", raw_sha256) is None:
+        raise ValueError(
+            f"{expected_id}.dataset.raw_sha256 must be a lowercase SHA-256"
+        )
+    raw_byte_count = _positive_int(
+        dataset["raw_byte_count"], f"{expected_id}.dataset.raw_byte_count"
+    )
 
     max_features_value = preprocessing["max_features"]
     max_features = (
@@ -3662,6 +3771,8 @@ def _load_dataset_spec(config_dir: Path, expected_id: str) -> DatasetSpec:
         dataset_id=dataset_id,
         display_name=display_name,
         raw_path=raw_path,
+        raw_sha256=raw_sha256,
+        raw_byte_count=raw_byte_count,
         target=target,
         task=task,
         utility=utility,

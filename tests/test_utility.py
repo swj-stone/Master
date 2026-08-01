@@ -4,7 +4,7 @@ Unit tests for ``minppi_mofs.utility`` — pure utility functions.
 Verify all classification and regression metrics with known inputs.
 Run::
 
-    python -m pytest tests/test_utility.py -v
+    ../venv/Scripts/python.exe -m pytest tests/test_utility.py -v
 """
 
 from __future__ import annotations
@@ -507,38 +507,6 @@ class TestEvaluateRejectsUtilityOverride:
             cache.evaluate({"f"}, utility="f1")
 
 
-class TestPredictionKeyGuard:
-    """E4 must refuse to label divergent cache keys as shared predictions."""
-
-    def test_accepts_identical_key_sets(self) -> None:
-        from experiments.e4_isolet_utility_ablation import (
-            _assert_same_prediction_keys,
-        )
-
-        keys = {("f0",), ("f0", "f1")}
-        _assert_same_prediction_keys(keys, set(keys))
-
-    @pytest.mark.parametrize(
-        "before, after, expected",
-        [
-            ({("f0",)}, {("f0",), ("f1",)}, "added=1, missing=0"),
-            ({("f0",), ("f1",)}, {("f0",)}, "added=0, missing=1"),
-        ],
-    )
-    def test_rejects_changed_key_sets(
-        self,
-        before: set[tuple[str, ...]],
-        after: set[tuple[str, ...]],
-        expected: str,
-    ) -> None:
-        from experiments.e4_isolet_utility_ablation import (
-            _assert_same_prediction_keys,
-        )
-
-        with pytest.raises(RuntimeError, match=expected):
-            _assert_same_prediction_keys(before, after)
-
-
 class TestFullRunCacheConsistency:
     """Two complete utility runs must reuse one fixed evaluation plan."""
 
@@ -546,9 +514,6 @@ class TestFullRunCacheConsistency:
         import pandas as pd
         from unittest import mock
 
-        from experiments.e4_isolet_utility_ablation import (
-            _assert_same_prediction_keys,
-        )
         from minppi_mofs.min_ppi import (
             estimate_minppi_random_mc,
             make_shared_coalition_plan,
@@ -613,4 +578,4 @@ class TestFullRunCacheConsistency:
         keys_after_ovr_auc = set(cache._preds)
 
         assert keys_after_ovr_auc == keys_after_accuracy
-        _assert_same_prediction_keys(keys_after_accuracy, keys_after_ovr_auc)
+        assert keys_after_ovr_auc == keys_after_accuracy

@@ -1,7 +1,7 @@
-"""
+r"""
 Tests for ``minppi_mofs.min_ppi`` — estimation strategies and Theorem 1.
 
-Covers (per tests/README.md):
+Covers:
 - Lemma 1 (boundedness): MinPPI_i ∈ {-1, 0, +1}
 - Lemma 2 (coincidence): MinSS_i = MinBz_i (same min over same set)
 - Theorem 1 (three-way classification): decisive / harmful / neutral semantics
@@ -12,7 +12,7 @@ Covers (per tests/README.md):
 
 Run::
 
-    pytest tests/test_min_ppi.py -v
+    ..\venv\Scripts\python.exe -m pytest tests/test_min_ppi.py -v
 """
 
 from __future__ import annotations

@@ -109,6 +109,8 @@ DATASET_CONFIGS = {
             "id": "spambase",
             "display_name": "Spambase",
             "raw_path": "data/raw/spambase.csv",
+            "raw_sha256": "1" * 64,
+            "raw_byte_count": 1_111_924,
             "target": "is_spam",
             "task": "binary",
             "utility": "roc_auc",
@@ -121,6 +123,8 @@ DATASET_CONFIGS = {
             "id": "abalone",
             "display_name": "Abalone",
             "raw_path": "data/raw/abalone.csv",
+            "raw_sha256": "2" * 64,
+            "raw_byte_count": 196_146,
             "target": "Rings",
             "task": "regression",
             "utility": "r2",
@@ -209,6 +213,8 @@ def test_load_resolved_protocol_merges_global_and_dataset_configs(
     )
     assert protocol.datasets[0].task == "binary"
     assert protocol.datasets[0].utility == "roc_auc"
+    assert protocol.datasets[0].raw_sha256 == "1" * 64
+    assert protocol.datasets[0].raw_byte_count == 1_111_924
     assert protocol.datasets[1].task == "regression"
     assert protocol.datasets[1].utility == "r2"
     assert protocol.estimator_budgets == (2,)
@@ -630,6 +636,50 @@ def test_repository_protocol_configs_are_valid() -> None:
     assert smoke.backend == "cuda"
 
 
+def test_repository_protocol_registers_exact_raw_snapshots() -> None:
+    config_dir = Path(__file__).resolve().parents[1] / "configs"
+    protocol = load_resolved_protocol(
+        config_dir,
+        seeds=None,
+        backend=None,
+        smoke=False,
+    )
+
+    assert {
+        dataset.dataset_id: (dataset.raw_byte_count, dataset.raw_sha256)
+        for dataset in protocol.datasets
+    } == {
+        "abalone": (
+            196_146,
+            "81c45a0cf2d6244fc158cc18ccddf7f133509fe9820cfa85514699d83c006e40",
+        ),
+        "credit_card_fraud": (
+            148_701_764,
+            "5ac0db239c79b8234914ac04242b5a864cd34cd9c4e73526ed3808185285e335",
+        ),
+        "crimedata": (
+            1_527_364,
+            "6fb4c4f378a5e2ea98eb3bfe9effb7d750ef888e5975db10fa174b30ef8edcab",
+        ),
+        "gisette": (
+            192_231_337,
+            "02b8d81c00ed14e65310e9c57ec8ec34deaed237eb04117ba545c41ceef4ed6a",
+        ),
+        "isolet": (
+            32_685_013,
+            "7113075d4802471d595540ea5161978fd76cd892b58d96ce26d535e837dda200",
+        ),
+        "madelon": (
+            7_810_193,
+            "ac9cb79fe194a9032496d92160a679bf2b2dedf6a0d946962116864abdb77357",
+        ),
+        "spambase": (
+            1_111_924,
+            "9c4af29aa3b36519a8686fb9dc9b8dc0784d9686079c2945efeb298829d727e1",
+        ),
+    }
+
+
 @pytest.mark.parametrize(
     ("mutator", "message"),
     [
@@ -648,6 +698,22 @@ def test_repository_protocol_configs_are_valid() -> None:
         (
             lambda _g, d: d["spambase"]["dataset"].pop("target"),
             "target",
+        ),
+        (
+            lambda _g, d: d["spambase"]["dataset"].pop("raw_sha256"),
+            "raw_sha256",
+        ),
+        (
+            lambda _g, d: d["spambase"]["dataset"].update(
+                {"raw_sha256": "not-a-sha256"}
+            ),
+            "raw_sha256",
+        ),
+        (
+            lambda _g, d: d["spambase"]["dataset"].update(
+                {"raw_byte_count": 0}
+            ),
+            "raw_byte_count",
         ),
         (
             lambda _g, d: d["spambase"]["dataset"].update(
@@ -1111,6 +1177,45 @@ def _refresh_marker_hash(layout, relative_path: str) -> None:
     marker_path.write_text(json.dumps(marker), encoding="utf-8")
 
 
+def _scientific_environment_fixture() -> dict[str, object]:
+    return {
+        "python": "3.13.9",
+        "numpy": "2.4.6",
+        "pandas": "3.0.3",
+        "scikit_learn": "1.9.0",
+        "xgboost": "3.3.0",
+        "xgboost_build_info": {
+            "USE_CUDA": True,
+            "CUDA_VERSION": [12, 9],
+            "libxgboost": "C:/first/venv/xgboost.dll",
+        },
+        "cuda_build_info": {"USE_CUDA": True, "CUDA_VERSION": [12, 9]},
+        "cuda_driver": "591.91",
+        "os": "Windows-11-10.0.26200-SP0",
+        "timezone": "Zone A",
+        "utc_offset": "+08:00",
+        "backend": "cuda",
+    }
+
+
+def test_scientific_environment_digest_ignores_locality_and_detects_drift() -> None:
+    baseline = _scientific_environment_fixture()
+    relocated = deepcopy(baseline)
+    relocated["timezone"] = "Zone B"
+    relocated["utc_offset"] = "+03:00"
+    relocated["xgboost_build_info"]["libxgboost"] = (
+        "D:/other/venv/xgboost.dll"
+    )
+    drifted = deepcopy(baseline)
+    drifted["numpy"] = "9.9.9"
+
+    baseline_digest = protocol_module.scientific_environment_digest(baseline)
+
+    assert re.fullmatch(r"[0-9a-f]{64}", baseline_digest)
+    assert protocol_module.scientific_environment_digest(relocated) == baseline_digest
+    assert protocol_module.scientific_environment_digest(drifted) != baseline_digest
+
+
 def test_freeze_run_metadata_records_protocol_environment_and_sources(
     tmp_path: Path,
     resolved_protocol,
@@ -1164,6 +1269,89 @@ def test_freeze_run_metadata_records_protocol_environment_and_sources(
     assert (layout.configs_frozen / "spambase.yaml").is_file()
     assert (layout.configs_frozen / "abalone.yaml").is_file()
     assert (layout.root / "metadata_complete.json").is_file()
+
+
+def test_resume_rejects_current_scientific_environment_drift(
+    tmp_path: Path,
+    resolved_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+    current = json.loads(
+        (layout.root / "environment.json").read_text(encoding="utf-8")
+    )
+    current["numpy"] = "9.9.9"
+    monkeypatch.setattr(
+        protocol_module,
+        "_capture_environment",
+        lambda backend: {**current, "backend": backend},
+    )
+
+    with pytest.raises(RuntimeError, match="scientific environment drift"):
+        open_resumed_run(
+            tmp_path / "results",
+            "run-1",
+            resolved_protocol,
+            project_root=project_root,
+        )
+
+
+def test_resume_rejects_environment_digest_changed_only_in_completion_marker(
+    tmp_path: Path,
+    resolved_protocol,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+    marker_path = layout.root / "metadata_complete.json"
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    marker["scientific_environment_sha256"] = "0" * 64
+    marker_path.write_text(json.dumps(marker), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="metadata completion marker"):
+        open_resumed_run(
+            tmp_path / "results",
+            "run-1",
+            resolved_protocol,
+            project_root=project_root,
+        )
+
+
+def test_resume_allows_timezone_and_install_path_relocation(
+    tmp_path: Path,
+    resolved_protocol,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root = tmp_path / "project"
+    _write_project_sources(project_root)
+    layout = create_new_run(tmp_path / "results", "run-1", resolved_protocol)
+    freeze_run_metadata(layout, resolved_protocol, project_root=project_root)
+    current = json.loads(
+        (layout.root / "environment.json").read_text(encoding="utf-8")
+    )
+    current["timezone"] = "Relocated Zone"
+    current["utc_offset"] = "-04:00"
+    current["xgboost_build_info"]["libxgboost"] = (
+        "D:/relocated/venv/xgboost.dll"
+    )
+    monkeypatch.setattr(
+        protocol_module,
+        "_capture_environment",
+        lambda backend: {**current, "backend": backend},
+    )
+
+    resumed = open_resumed_run(
+        tmp_path / "results",
+        "run-1",
+        resolved_protocol,
+        project_root=project_root,
+    )
+
+    assert resumed == layout
 
 
 def test_freeze_run_metadata_refuses_to_replace_frozen_metadata(

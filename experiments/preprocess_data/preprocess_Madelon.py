@@ -7,7 +7,7 @@ Source: OpenML ID 1485.
 Processing: download, clean, and cache the raw CSV only.
 
 Run:
-    python experiments/preprocess_data/preprocess_Madelon.py
+    ../venv/Scripts/python.exe experiments/preprocess_data/preprocess_Madelon.py
 """
 
 from __future__ import annotations

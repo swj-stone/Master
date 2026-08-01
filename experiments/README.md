@@ -1,81 +1,56 @@
-# experiments/
+# ICOMP 2026 experiment executors
 
-## Authoritative ICOMP 2026 runner
+本目录中的 manifest 管线是新 ICOMP 2026 证据的唯一执行入口。所有命令从项目根目录 `Master` 运行；完整可复制命令见根目录 `README.md`。
 
-`run_icomp2026_pipeline.py` is the only runner for new ICOMP 2026 evidence. It
-accepts:
+## 入口
+
+- `run_icomp2026_pipeline.py`：执行一个 shard。新 run 创建冻结协议；恢复时必须显式传入 `--resume`。
+- `run_icomp2026_campaign.py`：把 canonical 五个 seeds 编排为三个 shard，并在 campaign 级别统一汇总。已有 shard 会自动恢复。
+- `calibrate_icomp2026_models.py`：只使用训练集和验证集，为七个数据集生成冻结 model policy。
+- `screen_icomp2026_results.py`：在正式 estimator 后读取 seed 42 checkpoint，生成 validation-only 方向筛查；它不是论文结果，也不访问正式 test。
+- `monitor_icomp2026_campaign.py`：只读状态监测；`--group initial` 与 `--group downstream` 分别查看两段实验，省略 `--watch` 时只输出一次；`--watch --interval-seconds 300` 每五分钟刷新并即时写出快照。
+- `summarize_multifidelity_campaign.py`：校验 shard 并集、协议和 provenance 后生成唯一正式汇总。
+- `make_paper_figures.py`：只从 canonical summary tables 生成三张论文图；正式 Overview 图还会用 raw canonical table 验证 Madelon/Credit-Card-Fraud 的完整 seed-42 alpha authority，smoke 只显示目标面板不在其 scope 内的占位说明。
+
+## 阶段顺序
 
 ```text
---stage {validate,preprocess,estimator,removal,alpha,nsga2,ablation,summarize,figures,all}
---config-dir <path>
---output-root <path>
---seeds <seed...>
---backend {cpu,cuda}
---run-id <id>
---resume
---smoke
---stop-after-jobs <N>  # smoke only
+validate -> preprocess -> estimator -> removal -> alpha -> nsga2 -> ablation -> summarize -> figures
 ```
 
-For script execution, the public process is a lightweight controller. It starts
-exactly one worker with the same interpreter and arguments, waits synchronously,
-and validates a nonce-bound completion receipt written after `main()` returns.
-On Windows it converts only native exit `0xC0000409` to public success, and only
-when that authenticated receipt records `main()` return code 0. Controlled stop
-75 and every ordinary nonzero exit are propagated unchanged; absent, malformed,
-or mismatched receipts fail closed. The parent imports no `minppi_mofs` or stage
-module, so model and CUDA state exist only in the single worker.
+- `alpha` 和 `ablation` 的实际数据集/seed 范围由 `configs/icomp2026_pipeline.yaml::stage_scopes` 决定。
+- `removal`、`alpha` 和 `nsga2` 会访问 held-out test；campaign 必须显式带 `--allow-test-access`。
+- 新 run 不能直接从 `estimator` 开始。应先顺序完成 `validate` 和 `preprocess`，或在 smoke 中使用 `--stage all`。
+- Smoke 与 formal 必须使用不同 run ID；smoke 的表格、宏和图片不能进入论文。
 
-Never run two GPU/model commands at once. Each command below must finish and the
-GPU process must exit before the next command starts.
+## 单 GPU 并发边界
 
-## Task 12 acceptance evidence
+正式 campaign 当前固定使用 CUDA，并支持最多三个内部 shard worker。`--max-parallel 3` 是当前两天目标配置，不是未实测的完成时长保证；并发只应由一个 campaign 进程管理。运行 campaign 时不得再手工启动第二个 campaign、pipeline、校准或其他 GPU 模型任务。
 
-`results/icomp2026_rerun/task5-smoke` is immutable diagnostic evidence. Its 55
-jobs and durable artifacts completed, but its original public invocation ended
-nonzero during native CUDA/XGBoost interpreter teardown. It is not the acceptance
-run and must not be deleted, overwritten, resumed, or relabelled as passing.
+若 smoke 暴露显存不足，应停止并为一个全新的 campaign 选择较小的 `--max-parallel`；不要在同一 campaign 运行中途改变执行设置。
 
-The accepted post-fix smoke command was:
+`native_process_guard.py` 隔离 pipeline worker 的解释器生命周期并验证完成 receipt；它不等价于显存调度器。
 
-```powershell
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage all --config-dir configs --output-root results\icomp2026_rerun --seeds 42 --backend cuda --run-id task5-smoke-recovery --smoke
-```
+## 恢复语义
 
-On 2026-07-23 it returned public exit 0. The worker reproduced the post-success
-`0xC0000409` teardown and the parent emitted the documented containment warning.
-The durable audit found 55/55 successes, no failed/pending/running/skipped jobs,
-24 allowed and zero denied/unresolved test-access events, a complete six-file
-summary bundle, and three non-empty paper PDFs. The frozen protocol and summary
-both identify the run as `smoke`.
+- Pipeline：复用原命令并增加 `--resume`；run ID、源代码、配置和 model policy 必须完全一致。
+- Campaign：原样重输同一 campaign 命令；编排器对已存在 shard 自动使用 resume。
+- 成功 job 只有在 canonical record 和声明的 artifacts 均通过校验时才会跳过。
+- 不要删除、覆盖或复制其他 run 的 cache。源文件或协议漂移会 fail closed。
 
-Controlled interruption and resume were proven, in this order:
+## 输出契约
 
-```powershell
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage all --config-dir configs --output-root results\icomp2026_rerun --seeds 42 --backend cuda --run-id task5-resume-check --smoke --stop-after-jobs 1
-..\venv\Scripts\python.exe experiments\run_icomp2026_pipeline.py --stage all --config-dir configs --output-root results\icomp2026_rerun --seeds 42 --backend cuda --run-id task5-resume-check --smoke --resume
-```
+每个 run 保存：
 
-The first command returned 75 and the resume returned public exit 0. The first
-completed validate job remained `success`, attempt 1. Its result record and both
-declared artifacts retained identical bytes, SHA-256, and modification times;
-after resume all 55 jobs were successful and every successful attempt remained
-1.
+- 冻结的 resolved protocol、稳定科学环境摘要、source fingerprint 与注册 raw authority；
+- `run_manifest.csv`、根状态和阶段状态；
+- canonical `raw_metrics/` records；
+- test-access audit 和 protocol audit；
+- 可恢复的 estimator bundle/cache/progress；
+- summary tables、LaTeX macros、bundle manifest 和 figures。
 
-## Output and audit contract
+正式发布前，campaign summary 必须验证五种子范围、跨 shard 的 raw/environment/source/model-policy 摘要和全部上游 artifacts，并明确写出 `publication_allowed: true`。当前 `results/` 为空，因此仓库内没有已完成的正式 campaign。
 
-Each run owns frozen protocol/environment/source metadata, `run_manifest.csv`,
-root and per-stage `status.json`, canonical records under `raw_metrics/`,
-`protocol_audit.json`, `output.log`, summary tables, and figures. A summary is
-valid only after manifest-based completeness succeeds. Allowed held-out test
-access is limited to final removal, alpha-grid, and NSGA-II-front evaluation;
-every other request is denied and any denial requires an explicit audited
-resolution before publication.
+## 辅助脚本
 
-Smoke and formal results must use different run IDs and directories. Smoke
-tables, macros, and figures are validation artifacts and must never be copied
-into the paper as formal results. No five-seed formal command is authorized by
-Task 12; it requires the user's explicit approval in a later task.
-
-Legacy scripts remain historical or narrowly scoped utilities. They are not an
-alternative source of new paper results.
+Benchmark、forecast、screening、加速验证、ISOLET utility pair 和 `preprocess_data/` 是诊断或数据获取工具。它们可以帮助选择正式设置，但不能单独产生论文结果，也不能替代 manifest 管线。

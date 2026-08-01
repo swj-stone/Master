@@ -1,5 +1,7 @@
 # 硕士论文整体规划
 
+> **范围说明：** 本文档是未来硕士论文的研究草稿，不属于 ICOMP 2026 正式协议或实验结果；其中的时间、算力和方法均未冻结。
+
 ## 论文方向
 
 **Bipartite Game-Theoretic Joint Feature Selection and Neural Architecture Search for Tabular Data**
