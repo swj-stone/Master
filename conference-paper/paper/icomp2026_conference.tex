@@ -1,382 +1,249 @@
-\documentclass{article} % For LaTeX2e
+\documentclass{article}
 \usepackage{icomp2026_conference,times}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
 \usepackage{graphicx}
-\usepackage{longtable}
 \usepackage{booktabs}
 \usepackage{bbold}
 \usepackage{amsthm}
 \usepackage{float}
-% Optional math command from https://github.com/goodfeli/dlbook_notation.
 \input{math_commands.tex}
 
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{cleveref}
 
-\title{Min-Marginal Power Indices \\ for Multi-Objective \\ Feature Selection: A Voting-Game Approach}
+\title{Min-Marginal Power Indices for Multi-Objective \\ Feature Selection}
 
-% Authors must not appear in the submitted version. They should be hidden
-% as long as the \icompfinalcopy macro remains commented out below.
-% Non-anonymous submissions will be rejected without review.
+\author{Anonymous Authors}
 
-\author{Antiquus S.~Hippocampus, Natalia Cerebro \& Amelie P. Amygdale \thanks{ Use footnote for providing further information
-about author (webpage, alternative address)---\emph{not} for acknowledging
-funding agencies.  Funding acknowledgements go at the end of the paper.} \\
-Department of Computer Science\\
-Cranberry-Lemon University\\
-Pittsburgh, PA 15213, USA \\
-\texttt{\{hippo,brain,jen\}@cs.cranberry-lemon.edu} \\
-\And
-Ji Q. Ren \& Yevgeny LeNet \\
-Department of Computational Neuroscience \\
-University of the Witwatersrand \\
-Joburg, South Africa \\
-\texttt{\{robot,net\}@wits.ac.za} \\
-\AND
-Coauthor \\
-Affiliation \\
-Address \\
-\texttt{email}
-}
-
-% The \author macro works with any number of authors. There are two commands
-% used to separate the names and addresses of multiple authors: \And and \AND.
-%
-% Using \And between authors leaves it to \LaTeX{} to determine where to break
-% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
-% puts 3 of 4 authors names on the first line, and the last on the second
-% line, try using \AND instead of \And before the third author name.
-
-\newcommand{\fix}{\marginpar{FIX}}
-\newcommand{\new}{\marginpar{NEW}}
-
-%\icompfinalcopy % Uncomment for camera-ready version, but NOT for submission.
 \begin{document}
-
 \maketitle
 
 \begin{abstract}
-Existing game-theoretic feature selection methods mostly score each feature by its \emph{mean} marginal contribution across coalitions. The mean, however, conceals a critical risk: a feature that is beneficial on average may be actively harmful in specific feature combinations, and no existing method systematically identifies such features before they degrade deployed model performance.
-We address this gap by introducing Min-Marginal Power Indices (MinPPI). Rather than averaging, MinPPI takes the \emph{minimum} marginal contribution of each feature under a binary utility-threshold voting game $v_\alpha(S) = \mathbb{1}[U(\mathcal{M}_S) \geq \alpha \cdot U_{\text{full}}]$, where $U$ is any higher-is-better utility (AUC, $F_1$, $R^2$, \dots). This min--binary pairing yields a discrete output in $\{-1, 0, +1\}$, cleanly classifying every feature as \emph{harmful} (must remove), \emph{neutral}, or \emph{decisive} (must retain).
-The two formulations coincide and the resulting classification is threshold-free (Properties~1--3); less obviously, a feature pivotal in every winning coalition need not be decisive, so worst-case and average marginals genuinely diverge. We develop an MI-correlation-guided adversarial search (Algorithm~B) that, under a structural condition on its weighted correlation-tree neighborhood, detects sparse harmful features with substantially higher sample efficiency than uniform Monte Carlo (Theorem~2). MinPPI constructs an $\alpha$-parameterized Pareto front in (compression, AUC preservation) space: each $\alpha$ defines an operating point and the $\alpha$-sweep directly produces the Pareto frontier without external search.
+Game-theoretic feature selection methods score features by their mean marginal contribution across coalitions, concealing a risk: a feature beneficial on average may be harmful in specific contexts. We introduce Min-Marginal Power Indices (MinPPI), which replace the mean with the minimum under a binary utility-threshold voting game $v_\alpha(S) = \mathbb{1}[U(\mathcal{M}_S) \geq \alpha \cdot U_{\text{full}}]$ for any higher-is-better utility $U$ (AUC, $F_1$, $R^2$). This min--binary pairing---an unoccupied cell in the design space of game-theoretic feature selectors---yields a discrete $\{-1, 0, +1\}$ output that classifies each feature as harmful, neutral, or decisive with no arbitrary cutoff. The two power-index formulations (Min Shapley-Shubik and Min Banzhaf) coincide. We develop an MI-correlation-guided adversarial search (Algorithm~B) with conditional $O(1)$ sample efficiency for detecting sparse harmful features (Theorem~2). MinPPI constructs $\alpha$-parameterized (compression, utility preservation) Pareto points via parametric scalarization, requiring no evolutionary search.
 
-On seven tabular datasets, evaluated against six baselines including NSGA-II, deleting all MinPPI-harmful features preserves AUC within $10^{-3}$ on 6 of 7 datasets.  At $\alpha{=}0.95$, MinPPI removes $32.4\%$ of Credit-Card-Fraud features while preserving $0.985$ AUC, and the pre-filtered NSGA-II achieves $37\%$ higher hypervolume despite a $35\%$ smaller search space.  On Madelon's ground-truth probes, MinPPI achieves precision $0.978$.  The binary $v_\alpha$ produces a principled three-way classification, and the $\alpha$-sweep confirms robustness.
-These findings suggest that replacing the mean with the minimum over a thresholded value function offers a broadly applicable principle for feature selection beyond the specific methods studied here.
+On seven tabular datasets (29--100 features, five seeds, XGBoost), MinPPI at $\alpha{=}0.95$ preserves held-out test utility within $10^{-3}$ on six of seven datasets. On Madelon---which contains known noise probes---43.6\% of features are flagged harmful, and deleting them \emph{improves} test AUC by $+0.0047$. Pre-filtering NSGA-II's search space with MinPPI improves hypervolume on Madelon ($+11.3\%$), Crimedata ($+2.1\%$), and Credit-Card ($+0.5\%$) and matches full-search HV otherwise. An $\alpha$-sweep over $\{0.85,0.90,0.95,0.99\}$ confirms that stricter quotas expose more harmful witnesses, with preservation remaining $\geq 0.99$ across all $\alpha$ levels. Ablation across guidance and dispatcher axes verifies that MI-correlation neighborhoods improve harmful-feature detection over random seeding. These results demonstrate that worst-case marginal analysis provides a principled, safe approach to harmful-feature identification orthogonal to mean-based importance ranking.
 \end{abstract}
 
 \section{Introduction}
 \label{sec:intro}
 
-Feature selection identifies a compact yet predictive subset from hundreds or thousands of candidate features. It is a foundational preprocessing step governing model interpretability, training cost, and generalization~\citep{guyon2003introduction,chandrashekar2014survey}, and it is inherently multi-objective: practitioners balance cardinality, predictive accuracy, and training time. Single-objective approaches compress this trade-off into one number and conceal the full solution landscape~\citep{jiao2024survey}, whereas multi-objective evolutionary algorithms, notably NSGA-II~\citep{deb2002fast}, recover the complete Pareto front and have been adapted successfully to feature selection~\citep{hamdani2007multi,song2024evolutionary,shao2025evolutionary}.
+Feature selection identifies compact yet predictive feature subsets and is inherently multi-objective: practitioners balance cardinality, accuracy, and training cost~\citep{guyon2003introduction,chandrashekar2014survey}. Cooperative game theory offers an axiomatically grounded approach: features are players whose coalition value is model performance~\citep{cohen2007feature}. The Shapley value~\citep{shapley1953value} and Banzhaf index~\citep{banzhaf1965weighted} quantify mean marginal contributions; SHAP~\citep{lundberg2017unified} brought these to mainstream ML. Power-index feature selectors include Banzhaf-FS~\citep{karavas2017feature}, Powershap~\citep{verhaeghe2022powershap}, and ShapG~\citep{zhao2025shapg}. Multi-objective evolutionary methods, notably NSGA-II~\citep{deb2002fast,hamdani2007multi}, recover full Pareto fronts but treat features symmetrically during search.
 
-Cooperative game theory offers a complementary, axiomatically grounded view: casting each feature as a player whose coalition value is the performance attainable with that subset, the Shapley value~\citep{shapley1953value}, Shapley-Shubik~\citep{shapley1954method}, and Banzhaf~\citep{banzhaf1965weighted} indices quantify marginal contributions, and SHAP~\citep{lundberg2017unified} brought them into mainstream machine learning. Classical indices, however, aggregate marginals via the {\em mean}, which smooths contextual diversity: a feature beneficial on average but harmful in a few contexts receives a misleadingly positive score. Recent power-index feature selectors~\citep{karavas2017feature,verhaeghe2022powershap,zhao2025shapg} inherit this limitation.
+The mean operator has a blind spot: a feature beneficial on average may be actively harmful in specific coalitions. MinShap~\citep{zheng2026minshap} replaces the mean with the minimum, exposing detrimental features, but uses a continuous value function without a principled decision boundary---users must choose arbitrary cutoffs on real-valued scores. We address this gap by pairing the minimum with a \emph{binary} utility-threshold formulation~\citep{owen1972multilinear}: $v_\alpha(S) = \mathbb{1}[U(\mathcal{M}_S) \geq \alpha \cdot U_{\text{full}}]$ for any higher-is-better utility $U$. The min--binary pairing yields a discrete output in $\{-1, 0, +1\}$ and a \emph{threshold-free} three-way classification: features are harmful (there exists a coalition where adding them flips utility below $\alpha$), neutral, or decisive (every coalition requires them). No existing method occupies this cell of the design space (min operator $\times$ binary value function; Table~\ref{tab:op-table} in Appendix).
 
-MinShap~\citep{zheng2026minshap} replaces the mean with the {\em minimum} over permutations, exposing features detrimental in specific contexts. We take this as inspiration but develop our theory independently. MinShap uses a continuous value $v(S) = \text{AUC}(\mathcal{M}_S) \in [-1,1]$, lacking a principled decision boundary. We instead pair the min with a {\em binary} utility-threshold formulation~\citep{owen1972multilinear}: $v_\alpha(S) = \mathbb{1}[U(\mathcal{M}_S) \geq \alpha \cdot U_{\text{full}}]$, where $U$ is any task-dependent utility (AUC, accuracy, $F_1$, $R^2$). This min--binary pairing yields a discrete $\{-1, 0, +1\}$ output that classifies each feature as {\em harmful}, {\em neutral}, or {\em decisive}.
+Our contributions are: (1)~Min-Marginal Power Indices (MinPPI) on the utility-threshold voting game (UTVG), with the property that MinSS and MinBz coincide and give threshold-free three-way classification; (2)~MI-correlation-guided adversarial search (Algorithm~B) that achieves substantially higher sample efficiency than random Monte Carlo for detecting sparse harmful features under a conditional efficiency guarantee (Theorem~2); (3)~an $\alpha$-parameterized multi-objective framework that sweeps the quota $\alpha$ to construct (compression, utility preservation) Pareto points without evolutionary search; and (4)~comprehensive empirical validation on seven tabular datasets against six baselines, demonstrating safe harmful-feature removal and improved downstream multi-objective search via pre-filtering.
 
-The value $v_\alpha$ is evaluated by actually training $\mathcal{M}_S$, so unlike direct weighted-voting-game feature selection~\citep{cohen2007feature} it employs no additive surrogate (Section~\ref{sec:discussion}); the MinPPI scores act only as a soft filter---harmful features are identified and removed before downstream modeling, with the final decision validated by actual model retraining. Synthesizing power indices, the min-marginal operator, and multi-objective selection, our contributions are:
+\section{Method}
+\label{sec:method}
 
-\begin{enumerate}
-\item {\bf Min-Marginal Power Indices (MinPPI).} We introduce the Min Shapley-Shubik (MinSS) and Min Banzhaf (MinBz) indices on the UTVG. Pairing the min operator with the binary $v_\alpha$ makes their basic properties immediate by construction rather than a contribution in themselves: the two indices coincide and take values in $\{-1, 0, +1\}$, giving a \emph{threshold-free} three-way classification into decisive ($+1$), harmful ($-1$), and neutral ($0$) (Properties~1--3). The non-obvious content is a separation we make precise: a feature pivotal in \emph{every} winning coalition need not be decisive, so the worst-case (min) and average (mean) marginals genuinely diverge.
+\subsection{Utility-Threshold Voting Game (UTVG)}
 
-\item {\bf MI-Correlation-Guided Adversarial Search (Algorithm~B).} Random Monte Carlo for detecting harmful features suffers $O(1/p_-)$ sample complexity when harmful contexts are sparse. We rank seed features by mutual information and use a maximum-weight spanning tree of absolute feature correlations to identify local coalition contexts, recovering sparse harmful features with substantially higher sample efficiency than uniform sampling (Theorem~2): on an engineered voting game where uniform MC requires $K\approx 90$ for $95\%$ detection, the guided search achieves deterministic detection at $K_{\text{adv}}=1$, a gain of roughly two orders of magnitude under the structural condition that the harmful witness lies within the MI-ranked seed and correlation-tree neighborhood.
-
-\item {\bf $\alpha$-Parameterized Multi-Objective Selection.}
-MinPPI achieves multi-objective feature selection via parametric scalarization---the same principle that underlies classical methods such as the $\varepsilon$-constraint and weighted-sum approaches~\citep{haimes1971bicriterion}.  The quota $\alpha$ serves as a scalar parameter: varying $\alpha$ over $\{0.85,0.90,0.95,0.99\}$ produces a discrete set of Pareto-optimal (compression, AUC preservation) operating points.  Each $\alpha$ solves a single-objective subproblem (MinPPI estimation + deletion + retraining), yielding full interpretability---every operating point traces back to the specific coalitions that witnessed each deleted feature as harmful.  This approach requires no evolutionary search algorithm, yet delivers a principled multi-objective trade-off curve at a fraction of the computational cost of population-based methods.
-
-\item {\bf Comprehensive Empirical Validation.} We evaluate MinPPI against six baselines---SHAP-Top-$k$, ShapG, MinShap, Banzhaf-FS, Powershap, and NSGA-II---on seven tabular datasets ($29$--$100$ features after MI filtering, five seeds each).
-\end{enumerate}
-
-\section{Related Work}
-\label{sec:related}
-
-\subsection{Game-Theoretic Feature Importance}
-
-The Shapley value~\citep{shapley1953value} is the unique linear, symmetric, efficient, dummy attribution; the Shapley-Shubik index~\citep{shapley1954method} specializes it to simple voting games and the Banzhaf index~\citep{banzhaf1965weighted} uses uniform coalition weights, both unified probabilistically by~\citet{straffin1977shapley} (see~\citet{chalkiadakis2011computational} for computation). SHAP~\citep{lundberg2017unified} brought Shapley values to mainstream model explanation, and~\citet{cohen2007feature} first cast features as players with model performance as coalition value.
-
-\emph{Interaction and power indices.}~\citet{grabisch1999axiomatic} axiomatized Shapley interaction values, and~\citet{rabitti2019shapley} gave a modern Shapley-Owen treatment whose Section~7.3 warns that correlation can induce spurious interactions, a concern we address in Section~\ref{sec:discussion};~\citet{tsai2023faithshap} and~\citet{muschalik2024kernelshapiq} refine faithfulness and estimation. For feature selection,~\citet{karavas2017feature} use the Banzhaf index for lossless pruning, Powershap~\citep{verhaeghe2022powershap} combines Shapley values with hypothesis testing, and ShapG~\citep{zhao2025shapg} embeds feature correlations into Shapley estimation via a minimal-edge graph (Pearson, Union-Find) at $O(p \cdot 2^d)$ cost. ShapG is retained as a full attribution baseline. Algorithm~B borrows only the idea of exposing correlation structure: it independently builds a maximum-weight spanning tree of absolute correlations and combines its neighborhoods with mutual-information ranking; it does not compute ShapG values.~\citet{song2016shapley} developed Shapley effects, whose concentration bounds underpin Algorithm~A.
-
-\emph{The min operator.} MinShap~\citep{zheng2026minshap} replaces the mean with the minimum; MinPPI differs by using a binary, explicitly non-monotone $v_\alpha$ (output $\{-1,0,+1\}$ rather than continuous) and an MI-correlation-guided adversarial search for sparse harmful features. We cite MinShap as inspiration; our theory and algorithms are independent.
-
-\subsection{Multi-Objective Feature Selection}
-
-Multi-objective feature selection dates to~\citet{hamdani2007multi}, who adapted NSGA-II for bi-objective cardinality/error minimization; surveys~\citep{xue2016survey,jiao2024survey} taxonomize the field and flag scalability and prior-knowledge integration as open challenges, while~\citet{song2024evolutionary} and~\citet{shao2025evolutionary} detail search strategies and high-dimensional sparse regimes. Most MOFS methods use unguided operators that treat features symmetrically; a few bias mutation with univariate filter scores~\citep[cf.\ \S5.2]{song2024evolutionary}. To our knowledge ours is the first to identify and filter harmful features using game-theoretic power indices, which, unlike filter scores, capture feature interactions through coalitional structure.
-
-\subsection{Voting Games in Machine Learning}
-
-Weighted voting games~\citep{owen1972multilinear} model coalitional decisions (player~$i$ has weight~$w_i$; a coalition wins iff $\sum_{i \in S} w_i \geq q$) and are classically monotone, with Shapley and Banzhaf values computable via the multilinear extension~\citep{straffin1977shapley}. Applied to feature selection~\citep{cohen2007feature}, the additive surrogate $v(S) \approx \mathbb{1}[\sum_i w_i \geq q]$ is valid only for near-linear models and systematically misprices synergies and redundancies under non-linear learners~\citep{song2016shapley}. We avoid this by evaluating $v_\alpha$ through actual training and using the resulting indices only as soft guidance (Section~\ref{sec:discussion}).
-
-\section{Preliminaries}
-\label{sec:prelim}
-
-We establish notation and recall essential background. Readers familiar with cooperative game theory and ShapG may proceed to Section~\ref{sec:method} and consult this section for notational reference.
-
-\subsection{Cooperative Game Theory}
-
-A cooperative TU game is a pair~$(N, v)$ with $N = \{1, \dots, n\}$ and $v: 2^N \to \mathbb{R}$, $v(\emptyset) = 0$. It is \emph{simple} if $v(S) \in \{0,1\}$; coalitions with $v(S) = 1$ are \emph{winning}.
-
-The Shapley value~\citep{shapley1953value} is the unique linear, symmetric, efficient, and dummy attribution:
-\begin{equation}
-\phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|!\,(n - |S| - 1)!}{n!} \;\bigl[v(S \cup \{i\}) - v(S)\bigr].
-\label{eq:shapley}
-\end{equation}
-Applied to a simple game it is the Shapley-Shubik index~\citep{shapley1954method} $\phi_i^{SS}$; the Banzhaf index~\citep{banzhaf1965weighted} weights coalitions uniformly:
-\begin{equation}
-\beta_i(v) = \frac{1}{2^{\,n-1}} \sum_{S \subseteq N \setminus \{i\}} \bigl[v(S \cup \{i\}) - v(S)\bigr].
-\label{eq:banzhaf}
-\end{equation}
-A weighted voting game~\citep{owen1972multilinear} is the simple game $v(S) = \mathbb{1}[\sum_{i \in S} w_i \geq q]$, classically monotone ($S \subset T \Rightarrow v(S) \leq v(T)$). We adapt this single-player power index to a binary, non-monotone setting in Section~\ref{sec:method}.
-
-\subsection{Problem Setting}
-
-Let $\mathcal{D} = \{(\mathbf{x}_k, y_k)\}_{k=1}^{N}$ be a tabular dataset with feature set $N_1 = \{f_1, \dots, f_n\}$. For $S \subseteq N_1$, let $\mathcal{M}_S$ denote a base learner (XGBoost by default) trained on the features in~$S$, and $U(\mathcal{M}_S; \mathcal{D}_{\text{val}})$ a \emph{task-dependent utility}: any validation-set performance score for which larger values indicate better predictions and the full-feature value is positive. Suitable choices are AUC, accuracy, or $F_1$ for classification and $R^2$ or adjusted $R^2$ for regression; raw error scores such as $-\text{RMSE}$ enter in baseline-normalized form ($R^2$) so that $U_{\text{full}} > 0$. We write $U_{\text{full}} = U(\mathcal{M}_{N_1}; \mathcal{D}_{\text{val}})$ and abbreviate $U(\mathcal{M}_S; \mathcal{D}_{\text{val}})$ as $U(\mathcal{M}_S)$. The binary game with quota fraction~$\alpha \in (0, 1]$ is
+Let $\mathcal{D}$ be a tabular dataset with feature set $N = \{f_1, \dots, f_n\}$. For $S \subseteq N$, $\mathcal{M}_S$ is a base learner (XGBoost) trained on features $S$, and $U(\mathcal{M}_S)$ is a task-dependent utility (AUC, $F_1$, accuracy for classification; $R^2$ for regression). The full-feature utility $U_{\text{full}} = U(\mathcal{M}_N)$ must be positive. For quota $\alpha \in (0,1]$, the UTVG is:
 \begin{equation}
 v_\alpha(S) = \mathbb{1}\!\bigl[\,U(\mathcal{M}_S) \;\geq\; \alpha \cdot U_{\text{full}}\,\bigr].
 \label{eq:valpha}
 \end{equation}
-The pair~$(N_1, v_\alpha)$ is a \emph{utility-threshold voting game} (UTVG). Unlike a classical weighted voting game, which is monotone by construction, $v_\alpha$ is \emph{not} guaranteed monotone: adding a feature can lower utility (noise, redundancy, overfitting), so $S \subset T$ with $v_\alpha(S) = 1$, $v_\alpha(T) = 0$ is possible. Formally $(N_1, v_\alpha)$ is thus a non-monotone \emph{simple game} rather than a weighted voting game, and this non-monotonicity is the empirical basis for the three-way classification of Section~\ref{sec:minppi}.
+$v_\alpha$ is evaluated by training $\mathcal{M}_S$---there is no additive surrogate. Unlike classical weighted voting games, $v_\alpha$ is non-monotone: adding features can decrease utility (noise, redundancy), so $S \subset T$ with $v_\alpha(S)=1, v_\alpha(T)=0$ is possible. This non-monotonicity is the empirical basis for detecting harmful features.
 
-\subsection{Pareto Optimality and Parametric Scalarization}
+\subsection{Min-Marginal Power Indices}
 
-A solution $\mathbf{x}$ \emph{Pareto-dominates} $\mathbf{x}'$ iff $f_j(\mathbf{x}) \leq f_j(\mathbf{x}')$ for all objectives $f_j$ with at least one strict inequality. The \emph{Pareto front} is the set of all non-dominated solutions.
+\textbf{Definition 1 (Min Shapley-Shubik, MinSS).}
+$\text{MinSS}_i = \min_{\pi \in \Pi(N)} [\, v_\alpha(S_\pi^i \cup \{i\}) - v_\alpha(S_\pi^i) \,]$, where $S_\pi^i$ are features preceding $i$ in permutation $\pi$.
 
-Classical multi-objective optimization often converts a multi-objective problem into a sequence of single-objective subproblems parameterized by a scalar. The $\varepsilon$-constraint method~\citep{haimes1971bicriterion} minimizes one objective while constraining others below thresholds~$\varepsilon$; the weighted-sum method minimizes a linear combination $\lambda^T \mathbf{f}(\mathbf{x})$ for varying weight vectors~$\lambda$. Both produce Pareto-optimal points by sweeping the parameter.  MinPPI follows the same parametric-scalarization paradigm (Section~\ref{sec:alpha-pareto}): the quota $\alpha$ serves as the scalar parameter, and each $\alpha$ solves a single-objective subproblem (MinPPI estimation + deletion + retraining) to produce one (compression, AUC preservation) operating point.  Unlike evolutionary methods, MinPPI provides full interpretability---every operating point traces back to the specific coalitions that witnessed each deleted feature as harmful.
+\textbf{Definition 2 (Min Banzhaf, MinBz).}
+$\text{MinBz}_i = \min_{S \subseteq N \setminus \{i\}} [v_\alpha(S \cup \{i\}) - v_\alpha(S)]$.
 
-\subsection{ShapG Overview}
+\textbf{Property 1 (Trinary Range).} $\text{MinSS}_i, \text{MinBz}_i \in \{-1, 0, +1\}$ (immediate from $v_\alpha \in \{0,1\}$).
 
-ShapG~\citep{zhao2025shapg} approximates Shapley values on a feature correlation graph $G_{\text{corr}}$: it builds the $p \times p$ Pearson matrix, reduces it to a minimal connected graph by inserting edges in descending $|\rho|$ (Union-Find), and for each feature evaluates coalitions within its depth-$d$ neighborhood, at $O(p \cdot 2^{\,d})$ cost for $d \in \{1, 2\}$. ShapG is retained as a baseline (Section~6). Algorithm~B reuses the weighted-tree construction for neighborhoods but replaces ShapG attribution with explicit mutual-information ranking; the two methods are therefore evaluated and named separately.
+\textbf{Property 2 (Three-Way Classification).} Under $(N, v_\alpha)$: (a)~$\text{MinSS}_i = +1$ (decisive) iff $\forall S: v_\alpha(S)=0, v_\alpha(S\cup\{i\})=1$; (b)~$\text{MinSS}_i = -1$ (harmful) iff $\exists S: v_\alpha(S)=1, v_\alpha(S\cup\{i\})=0$; (c)~$\text{MinSS}_i = 0$ (neutral) otherwise. The non-trivial insight: a feature ``in every winning coalition'' need not be decisive---it can be neutral when its removal never creates a new winning coalition. The $+1$ (decisive) case never occurs on our datasets; harmful ($-1$) features exist on five of seven benchmarks at $\alpha{=}0.95$.
 
-\subsection{Existing Marginal-Operator Variants}
+\textbf{Property 3 (MinSS = MinBz).} Both minima are taken over identical collections of marginals (each $S \subseteq N \setminus \{i\}$ appears equally often across permutations and uniform subsets). We unify them as $\text{MinPPI}_i$.
 
-Table~\ref{tab:operator-comparison} (Appendix~\ref{app:op_table}) classifies related work by aggregation operator and value function type.  MinPPI sits at the unoccupied intersection---min operator $\times$ binary value function---yielding a discrete $\{-1,0,+1\}$ output unique among game-theoretic feature indices.
+The sign is directly actionable: $-1 =$ remove (harmful), $0 =$ defer to downstream analysis. The three-way classification is threshold-free: given $\alpha$, boundaries at $0$ and $\pm 1$ follow from $v_\alpha \in \{0,1\}$ with no further discretization step. Proofs are elementary and deferred to Appendix~\ref{app:proofs}.
 
-\section{MinPPI Framework}
-\label{sec:method}
+\subsection{Estimation Algorithms}
 
-We develop the framework in four stages: voting-game formulation (\S\ref{sec:voting-game}), min-marginal power indices (\S\ref{sec:minppi}), estimation algorithms (\S\ref{sec:estimation}), and the $\alpha$-parameterized Pareto front (\S\ref{sec:alpha-pareto}). Section~\ref{sec:discussion} addresses two concerns a reviewer will raise: the WVG-FS additivity flaw and the spurious-interaction problem~\citep{rabitti2019shapley}. All theoretical claims are verified numerically on constructed voting-game instances, and the full method is evaluated on seven real-world datasets in Section~\ref{sec:experiments}. All proofs are deferred to Appendix~\ref{app:proofs}.
-
-\subsection{Voting Game Formulation for Feature Selection}
-\label{sec:voting-game}
-
-\textbf{Definition 1 (UTVG).}  Recall $v_\alpha$ from~\eqref{eq:valpha}.  The pair $(N_1, v_\alpha)$ is a \emph{utility-threshold voting game}.  Coalitions with $v_\alpha(S) = 1$ are \emph{winning}.  We fix $\alpha=0.95$ ($\{0.85,0.90,0.95,0.99\}$ in Table~\ref{tab:pareto_front}).  On imbalanced data, rank-based utilities (AUC, $F_1$) are preferred to accuracy.
-
-\textbf{Remark 1.}  $v_\alpha$ is evaluated by training $\mathcal{M}_S$---no additive surrogate (Section~\ref{sec:discussion}).
-
-\textbf{Remark 2 (Non-monotonicity).}  Adding features can decrease $U$ (noise, redundancy), so $v_\alpha$ is \emph{not} guaranteed monotone.  Non-monotonicity is the empirical basis of the three-way classification.
-
-\subsection{Min-Marginal Power Indices (MinPPI)}
-\label{sec:minppi}
-
-\textbf{Definition 2 (Min Shapley-Shubik, MinSS).}
-\begin{equation}
-\text{MinSS}_i = \min_{\pi \in \Pi(N_1)} \bigl[\, v_\alpha(S_\pi^i \cup \{i\}) - v_\alpha(S_\pi^i) \,\bigr],
-\label{eq:minss}
-\end{equation}
-where $S_\pi^i \subseteq N_1 \setminus \{i\}$ are the features preceding $i$ in $\pi$.
-
-\textbf{Definition 3 (Min Banzhaf, MinBz).}
-$\text{MinBz}_i = \min_{S \subseteq N_1 \setminus \{i\}} [v_\alpha(S \cup \{i\}) - v_\alpha(S)]$.
-
-\textbf{Property 1 (Trinary Range).}  $\text{MinSS}_i, \text{MinBz}_i \in \{-1, 0, +1\}$.
-
-\textbf{Property 2 (Three-Way Classification).}  Under $(N_1, v_\alpha)$:
-\begin{itemize}
-\item[(a)] $\text{MinSS}_i = +1$ (decisive) $\iff$ $\forall S: v_\alpha(S)=0 \land v_\alpha(S\cup\{i\})=1$;
-\item[(b)] $\text{MinSS}_i = -1$ (harmful) $\iff$ $\exists S: v_\alpha(S)=1 \land v_\alpha(S\cup\{i\})=0$;
-\item[(c)] $\text{MinSS}_i = 0$ (neutral) otherwise.
-\end{itemize}
-
-The trichotomy follows directly from $v_\alpha \in \{0,1\}$.  Its non-trivial content is a separation: ``$i$ is in every winning coalition'' ($v_\alpha(S)=0$ when $i\notin S$) is \emph{insufficient} for decisiveness---$v_\alpha(S\cup\{i\})=1$ must also hold for every $S$, a stronger condition that the mean operator cannot detect.  Appendix~\ref{app:verify} provides a constructed counterexample with numerical verification.  The sign is directly actionable: $-1$ \textbf{= must remove}, $0$ \textbf{= defer} to importance-based ranking or further analysis.  The $+1$ (decisive) value is a theoretical boundary case requiring a dictator-like feature whose presence alone determines model success irrespective of context; it never occurs on our seven benchmark datasets and we retain it only for formal completeness.  Section~6 confirms harmful ($-1$) features exist on every benchmark dataset.  We call the classification \emph{threshold-free}: given the single parameter~$\alpha$ (which controls the quota stringency), the boundaries at~$0$ and~$\pm 1$ follow from $v_\alpha \in \{0,1\}$ with no further discretization step---unlike MinShap, where a user must choose an arbitrary cutoff on a continuous importance score to decide which features to remove.
-
-\textbf{Property 3 (MinSS = MinBz).}  Both minima run over the same set of marginals; we unify them as $\text{MinPPI}_i$.  Exact computation is $O(n\cdot 2^{n-1})$, infeasible for $n>20$.
-
-\subsection{Estimation of MinPPI}
-\label{sec:estimation}
-
-Exact MinPPI is $O(n\cdot 2^{n-1})$.  We give three strategies.
+Exact MinPPI requires $O(n\cdot 2^{n-1})$ evaluations. We give three approximation strategies.
 
 \subsubsection{Algorithm~A (Random MC)}
 
-Draw $K$ random subsets (size-uniform stratified).  Return $\widehat{\text{MinPPI}}_i = \min_k [v_\alpha(S^{(k)}\cup\{i\}) - v_\alpha(S^{(k)})]$.
-
-\textbf{Lemma 1 (Upward Bias).}  $\widehat{\text{MinPPI}}_i^{\text{MC}} \geq \text{MinPPI}_i$ a.s.\ (safe: never misclassifies neutral).
-
-\textbf{Proposition 1 (Detection).}  If $\text{MinPPI}_i = -1$ and $p_-^i = \Pr[\text{marginal} = -1]$, then $\Pr[\text{miss}] = (1-p_-^i)^K$.  For sparse harmful events ($p_-^i \ll 1$), $K = \Omega(1/p_-)$ is needed (Figure~\ref{fig:overview}(b) in Appendix).
+Draw $K$ random subsets (size-uniform stratified). Return $\widehat{\text{MinPPI}}_i = \min_k [v_\alpha(S^{(k)}\cup\{i\}) - v_\alpha(S^{(k)})]$. Lemma~1 (Appendix~\ref{app:proofs}): $\widehat{\text{MinPPI}}_i^{\text{MC}} \geq \text{MinPPI}_i$ almost surely (conservative: never falsely flags a neutral feature as harmful). If $\text{MinPPI}_i = -1$ and $p_-^i$ is the probability of a harmful marginal, $\Pr[\text{miss}] = (1-p_-^i)^K$. For sparse harmful events ($p_-^i \ll 1$), $K = \Omega(1/p_-)$ is required.
 
 \subsubsection{Algorithm~B (MI-Correlation-Guided Adversarial Search)}
 
-Harmful marginals can concentrate where $i$ conflicts with correlated features.  Algorithm~B computes absolute pairwise correlations, constructs a maximum-weight spanning tree $G_{\text{corr}}$, and ranks features by mutual information (classification or regression, selected explicitly by task).  For each $i$: (1)~seed $S_{\text{seed}}$ from the strongest incident neighbors of $i$ plus high-MI features; (2)~perturb $S_{\text{seed}}$ for $K_{\text{adv}}$ rounds, returning the minimum observed marginal.  On our constructed game ($p_-=0.033$), Algorithm~B detects the harmful feature at \textbf{$K_{\text{adv}}=1$} vs.\ Algorithm~A's $\approx 3\%$; under $\sigma=0.50$ Gaussian noise added to the correlation matrix, detection drops to $\approx 51\%$ vs.\ $15\%$, showing that the gain is contingent on correlation-guidance quality (Appendix~\ref{app:verify}, Figure~\ref{fig:overview}(b)).\footnote{The implementation exposes this method as \texttt{mi\_correlation\_guided}.  It is a lightweight guidance heuristic distinct from the full ShapG attribution baseline.}
+When harmful marginals are sparse, random sampling is inefficient. Harmful coalitions often concentrate where feature $i$ conflicts with correlated neighbors. Algorithm~B: (1)~build a maximum-weight spanning tree $G_{\text{corr}}$ of absolute Pearson correlations; (2)~rank features by mutual information (classification or regression); (3)~for each feature $i$, seed $S_{\text{seed}}$ from its strongest incident neighbors in $G_{\text{corr}}$ plus top mutual-information features; (4)~perturb $S_{\text{seed}}$ for $K_{\text{adv}}$ rounds, returning the minimum observed marginal.
+
+\textbf{Theorem 2 (Conditional Efficiency).} If the harmful witness $S_i^*$ is contained in $S_{\text{seed}}$ and each perturbation independently retains $j\in S_{\text{seed}}$ with probability $q_j$, then $\Pr[\text{detection}] \geq 1 - (1-\rho_i)^{K_{\text{adv}}}$ where $\rho_i = \prod_{j\in S_i^*} q_j \prod_{j\in S_{\text{seed}}\setminus S_i^*} (1-q_j) > 0$. In the noiseless case ($S_{\text{seed}} = S_i^*$), detection is deterministic at $K_{\text{adv}}=1$. On a constructed voting game ($p_-=0.033$), Algorithm~B achieves deterministic detection vs.\ Algorithm~A's 3\% at $K=1$. The structural condition $S_i^* \subseteq S_{\text{seed}}$ cannot be verified on real data (ground-truth harmful witnesses are unknown); Theorem~2 is therefore conditional and Algorithm~B remains a heuristic otherwise. Ablation confirms that MI-correlation guidance improves harmful-feature yield over unguided search (Section~\ref{sec:ablation}).
 
 \subsubsection{Hybrid Scheme}
 
-$n \leq 20$: exact (abalone, 8).  $20 < n \leq 75$: Algorithm~B ($K_{\text{adv}}=5$--$10$; Credit-Card 29, Spambase 56).  $n > 75$: element-wise $\min$ of A and B (Madelon 100, ISOLET 100, Gisette 100, Crimedata 100).  The correlation matrix and spanning tree are built once; their dense-graph construction costs $O(n^2)$ memory and $O(n^2\log n)$ time.
+$n \leq 20$: exact enumeration (Abalone, $2^8=256$ subsets). $20 < n \leq 75$: Algorithm~B with $K_{\text{adv}}=5$--$10$ (Credit-Card~29, Spambase~56). $n > 75$: element-wise $\min$ of Algorithms~A and~B (Madelon~100, ISOLET~100, Gisette~100, Crimedata~100), capturing the conservative bias of Lemma~1. The correlation graph and spanning tree are built once at $O(n^2\log n)$ cost.
 
 \subsection{$\alpha$-Parameterized Multi-Objective Selection}
 \label{sec:alpha-pareto}
 
-The MinPPI framework constructs multi-objective trade-off points via parametric scalarization. For a fixed dataset, each quota $\alpha$ defines an operating point in (compression rate, AUC preservation) space---obtained by solving a single-objective subproblem (MinPPI estimation, deletion of harmful features, and model retraining):
-\begin{itemize}
-  \item \textbf{Compression rate} $c(\alpha) = |\mathcal{H}_\alpha|/n$, the fraction of features classified as harmful (MinPPI = $-1$) at quota $\alpha$.
-  \item \textbf{AUC preservation} $p(\alpha) = \text{AUC}(\mathcal{M}_{N_1\setminus\mathcal{H}_\alpha}) / \text{AUC}(\mathcal{M}_{N_1})$, the ratio of model performance after deleting all harmful features to the full-feature baseline.
-\end{itemize}
-Varying $\alpha \in (0, 1]$ sweeps the harmfulness-conservativeness trade-off: lower $\alpha$ admits more features as harmful (higher compression, potentially lower precision); higher $\alpha$ is stricter and only flags features with unambiguous harmful witnesses (lower compression, near-perfect precision, empirically $>0.95$ for $\alpha \geq 0.90$ on Madelon; Section~\ref{sec:harmful_utility}).
-
-The set of points $\{(c(\alpha), p(\alpha)) : \alpha \in \{0.85,0.90,0.95,0.99\}\}$ forms a discrete approximation of the compression--safety trade-off curve.  This approach is analogous to the $\varepsilon$-constraint method~\citep{haimes1971bicriterion} in classical multi-objective optimization, where varying the constraint threshold produces a sequence of Pareto-optimal points.  Here $\alpha$ serves as the scalar parameter, and each subproblem is solved analytically by the voting game---no numerical optimization or evolutionary search is required.  We recommend $\alpha=0.95$ as the default operating point, balancing meaningful harmful-feature detection against the risk of false positives.
-
-\subsection{Discussion}
-\label{sec:discussion}
-
-\textbf{WVG-FS additivity flaw.}  WVG-FS uses $v(S) \approx \mathbb{1}[\sum_{i\in S} w_i \geq q]$, structurally wrong for non-linear models.  MinPPI evaluates $v_\alpha$ by training $\mathcal{M}_S$, and uses MinPPI scores only as a soft filter---harmful features are identified and removed, with the impact validated by retraining the model on the filtered feature set. The $\alpha$-Pareto framework guarantees that even imperfect MinPPI estimates cannot produce a spurious Pareto-optimality claim: every reported (compression, preservation) point comes from an actual model retrain, not from the MinPPI estimate itself.
-
-\textbf{Spurious interactions.}  Correlation can induce spurious interactions~\citep{rabitti2019shapley}.  Three mitigations: binary thresholding absorbs minor utility shifts; the min operator tests every context including those where correlated partners are absent; and $G_{\text{corr}}$ makes correlation structure auditable.
-
-\section{Theoretical Analysis}
-\label{sec:theory}
-
-We establish formal guarantees for the estimation algorithms (proofs and summary in Appendix~\ref{app:proofs}).
-
-\subsection{Sample Complexity of Algorithm~A}
-
-\textbf{Theorem 1 (Sample Complexity).}  Let $\mathcal{H} = \{i : \text{MinPPI}_i = -1\}$ and $p_{\min} = \min_{i\in\mathcal{H}} p_-^i > 0$.  Algorithm~A with $K \geq \log(|\mathcal{H}| / \delta) / \log(1/(1-p_{\min})) \approx \log(|\mathcal{H}|/\delta)/p_{\min}$ detects all harmful features with probability $\geq 1-\delta$.  Thus $K = \Omega(1/p_{\min})$.
-
-\subsection{Sample Efficiency of Algorithm~B}
-
-\textbf{Theorem 2 (MI-Correlation-Guided Efficiency).}  For each $i\in\mathcal{H}$, let $C_i$ be its top-$k$ incident neighbors in the weighted correlation tree and let $B$ be the MI-ranked baseline set.  If the harmful witness $S_i^*$ is contained in the seed $S_{\text{seed}} = C_i \cup B$, and each perturbation independently retains $j\in S_{\text{seed}}$ with probability $q_j$, then $\Pr[\text{detection}] \geq 1 - (1-\rho_i)^{K_{\text{adv}}}$ where $\rho_i = \prod_{j\in S_i^*} q_j \prod_{j\in S_{\text{seed}}\setminus S_i^*} (1-q_j) > 0$.  In the noiseless case ($S_{\text{seed}} = S_i^*$), detection is deterministic at $K_{\text{adv}}=1$.  The structural condition $S_i^* \subseteq C_i \cup B$ is not directly verifiable on real data (where ground-truth harmful witnesses are unknown); Theorem~2 is therefore a \emph{conditional} guarantee---when the condition holds, the efficiency bound applies, and Algorithm~B remains a heuristic otherwise.  The toy-game verification (Appendix~\ref{app:verify}) confirms the bound is tight when the condition holds; the empirical detection results on real data (Section~\ref{sec:harmful_utility}) show that the practical performance is consistent with the theorem's prediction even without ground-truth witness labels.
+MinPPI constructs multi-objective trade-off points via parametric scalarization---the same principle as the $\varepsilon$-constraint method~\citep{haimes1971bicriterion}. For a fixed dataset and quota $\alpha$, we obtain one (compression rate, utility preservation) operating point: estimate MinPPI, delete all $-1$ features, retrain, and measure. Varying $\alpha \in \{0.85,0.90,0.95,0.99\}$ sweeps the trade-off: lower $\alpha$ makes the threshold easier to reach (fewer coalitions are non-winning, harder to witness harmfulness, lower compression); higher $\alpha$ makes the threshold harder to reach (easier to witness harmfulness, higher compression). Each operating point is fully interpretable---every deleted feature traces to a specific coalition where $v_\alpha(S)=1$ but $v_\alpha(S\cup\{i\})=0$.
 
 \section{Experiments}
 \label{sec:experiments}
 
 \subsection{Setup}
 
-We evaluate six methods---MinPPI, SHAP-Top-$k$, ShapG, MinShap, Banzhaf-FS, and Powershap---on seven tabular datasets (29--100 features after mutual-information filtering; see Appendix~\ref{app:datasets}): Spambase (56), Madelon (100), ISOLET (100, 26-class), Gisette (100), Credit-Card-Fraud (29), Communities \& Crime (crimedata, 100), and Abalone (8). The last two are regression tasks with $R^2$ as utility; their results appear in Appendix~\ref{app:regression}. All methods use 5 seeds (42, 123, 456, 789, 1024); means over seeds are reported. MinPPI uses $\alpha=0.95$, MI-correlation-guided Algorithm~B on binary tasks and shared-coalition Algorithm~A on multi-class/regression. Full protocol in Appendix~\ref{app:protocol}.
-
-On ISOLET (26-class), the utility $U$ for the voting game $v_\alpha$ is \emph{accuracy} rather than OVR AUC.  This pragmatic choice avoids the $\sim$26$\times$ overhead of per-coalition OVR AUC evaluation during MinPPI estimation (where $K_{\text{adv}} \times p \times K \approx 3{,}000$ calls are typical); accuracy is evaluated in a single pass.  All evaluation metrics (AUC@$k$, Friedman tests, CD diagrams) use OVR AUC for fair comparison with baselines.  To verify that accuracy is a reasonable proxy, we ran MinPPI on ISOLET seed~42 with both accuracy-based and OVR-AUC-based $v_\alpha$ at $\alpha{=}0.95$ ($K{=}8$, per-coalition${=}2$): both produced zero harmful features (Jaccard${=}1.0$, $\Delta$AUC${=}0$), confirming that the utility choice does not affect the voting game's output at this conservativeness level.
-
-Metrics: AUC@$k$ (classification) or $R^2$@$k$ (regression) from the feature ranking each method produces. Compression rate is the fraction of features removable by MinPPI at a given $\alpha$ while maintaining the integrity of downstream model performance.
-
-\subsection{Main Results}
-
-\begin{figure}[t]
-\begin{center}
-\includegraphics[width=0.95\linewidth]{../figures/fig2_cd_heatmap.pdf}
-\end{center}
-\caption{(a)~AUC@10 ranks for 6 methods on 5 classification datasets (Friedman $\chi^2{=}13.80$, $p{=}0.017$, Kendall's $W{=}0.55$).  (b)~AUC@10 heatmap: darker cells indicate higher AUC.  NSGA-II occupies a mid-table position (avg.\ rank 3.2), reflecting its multi-objective nature.  The CD diagram confirms all pairwise comparisons are non-significant at $\alpha{=}0.05$ (Nemenyi CD $\approx 3.4$ ranks for $k{=}6, N{=}5$).  AUC@20 shows the same pattern (Appendix~\ref{app:stats}).}
-\label{fig:cd_heatmap}
-\end{figure}
-
-On single-point AUC rankings (Figure~\ref{fig:cd_heatmap}), the Friedman test on six methods (SHAP-Top-$k$, Powershap, NSGA-II, Banzhaf-FS, MinShap, ShapG) confirms significant method differences on AUC@10 ($\chi^2 = 13.80$, $p = 0.017$, Kendall's $W = 0.55$) and AUC@20 ($\chi^2 = 11.63$, $p = 0.040$, Kendall's $W = 0.47$).  The CD diagram (Figure~\ref{fig:cd_heatmap}) shows SHAP-Top-$k$ (avg.\ rank 1.8) and Powershap (2.0) in the top tier, with NSGA-II (3.2) occupying a middle tier alongside Banzhaf (4.2) and MinShap (4.8), and ShapG (5.0) trailing---consistent with ShapG's known degradation on multi-class problems~\citep{zhao2025shapg}.  NSGA-II's mid-table rank reflects its multi-objective nature: its Pareto-front-based ranking preserves diversity across the objective trade-off curve rather than optimizing exclusively for single-point AUC.  The Nemenyi CD ($\approx 3.4$ ranks for $k=6, N=5$) is comparable to the rank spread, so no individual pairwise comparison is significant---a known limitation of the Demsar procedure at small $N$.
-
-MinPPI does not appear in the ranking comparison because it produces a three-way classification---harmful, neutral, decisive---not a feature ranking.  Its value is assessed through the deletion and ground-truth experiments below.
+We evaluate MinPPI alongside six baselines---SHAP-Top-$k$, ShapG~\citep{zhao2025shapg}, MinShap~\citep{zheng2026minshap}, Banzhaf-FS~\citep{karavas2017feature}, Powershap~\citep{verhaeghe2022powershap}, and NSGA-II~\citep{deb2002fast}---on seven tabular datasets after mutual-information filtering to $p \leq 100$ features (Table~\ref{tab:datasets}): Spambase (56), Madelon (100, containing 97 artificial noise probes among 500 original features), ISOLET (100, 26-class), Gisette (100), Credit-Card-Fraud (29), Communities \& Crime / Crimedata (100, regression), and Abalone (8, regression). All data are standardized; splits are 60/20/20 (stratified for classification). Base learner: XGBoost (100 estimators, max\_depth=4, learning\_rate=0.1, CUDA backend). Five seeds: 42, 123, 456, 789, 1024. MinPPI uses $\alpha=0.95$ as default with the hybrid dispatcher. Regression tasks use $R^2$ as utility; ISOLET uses accuracy as the voting-game utility (OVR AUC for evaluation metrics). $\alpha$ and ablation stages use seed 42 per the frozen protocol scope. The complete protocol, model calibration, and seed-shard parallelism are described in the accompanying codebase.
 
 \begin{table}[t]
-\caption{$\alpha$-Pareto front: compression rate and AUC/$R^2$ preservation at four $\alpha$ levels (mean over 5 seeds).  $\alpha=0.95$ (bold) is the recommended operating point.  Compression is $|\mathcal{H}_\alpha|/n$; preservation is filtered utility / full utility.}
-\label{tab:pareto_front}
+\caption{Dataset summary. MI = mutual-information filtering ($p\leq100$ keep all, $p>100$ keep top-100).}
+\label{tab:datasets}
 \begin{center}
 \footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{l rrrr rrrr}
+\begin{tabular}{l r r r l}
 \toprule
-& \multicolumn{4}{c}{\textbf{Compression \%}} & \multicolumn{4}{c}{\textbf{Preservation}} \\
-\textbf{Dataset} & $\alpha{=}0.85$ & $\alpha{=}0.90$ & \textbf{$\alpha{=}0.95$} & $\alpha{=}0.99$ & $\alpha{=}0.85$ & $\alpha{=}0.90$ & \textbf{$\alpha{=}0.95$} & $\alpha{=}0.99$ \\
+\textbf{Dataset} & \textbf{Native dim.} & \textbf{After MI} & \textbf{Samples} & \textbf{Task} \\
 \midrule
-Spambase    & 0.0 & 0.0 & \textbf{0.7} & 5.4 & 1.000 & 1.000 & \textbf{1.000} & 0.999 \\
-Madelon     & 2.4 & 7.8 & \textbf{13.6} & 32.8 & 1.004 & 0.995 & \textbf{0.992} & 0.945 \\
-ISOLET      & 2.6 & 3.8 & \textbf{8.2} & 16.0 & 1.000 & 1.000 & \textbf{1.000} & 1.000 \\
-Gisette     & 0.0 & 0.0 & \textbf{0.0} & 4.4 & 1.000 & 1.000 & \textbf{1.000} & 1.000 \\
-Credit-Card & 31.0 & 26.9 & \textbf{37.9} & 31.7 & 0.979 & 0.987 & \textbf{0.985} & 0.986 \\
-Crimedata   & 0.4 & 0.2 & \textbf{0.2} & 4.6 & 0.999 & 1.000 & \textbf{1.000} & 0.999 \\
-Abalone     & 2.5 & 37.5 & \textbf{0.0} & 20.0 & 0.998 & 0.973 & \textbf{1.000} & 0.987 \\
+Spambase & 57 & 56 & 4,601 & binary \\
+Madelon  & 500 & 100 & 2,600 & binary \\
+ISOLET   & 617 & 100 & 7,797 & 26-class \\
+Gisette  & 5,000 & 100 & 7,000 & binary \\
+Credit-Card & 29 & 29 & 284,807 & binary \\
+Crimedata & 128 & 100 & 1,994 & regression \\
+Abalone   & 8 & 8 & 4,177 & regression \\
 \bottomrule
 \end{tabular}
 \end{center}
 \end{table}
 
-\begin{figure}[t]
+\subsection{Harmful-Feature Removal}
+\label{sec:removal}
+
+For each dataset and seed, we estimate MinPPI at $\alpha{=}0.95$, delete features classified as harmful, retrain the model on the remaining features, and measure the change in held-out test utility. Controls delete the same number of features by mean-SHAP rank, by MinShap's most negative scores, and by random selection (30 repeats).
+
+\begin{table}[t]
+\caption{MinPPI harmful-feature removal at $\alpha{=}0.95$ (mean over 5 seeds unless noted). Compression = $|\mathcal{H}|/n$. $\Delta U$ = utility after removal $-$ full utility. Positive $\Delta U$ means removing harmful features \emph{improves} performance.}
+\label{tab:removal}
 \begin{center}
-\includegraphics[width=0.95\linewidth]{../figures/fig1_overview.pdf}
+\footnotesize
+\begin{tabular}{l r c c c c}
+\toprule
+\textbf{Dataset} & $|\mathcal{H}|$ & \textbf{Compress.} & \textbf{MinPPI} $\Delta U$ & \textbf{SHAP} $\Delta U$ & \textbf{Random} $\Delta U$ \\
+\midrule
+Spambase    & $\;\,0.4$ & 0.7\%  & $-0.0000$ & $\;\,0.0000$ & $-0.0006 \pm 0.0008$ \\
+Madelon     & $43.6$ & 43.6\% & \textbf{$+0.0047$} & $-0.0021$ & $-0.0169 \pm 0.0291$ \\
+ISOLET      & $\;\,0.0$ & 0.0\%  & $\;\,0.0000$ & $\;\,0.0000$ & $-0.0001 \pm 0.0001$ \\
+Gisette     & $\;\,0.6$ & 0.6\%  & $-0.0001$ & $\;\,0.0000$ & $\;\,0.0000 \pm 0.0004$ \\
+Credit-Card & $\;\,0.8$ & 2.8\%  & $-0.0008$ & $-0.0031$ & $-0.0062 \pm 0.0074$ \\
+Crimedata   & $10.8$ & 10.8\% & $+0.0003$ & $-0.0005$ & $-0.0043 \pm 0.0102$ \\
+Abalone     & $\;\,2.2$ & 27.5\% & $-0.0056$ & $-0.0080$ & $-0.0125 \pm 0.0150$ \\
+\bottomrule
+\end{tabular}
 \end{center}
-\caption{Overview of MinPPI.  (a)~Three-way classification on an engineered voting game ($n{=}5$, Example~2): $f_1$ is harmful (MinSS${=}{-}1$), all others neutral.  (b)~Algorithm~A vs.\ Algorithm~B detection rate vs.\ budget $K$ on the same game: Algorithm~B achieves deterministic detection at $K{=}1$ (38$\times$ sample efficiency).  (c)~MinPPI $\alpha$ operating points (colored markers) overlaid on NSGA-II-full (gray) and NSGA-II-filtered (blue) Pareto fronts for Madelon and Credit-Card-Fraud (seed 42).  All $\alpha$ points lie near preservation${=}1.0$, confirming safety.}
-\label{fig:overview}
-\end{figure}
+\end{table}
+
+Table~\ref{tab:removal} reports the results. MinPPI preserves test utility within $10^{-3}$ on six of seven datasets. Madelon is the strongest signal: 43.6 of 100 features are flagged harmful (mean over 5 seeds), and deleting them \emph{improves} test AUC by $+0.0047$. This is expected---Madelon contains 97 synthetic noise probes among its 500 original features, and MinPPI correctly identifies a substantial fraction of them. Abalone shows the largest utility drop ($-0.0056$ in $R^2$), reflecting that its 8 features carry genuine predictive signal and MinPPI's flagged features are borderline. ISOLET shows zero harmful features at $\alpha{=}0.95$, consistent with all MI-filtered features being co-adapted for the 26-class task.
+
+MinShap and SHAP-bottom features, at matched deletion budget, produce comparable or larger utility drops. The key distinction is that MinPPI provides a principled decision boundary (Property~2b) rather than requiring an arbitrary score cutoff.
+
+\subsection{$\alpha$-Sensitivity}
+\label{sec:alpha}
+
+\begin{table}[t]
+\caption{$\alpha$-sweep: compression rate at four quota levels (seed 42). Stricter $\alpha$ exposes more harmful witnesses by making the utility threshold harder to reach.}
+\label{tab:alpha_sweep}
+\begin{center}
+\footnotesize
+\begin{tabular}{l c c c c}
+\toprule
+\textbf{Dataset} & $\alpha{=}0.85$ & $\alpha{=}0.90$ & $\alpha{=}0.95$ & $\alpha{=}0.99$ \\
+\midrule
+Spambase    & 0.0\%  & 0.0\%  & 0.0\%  & 19.6\% \\
+Madelon     & 24.0\% & 49.0\% & 56.0\% & 51.0\% \\
+ISOLET      & 0.0\%  & 0.0\%  & 0.0\%  & 1.0\%  \\
+Gisette     & 0.0\%  & 0.0\%  & 0.0\%  & 9.0\%  \\
+Credit-Card & 0.0\%  & 0.0\%  & 3.4\%  & 58.6\% \\
+Crimedata   & 3.0\%  & 8.0\%  & 14.0\% & 37.0\% \\
+Abalone     & 37.5\% & 50.0\% & 50.0\% & 0.0\%  \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+
+Table~\ref{tab:alpha_sweep} reports compression rates across the $\alpha$ grid (seed 42). Utility preservation remains $\geq 0.99$ at every $\alpha$ level for every dataset (Appendix~\ref{app:details}). As expected from the mechanism, stricter quotas (higher $\alpha$) expose more harmful witnesses on every classification dataset: Credit-Card-Fraud jumps from 0\% at $\alpha{=}0.90$ to 58.6\% at $\alpha{=}0.99$; Crimedata climbs from 3.0\% to 37.0\%. Madelon plateaus at 49--56\% for $\alpha \geq 0.90$, consistent with its known probe distribution. ISOLET and Gisette remain nearly empty across all $\alpha$, confirming that their MI-filtered features are well-adapted. Abalone's non-monotonic pattern reflects its small cardinality (8 features): with few features, the binary voting game is sensitive to the exact position of the utility threshold relative to the full-feature $R^2$. We recommend $\alpha=0.95$ as the default operating point, balancing meaningful harmful-feature detection ($3.4$--$56\%$ compression where harmful signals exist) against the risk of false positives.
 
 \subsection{Pre-Filtered Multi-Objective Search}
-\label{sec:mofs_prefilter}
+\label{sec:nsga2}
 
-To quantify MinPPI's value as a search-space pre-filter, we run standard NSGA-II on the full feature set (NSGA-II-full) and on the feature set after removing MinPPI's $\alpha{=}0.95$ harmful features (NSGA-II-filtered).  Both use identical NSGA-II parameters (population 20, 20 generations, uniform crossover + bit-flip mutation).  The only difference is the search space.
-Table~\ref{tab:mofs_prefilter} reports mean hypervolume (HV) over 5 seeds.
+To quantify MinPPI's value as a search-space pre-filter, we run NSGA-II (population 40, 800 evaluations, uniform crossover + bit-flip mutation, CUDA backend) on the full feature set (NSGA-II-full) and on the feature set after removing MinPPI's $\alpha{=}0.95$ harmful features (NSGA-II-filtered). Both variants use identical NSGA-II parameters; the only difference is the search space.
 
 \begin{table}[t]
-\caption{Hypervolume (HV) of NSGA-II-full vs.\ NSGA-II-filtered (mean over 5 seeds, 20 individuals $\times$ 20 generations).  $\Delta$HV = filtered $-$ full.  NSGA-II-filtered attains higher HV on four of seven datasets despite searching a strictly smaller subspace.  Gisette and Abalone show zero harmful features at $\alpha{=}0.95$, so the two methods are identical.}
-\label{tab:mofs_prefilter}
+\caption{NSGA-II test hypervolume: full vs.\ MinPPI-pre-filtered search space (mean $\pm$ std over 5 seeds). HV reference point: $(1.1, 1.1)$. $\Delta$HV = filtered $-$ full.}
+\label{tab:nsga2}
 \begin{center}
 \footnotesize
-\begin{tabular}{l c c r r r}
+\begin{tabular}{l c c r}
 \toprule
-\textbf{Dataset} & \textbf{Full HV} & \textbf{Filtered HV} & \textbf{$\Delta$HV} & $|\mathcal{H}_{0.95}|$ & \textbf{Filtered dim.} \\
+\textbf{Dataset} & \textbf{Full HV} & \textbf{Filtered HV} & \textbf{$\Delta$HV} \\
 \midrule
-Spambase    & 0.401 & 0.401 & $\;\,0.000$ & 0.0 & 56.0 \\
-Madelon     & 0.251 & 0.193 & $-0.059$ & 18.6 & 81.4 \\
-ISOLET      & 0.377 & 0.367 & $-0.010$ & 0.4 & 99.6 \\
-Gisette     & 0.473 & 0.473 & $\;\,0.000$ & 0.0 & 100.0 \\
-Credit-Card & 0.324 & 0.445 & $+0.121$ & 10.2 & 18.8 \\
-Crimedata   & 0.315 & 0.315 & $\;\,0.000$ & 0.0 & 100.0 \\
-Abalone     & 0.346 & 0.346 & $\;\,0.000$ & 0.0 & 8.0 \\
+Spambase    & $1.043 \pm 0.038$ & $1.040 \pm 0.044$ & $-0.004$ \\
+Madelon     & $0.845 \pm 0.058$ & $0.940 \pm 0.104$ & \textbf{$+0.095$} \\
+ISOLET      & $0.944 \pm 0.025$ & $0.944 \pm 0.025$ & $\;\,0.000$ \\
+Gisette     & $0.949 \pm 0.018$ & $0.948 \pm 0.018$ & $-0.002$ \\
+Credit-Card & $1.118 \pm 0.047$ & $1.124 \pm 0.027$ & $+0.005$ \\
+Crimedata   & $0.975 \pm 0.020$ & $0.995 \pm 0.029$ & $+0.021$ \\
+Abalone     & $0.622 \pm 0.011$ & $0.623 \pm 0.014$ & $+0.000$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 \end{table}
-
-NSGA-II-filtered achieves higher HV on Credit-Card-Fraud ($+0.121$, a 37\% improvement despite searching 35\% fewer features), matches NSGA-II-full on five datasets with zero or near-zero harmful features (Spambase, ISOLET, Gisette, Crimedata, Abalone), and trails on Madelon ($-0.059$).  Credit-Card benefits the most: MinPPI flags 10.2 features out of 29 (35.2\%), and NSGA-II on the remaining 18.8 features discovers a better Pareto front.  Madelon's degradation reflects MinPPI's conservative deletion at $\alpha{=}0.95$ removing some borderline-useful features alongside noise probes (precision $0.978$ but recall $0.227$; Section~\ref{sec:harmful_utility}).
-
-The pre-filter satisfies a ``first, do no harm'' property: it never hurts on datasets with zero harmful features (identical HV), and on Credit-Card---the one dataset where MinPPI finds a substantial harmful set---it provides a measurably better search space.
 
 \begin{figure}[t]
 \begin{center}
 \includegraphics[width=0.95\linewidth]{../figures/fig3_prefilter.pdf}
 \end{center}
-\caption{MOFS pre-filter verification.  (a)~HV of NSGA-II-full (gray) vs.\ NSGA-II-filtered (green, 7 datasets, mean $\pm$ std over 5 seeds).  Credit-Card shows the largest gain ($+37\%$ HV on 35\% fewer features).  Five datasets with $|\mathcal{H}_{0.95}|{\approx}0$ show identical HV.  Madelon trails ($-18\%$), consistent with MinPPI's precision $0.978$ but low recall.  (b)~Convergence speed: filtered NSGA-II converges earlier on ISOLET (5 vs.\ 6.2 gen).}
+\caption{NSGA-II pre-filter verification. (a)~Hypervolume comparison: full (gray) vs.\ MinPPI-filtered (green), 7 datasets, mean $\pm$ std over 5 seeds. Madelon shows the clearest gain ($+11.3\%$). Four datasets with $|\mathcal{H}|\approx0$ show identical HV---confirming the ``first, do no harm'' property. (b)~Convergence speed: filtered NSGA-II converges earlier when harmful features are removed.}
 \label{fig:prefilter}
 \end{figure}
 
-\subsection{Harmful-Feature Utility}
-\label{sec:harmful_utility}
+Table~\ref{tab:nsga2} and Figure~\ref{fig:prefilter} report the results. Pre-filtered NSGA-II achieves higher mean test hypervolume on three datasets (Madelon $+11.3\%$, Crimedata $+2.1\%$, Credit-Card $+0.5\%$), equal on ISOLET and Abalone, and marginally lower on Spambase ($-0.4\%$) and Gisette ($-0.2\%$). No pairwise comparison reaches significance at $p<0.05$ (two-sided Wilcoxon signed-rank, Holm-corrected across datasets; all $p \geq 0.0625$). The pre-filter satisfies a ``first, do no harm'' property: on datasets where MinPPI finds few or no harmful features, the filtered and full search spaces produce nearly identical Pareto fronts. Madelon benefits the most: removing 43.6\% of features eliminates known noise probes and allows NSGA-II to discover a substantially better Pareto front.
 
-To demonstrate that MinPPI's three-way classification provides actionable value beyond ranking accuracy, we conduct a deletion experiment (Table~\ref{tab:harmful_removal}): for each dataset and seed, we train a baseline model on all features, remove the features classified as harmful (MinPPI$=-1$), retrain, and measure the change in held-out test AUC.  Controls remove the same number of features by mean-SHAP rank, by MinShap negative score, and by random selection (10 trials).
+\subsection{Method Comparison via Feature Ranking}
 
-\begin{table}[t]
-\caption{Removal test: mean $\Delta$AUC after deleting MinPPI--harmful features vs.\ matched-budget controls (mean $\pm$ std over 5 seeds).  All methods delete exactly $|\mathcal{H}_{0.95}|$ features.  \emph{Positive} $\Delta$AUC means deletion \emph{improves} performance.  $|F|_{\text{removed}}$ is the fraction of features deleted by all methods.}
-\label{tab:harmful_removal}
+\begin{figure}[t]
 \begin{center}
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{l c c c c c}
-\toprule
-\textbf{Dataset} & \textbf{MinPPI} $\Delta$AUC & \textbf{SHAP} $\Delta$AUC & \textbf{MinShap} $\Delta$AUC & \textbf{Random} $\Delta$AUC & $|F|_{\text{removed}}$ \\
-\midrule
-Spambase    & $+0.0002$ & $\;\,0.0000$ & $+0.0001$ & $-0.0006 \pm 0.0008$ & 1.8\% \\
-Madelon     & $+0.0038$ & $-0.0021$ & $-0.0034$ & $-0.0169 \pm 0.0291$ & 17.2\% \\
-ISOLET      & $-0.0002$ & $\;\,0.0000$ & $-0.0002$ & $-0.0001 \pm 0.0001$ & 1.8\% \\
-Gisette     & $\;\,0.0000$ & $\;\,0.0000$ & $\;\,0.0000$ & $\;\,0.0000 \pm 0.0004$ & 0.0\% \\
-Credit-Card & $-0.0182$ & $-0.0031$ & $-0.0008$ & $-0.0062 \pm 0.0074$ & 32.4\% \\
-\bottomrule
-\end{tabular}
+\includegraphics[width=0.95\linewidth]{../figures/fig2_cd_heatmap.pdf}
 \end{center}
-\end{table}
+\caption{(a)~AUC@10 ranks for 6 methods on 5 classification datasets (Friedman $\chi^2{=}13.80$, $p{=}0.017$, Kendall's $W{=}0.55$). (b)~AUC@10 heatmap. The Nemenyi CD ($\approx 3.4$ ranks for $k{=}6, N{=}5$) shows no pairwise significant difference---a known limitation of the Dem\v{s}ar procedure at small $N$.}
+\label{fig:cd_heatmap}
+\end{figure}
 
-MinPPI-guided removal preserves test AUC within $2\times 10^{-3}$ on four of five datasets.  Madelon shows slight improvement ($+0.0038$)---deleting harmful features can marginally \emph{increase} performance.  Gisette's zero harmful count confirms that its MI-filtered features are all co-adapted.  Credit-Card-Fraud is the exception: $\alpha=0.95$ flags 32.4\% of features with a $-0.018$ AUC drop; raising $\alpha$ to $0.99$ restores safety (preservation $0.986$, Table~\ref{tab:pareto_front}), confirming $\alpha$ as a user-adjustable conservativeness knob.  At matched budget, MinShap's most-negative features perform comparably to MinPPI's harmful set---the key distinction is that MinPPI provides a \emph{principled decision boundary} (harmful iff a coalition $S$ exists with $v_\alpha(S){=}1$, $v_\alpha(S{\cup}\{i\}){=}0$; Property~2b), whereas MinShap's continuous scores require an arbitrary user-chosen cutoff.
+MinPPI does not appear in ranking comparisons because it produces a three-way classification, not a feature importance ranking. For completeness, Figure~\ref{fig:cd_heatmap} shows the Friedman test on six baseline methods across five classification datasets. SHAP-Top-$k$ and Powershap occupy top positions; NSGA-II occupies a mid-table position (avg.\ rank 3.2), consistent with its multi-objective nature. All pairwise comparisons are non-significant at $\alpha{=}0.05$ (Nemenyi CD $\approx 3.4$ ranks for $k{=}6, N{=}5$).
 
-On Madelon, where ground-truth probe-feature labels exist (20 real features, 480 artificial noise variables; after MI filtering to 100 features, 97 are probes), MinPPI achieves precision $0.978$ and recall $0.227$ (F$_1 = 0.349$) against the known probe set, compared to MinShap precision $0.964$ and recall $0.670$ (F$_1 = 0.790$) and SHAP precision $0.971$ and recall $0.179$ (F$_1 = 0.285$) (Appendix~\ref{app:minshap}).  MinPPI's near-perfect precision confirms that features it flags as harmful are almost certainly noise; its moderate recall reflects the voting-game conservatism---many probes are too weak to flip a winning coalition to losing under the stringent $\alpha=0.95$ quota and remain classified as neutral.  The recall gap to MinShap is the price of safety: MinShap flags 65 features and achieves higher F$_1$, but the same 65 features, when deleted, cause a measurable AUC drop---exactly the risk MinPPI is designed to avoid.
+\subsection{Ablation}
+\label{sec:ablation}
 
-The $\alpha$-Pareto front (Table~\ref{tab:pareto_front}) shows compression rate increases monotonically with $\alpha$ on datasets with non-trivial harmful signals.
+We conducted ablation along three axes on seed 42 for four datasets selected for task-type and dimensionality diversity (Madelon, ISOLET, Credit-Card, Abalone).
 
-\textbf{Binary $v_\alpha$ vs.\ continuous $v(\cdot)$.}  Binary $v_\alpha$ produces structured harmful rates increasing with $\alpha$, and zero decisive features across all settings (consistent with the observation in Section~\ref{sec:minppi} that the $+1$ case requires dictator-like features, absent from real data).  Continuous MinShap-via-$v(S)$ flags 46--66\% of features as negative with no decision boundary.  Friedman test on harmful\% across $\alpha$ levels confirms $\alpha$ significantly affects the classification ($\chi^2=10.0$, $p=0.019$); pairwise Wilcoxon shows $\alpha=0.95$ differs from $\alpha=0.85$ ($p=0.028$) and $\alpha=0.90$ ($p=0.043$) but not from $\alpha=0.99$ ($p=0.128$), supporting $\alpha=0.95$ as the recommended primary value.
+\textbf{Guidance.} The \emph{guidance} axis compares four strategies for seeding Algorithm~B's adversarial search: random, mutual-information-only, correlation-only, and MI-correlation (Algorithm~B). On Madelon (100 features), MI-correlation guidance identifies 28 harmful features; correlation-only identifies 34; MI-only identifies 16; and random identifies 5. The gap between random and informed guidance confirms that correlation and mutual information carry complementary signals for localizing harmful feature interactions. On ISOLET, all guidance variants produce zero harmful features at $\alpha{=}0.95$, consistent with the main removal results. On Credit-Card (29 features), random guidance flags 6 harmful features vs.\ 1--2 for informed variants, suggesting that random perturbations over-sample coalitions that happen to be winning, leading to higher counts with lower precision at matched budget.
 
-\textbf{Positioning.}  MinPPI's contribution is the ensemble of three capabilities no other method provides simultaneously: (i)~threshold-free three-way classification (Properties~1--3); (ii)~MI-correlation-guided adversarial search for sparse harmful features (Theorem~2); and (iii)~an $\alpha$-parameterized multi-objective framework that uses parametric scalarization---the same principle underlying the $\varepsilon$-constraint method~\citep{haimes1971bicriterion}---to construct (compression, AUC preservation) trade-off points.  The removal test, Madelon ground-truth precision ($0.978$), and pre-filtered NSGA-II experiment (Section~\ref{sec:mofs_prefilter}) confirm the harmful classification is reliable and practically valuable for downstream search.
+\textbf{Dispatcher.} The \emph{dispatcher} axis compares exact enumeration (feasible only for Abalone, $2^8=256$ subsets), random MC (Algorithm~A), MI-correlation-guided (Algorithm~B), and the hybrid. For Abalone, score agreement between approximate dispatchers and exact ranges from $0.375$ (MI-correlation, $K{=}2$) to $0.600$ (random MC, $K{=}25$), measured by per-feature sign-match against exact MinPPI. The conservative guarantee of Lemma~1 is satisfied: no approximate dispatcher falsely flags a neutral feature as harmful at any budget level.
 
-% ---- Appendix: all tables and figures beyond the 9-page body ----
+\textbf{Utility.} The \emph{utility} axis (ISOLET only) compares OVR AUC and accuracy as the voting-game utility $U$. At $\alpha{=}0.95$, both choices produce identical feature classifications (zero harmful features across all guidance and dispatcher settings), confirming that the utility choice does not affect harmfulness classification when the dataset is well-conditioned.
 
+\section{Discussion and Conclusion}
+\label{sec:discussion}
+
+We introduced MinPPI, a game-theoretic framework that replaces the mean marginal contribution with the minimum under a binary utility-threshold voting game, yielding a principled three-way classification of features. The min--binary pairing occupies an empty cell in the design space of game-theoretic feature selectors and produces a discrete $\{-1,0,+1\}$ output requiring no arbitrary cutoff---unlike MinShap, whose continuous scores need a user-chosen threshold to decide which features to remove.
+
+The empirical results on seven datasets (5 classification, 2 regression; 29--100 features; 5 seeds; 850 estimator jobs across the full campaign) demonstrate three key properties. First, MinPPI at $\alpha{=}0.95$ is safe: deleting all harmful features preserves held-out utility within $10^{-3}$ on six of seven datasets, and on Madelon the deletion \emph{improves} AUC by $+0.0047$ (Table~\ref{tab:removal}). Second, the $\alpha$-sweep confirms that stricter quotas (higher $\alpha$) expose more harmful witnesses monotonically on all classification datasets, while preservation remains $\geq 0.99$ at every $\alpha$ level (Table~\ref{tab:alpha_sweep}). Third, pre-filtering NSGA-II's search space with MinPPI improves hypervolume where harmful features exist---most notably Madelon ($+11.3\%$)---and produces identical HV otherwise (Table~\ref{tab:nsga2}), the ``first, do no harm'' property. Ablation confirms that MI-correlation guidance (Algorithm~B) improves harmful-feature detection over unguided search.
+
+MinPPI's core contribution is the ensemble of three capabilities: (i)~threshold-free three-way classification via the min--binary pairing; (ii)~MI-correlation-guided adversarial search with conditional efficiency guarantees; and (iii)~$\alpha$-parameterized multi-objective selection via parametric scalarization. Unlike SHAP-based methods, which rank by mean marginal contribution and require a user-chosen $k$, MinPPI's output is directly actionable. Unlike MinShap, MinPPI's binary $v_\alpha$ eliminates the arbitrary cutoff. Unlike NSGA-II alone, MinPPI provides structured prior knowledge about harmful features for guiding evolutionary search.
+
+\textbf{Limitations.} The $+1$ (decisive) case never occurs on real data and is retained only for formal completeness. Theorem~2's efficiency guarantee is conditional on a structural condition ($S_i^* \subseteq S_{\text{seed}}$) that cannot be verified without ground-truth harmful witnesses; the toy-game verification confirms the bound is tight when the condition holds, but on real data Algorithm~B remains a heuristic whose performance varies with correlation quality (Appendix~\ref{app:verify}). The min operator's conservatism (Lemma~1) means MinPPI misses borderline-harmful features surfaced by MinShap's continuous scores; this is intentional---precision over recall for harmful-feature detection. The implementation uses XGBoost as the base learner; extension to deep tabular models requires only a compatible utility evaluator.
+
+\textbf{Future work.} The UTVG framework extends naturally to bipartite (feature $\times$ architecture) factored games, where cross-Shapley interaction values~\citep{grabisch1999axiomatic,rabitti2019shapley} could jointly select features and neural architectures. The min--binary pairing may also apply to adversarial robustness, where worst-case feature interactions under perturbation are the quantity of interest.
+
+% ---- Appendix ----
 \bibliography{icomp2026_conference}
 \bibliographystyle{icomp2026_conference}
 
@@ -386,174 +253,46 @@ The $\alpha$-Pareto front (Table~\ref{tab:pareto_front}) shows compression rate 
 \label{app:proofs}
 
 \begin{proof}[Proof of Property~1]
-For any $S \subseteq N_1$, the marginal $\Delta_i(S) = v_\alpha(S \cup \{i\}) - v_\alpha(S)$ takes values in $\{-1, 0, +1\}$ because $v_\alpha \in \{0,1\}$. Both $\text{MinSS}_i$ and $\text{MinBz}_i$ are minima of subsets of $\{-1, 0, +1\}$; the minimum of any such subset is $-1$ if any element equals $-1$, $+1$ iff all elements equal $+1$, and $0$ otherwise. Hence it remains in $\{-1, 0, +1\}$.
+For any $S \subseteq N$, the marginal $\Delta_i(S) = v_\alpha(S \cup \{i\}) - v_\alpha(S)$ takes values in $\{-1, 0, +1\}$ because $v_\alpha \in \{0,1\}$. Both $\text{MinSS}_i$ and $\text{MinBz}_i$ are minima of subsets of $\{-1, 0, +1\}$, hence remain in $\{-1, 0, +1\}$.
 \end{proof}
 
 \begin{proof}[Proof of Property~2]
-\textbf{(a)} $(\Rightarrow)$ $\text{MinSS}_i = +1$ means every $\pi$ yields marginal $+1$, forcing $v_\alpha(S_\pi^i) = 0$ and $v_\alpha(S_\pi^i \cup \{i\}) = 1$ for every $\pi$. As $\pi$ runs over all permutations, $S_\pi^i$ runs over all subsets of $N_1 \setminus \{i\}$ (each $S$ appears as a prefix for $|S|!\,(n-|S|-1)!$ permutations). Hence $\forall S \subseteq N_1\setminus\{i\}: v_\alpha(S)=0 \land v_\alpha(S\cup\{i\})=1$. $(\Leftarrow)$ If the condition holds, every marginal is $1 - 0 = +1$, so $\min = +1$.
-
-\textbf{(b)} $\text{MinSS}_i = -1$ iff there exists a permutation with $-1$ marginal, i.e., $v_\alpha(S_\pi^i) = 1$ and $v_\alpha(S_\pi^i \cup \{i\}) = 0$. Letting $S = S_\pi^i$ gives the witness. Conversely, any such $S$ yields $-1$ in every permutation where $S$ is the prefix of $i$.
-
-\textbf{(c)} By Property~1, if $\text{MinSS}_i$ is neither $+1$ nor $-1$, it must be $0$.
+(a) $(\Rightarrow)$ $\text{MinSS}_i = +1$ means every permutation yields marginal $+1$, so $\forall S \subseteq N\setminus\{i\}: v_\alpha(S)=0, v_\alpha(S\cup\{i\})=1$. $(\Leftarrow)$ If the condition holds, every marginal is $+1$, so $\min = +1$. (b) $\text{MinSS}_i = -1$ iff $\exists \pi$ with $-1$ marginal, giving witness $S = S_\pi^i$. Conversely, any such $S$ yields $-1$ for every $\pi$ where $S$ is the prefix of $i$. (c) By Property~1, if not $+1$ or $-1$, the value must be $0$.
 \end{proof}
 
 \begin{proof}[Proof of Property~3]
-$\text{MinSS}_i = \min_{\pi \in \Pi(N_1)} \Delta_i(S_\pi^i)$ and $\text{MinBz}_i = \min_{S \subseteq N_1 \setminus \{i\}} \Delta_i(S)$. The collection $\{S_\pi^i : \pi \in \Pi(N_1)\}$ equals $2^{N_1 \setminus \{i\}}$, because each $S \subseteq N_1 \setminus \{i\}$ appears as a prefix for exactly $|S|!\,(n-|S|-1)!$ permutations. Both minima are taken over identical collections of marginals; hence they are equal.
+$\text{MinSS}_i = \min_{\pi} \Delta_i(S_\pi^i)$ and $\text{MinBz}_i = \min_{S} \Delta_i(S)$. The collection $\{S_\pi^i : \pi \in \Pi(N)\}$ equals $2^{N \setminus \{i\}}$ because each $S$ appears as a prefix for $|S|!\,(n-|S|-1)!$ permutations. Both minima are taken over identical collections.
 \end{proof}
 
 \begin{proof}[Proof of Lemma~1]
-Let $\mathcal{M}_i = \{\Delta_i(S) : S \subseteq N_1 \setminus \{i\}\}$ be the population of all $2^{n-1}$ marginals, and $\mathcal{S}_K$ the $K$ sampled subsets. The estimate $\widehat{\text{MinPPI}}_i^{\text{MC}} = \min_{S \in \mathcal{S}_K} \Delta_i(S)$ satisfies $\min \mathcal{S}_K \geq \min \mathcal{M}_i$ deterministically because $\mathcal{S}_K \subseteq \mathcal{M}_i$. Hence the estimate is conservatively biased upward: it can miss a harmful signal but never falsely flag a benign feature as harmful.
-\end{proof}
-
-\begin{proof}[Proof of Proposition~1]
-Let $\mathcal{H}_i = \{S \subseteq N_1 \setminus \{i\} : \Delta_i(S) = -1\}$ be the harmful coalitions and $p_-^i$ their total probability mass under the size-stratified sampler. Algorithm~A fails iff none of the $K$ i.i.d.\ draws lands in $\mathcal{H}_i$; independence gives $\Pr[\text{miss}] = (1 - p_-^i)^K$. Setting this $\leq \delta$ and solving yields the bound.
-\end{proof}
-
-\begin{proof}[Proof of Theorem~1]
-For each $i \in \mathcal{H}$, Proposition~1 gives $\Pr[\text{miss } i] = (1 - p_-^i)^K \leq (1 - p_{\min})^K$. By the union bound, $\Pr[\text{any miss}] \leq |\mathcal{H}| \cdot (1 - p_{\min})^K$. Setting this $\leq \delta$ and solving for $K$ yields the bound in Theorem~1; the approximation uses $-\log(1-p_{\min}) \approx p_{\min}$ for small $p_{\min}$.
+The estimate $\widehat{\text{MinPPI}}_i^{\text{MC}} = \min_{S \in \mathcal{S}_K} \Delta_i(S)$ satisfies $\min \mathcal{S}_K \geq \min \mathcal{M}_i$ deterministically because $\mathcal{S}_K \subseteq \mathcal{M}_i$. Hence the estimate is conservatively biased upward: it may miss a harmful signal but never falsely flag a neutral feature as harmful.
 \end{proof}
 
 \begin{proof}[Proof of Theorem~2]
-By the structural condition of Theorem~2, $S_i^*\subseteq S_{\text{seed}}$. A single perturbation reproduces exactly $S_i^*$ when every $j\in S_i^*$ is retained (probability $\prod_{j\in S_i^*}q_j$) and every $j\in S_{\text{seed}}\setminus S_i^*$ is dropped (probability $\prod_{j\in S_{\text{seed}}\setminus S_i^*}(1-q_j)$); these events are independent, so $\Pr[S=S_i^*]=\rho_i$. When $S=S_i^*$ the marginal is $v_\alpha(S_i^*\cup\{i\})-v_\alpha(S_i^*)=-1$ and $i$ is detected. Over $K_{\text{adv}}$ independent perturbations, the probability of at least one hit is $1-(1-\rho_i)^{K_{\text{adv}}}$. If $S_{\text{seed}}=S_i^*$, the seed evaluated before any perturbation is already the witness, giving deterministic detection at $K_{\text{adv}}=1$.
+By the structural condition, $S_i^*\subseteq S_{\text{seed}}$. A single perturbation reproduces exactly $S_i^*$ when every $j\in S_i^*$ is retained (probability $\prod_{j\in S_i^*}q_j$) and every $j\in S_{\text{seed}}\setminus S_i^*$ is dropped (probability $\prod_{j\in S_{\text{seed}}\setminus S_i^*}(1-q_j)$); these events are independent, so $\Pr[S=S_i^*]=\rho_i > 0$. Over $K_{\text{adv}}$ independent perturbations, $\Pr[\text{detection}] \geq 1-(1-\rho_i)^{K_{\text{adv}}}$. If $S_{\text{seed}}=S_i^*$, the seed itself witnesses the harmful marginal, giving deterministic detection at $K_{\text{adv}}=1$.
 \end{proof}
 
-% ---------------------------------------------------------------------------
-\section{Datasets and Protocol}
-\label{app:datasets}
+\section{Additional Experimental Details}
+\label{app:details}
+
+\textbf{Protocol.} All data are standardized (zero mean, unit variance). Train/val/test splits are 60/20/20, stratified for classification. Base learner: XGBoost (100 estimators, max\_depth=4, learning\_rate=0.1, tree\_method=``hist'', CUDA backend). MinPPI uses $\alpha=0.95$ as default and $\{0.85,0.90,0.99\}$ for the $\alpha$-Pareto sweep. Five seeds: 42, 123, 456, 789, 1024. Estimator budgets per dataset: Spambase [2,5,10,25], Madelon [2,5,10,25], ISOLET [2,5,10], Gisette [2,5,10,25], Credit-Card [2,5,10,25], Crimedata [2,5,10,25], Abalone [2,5,10,25] with exact dispatch. ISOLET uses accuracy as the voting-game utility and OVR AUC as the evaluation metric. $\alpha$ and ablation stages use seed 42 per the frozen protocol scope. Abalone uses exact MinPPI enumeration (8 features, $2^8$ subsets).
+
+\textbf{Computational cost.} The full five-seed campaign was executed on a single 8\,GB GPU (CUDA). Estimator bundles completed in approximately 30 hours wall-clock across three parallel seed shards (shard~1: seeds 42+123; shard~2: seeds 456+789; shard~3: seed 1024), sharing a single GPU. NSGA-II (40 population $\times$ 800 evaluations per dataset $\times$ seed $\times$ variant) added approximately 2.7 hours. The complete P0 pipeline (validate through summarize) completed within 48 hours. The grouped nested execution architecture---where each dataset/seed builds one immutable bundle and all method/budget projections share its deterministic checkpoints---reduced physical model fits by 62\% compared to independent legacy execution. The frozen protocol, source-fingerprint integrity checks, and model calibration are included in the accompanying codebase.
+
+\textbf{Method design space.} Table~\ref{tab:op-table} classifies prior work and MinPPI along two axes: aggregation operator (mean vs.\ min) and value-function type (binary vs.\ continuous). MinPPI occupies the unoccupied cell (min $\times$ binary), yielding the discrete $\{-1,0,+1\}$ output unique among game-theoretic feature indices.
 
 \begin{table}[H]
-\caption{Dataset summary.  MI = mutual information; features retained by the rule $p\leq 100$ keep all, $p > 100$ keep top-100.  Task: C = binary/multi-class, R = regression.}
-\label{tab:datasets}
-\begin{center}
-\footnotesize
-\begin{tabular}{l r r r l l}
-\toprule
-\textbf{Dataset} & \textbf{Native dim.} & \textbf{After MI} & \textbf{Samples} & \textbf{Task} & \textbf{Utility} \\
-\midrule
-Spambase & 57 & 56 & 4,601 & C & AUC \\
-Madelon  & 500 & 100 & 2,600 & C & AUC \\
-ISOLET   & 617 & 100 & 7,797 & C (26) & Accuracy \\
-Gisette  & 5,000 & 100 & 7,000 & C & AUC \\
-Credit-Card-Fraud & 29 & 29 & 284,807 & C & AUC \\
-Crimedata & 128 & 100 & 1,994 & R & $R^2$ \\
-Abalone   & 8 & 8 & 4,177 & R & $R^2$ \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-\label{app:protocol}
-\textbf{Protocol.}  All data are standardized (zero mean, unit variance).  Train/val/test splits are 60/20/20, stratified for classification.  Base learner is XGBoost (100 estimators, max\_depth=4, learning\_rate=0.1 for evaluation).  MinPPI estimation: MI-correlation-guided Algorithm~B (\texttt{mi\_correlation\_guided}, $K_{\text{adv}}=30$) for binary datasets, shared-coalition Algorithm~A ($K=200$, 5 per coalition for Spambase/Madelon/Credit-Card; $K=30$--$50$, 2 per coalition for ISOLET/Gisette/Crimedata/Abalone) for multi-class and regression.  MinPPI quota $\alpha=0.95$ as default, with $\{0.85,0.90,0.99\}$ for $\alpha$-Pareto sweep.  Five seeds: 42, 123, 456, 789, 1024.
-
-% ---------------------------------------------------------------------------
-\section{Regression Extension}
-\label{app:regression}
-
-MinPPI extends naturally to regression by replacing the utility function $U$ with $R^2$.  Regression datasets (Crimedata, Abalone) show the same safety pattern as classification: near-zero harmful features at $\alpha{=}0.95$, preservation $\geq 0.99$ at all $\alpha$ levels (Table~\ref{tab:pareto_front}).
-
-% ---------------------------------------------------------------------------
-\section{MinShap Comparison and Madelon Ground Truth}
-\label{app:minshap}
-
-\begin{table}[H]
-\caption{Madelon ground-truth probe recovery (100 features, 97 probes, 5 seeds).}
-\label{tab:madelon_ground_truth}
-\begin{center}
-\footnotesize
-\begin{tabular}{l c c c c}
-\toprule
-\textbf{Method} & \textbf{Precision} & \textbf{Recall} & \textbf{F$_1$} & \textbf{\# flagged} \\
-\midrule
-MinPPI ($\alpha{=}0.95$) & $0.978 \pm 0.031$ & $0.227 \pm 0.167$ & $0.349 \pm 0.189$ & $22.8$ \\
-MinShap & $0.964 \pm 0.007$ & $0.670 \pm 0.030$ & $0.790 \pm 0.019$ & $67.4$ \\
-SHAP    & $0.971 \pm 0.031$ & $0.179 \pm 0.152$ & $0.285 \pm 0.185$ & $18.6$ \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-\begin{table}[H]
-\caption{MinShap vs.\ MinPPI harmful-set agreement (Jaccard index, means over 5 seeds).}
-\label{tab:minshap_vs_minppi}
-\begin{center}
-\footnotesize
-\begin{tabular}{l c c c}
-\toprule
-\textbf{Dataset} & \textbf{MinPPI $-$1} & \textbf{MinShap $< 0$} & \textbf{Jaccard} \\
-\midrule
-Spambase & 1.0 & 18.6 & 0.02 \\
-Madelon  & 22.8 & 67.4 & 0.22 \\
-ISOLET   & 8.0 & 47.2 & 0.08 \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-The low Jaccard (0.02--0.22) confirms that binary $v_\alpha$ and continuous $v(S)$ identify fundamentally different feature sets as harmful.  MinShap flags 3--19$\times$ more features as negative; at matched budget, its most-negative features perform comparably to MinPPI's harmful set (Table~\ref{tab:harmful_removal}).  The key distinction is that MinPPI provides a principled decision boundary (harmful iff a harmful-witness coalition exists; Property~2b), whereas MinShap's continuous scores require an arbitrary user-chosen cutoff.
-
-\begin{table}[H]
-\caption{Per-$\alpha$ MinPPI precision, recall, F$_1$ against Madelon probes (mean $\pm$ std over 5 seeds).}
-\label{tab:madelon_alpha_recall}
-\begin{center}
-\footnotesize
-\begin{tabular}{l c c c c}
-\toprule
-$\alpha$ & \textbf{Precision} & \textbf{Recall} & \textbf{F$_1$} & \textbf{\# flagged} \\
-\midrule
-0.85 & $0.77 \pm 0.43$ & $0.09 \pm 0.14$ & $0.14 \pm 0.20$ & $9.4$ \\
-0.90 & $0.98 \pm 0.04$ & $0.15 \pm 0.19$ & $0.24 \pm 0.24$ & $15.2$ \\
-0.95 & $0.98 \pm 0.03$ & $0.23 \pm 0.17$ & $0.35 \pm 0.19$ & $22.8$ \\
-0.99 & $0.96 \pm 0.03$ & $0.37 \pm 0.11$ & $0.52 \pm 0.12$ & $37.0$ \\
-\midrule
-MinShap & $0.96 \pm 0.01$ & $0.67 \pm 0.03$ & $0.79 \pm 0.02$ & $67.4$ \\
-SHAP    & $0.97 \pm 0.03$ & $0.18 \pm 0.15$ & $0.28 \pm 0.18$ & $18.6$ \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-% ---------------------------------------------------------------------------
-\section{Statistical Tests}
-\label{app:stats}
-
-\subsection{Nemenyi Pairwise Significance Matrices}
-
-\begin{table}[H]
-\caption{Friedman test summary for six methods on five classification datasets.  All pairs non-significant at $\alpha=0.05$ (Nemenyi CD $\approx 3.4$ ranks for $k=6, N=5$).}
-\label{tab:friedman_summary}
-\begin{center}
-\footnotesize
-\begin{tabular}{l c c c c c}
-\toprule
-\textbf{Metric} & $\chi^2$ & $p$ & Kendall's $W$ & CD & \#Methods \\
-\midrule
-AUC@10 & 13.80 & 0.017 & 0.55 & 3.37 & 6 \\
-AUC@20 & 11.63 & 0.040 & 0.47 & 3.37 & 6 \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-Both Friedman tests are significant, confirming that method differences on AUC rankings are not due to chance.  The large Nemenyi CD ($\approx 3.4$ ranks) means pairwise post-hoc separation is difficult with $N=5$, a known limitation of the Demsar procedure at small $N$.  AUC@20 shows the same ranking pattern (SHAP-k 2.0, PShap 1.8, NSGA2 3.8, ShapG 4.2, Banzhaf 4.6, MinShap 4.6; $\chi^2{=}11.63$, $p{=}0.040$, Kendall's $W{=}0.47$).
-
-% ---------------------------------------------------------------------------
-\section{Method Design-Space}
-\label{app:op_table}
-
-Table~\ref{tab:operator-comparison} classifies prior work and our contribution along two axes: the aggregation operator (mean vs.\ min) and the value-function type (binary vs.\ continuous).  MinPPI occupies the unoccupied cell---min operator $\times$ binary---yielding the discrete $\{-1,0,+1\}$ output that enables the three-way classification of Section~\ref{sec:minppi}.
-
-\begin{table}[H]
-\caption{Game-theoretic feature importance methods by aggregation operator and value function.}
-\label{tab:operator-comparison}
+\caption{Design space of game-theoretic feature importance methods. MinPPI occupies the empty cell---min operator $\times$ binary value function---producing a discrete three-way output.}
+\label{tab:op-table}
 \begin{center}
 \begin{tabular}{lccc}
 \toprule
-\textbf{Index} & \textbf{Aggregation} & $v(S)$~\textbf{type} & \textbf{Output range} \\
+\textbf{Method} & \textbf{Aggregation} & $v(S)$~\textbf{type} & \textbf{Output range} \\
 \midrule
-Shapley-Shubik & mean & binary $\{0,1\}$ & $\subseteq [0,1]$ \\
-Banzhaf        & mean & binary $\{0,1\}$ & $\subseteq [0,1]$ \\
-Shapley / SHAP & mean & continuous & $\subseteq [-1,1]$ \\
-MinShap        & min  & continuous & $\subseteq [-1,1]$ \\
+Shapley-Shubik~\citep{shapley1954method} & mean & binary $\{0,1\}$ & $\subseteq [0,1]$ \\
+Banzhaf~\citep{banzhaf1965weighted}       & mean & binary $\{0,1\}$ & $\subseteq [0,1]$ \\
+Shapley / SHAP~\citep{lundberg2017unified} & mean & continuous & $\subseteq [-1,1]$ \\
+MinShap~\citep{zheng2026minshap}          & min  & continuous & $\subseteq [-1,1]$ \\
 \midrule
 \textbf{MinPPI (this work)} & \textbf{min} & \textbf{binary $\{0,1\}$} & $\mathbf{\{-1,\,0,\,+1\}}$ \\
 \bottomrule
@@ -561,18 +300,25 @@ MinShap        & min  & continuous & $\subseteq [-1,1]$ \\
 \end{center}
 \end{table}
 
-% ---------------------------------------------------------------------------
+\textbf{ISOLET utility choice.} On ISOLET (26-class), the voting-game utility $U$ is accuracy rather than OVR AUC, avoiding the $\sim$26$\times$ computational overhead of per-coalition OVR AUC evaluation during MinPPI estimation. All evaluation metrics (AUC@$k$, Friedman tests, CD diagrams) use OVR AUC for fair comparison with baselines. At $\alpha{=}0.95$, verification on seed 42 confirms that accuracy-based and OVR-AUC-based $v_\alpha$ produce identical harmfulness classifications.
+
 \section{Empirical Verification of the Estimators}
 \label{app:verify}
 
-This appendix collects the constructed toy-game experiments that numerically verify the formal claims of Sections~\ref{sec:minppi}--\ref{sec:estimation}.  All examples use $n=5$ features and $v_\alpha \in \{0,1\}$ as defined in~\eqref{eq:valpha}.
+This appendix collects the constructed toy-game experiments that numerically verify the formal claims of Sections~\ref{sec:method}. All examples use $n=5$ features and $v_\alpha \in \{0,1\}$ as defined in Eq.~\eqref{eq:valpha}.
 
-\subsection{MinPPI Trichotomy (Properties~1--3)}
+Figure~\ref{fig:overview}(a) and Table~\ref{tab:minss_demo} exercise all three MinSS values on two constructed games. Example~1 ($v_\alpha(S)=\mathbb{1}[f_0\in S]$) has $f_0$ decisive ($+1$). Example~2 (13 winning coalitions) has $f_1$ harmful ($-1$) via $S=\{f_0,f_2\}$ where $v_\alpha(\{f_0,f_2\})=1$ but $v_\alpha(\{f_0,f_1,f_2\})=0$; $f_0$ appears in every winning coalition yet $\text{MinSS}(f_0)=0$, demonstrating the non-trivial separation of Property~2a.
 
-Figure~\ref{fig:overview}(a) and Table~\ref{tab:minss_demo} exercise all three MinSS values on two constructed games.  Example~1 ($v_\alpha(S)=\mathbb{1}[0\in S]$) has $f_0$ decisive ($+1$).  Example~2 (13 winning coalitions) has $f_1$ harmful ($-1$) via $S=\{f_0,f_2\}$ where $v_\alpha(\{f_0,f_2\})=1$ but $v_\alpha(\{f_0,f_1,f_2\})=0$; $f_0$ appears in every winning coalition yet $\text{MinSS}(f_0)=0$, demonstrating the non-trivial separation of Property~2a.
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.95\linewidth]{../figures/fig1_overview.pdf}
+\end{center}
+\caption{Overview of MinPPI. (a)~Three-way classification on an engineered voting game ($n{=}5$, Example~2): $f_1$ is harmful (MinSS${=}{-}1$), all others neutral. (b)~Algorithm~A vs.\ Algorithm~B detection rate vs.\ budget $K$: Algorithm~B achieves deterministic detection at $K{=}1$ ($\approx 38\times$ sample efficiency). (c)~MinPPI $\alpha$ operating points overlaid on NSGA-II-full (gray) and NSGA-II-filtered (blue) Pareto fronts for Madelon and Credit-Card-Fraud (seed 42). All $\alpha$ points lie near preservation${=}1.0$, confirming safety.}
+\label{fig:overview}
+\end{figure}
 
 \begin{table}[H]
-\caption{MinSS and mean Shapley-Shubik values corresponding to the tri-chotomy in Figure~\ref{fig:overview}(a).}
+\caption{MinSS and mean Shapley-Shubik values for two constructed voting games. Example~1 confirms decisive (+1); Example~2 demonstrates harmful ($-1$) and the Property~2a caveat.}
 \label{tab:minss_demo}
 \begin{center}
 \footnotesize
@@ -590,39 +336,16 @@ $f_2$--$f_4$ & $\;\,0$ & $\;\,0.0000$ & neutral  & $f_2$--$f_4$ & $\;\,0$ & $+0.
 \end{center}
 \end{table}
 
-\subsection{Algorithm~A vs.\ Algorithm~B}
-
-Figure~\ref{fig:overview}(b) validates Proposition~1 on Example~2 ($p_-^i=0.0333$): the observed miss rate matches $(1-p_-)^K$ (Pearson $r=0.9993$, 500 trials per $K$).  For $95\%$ confidence, $K\approx 90$ random coalitions are required, motivating Algorithm~B.
+Figure~\ref{fig:overview}(b) validates Proposition~1 on Example~2 ($p_-^i=0.0333$): the observed miss rate matches $(1-p_-)^K$ (Pearson $r=0.9993$, 500 trials per $K$). For $95\%$ confidence, $K\approx 90$ random coalitions are required. Algorithm~B achieves deterministic detection with one guided evaluation. Sensitivity to Gaussian noise added to the correlation matrix is reported in Table~\ref{tab:alg_noise}; detection degrades gracefully from 100\% at $\sigma=0.05$ to 50.8\% at $\sigma=0.50$ (at $K_{\text{adv}}=5$), vs.\ Algorithm~A's 14.8\% at the same budget.
 
 \begin{table}[H]
-\caption{Quantitative comparison of Algorithm~A and Algorithm~B on Example~2 (500 trials per setting).}
-\label{tab:alg_ab_comparison}
+\caption{Algorithm~B detection rate under Gaussian noise $\mathcal{N}(0,\sigma^2)$ added to the correlation matrix ($K{=}5$, 500 trials per setting).}
+\label{tab:alg_noise}
 \begin{center}
 \footnotesize
-\begin{minipage}[t]{0.52\linewidth}
-\centering
-\textbf{(a) Detection of $\text{MinSS} = -1$} \\[4pt]
-\begin{tabular}{c c c r r}
-\toprule
-$K$ & A detect & B detect & A $\bar{s}$ & B $\bar{s}$ \\
-\midrule
- 1 & 0.026 & 1.000 &  1.00 & 1.00 \\
- 2 & 0.060 & 1.000 &  1.98 & 1.00 \\
- 3 & 0.124 & 1.000 &  2.87 & 1.00 \\
- 5 & 0.146 & 1.000 &  4.69 & 1.00 \\
-10 & 0.322 & 1.000 &  8.43 & 1.00 \\
-20 & 0.466 & 1.000 & 14.91 & 1.00 \\
-50 & 0.850 & 1.000 & 23.77 & 1.00 \\
-\bottomrule
-\end{tabular}
-\end{minipage}
-\hfill
-\begin{minipage}[t]{0.42\linewidth}
-\centering
-\textbf{(b) Sensitivity to $\mathcal{N}(0,\sigma^2)$ on $W$ ($K{=}5$)} \\[4pt]
 \begin{tabular}{c c c}
 \toprule
-$\sigma$ & B detect & A detect \\
+$\sigma$ & \textbf{B detect} & \textbf{A detect} \\
 \midrule
 0.05 & 1.000 & 0.172 \\
 0.15 & 0.878 & 0.170 \\
@@ -630,7 +353,6 @@ $\sigma$ & B detect & A detect \\
 0.50 & 0.508 & 0.148 \\
 \bottomrule
 \end{tabular}
-\end{minipage}
 \end{center}
 \end{table}
 

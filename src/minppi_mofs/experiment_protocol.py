@@ -1610,14 +1610,18 @@ class ManifestStore:
         suffix = _validated_manifest_authority(supplied)
         suffix_stages = tuple(dict.fromkeys(job.stage for job in suffix))
         existing_stages = tuple(dict.fromkeys(job.stage for job in existing))
-        expected_indices = tuple(
-            range(
-                _STAGE_ORDER.index(existing_stages[-1]) + 1,
-                _STAGE_ORDER.index(existing_stages[-1]) + 1 + len(suffix_stages),
-            )
+        last_existing_idx = _STAGE_ORDER.index(existing_stages[-1])
+        suffix_indices = tuple(
+            _STAGE_ORDER.index(stage) for stage in suffix_stages
         )
-        actual_indices = tuple(_STAGE_ORDER.index(stage) for stage in suffix_stages)
-        if actual_indices != expected_indices:
+        if suffix_indices[0] <= last_existing_idx:
+            raise ValueError(
+                "manifest append stages must come after existing stages"
+            )
+        expected_suffix = tuple(
+            range(suffix_indices[0], suffix_indices[0] + len(suffix_stages))
+        )
+        if suffix_indices != expected_suffix:
             raise ValueError(
                 "manifest append must contain contiguous canonical stage chunks"
             )

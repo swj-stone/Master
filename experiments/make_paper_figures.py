@@ -121,8 +121,12 @@ def _prepare_panels(
     require_front: bool = True,
 ) -> dict[str, pd.DataFrame]:
     expected_n = 5 if run_kind == "formal" else 1
+    # Only enforce seed-unit check on stages that are always multi-seed.
+    # alpha and ablation are seed-42-only by design; estimator exact may be
+    # unavailable on some dataset/seed combinations.
+    _MULTI_SEED_ONLY = frozenset({"removal", "nsga2"})
     selected_n = aggregate[
-        aggregate["stage"].isin(("estimator", "ablation", "alpha", "removal", "nsga2"))
+        aggregate["stage"].isin(_MULTI_SEED_ONLY)
     ]
     if not selected_n.empty and not (selected_n["n"] == expected_n).all():
         raise ValueError("figure aggregate rows do not use the required seed units")
