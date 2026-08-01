@@ -6656,9 +6656,11 @@ def test_legacy_preprocessors_are_import_safe_raw_cache_only_scripts() -> None:
         assert all(
             call.args
             and isinstance(call.args[0], ast.Name)
-            and call.args[0].id == "raw_path"
+            and call.args[0].id == "destination"
             for call in csv_writes
         ), path.name
+        assert "materialize_registered_snapshot" in source, path.name
+        assert "drop_duplicates" not in source, path.name
         assert any(
             isinstance(node, ast.If)
             and isinstance(node.test, ast.Compare)

@@ -74,8 +74,7 @@ $PY = (Resolve-Path "../venv/Scripts/python.exe").Path
 $PY = (Resolve-Path "../venv/Scripts/python.exe").Path
 & $PY -m pip check
 & $PY -c "import minppi_mofs; print('import OK')"
-New-Item -ItemType Directory -Force -Path .pytest-tmp | Out-Null
-& $PY -m pytest tests -q -p no:cacheprovider --basetemp .pytest-tmp
+& $PY -m pytest tests -q -p no:cacheprovider --basetemp ".t$PID"
 & $PY -m ruff check src experiments tests conference-paper/sync_figures.py
 ```
 
@@ -87,90 +86,22 @@ New-Item -ItemType Directory -Force -Path .pytest-tmp | Out-Null
 
 ### 第一组：原始数据、校准、smoke 与密封 estimator
 
-第一组显式运行七个数据获取脚本。它们只创建或复核 `data/raw/*.csv`，不生成正式划分；正式的 train/validation/test 划分仍由 manifest 管线在各 run 内完成。随后以 seed 42 校准模型、运行独立 smoke，最后让正式五种子 campaign 只运行到 estimator，held-out test 保持密封。
+第一组入口显式运行七个数据获取脚本。它们只创建或逐字节复核 `data/raw/*.csv`，已有快照不会被清洗、去重或覆盖；下载先写同目录临时文件，只有 SHA-256 和字节数与 dataset YAML 完全一致才会发布。正式的 train/validation/test 划分仍由 manifest 管线在各 run 内完成。随后入口以 seed 42 校准模型、运行独立 smoke，最后让正式五种子 campaign 只运行到 estimator，held-out test 保持密封。
+
+入口是单个 Python 编排进程，而不是一组彼此独立的 PowerShell 顶层语句。任一子命令非零时异常会立即向上传播，后续 preprocess、校准、smoke、campaign 或 screening 不会继续启动。
+
+正式 provenance 必须对应一个可重建的 Git commit。一键入口会在开始时及正式 `validate` 前再次要求 `git status --short` 为空；请先提交本轮预期代码和文档。`data/`、`results/` 与测试临时目录已被忽略，不会妨碍该门禁。
 
 ```powershell
 $ErrorActionPreference = "Stop"
 $PY = (Resolve-Path "../venv/Scripts/python.exe").Path
-$OUT = "results\icomp2026_formal"
-$BOOT = "bootstrap-s42-v1"
-$SMOKE = "smoke-s42-v1"
-$CID = "icomp2026-formal-v1"
-$POLICY = "$OUT\$BOOT\calibration\model_policy.json"
-
-function Invoke-ProjectPython {
-    param([Parameter(Mandatory = $true)][string[]]$Arguments)
-    Write-Host "`n> $PY $($Arguments -join ' ')" -ForegroundColor Cyan
-    & $PY @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "project Python failed with exit $LASTEXITCODE"
-    }
-}
-
-Invoke-ProjectPython -Arguments @("-m", "pip", "check")
-Invoke-ProjectPython -Arguments @("-c", "import minppi_mofs; print('import OK')")
-New-Item -ItemType Directory -Force -Path .pytest-tmp | Out-Null
-Invoke-ProjectPython -Arguments @("-m", "pytest", "tests", "-q", "-p", "no:cacheprovider", "--basetemp", ".pytest-tmp\group1-$PID")
-Invoke-ProjectPython -Arguments @("-m", "ruff", "check", "src", "experiments", "tests", "conference-paper/sync_figures.py")
-
-Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_abalone.py")
-Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_Credit-Card-Fraud.py")
-Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_crimedata.py")
-Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_Gisette.py")
-Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_ISOLET.py")
-Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_Madelon.py")
-Invoke-ProjectPython -Arguments @("experiments\preprocess_data\preprocess_Spambase.py")
-Get-FileHash -Algorithm SHA256 data\raw\*.csv | Sort-Object Path
-
-$ValidateArguments = @(
-    "experiments\run_icomp2026_pipeline.py", "--stage", "validate",
-    "--config-dir", "configs", "--output-root", $OUT, "--seeds", "42",
-    "--backend", "cuda", "--run-id", $BOOT
-)
-if (Test-Path "$OUT\$BOOT") { $ValidateArguments += "--resume" }
-Invoke-ProjectPython -Arguments $ValidateArguments
-Invoke-ProjectPython -Arguments @(
-    "experiments\run_icomp2026_pipeline.py", "--stage", "preprocess",
-    "--config-dir", "configs", "--output-root", $OUT, "--seeds", "42",
-    "--backend", "cuda", "--run-id", $BOOT, "--resume"
-)
-
-if (-not (Test-Path $POLICY)) {
-    Invoke-ProjectPython -Arguments @(
-        "experiments\calibrate_icomp2026_models.py", "--run-root", "$OUT\$BOOT",
-        "--config-dir", "configs", "--backend", "cuda", "--seed", "42",
-        "--candidate-rounds", "10", "20", "40", "100", "--output", $POLICY
-    )
-} else {
-    Write-Host "Using existing frozen model policy: $POLICY" -ForegroundColor Yellow
-}
-
-$SmokeArguments = @(
-    "experiments\run_icomp2026_pipeline.py", "--stage", "all",
-    "--config-dir", "configs", "--output-root", $OUT, "--seeds", "42",
-    "--backend", "cuda", "--run-id", $SMOKE, "--smoke",
-    "--model-policy", $POLICY
-)
-if (Test-Path "$OUT\$SMOKE") { $SmokeArguments += "--resume" }
-Invoke-ProjectPython -Arguments $SmokeArguments
-
-Invoke-ProjectPython -Arguments @(
-    "experiments\run_icomp2026_campaign.py", "--config-dir", "configs",
-    "--output-root", $OUT, "--campaign-id", $CID,
-    "--model-policy", $POLICY, "--through", "estimator",
-    "--max-parallel", "3"
-)
-Invoke-ProjectPython -Arguments @(
-    "experiments\screen_icomp2026_results.py",
-    "--run-root", "$OUT\$CID-s42-123", "--config-dir", "configs",
-    "--model-policy", $POLICY, "--backend", "cuda", "--seed", "42",
-    "--output-dir", "$OUT\$CID\screening"
-)
+& $PY experiments\run_icomp2026_group1.py
+if ($LASTEXITCODE -ne 0) { throw "Group 1 failed with exit $LASTEXITCODE" }
 ```
 
-第一组中断后，原样重输整个代码块即可：bootstrap 与 smoke 会根据目录是否存在显式恢复，campaign 会对已有 shard 自动恢复。最后检查 `results\icomp2026_formal\icomp2026-formal-v1\screening\screen_report.md`；它是 seed-42 的 validation-only 方向筛查，不是论文结果。不要删除成功 shard、替换 model policy、升级当前 venv/显卡驱动或复制其他 run 的 cache；科学环境摘要发生变化时 resume 会拒绝继续。
+第一组中断后，原样重输这个代码块即可：bootstrap 与 smoke 会根据目录是否存在显式恢复，campaign 会对已有 shard 自动恢复。最后检查 `results\icomp2026_formal\icomp2026-formal-v1\screening\screen_report.md`；它是 seed-42 的 validation-only 方向筛查，不是论文结果。不要删除成功 shard、替换 model policy、升级当前 venv/显卡驱动或复制其他 run 的 cache；科学环境摘要发生变化时 resume 会拒绝继续。
 
-第一组长任务启动后，可在另一个位于 `Master` 的 PowerShell 终端执行一次性快照：
+监测器读取 campaign plan，因此不能监测第一组前置的环境验收、数据获取、bootstrap、校准和 smoke；这些阶段直接看一键入口终端。等 `results\icomp2026_formal\icomp2026-formal-v1\campaign_plan.json` 出现后，再在另一个位于 `Master` 的 PowerShell 终端执行一次性 campaign 快照：
 
 ```powershell
 $PY = (Resolve-Path "../venv/Scripts/python.exe").Path

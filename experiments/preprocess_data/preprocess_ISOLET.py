@@ -17,41 +17,57 @@ from pathlib import Path
 import pandas as pd
 from sklearn.datasets import fetch_openml
 
+try:
+    from experiments.preprocess_data.raw_snapshot import (
+        load_registered_snapshot,
+        materialize_registered_snapshot,
+    )
+except ModuleNotFoundError:  # Direct script execution from this directory.
+    from raw_snapshot import load_registered_snapshot, materialize_registered_snapshot
+
 FEATURE_NAMES = [f"f{i}" for i in range(1, 618)]
 TARGET = "letter"
 N_CLASSES = 26
 
 
 def banner(title: str) -> None:
-    print(f"\n{'='*72}\n{title}\n{'='*72}")
+    print(f"\n{'=' * 72}\n{title}\n{'=' * 72}")
 
 
-def main() -> None:
-    project_root = Path(__file__).resolve().parent.parent.parent
-    raw_dir = project_root / "data" / "raw"
-    raw_path = raw_dir / "isolet.csv"
+def main(*, project_root: Path | None = None) -> None:
+    project_root = (
+        Path(__file__).resolve().parent.parent.parent
+        if project_root is None
+        else Path(project_root).resolve()
+    )
+    snapshot = load_registered_snapshot(
+        project_root / "configs" / "isolet.yaml",
+        expected_dataset_id="isolet",
+    )
 
-    banner("ISOLET — download")
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    if raw_path.exists():
-        print(f"Loading cached {raw_path}")
-        df = pd.read_csv(raw_path)
-    else:
+    def produce(destination: Path) -> None:
         print("Fetching from OpenML name='isolet' ...")
-        bunch = fetch_openml(name="isolet", version=1, as_frame=True, parser="auto")
+        bunch = fetch_openml(
+            name="isolet",
+            version=1,
+            as_frame=True,
+            parser="auto",
+            cache=False,
+        )
         X = bunch.data.astype(float)
         y = bunch.target
         label_map = {lbl: i for i, lbl in enumerate(sorted(y.unique()))}
         y_mapped = y.map(label_map)
         X.columns = FEATURE_NAMES
-        df = pd.concat([X, pd.Series(y_mapped.values, name=TARGET, index=X.index)], axis=1)
-        df.to_csv(raw_path, index=False)
-    print(f"  Shape: {df.shape}  Classes: {df[TARGET].nunique()}")
+        df = pd.concat(
+            [X, pd.Series(y_mapped.values, name=TARGET, index=X.index)], axis=1
+        )
+        df.to_csv(destination, index=False, lineterminator="\r\n")
 
-    banner("ISOLET — drop duplicates")
-    df = df.drop_duplicates().reset_index(drop=True)
-    df.to_csv(raw_path, index=False)
-    print(f"  After dedup: {df.shape}")
+    banner("ISOLET — registered raw snapshot")
+    raw_path = materialize_registered_snapshot(snapshot, produce)
+    df = pd.read_csv(raw_path)
+    print(f"  Shape: {df.shape}  Classes: {df[TARGET].nunique()}")
 
     banner("Done")
     print(f"Raw cache: {raw_path}")

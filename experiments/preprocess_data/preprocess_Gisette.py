@@ -19,26 +19,41 @@ import pandas as pd
 from scipy.sparse import issparse
 from sklearn.datasets import fetch_openml
 
+try:
+    from experiments.preprocess_data.raw_snapshot import (
+        load_registered_snapshot,
+        materialize_registered_snapshot,
+    )
+except ModuleNotFoundError:  # Direct script execution from this directory.
+    from raw_snapshot import load_registered_snapshot, materialize_registered_snapshot
+
 TARGET = "label"
 
 
 def banner(title: str) -> None:
-    print(f"\n{'='*72}\n{title}\n{'='*72}")
+    print(f"\n{'=' * 72}\n{title}\n{'=' * 72}")
 
 
-def main() -> None:
-    project_root = Path(__file__).resolve().parent.parent.parent
-    raw_dir = project_root / "data" / "raw"
-    raw_path = raw_dir / "gisette.csv"
+def main(*, project_root: Path | None = None) -> None:
+    project_root = (
+        Path(__file__).resolve().parent.parent.parent
+        if project_root is None
+        else Path(project_root).resolve()
+    )
+    snapshot = load_registered_snapshot(
+        project_root / "configs" / "gisette.yaml",
+        expected_dataset_id="gisette",
+    )
 
-    banner("Gisette — download")
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    if raw_path.exists():
-        print(f"Loading cached {raw_path}")
-        df = pd.read_csv(raw_path)
-    else:
+    def produce(destination: Path) -> None:
         print("Fetching from OpenML name='gisette' ...")
-        bunch = fetch_openml(name="gisette", version=1, as_frame=False, parser="auto")
+        bunch = fetch_openml(
+            name="gisette",
+            version=1,
+            as_frame=False,
+            parser="auto",
+            cache=False,
+        )
         X_data = bunch.data
         if issparse(X_data):
             X = X_data.toarray().astype(float)
@@ -51,13 +66,12 @@ def main() -> None:
         full = np.column_stack([X, y_mapped.reshape(-1, 1)])
         df = pd.DataFrame(full, columns=cols + [TARGET])
         df[TARGET] = df[TARGET].astype(int)
-        df.to_csv(raw_path, index=False)
-    print(f"  Shape: {df.shape}")
+        df.to_csv(destination, index=False, lineterminator="\r\n")
 
-    banner("Gisette — drop duplicates")
-    df = df.drop_duplicates().reset_index(drop=True)
-    df.to_csv(raw_path, index=False)
-    print(f"  After dedup: {df.shape}")
+    banner("Gisette — registered raw snapshot")
+    raw_path = materialize_registered_snapshot(snapshot, produce)
+    df = pd.read_csv(raw_path)
+    print(f"  Shape: {df.shape}")
 
     banner("Done")
     print(f"Raw cache: {raw_path}")

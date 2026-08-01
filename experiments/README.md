@@ -4,11 +4,12 @@
 
 ## 入口
 
+- `run_icomp2026_group1.py`：第一组唯一的一键入口；严格使用相邻 `venv`，顺序执行环境验收、七个 raw snapshot 获取/校验、bootstrap、校准、smoke、密封 estimator campaign 与 validation-only screening，任一子命令失败即停止。
 - `run_icomp2026_pipeline.py`：执行一个 shard。新 run 创建冻结协议；恢复时必须显式传入 `--resume`。
 - `run_icomp2026_campaign.py`：把 canonical 五个 seeds 编排为三个 shard，并在 campaign 级别统一汇总。已有 shard 会自动恢复。
 - `calibrate_icomp2026_models.py`：只使用训练集和验证集，为七个数据集生成冻结 model policy。
 - `screen_icomp2026_results.py`：在正式 estimator 后读取 seed 42 checkpoint，生成 validation-only 方向筛查；它不是论文结果，也不访问正式 test。
-- `monitor_icomp2026_campaign.py`：只读状态监测；`--group initial` 与 `--group downstream` 分别查看两段实验，省略 `--watch` 时只输出一次；`--watch --interval-seconds 300` 每五分钟刷新并即时写出快照。
+- `monitor_icomp2026_campaign.py`：只读 campaign 状态监测；需等待 campaign 入口创建 `campaign_plan.json`，不覆盖此前的数据获取、bootstrap、校准和 smoke。`--group initial` 与 `--group downstream` 分别查看两段实验，省略 `--watch` 时只输出一次；`--watch --interval-seconds 300` 每五分钟刷新并即时写出快照。
 - `summarize_multifidelity_campaign.py`：校验 shard 并集、协议和 provenance 后生成唯一正式汇总。
 - `make_paper_figures.py`：只从 canonical summary tables 生成三张论文图；正式 Overview 图还会用 raw canonical table 验证 Madelon/Credit-Card-Fraud 的完整 seed-42 alpha authority，smoke 只显示目标面板不在其 scope 内的占位说明。
 
@@ -49,7 +50,7 @@ validate -> preprocess -> estimator -> removal -> alpha -> nsga2 -> ablation -> 
 - 可恢复的 estimator bundle/cache/progress；
 - summary tables、LaTeX macros、bundle manifest 和 figures。
 
-正式发布前，campaign summary 必须验证五种子范围、跨 shard 的 raw/environment/source/model-policy 摘要和全部上游 artifacts，并明确写出 `publication_allowed: true`。当前 `results/` 为空，因此仓库内没有已完成的正式 campaign。
+正式发布前，campaign summary 必须验证五种子范围、跨 shard 的 raw/environment/source/model-policy 摘要和全部上游 artifacts，并明确写出 `publication_allowed: true`。失败日志、smoke、bootstrap 或未完成的 shard 都不构成正式论文结果。
 
 ## 辅助脚本
 

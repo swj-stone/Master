@@ -16,35 +16,45 @@ from pathlib import Path
 
 import pandas as pd
 
+try:
+    from experiments.preprocess_data.raw_snapshot import (
+        load_registered_snapshot,
+        materialize_registered_snapshot,
+    )
+except ModuleNotFoundError:  # Direct script execution from this directory.
+    from raw_snapshot import load_registered_snapshot, materialize_registered_snapshot
+
 TARGET = "Rings"
 
 
 def banner(title: str) -> None:
-    print(f"\n{'='*72}\n{title}\n{'='*72}")
+    print(f"\n{'=' * 72}\n{title}\n{'=' * 72}")
 
 
-def main() -> None:
-    project_root = Path(__file__).resolve().parent.parent.parent
-    raw_dir = project_root / "data" / "raw"
-    raw_path = raw_dir / "abalone.csv"
+def main(*, project_root: Path | None = None) -> None:
+    project_root = (
+        Path(__file__).resolve().parent.parent.parent
+        if project_root is None
+        else Path(project_root).resolve()
+    )
+    snapshot = load_registered_snapshot(
+        project_root / "configs" / "abalone.yaml",
+        expected_dataset_id="abalone",
+    )
 
-    banner("Abalone — download")
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    if raw_path.exists():
-        print(f"Loading cached {raw_path}")
-        df = pd.read_csv(raw_path)
-    else:
+    def produce(destination: Path) -> None:
         url = "https://raw.githubusercontent.com/Vector-s-Lab/LinearRegression/main/data/abalone_processing.csv"
         print(f"Downloading from {url}")
         df = pd.read_csv(url)
-        df.to_csv(raw_path, index=False)
-    print(f"  Shape: {df.shape}")
-    print(f"  Target: min={df[TARGET].min():.2f}  mean={df[TARGET].mean():.2f}  max={df[TARGET].max():.2f}")
+        df.to_csv(destination, index=False, lineterminator="\r\n")
 
-    banner("Abalone — drop duplicates")
-    df = df.drop_duplicates().reset_index(drop=True)
-    df.to_csv(raw_path, index=False)
-    print(f"  After dedup: {df.shape}")
+    banner("Abalone — registered raw snapshot")
+    raw_path = materialize_registered_snapshot(snapshot, produce)
+    df = pd.read_csv(raw_path)
+    print(f"  Shape: {df.shape}")
+    print(
+        f"  Target: min={df[TARGET].min():.2f}  mean={df[TARGET].mean():.2f}  max={df[TARGET].max():.2f}"
+    )
 
     banner("Done")
     print(f"Raw cache: {raw_path}")

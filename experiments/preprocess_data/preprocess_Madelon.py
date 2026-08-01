@@ -17,40 +17,50 @@ from pathlib import Path
 import pandas as pd
 from sklearn.datasets import fetch_openml
 
+try:
+    from experiments.preprocess_data.raw_snapshot import (
+        load_registered_snapshot,
+        materialize_registered_snapshot,
+    )
+except ModuleNotFoundError:  # Direct script execution from this directory.
+    from raw_snapshot import load_registered_snapshot, materialize_registered_snapshot
+
 FEATURE_NAMES = [f"f{i}" for i in range(1, 501)]
 TARGET = "label"
 
 
 def banner(title: str) -> None:
-    print(f"\n{'='*72}\n{title}\n{'='*72}")
+    print(f"\n{'=' * 72}\n{title}\n{'=' * 72}")
 
 
-def main() -> None:
-    project_root = Path(__file__).resolve().parent.parent.parent
-    raw_dir = project_root / "data" / "raw"
-    raw_path = raw_dir / "madelon.csv"
+def main(*, project_root: Path | None = None) -> None:
+    project_root = (
+        Path(__file__).resolve().parent.parent.parent
+        if project_root is None
+        else Path(project_root).resolve()
+    )
+    snapshot = load_registered_snapshot(
+        project_root / "configs" / "madelon.yaml",
+        expected_dataset_id="madelon",
+    )
 
-    banner("Madelon — download")
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    if raw_path.exists():
-        print(f"Loading cached {raw_path}")
-        df = pd.read_csv(raw_path)
-    else:
+    def produce(destination: Path) -> None:
         print("Fetching from OpenML ID 1485 ...")
-        bunch = fetch_openml(data_id=1485, as_frame=True, parser="auto")
+        bunch = fetch_openml(data_id=1485, as_frame=True, parser="auto", cache=False)
         X = bunch.data.astype(float)
         y = bunch.target
         labels = sorted(y.unique())
         y_mapped = y.map({labels[0]: 0, labels[1]: 1})
         X.columns = FEATURE_NAMES
-        df = pd.concat([X, pd.Series(y_mapped.values, name=TARGET, index=X.index)], axis=1)
-        df.to_csv(raw_path, index=False)
-    print(f"  Shape: {df.shape}")
+        df = pd.concat(
+            [X, pd.Series(y_mapped.values, name=TARGET, index=X.index)], axis=1
+        )
+        df.to_csv(destination, index=False, lineterminator="\r\n")
 
-    banner("Madelon — drop duplicates")
-    df = df.drop_duplicates().reset_index(drop=True)
-    df.to_csv(raw_path, index=False)
-    print(f"  After dedup: {df.shape}")
+    banner("Madelon — registered raw snapshot")
+    raw_path = materialize_registered_snapshot(snapshot, produce)
+    df = pd.read_csv(raw_path)
+    print(f"  Shape: {df.shape}")
 
     banner("Done")
     print(f"Raw cache: {raw_path}")
