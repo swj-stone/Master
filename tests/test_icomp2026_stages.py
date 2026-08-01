@@ -6716,9 +6716,7 @@ def test_removal_dependency_failure_does_not_open_cache_or_write_artifact(
     )
     removal = build_job_manifest(smoke_protocol, stages=("removal",))
     manifest = preprocess + estimator + removal
-    layout = create_new_run(
-        tmp_path / "results", "removal-needs-estimator", smoke_protocol
-    )
+    layout = create_new_run(tmp_path / "results", "r", smoke_protocol)
     status = StatusStore(layout, manifest)
     _complete_jobs(layout, status, preprocess)
     contexts = _contexts(smoke_protocol, layout, manifest, status)

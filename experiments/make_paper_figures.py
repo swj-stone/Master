@@ -110,15 +110,6 @@ _CANONICAL_DATASETS = (
     "madelon",
     "spambase",
 )
-_DATASET_DISPLAY_NAMES = {
-    "abalone": "Abalone",
-    "credit_card_fraud": "Credit-Card-Fraud",
-    "crimedata": "Crimedata",
-    "gisette": "Gisette",
-    "isolet": "ISOLET",
-    "madelon": "Madelon",
-    "spambase": "Spambase",
-}
 _OVERVIEW_FORMAL_DATASETS = ("madelon", "credit_card_fraud")
 _OVERVIEW_ALPHAS = (0.85, 0.90, 0.95, 0.99)
 _EXAMPLE2_WINNING = frozenset(
@@ -660,7 +651,7 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
         fig, axes = plt.subplots(
             2,
             3,
-            figsize=(11, 5.4),
+            figsize=(7.5, 4.7),
             gridspec_kw={"height_ratios": (3.2, 1.25)},
         )
 
@@ -690,7 +681,7 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
         axes[0, 0].set_ylim(-1.25, 1.20)
         axes[0, 0].axhline(0.0, color="#555555", linewidth=0.7)
         axes[0, 0].set_ylabel("MinSS")
-        axes[0, 0].set_title("(a) MinSS classification (Example 2)")
+        axes[0, 0].set_title("(a) MinSS classification\n(Example 2)")
 
         budgets, random_mc, guided, negative_probability, guided_probability = (
             _example2_detection_curves()
@@ -714,22 +705,24 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
             label="Algorithm B",
         )[0]
         axes[0, 1].set_xscale("log")
-        axes[0, 1].set_xticks(budgets, [str(value) for value in budgets])
+        displayed_budgets = (1, 2, 5, 10, 20, 100)
+        axes[0, 1].set_xticks(
+            displayed_budgets, [str(value) for value in displayed_budgets]
+        )
         axes[0, 1].set_ylim(0.0, 1.05)
         axes[0, 1].set_xlabel("Budget K")
         axes[0, 1].set_ylabel("Harmful-feature detection rate")
-        axes[0, 1].set_title("(b) Conditional detection vs budget K")
+        axes[0, 1].set_title("(b) Conditional detection\nvs budget K")
 
         method_style = {
-            "full": ("#999999", "NSGA-II full"),
-            "minppi_prefilter": ("#4c78a8", "NSGA-II filtered"),
+            "full": ("#999999", "full"),
+            "minppi_prefilter": ("#4c78a8", "filtered"),
         }
         dataset_markers = ("o", "s")
         legend_handles: list[object] = []
         legend_labels: list[str] = []
         code_index = 0
         for dataset_index, dataset in enumerate(datasets):
-            display_name = _DATASET_DISPLAY_NAMES.get(dataset, dataset)
             marker = dataset_markers[dataset_index]
             for method in _NSGA_METHODS:
                 color, method_name = method_style[method]
@@ -748,7 +741,7 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
                 )
                 code = chr(ord("A") + code_index)
                 legend_handles.append(artist)
-                legend_labels.append(f"{code}  {display_name}: {method_name}")
+                legend_labels.append(f"{code}  {method_name}")
                 code_index += 1
             alpha_rows = alpha[alpha["dataset_id"] == dataset].sort_values("alpha")
             alpha_line = axes[0, 2].plot(
@@ -762,7 +755,7 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
             )[0]
             code = chr(ord("A") + code_index)
             legend_handles.append(alpha_line)
-            legend_labels.append(f"{code}  {display_name}: MinPPI alpha")
+            legend_labels.append(f"{code}  alpha")
             code_index += 1
         if not datasets:
             axes[0, 2].text(
@@ -776,7 +769,7 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
             )
             legend_handles.append(Patch(facecolor="none", edgecolor="none"))
             legend_labels.append("Formal seed-42 panel generated downstream")
-        axes[0, 2].set_title("(c) Alpha points and held-out Pareto fronts")
+        axes[0, 2].set_title("(c) Alpha points and held-out\nPareto fronts")
         axes[0, 2].set_xlabel("Compression")
         axes[0, 2].set_ylabel("Held-out utility")
 
@@ -792,24 +785,43 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
             labels=("Harmful: MinSS = -1", "Neutral: MinSS = 0"),
             loc="upper center",
             frameon=False,
+            fontsize=8,
         )
         axes[1, 1].legend(
             handles=(line_a, line_b),
             labels=(
-                f"Algorithm A: exact random MC (p- = {negative_probability:.4f})",
-                "Algorithm B: conditional oracle guidance "
-                f"(rho = {guided_probability:.3f})",
+                f"Algorithm A: random MC\np- = {negative_probability:.4f}",
+                "Algorithm B: conditional oracle guidance\n"
+                f"rho = {guided_probability:.3f}",
             ),
             loc="upper center",
             frameon=False,
+            fontsize=8,
+        )
+        if datasets:
+            dataset_codebook = "A-C: Madelon     D-F: Credit-Card-Fraud"
+            legend_order = (0, 3, 1, 4, 2, 5)
+            legend_handles = [legend_handles[index] for index in legend_order]
+            legend_labels = [legend_labels[index] for index in legend_order]
+        else:
+            dataset_codebook = "Formal targets: Madelon and Credit-Card-Fraud"
+        axes[1, 2].text(
+            0.5,
+            1.0,
+            dataset_codebook,
+            transform=axes[1, 2].transAxes,
+            ha="center",
+            va="top",
+            fontsize=8,
         )
         axes[1, 2].legend(
             handles=legend_handles,
             labels=legend_labels,
             loc="upper center",
-            ncol=2,
+            bbox_to_anchor=(0.5, 0.78),
+            ncol=3 if datasets else 1,
             frameon=False,
-            fontsize=6,
+            fontsize=8,
             columnspacing=0.8,
             handletextpad=0.5,
         )

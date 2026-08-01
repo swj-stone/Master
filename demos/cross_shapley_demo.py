@@ -191,7 +191,7 @@ def arch_shapley_given_features(o: int, F_fixed: Tuple[int, ...]) -> float:
 
 
 def cross_shapley(i: int, o: int) -> float:
-    """
+    r"""
     Bipartite Shapley interaction value:
 
         φ_{i,o} = Σ_{S ⊆ N₁\{i}} Σ_{T ⊆ N₂\{o}}

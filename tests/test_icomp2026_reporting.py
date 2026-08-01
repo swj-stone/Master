@@ -819,9 +819,9 @@ def test_article_fig3_overview_uses_two_rows_with_dedicated_legends(
         assert len(fig.axes) == 6
         top_axes = fig.axes[:3]
         assert [axis.get_title() for axis in top_axes] == [
-            "(a) MinSS classification (Example 2)",
-            "(b) Conditional detection vs budget K",
-            "(c) Alpha points and held-out Pareto fronts",
+            "(a) MinSS classification\n(Example 2)",
+            "(b) Conditional detection\nvs budget K",
+            "(c) Alpha points and held-out\nPareto fronts",
         ]
         assert [patch.get_height() for patch in top_axes[0].patches] == [
             0,
@@ -864,6 +864,14 @@ def test_article_fig3_detection_curve_uses_exact_example2_probability(
         random_mc = curves["Algorithm A"]
         guided = curves["Algorithm B"]
         assert random_mc.get_xdata() == pytest.approx([1, 2, 3, 5, 10, 20, 50, 100])
+        assert [label.get_text() for label in fig.axes[1].get_xticklabels()] == [
+            "1",
+            "2",
+            "5",
+            "10",
+            "20",
+            "100",
+        ]
         assert random_mc.get_ydata() == pytest.approx(
             [1.0 - (29.0 / 30.0) ** k for k in random_mc.get_xdata()]
         )
@@ -899,10 +907,18 @@ def test_article_fig3_formal_panel_selects_seed42_named_datasets(
         assert len(front_offsets) == 4
         assert front_offsets == pytest.approx([(0.20, 0.80)] * 4)
         legend_text = [text.get_text() for text in fig.axes[5].get_legend().get_texts()]
-        assert len(legend_text) == 6
-        assert any("Madelon" in text for text in legend_text)
-        assert any("Credit-Card-Fraud" in text for text in legend_text)
-        assert all("Spambase" not in text for text in legend_text)
+        assert legend_text == [
+            "A  full",
+            "D  full",
+            "B  filtered",
+            "E  filtered",
+            "C  alpha",
+            "F  alpha",
+        ]
+        dataset_codebook = fig.axes[5].texts[0].get_text()
+        assert "A-C: Madelon" in dataset_codebook
+        assert "D-F: Credit-Card-Fraud" in dataset_codebook
+        assert "Spambase" not in dataset_codebook
     finally:
         figure_module.plt.close(fig)
 
