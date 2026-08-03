@@ -28,6 +28,9 @@ dist/
 .superpowers/
 .implementation-plan.md
 
+# QA/scratch outputs
+tmp/
+
 # LaTeX build products; keep the source, bibliography, styles, and final PDF
 conference-paper/build/
 conference-paper/*.zip
