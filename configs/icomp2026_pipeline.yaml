@@ -6,7 +6,6 @@ datasets:
   - isolet
   - gisette
   - credit_card_fraud
-  - crimedata
   - abalone
 
 seeds: [42, 123, 456, 789, 1024]
@@ -37,7 +36,6 @@ estimator:
     isolet: [2, 5, 10]
     gisette: [2, 5, 10, 25]
     credit_card_fraud: [2, 5, 10, 25]
-    crimedata: [2, 5, 10, 25]
     abalone: [2, 5, 10, 25]
   exact_max_features: 16
 
@@ -72,7 +70,6 @@ stage_scopes:
       - isolet
       - gisette
       - credit_card_fraud
-      - crimedata
       - abalone
     seeds: [42]
   ablation:

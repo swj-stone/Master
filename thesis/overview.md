@@ -61,7 +61,7 @@
 | 搜索引擎 | NSGA-II (single-layer) | NSGA-II + DARTS (joint) |
 | 时间 | 2026-06 至 2026-07 | 2026-08 至 2027-05 |
 
-会议论文的 NSGA-II 引擎、ShapG 集成、5 个表格数据集 baseline 全部可以**直接迁移**到论文 Phase B。
+会议论文的 NSGA-II 引擎、ShapG 集成和六个保留数据集的 baseline 可以**直接迁移**到论文 Phase B。
 
 ## 算力使用
 

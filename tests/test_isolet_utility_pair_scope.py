@@ -598,7 +598,7 @@ def test_real_repository_config_projects_to_canonical_isolet_scope() -> None:
     projected = module.project_isolet_utility_pair_protocol(loaded)
     manifest = module.build_isolet_utility_pair_manifest(projected)
 
-    assert len(loaded.datasets) == 7
+    assert len(loaded.datasets) == 6
     assert tuple(dataset.dataset_id for dataset in projected.datasets) == (
         "isolet",
     )

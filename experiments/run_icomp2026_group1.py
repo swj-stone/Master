@@ -32,7 +32,6 @@ DATASETS = (
         "credit_card_fraud.yaml",
         "preprocess_Credit-Card-Fraud.py",
     ),
-    ("crimedata", "crimedata.yaml", "preprocess_crimedata.py"),
     ("gisette", "gisette.yaml", "preprocess_Gisette.py"),
     ("isolet", "isolet.yaml", "preprocess_ISOLET.py"),
     ("madelon", "madelon.yaml", "preprocess_Madelon.py"),

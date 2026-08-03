@@ -546,6 +546,7 @@ def _write_figure_tables(root: Path) -> tuple[Path, Path, Path, Path]:
                 "analysis_label": "descriptive_smoke",
             }
             for method, value in (
+                ("full", 0.0),
                 ("minppi", -0.01),
                 ("shap_bottom", -0.02),
                 ("minshap_bottom", -0.03),
@@ -649,6 +650,30 @@ def test_figures_are_read_only_explicit_smoke_labeled_and_byte_deterministic(
         hashlib.sha256(path.read_bytes()).hexdigest() for path in tables
     ] == source_hashes
     assert all(path.parent == tmp_path / "figures-a" for path in first)
+
+
+def test_removal_ranks_include_full_before_hiding_its_bar(tmp_path: Path) -> None:
+    tables = _write_figure_tables(tmp_path)
+    raw = figure_module._read_table(
+        tables[0], figure_module._EXPECTED_RAW, "smoke"
+    )
+    aggregate = figure_module._read_table(
+        tables[1], figure_module._EXPECTED_AGGREGATE, "smoke"
+    )
+    paired = figure_module._read_table(
+        tables[2], figure_module._EXPECTED_PAIRED, "smoke"
+    )
+    front = figure_module._read_table(
+        tables[3], figure_module._EXPECTED_FRONT, "smoke"
+    )
+
+    panels = figure_module._prepare_panels(
+        aggregate, paired, front, run_kind="smoke", raw=raw
+    )
+
+    assert list(panels["ranks"].columns) == list(figure_module._REMOVAL_METHODS)
+    assert panels["ranks"].loc["spambase", "minppi"] == 2.0
+    assert panels["ranks"].loc["spambase", "random_matched"] == 6.0
 
 
 def test_figure_panels_ignore_unrelated_metrics_instead_of_mixing_units(
@@ -819,9 +844,9 @@ def test_article_fig3_overview_uses_two_rows_with_dedicated_legends(
         assert len(fig.axes) == 6
         top_axes = fig.axes[:3]
         assert [axis.get_title() for axis in top_axes] == [
-            "(a) MinSS classification\n(Example 2)",
+            "(a) MinSS classification\n(constructed game)",
             "(b) Conditional detection\nvs budget K",
-            "(c) Alpha points and held-out\nPareto fronts",
+            "(c) Held-out evaluations of\nvalidation-selected fronts",
         ]
         assert [patch.get_height() for patch in top_axes[0].patches] == [
             0,
@@ -955,7 +980,7 @@ def test_article_fig3_formal_alpha_authority_fails_closed(
 
 
 @pytest.mark.parametrize("foreign_dataset", (False, True))
-def test_formal_figures_require_exact_seven_dataset_authority(
+def test_formal_figures_require_exact_six_dataset_authority(
     tmp_path: Path, foreign_dataset: bool
 ) -> None:
     tables = _write_figure_tables(tmp_path)
@@ -971,7 +996,7 @@ def test_formal_figures_require_exact_seven_dataset_authority(
             )
         frame.to_csv(path, index=False, lineterminator="\n")
 
-    with pytest.raises(ValueError, match="formal NSGA-II.*seven|canonical dataset"):
+    with pytest.raises(ValueError, match="formal NSGA-II.*six|canonical dataset"):
         generate_all_figures(
             *tables, tmp_path / "invalid-formal-datasets", run_kind="formal"
         )
@@ -1025,18 +1050,86 @@ def test_prefilter_asset_retains_two_registered_endpoint_panels(
     fig = captured["figure"]
     try:
         assert len(fig.axes) == 2
+        assert tuple(fig.get_size_inches()) == pytest.approx((7.5, 3.6))
         assert [axis.get_title() for axis in fig.axes] == [
             "(a) Held-out hypervolume",
-            "(b) Convergence evaluations",
+            "(b) Post-hoc 95%-HV attainment",
         ]
         for axis in fig.axes:
             assert [label.get_text() for label in axis.get_xticklabels()] == [
-                "spambase"
+                "Spambase"
             ]
+            assert min(label.get_fontsize() for label in axis.get_xticklabels()) >= 8
             assert [text.get_text() for text in axis.get_legend().get_texts()] == [
-                "full",
-                "minppi_prefilter",
+                "Full",
+                "MinPPI-prefiltered",
             ]
+            assert min(
+                text.get_fontsize() for text in axis.get_legend().get_texts()
+            ) >= 8
+    finally:
+        figure_module.plt.close(fig)
+
+
+def test_removal_asset_uses_final_width_readable_typography(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def capture_figure(fig: object, destination: Path) -> Path:
+        captured["figure"] = fig
+        return destination
+
+    monkeypatch.setattr(figure_module, "_save", capture_figure)
+    panels = {
+        "ranks": pd.DataFrame(
+            {
+                "minppi": [2.0, 3.0],
+                "random_matched": [4.0, 5.0],
+            },
+            index=("abalone", "spambase"),
+        ),
+        "removal": pd.DataFrame(
+            {
+                "minppi": [0.001, -0.002],
+                "random_matched": [-0.010, -0.020],
+            },
+            index=("abalone", "spambase"),
+        ),
+    }
+    figure_module._render_fig2(panels, tmp_path, run_kind="smoke")
+    fig = captured["figure"]
+    try:
+        assert tuple(fig.get_size_inches()) == pytest.approx((7.5, 4.0))
+        assert min(text.get_fontsize() for text in fig.axes[1].texts) >= 8
+        assert [label.get_text() for label in fig.axes[0].get_yticklabels()] == [
+            "MinPPI",
+            "Random-matched",
+        ]
+        assert [label.get_text() for label in fig.axes[1].get_yticklabels()] == [
+            "Abalone",
+            "Spambase",
+        ]
+        assert [label.get_text() for label in fig.axes[1].get_xticklabels()] == [
+            "MinPPI",
+            "Random-matched",
+        ]
+        assert [text.get_text() for text in fig.axes[1].texts] == [
+            "+.001",
+            "-.010",
+            "-.002",
+            "-.020",
+        ]
+        assert (
+            fig.axes[1].get_position().width
+            > fig.axes[0].get_position().width
+        )
+        assert fig.axes[1].get_title() == "(b) Removal held-out ΔU"
+        assert fig.axes[2].get_ylabel() == "Held-out ΔU"
+        for axis in fig.axes[:2]:
+            tick_labels = axis.get_xticklabels() + axis.get_yticklabels()
+            assert min(label.get_fontsize() for label in tick_labels) >= 8
     finally:
         figure_module.plt.close(fig)
 

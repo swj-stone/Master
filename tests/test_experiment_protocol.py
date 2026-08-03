@@ -624,7 +624,7 @@ def test_repository_protocol_configs_are_valid() -> None:
         smoke=True,
     )
 
-    assert len(formal.datasets) == 7
+    assert len(formal.datasets) == 6
     assert formal.seeds == (42, 123, 456, 789, 1024)
     assert source.backend == "cpu"
     assert formal.backend == "cuda"
@@ -656,10 +656,6 @@ def test_repository_protocol_registers_exact_raw_snapshots() -> None:
         "credit_card_fraud": (
             148_701_764,
             "5ac0db239c79b8234914ac04242b5a864cd34cd9c4e73526ed3808185285e335",
-        ),
-        "crimedata": (
-            1_527_364,
-            "6fb4c4f378a5e2ea98eb3bfe9effb7d750ef888e5975db10fa174b30ef8edcab",
         ),
         "gisette": (
             192_231_337,

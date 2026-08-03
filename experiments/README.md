@@ -4,14 +4,15 @@
 
 ## 入口
 
-- `run_icomp2026_group1.py`：第一组唯一的一键入口；严格使用相邻 `venv`，顺序执行环境验收、七个 raw snapshot 获取/校验、bootstrap、校准、smoke、密封 estimator campaign 与 validation-only screening，任一子命令失败即停止。
+- `run_icomp2026_group1.py`：第一组唯一的一键入口；严格使用相邻 `venv`，顺序执行环境验收、六个正式 raw snapshot 获取/校验、bootstrap、校准、smoke、密封 estimator campaign 与 validation-only screening，任一子命令失败即停止。被隔离的历史 CrimeData 不参与正式调度。
 - `run_icomp2026_pipeline.py`：执行一个 shard。新 run 创建冻结协议；恢复时必须显式传入 `--resume`。
 - `run_icomp2026_campaign.py`：把 canonical 五个 seeds 编排为三个 shard，并在 campaign 级别统一汇总。已有 shard 会自动恢复。
-- `calibrate_icomp2026_models.py`：只使用训练集和验证集，为七个数据集生成冻结 model policy。
+- `calibrate_icomp2026_models.py`：只使用训练集和验证集，为六个正式数据集生成冻结 model policy。
 - `screen_icomp2026_results.py`：在正式 estimator 后读取 seed 42 checkpoint，生成 validation-only 方向筛查；它不是论文结果，也不访问正式 test。
 - `monitor_icomp2026_campaign.py`：只读 campaign 状态监测；需等待 campaign 入口创建 `campaign_plan.json`，不覆盖此前的数据获取、bootstrap、校准和 smoke。`--group initial` 与 `--group downstream` 分别查看两段实验，省略 `--watch` 时只输出一次；`--watch --interval-seconds 300` 每五分钟刷新并即时写出快照。
 - `summarize_multifidelity_campaign.py`：校验 shard 并集、协议和 provenance 后生成唯一正式汇总。
-- `make_paper_figures.py`：只从 canonical summary tables 生成三张论文图；正式 Overview 图还会用 raw canonical table 验证 Madelon/Credit-Card-Fraud 的完整 seed-42 alpha authority，smoke 只显示目标面板不在其 scope 内的占位说明。
+- `make_paper_figures.py`：只从 canonical summary tables 生成三张论文图；资产 `fig1_overview.pdf` 对应论文排版中的 Figure 3 “Overview of MinPPI”，并用 raw canonical table 验证 Madelon/Credit-Card-Fraud 的完整 seed-42 alpha authority。资产 `fig3_prefilter.pdf` 是独立预过滤结果图，并非论文 Figure 3。Smoke 只显示目标面板不在其 scope 内的占位说明。
+- `build_leakage_screened_publication.py`：仅用于已完成的历史七数据集 campaign；复现完整性证据，从 raw/front 行级记录排除 CrimeData 后重新聚合六数据集投稿表和图片，并保留来源哈希。新的六数据集 campaign 不需要该兼容步骤。
 
 ## 阶段顺序
 
@@ -51,6 +52,8 @@ validate -> preprocess -> estimator -> removal -> alpha -> nsga2 -> ablation -> 
 - summary tables、LaTeX macros、bundle manifest 和 figures。
 
 正式发布前，campaign summary 必须验证五种子范围、跨 shard 的 raw/environment/source/model-policy 摘要和全部上游 artifacts，并明确写出 `publication_allowed: true`。失败日志、smoke、bootstrap 或未完成的 shard 都不构成正式论文结果。
+
+历史 `v1` campaign 保留原七数据集审计层。只要其摘要包含 `publication_view`，投稿只能读取 `tables/publication/` 及其中的 provenance；`tables/summary/`、`tables/ranking/`、screening 和 bootstrap calibration 仍属于七数据集历史记录，不得用于论文数值或图。
 
 ## 辅助脚本
 

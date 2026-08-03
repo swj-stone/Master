@@ -27,9 +27,9 @@ _RC = {
     "font.size": 8,
     "axes.titlesize": 10,
     "axes.labelsize": 9,
-    "legend.fontsize": 6,
-    "xtick.labelsize": 7,
-    "ytick.labelsize": 7,
+    "legend.fontsize": 8,
+    "xtick.labelsize": 8,
+    "ytick.labelsize": 8,
     "pdf.compression": 6,
 }
 _EXPECTED_RAW = (
@@ -96,6 +96,7 @@ _REMOVAL_METHODS = (
     "banzhaf_bottom",
     "random_matched",
 )
+_RANK_METHODS = ("full", *_REMOVAL_METHODS)
 _NSGA_METHODS = ("full", "minppi_prefilter")
 _NSGA_METRICS = (
     "test_hv",
@@ -104,12 +105,29 @@ _NSGA_METRICS = (
 _CANONICAL_DATASETS = (
     "abalone",
     "credit_card_fraud",
-    "crimedata",
     "gisette",
     "isolet",
     "madelon",
     "spambase",
 )
+_DISPLAY_DATASETS = {
+    "abalone": "Abalone",
+    "credit_card_fraud": "Credit-Card-Fraud",
+    "crimedata": "Communities & Crime",
+    "gisette": "Gisette",
+    "isolet": "ISOLET",
+    "madelon": "Madelon",
+    "spambase": "Spambase",
+}
+_DISPLAY_METHODS = {
+    "full": "Full",
+    "minppi": "MinPPI",
+    "minppi_prefilter": "MinPPI-prefiltered",
+    "shap_bottom": "SHAP-bottom",
+    "minshap_bottom": "MinShap-bottom",
+    "banzhaf_bottom": "Banzhaf-bottom",
+    "random_matched": "Random-matched",
+}
 _OVERVIEW_FORMAL_DATASETS = ("madelon", "credit_card_fraud")
 _OVERVIEW_ALPHAS = (0.85, 0.90, 0.95, 0.99)
 _EXAMPLE2_WINNING = frozenset(
@@ -345,7 +363,26 @@ def _prepare_panels(
     matrix = removal.pivot(index="dataset_id", columns="method", values="mean").loc[
         datasets, list(_REMOVAL_METHODS)
     ]
-    ranks = matrix.rank(axis=1, ascending=False, method="average")
+    rank_rows = aggregate[
+        (aggregate["stage"] == "removal")
+        & (aggregate["metric"] == "delta_utility")
+        & aggregate["method"].isin(_RANK_METHODS)
+    ].copy()
+    _unique(rank_rows, ["dataset_id", "method"], "removal rank matrix")
+    expected_rank_pairs = {
+        (dataset, method) for dataset in datasets for method in _RANK_METHODS
+    }
+    actual_rank_pairs = set(
+        zip(rank_rows["dataset_id"], rank_rows["method"], strict=False)
+    )
+    if actual_rank_pairs != expected_rank_pairs:
+        raise ValueError("missing six-method removal rank rows")
+    ranks = (
+        rank_rows.pivot(index="dataset_id", columns="method", values="mean")
+        .loc[datasets, list(_RANK_METHODS)]
+        .rank(axis=1, ascending=False, method="average")
+        .loc[:, list(_REMOVAL_METHODS)]
+    )
 
     nsga = aggregate[
         (aggregate["stage"] == "nsga2")
@@ -358,7 +395,7 @@ def _prepare_panels(
     nsga_datasets = sorted(nsga["dataset_id"].astype(str).unique())
     if run_kind == "formal" and tuple(nsga_datasets) != _CANONICAL_DATASETS:
         raise ValueError(
-            "formal NSGA-II figures require the exact seven canonical datasets"
+            "formal NSGA-II figures require the exact six canonical datasets"
         )
     expected_nsga = {
         (dataset, method, metric)
@@ -681,7 +718,7 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
         axes[0, 0].set_ylim(-1.25, 1.20)
         axes[0, 0].axhline(0.0, color="#555555", linewidth=0.7)
         axes[0, 0].set_ylabel("MinSS")
-        axes[0, 0].set_title("(a) MinSS classification\n(Example 2)")
+        axes[0, 0].set_title("(a) MinSS classification\n(constructed game)")
 
         budgets, random_mc, guided, negative_probability, guided_probability = (
             _example2_detection_curves()
@@ -769,7 +806,9 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
             )
             legend_handles.append(Patch(facecolor="none", edgecolor="none"))
             legend_labels.append("Formal seed-42 panel generated downstream")
-        axes[0, 2].set_title("(c) Alpha points and held-out\nPareto fronts")
+        axes[0, 2].set_title(
+            "(c) Held-out evaluations of\nvalidation-selected fronts"
+        )
         axes[0, 2].set_xlabel("Compression")
         axes[0, 2].set_ylabel("Held-out utility")
 
@@ -832,10 +871,18 @@ def _render_fig1(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
 
 def _render_fig2(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -> Path:
     with plt.rc_context(_RC):
-        fig, axes = plt.subplots(1, 2, figsize=(11, 4.0))
+        fig, axes = plt.subplots(
+            1,
+            2,
+            figsize=(7.5, 4.0),
+            gridspec_kw={"width_ratios": (0.85, 1.15)},
+        )
         mean_ranks = panels["ranks"].mean(axis=0).sort_values()
         axes[0].barh(range(len(mean_ranks)), mean_ranks.values, color="#72b7b2")
-        axes[0].set_yticks(range(len(mean_ranks)), mean_ranks.index)
+        axes[0].set_yticks(
+            range(len(mean_ranks)),
+            [_DISPLAY_METHODS.get(str(method), str(method)) for method in mean_ranks.index],
+        )
         axes[0].invert_yaxis()
         axes[0].set_xlabel("Mean descending rank (1 = best)")
         axes[0].set_title("(a) Descriptive delta-utility ranks")
@@ -844,21 +891,35 @@ def _render_fig2(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
         matrix = panels["removal"]
         image = axes[1].imshow(matrix.to_numpy(), cmap="RdYlGn", aspect="auto")
         axes[1].set_xticks(
-            range(len(matrix.columns)), matrix.columns, rotation=35, ha="right"
+            range(len(matrix.columns)),
+            [
+                _DISPLAY_METHODS.get(str(method), str(method))
+                for method in matrix.columns
+            ],
+            rotation=35,
+            ha="right",
         )
-        axes[1].set_yticks(range(len(matrix.index)), matrix.index)
-        axes[1].set_title("(b) Removal test delta_utility")
+        axes[1].set_yticks(
+            range(len(matrix.index)),
+            [
+                _DISPLAY_DATASETS.get(str(dataset), str(dataset))
+                for dataset in matrix.index
+            ],
+        )
+        axes[1].set_title("(b) Removal held-out ΔU")
         for row_index in range(len(matrix.index)):
             for column_index in range(len(matrix.columns)):
+                value = matrix.iloc[row_index, column_index]
+                label = f"{value:+.3f}".replace("+0.", "+.").replace("-0.", "-.")
                 axes[1].text(
                     column_index,
                     row_index,
-                    f"{matrix.iloc[row_index, column_index]:+.3f}",
+                    label,
                     ha="center",
                     va="center",
-                    fontsize=5,
+                    fontsize=8,
                 )
-        fig.colorbar(image, ax=axes[1], shrink=0.8, label="delta_utility")
+        fig.colorbar(image, ax=axes[1], shrink=0.8, label="Held-out ΔU")
         _smoke_label(fig, run_kind)
         fig.tight_layout(rect=(0, 0, 1, 0.96))
         return _save(fig, output / "fig2_cd_heatmap.pdf")
@@ -866,14 +927,18 @@ def _render_fig2(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
 
 def _render_fig3(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -> Path:
     with plt.rc_context(_RC):
-        fig, axes = plt.subplots(1, 2, figsize=(11, 3.6))
+        fig, axes = plt.subplots(1, 2, figsize=(7.5, 3.6))
         nsga = panels["nsga"]
         datasets = sorted(nsga["dataset_id"].astype(str).unique())
         x = np.arange(len(datasets), dtype=float)
         width = 0.36
         for axis, metric, title in (
             (axes[0], "test_hv", "(a) Held-out hypervolume"),
-            (axes[1], "convergence_evaluation_count", "(b) Convergence evaluations"),
+            (
+                axes[1],
+                "convergence_evaluation_count",
+                "(b) Post-hoc 95%-HV attainment",
+            ),
         ):
             for offset, method, color in (
                 (-width / 2, "full", "#999999"),
@@ -891,13 +956,18 @@ def _render_fig3(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
                     width,
                     yerr=errors,
                     capsize=2 if errors is not None else 0,
-                    label=method,
+                    label=_DISPLAY_METHODS.get(method, method),
                     color=color,
                 )
-            axis.set_xticks(x, datasets, rotation=35, ha="right")
+            axis.set_xticks(
+                x,
+                [_DISPLAY_DATASETS.get(dataset, dataset) for dataset in datasets],
+                rotation=35,
+                ha="right",
+            )
             axis.set_title(title)
             axis.grid(True, axis="y", alpha=0.25)
-            axis.legend(fontsize=6)
+            axis.legend(fontsize=8)
         _smoke_label(fig, run_kind)
         fig.tight_layout(rect=(0, 0, 1, 0.96))
         return _save(fig, output / "fig3_prefilter.pdf")

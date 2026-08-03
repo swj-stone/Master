@@ -8,6 +8,7 @@
 \usepackage{bbold}
 \usepackage{amsthm}
 \usepackage{float}
+\usepackage{placeins}
 \input{math_commands.tex}
 
 \usepackage{hyperref}
@@ -23,146 +24,199 @@
 \maketitle
 
 \begin{abstract}
-Game-theoretic feature selection methods score features by their mean marginal contribution across coalitions, concealing a risk: a feature beneficial on average may be harmful in specific contexts. We introduce Min-Marginal Power Indices (MinPPI), which replace the mean with the minimum under a binary utility-threshold voting game $v_\alpha(S) = \mathbb{1}[U(\mathcal{M}_S) \geq \alpha \cdot U_{\text{full}}]$ for a configured higher-is-better utility $U$. This min--binary pairing---an unoccupied cell in the design space of game-theoretic feature selectors---yields a discrete $\{-1, 0, +1\}$ output that classifies each feature as harmful, neutral, or decisive with no arbitrary cutoff. The two power-index formulations (Min Shapley-Shubik and Min Banzhaf) coincide. We develop an MI-correlation-guided adversarial search (Algorithm~B) and give a conditional geometric detection bound for harmful witnesses in the perturbation distribution (Theorem~2). MinPPI constructs $\alpha$-parameterized (compression, utility preservation) operating points via parametric scalarization, requiring no evolutionary search.
+Game-theoretic feature selection usually aggregates a feature's marginal contributions across coalitions by a mean, which can conceal a context in which adding that feature reverses an acceptable decision. Building on minimum marginal aggregation, we specialize it to a binary utility-threshold voting game and call the resulting quota-indexed support statistic the Min-Marginal Power Index (MinPPI). For a fixed utility quota $\alpha$, exact MinPPI lies in $\{-1,0,+1\}$ and distinguishes a feature with a harmful threshold-crossing witness, a feature that is neither harmful nor universally decisive, and a universally decisive feature without requiring a second score cutoff. The minimum analogues of Shapley--Shubik and Banzhaf coincide at the support level because they minimize over the same distinct coalitions. We also study random Monte Carlo and MI-correlation-guided finite-budget estimators, and state the latter's detection result only as a conditional support-mass bound.
 
-The empirical component is a pre-registered protocol rather than a completed study. It covers seven tabular datasets, five canonical seeds, matched removal controls, an $\alpha$ sweep, estimator and utility ablations, and a full-versus-prefiltered NSGA-II comparison. No formal outcome is reported in this draft: empirical claims will be added only from a newly completed provenance bundle whose resolved protocol, complete upstream artifacts, canonical summary tables, and publication eligibility have been validated.
+We completed a registered seven-dataset campaign, but a post-run integrity audit found that one response was constructed from retained outcome-component predictors; we therefore exclude that dataset from every paper aggregate and report the six leakage-screened datasets over five frozen seeds. Across the resulting 30 dataset--seed units, validation-gated MinPPI removed 12.53\% of analyzed features on average, with nonzero removal in 14 units; the descriptive mean held-out $\Delta U$ was $-.000313$ across heterogeneous AUC and $R^2$ scales. This is not a superiority result: MinPPI's mean rank among six removal variants was 4.08 and the Friedman test found no evidence of a method effect ($p=.891$). Under a matched 800-evaluation budget, MinPPI-prefiltered NSGA-II changed dataset-averaged held-out hypervolume by $+0.01584$ (exact paired sign-flip $p=.0625$, Holm-adjusted $p=.4375$), driven mainly by Madelon. Exact-reference estimator evidence on Abalone did not show an advantage for MI-correlation guidance over random sampling. These heterogeneous, low-powered results position MinPPI as a quota-, model-, and split-conditioned candidate generator, not a universally superior feature selector.
 \end{abstract}
 
 \section{Introduction}
 \label{sec:intro}
 
-Feature selection identifies compact yet predictive feature subsets and is inherently multi-objective: practitioners balance cardinality, accuracy, and training cost~\citep{guyon2003introduction,chandrashekar2014survey}. Cooperative game theory offers an axiomatically grounded approach: features are players whose coalition value is model performance~\citep{cohen2007feature}. The Shapley value~\citep{shapley1953value} and Banzhaf index~\citep{banzhaf1965weighted} quantify mean marginal contributions; SHAP~\citep{lundberg2017unified} brought these to mainstream ML. Power-index feature selectors include Banzhaf-FS~\citep{karavas2017feature}, Powershap~\citep{verhaeghe2022powershap}, and ShapG~\citep{zhao2025shapg}. Multi-objective evolutionary methods, notably NSGA-II~\citep{deb2002fast,hamdani2007multi}, recover full Pareto fronts but treat features symmetrically during search.
+Feature selection balances predictive utility against the number of retained variables and is therefore naturally multi-objective~\citep{guyon2003introduction,chandrashekar2014survey,xue2016survey}. Cooperative-game methods treat features as players and a fitted model's utility as the coalition value~\citep{cohen2007feature}. The Shapley value and Banzhaf index summarize average marginal contributions~\citep{shapley1953value,banzhaf1965weighted}; SHAP made this view widely accessible for model explanation~\citep{lundberg2017unified}. Related selectors include Banzhaf-FS~\citep{karavas2017feature}, Powershap~\citep{verhaeghe2022powershap}, and ShapG~\citep{zhao2025shapg}. Evolutionary methods such as NSGA-II approximate empirical Pareto fronts but search a combinatorial feature space~\citep{deb2002fast,hamdani2007multi}.
 
-The mean operator has a blind spot: a feature beneficial on average may be actively harmful in specific coalitions. MinShap~\citep{zheng2026minshap} replaces the mean with the minimum, exposing detrimental features, but uses a continuous value function without a principled decision boundary---users must choose arbitrary cutoffs on real-valued scores. We address this gap by pairing the minimum with a \emph{binary} utility-threshold formulation~\citep{owen1972multilinear}: $v_\alpha(S) = \mathbb{1}[U(\mathcal{M}_S) \geq \alpha \cdot U_{\text{full}}]$ for any higher-is-better utility $U$. The min--binary pairing yields a discrete output in $\{-1, 0, +1\}$ and a \emph{threshold-free} three-way classification: features are harmful (there exists a coalition where adding them flips utility below $\alpha$), neutral, or decisive (every coalition requires them). No existing method occupies this cell of the design space (min operator $\times$ binary value function; Table~\ref{tab:op-table} in Appendix).
+A mean marginal contribution answers whether a feature helps on average, not whether there exists a coalition in which the feature reverses an otherwise acceptable decision. MinShap replaces averaging by minimum aggregation for general conditional-importance functionals~\citep{zheng2026minshap}. We specialize that aggregation to a binary utility-threshold game. This pairing supplies trinary support-level semantics: an observed $-1$ is existence-certified by an evaluated threshold-crossing coalition and, for a configured quota $\alpha$, the exact output needs no additional real-valued score cutoff. The quota remains a substantive user choice and is not removed by the construction.
 
-Our contributions are: (1)~Min-Marginal Power Indices (MinPPI) on the utility-threshold voting game (UTVG), with the property that MinSS and MinBz coincide and give threshold-free three-way classification; (2)~MI-correlation-guided adversarial search (Algorithm~B) with a conditional harmful-witness detection bound (Theorem~2); (3)~an $\alpha$-parameterized multi-objective framework that sweeps the quota $\alpha$ to construct (compression, utility preservation) operating points without evolutionary search; and (4)~a pre-registered empirical protocol on seven tabular datasets that evaluates matched-budget removal, estimator behavior, quota sensitivity, and full-versus-prefiltered NSGA-II. The fourth contribution is a study design; its formal results await a new validated provenance bundle.
+Our contributions are fourfold. First, we define the MinPPI specialization and establish its trinary range, quota-conditioned worst-case semantics, and support-level coincidence of its minimum Shapley--Shubik and minimum Banzhaf analogues. Second, we separate exact computation from finite-budget estimation: observed harmful labels are witness-certified, while missed witnesses remain possible, and the guidance bound is explicitly conditional on the perturbation distribution assigning positive mass to a harmful witness. Third, we use $\alpha$ to generate quota-indexed compression--utility operating points and pass candidate removals through a validation-only gate before test evaluation or downstream search. Fourth, we report a provenance-checked, five-seed analysis on six retained datasets, transparently derived from the completed seven-dataset campaign after a performance-independent data-integrity exclusion. Its evidence is deliberately mixed: removal methods are not statistically separated, prefiltering yields a positive but non-significant average hypervolume change, and guidance behavior depends on dataset, estimator, and utility.
 
 \section{Method}
 \label{sec:method}
 
-\subsection{Utility-Threshold Voting Game (UTVG)}
+\subsection{Utility-Threshold Voting Game}
 
-Let $\mathcal{D}$ be a tabular dataset with feature set $N = \{f_1, \dots, f_n\}$. For $S \subseteq N$, $\mathcal{M}_S$ is a base learner trained on features $S$, and $U(\mathcal{M}_S)$ is a configured higher-is-better utility. The formal protocol uses ROC AUC for binary classification, one-vs-rest (OVR) AUC for ISOLET multiclass classification, and $R^2$ for regression. The full-feature utility $U_{\text{full}} = U(\mathcal{M}_N)$ must be positive. For quota $\alpha \in (0,1]$, the UTVG is:
+Let $N=\{1,\ldots,n\}$ denote the analyzed features. For $S\subseteq N$, let $\mathcal{M}_S$ be the fixed model family fitted using $S$, and let $U(\mathcal{M}_S)$ be a configured real-valued, higher-is-better utility. The empty coalition uses a constant predictor derived only from the training response: class priors for classification and the training mean for regression. With full-feature utility $U_{\mathrm{full}}=U(\mathcal{M}_N)>0$ and quota $\alpha\in(0,1]$, define
 \begin{equation}
-v_\alpha(S) = \mathbb{1}\!\bigl[\,U(\mathcal{M}_S) \;\geq\; \alpha \cdot U_{\text{full}}\,\bigr].
-\label{eq:valpha}
+v_\alpha(S)=\mathbb{1}\!\left[U(\mathcal{M}_S)\geq \alpha U_{\mathrm{full}}\right].
+\label{eq:utvg}
 \end{equation}
-$v_\alpha$ is evaluated by training $\mathcal{M}_S$---there is no additive surrogate. Unlike classical weighted voting games, $v_\alpha$ is non-monotone: adding features can decrease utility (noise, redundancy), so $S \subset T$ with $v_\alpha(S)=1, v_\alpha(T)=0$ is possible. This non-monotonicity is the empirical basis for detecting harmful features.
+Unlike a classical monotone simple game, $v_\alpha$ need not be monotone: adding a feature can move utility below the quota. Its marginal is
+$\Delta_i(S)=v_\alpha(S\cup\{i\})-v_\alpha(S)\in\{-1,0,+1\}$.
 
 \subsection{Min-Marginal Power Indices}
 
-\textbf{Definition 1 (Min Shapley-Shubik, MinSS).}
-$\text{MinSS}_i = \min_{\pi \in \Pi(N)} [\, v_\alpha(S_\pi^i \cup \{i\}) - v_\alpha(S_\pi^i) \,]$, where $S_\pi^i$ are features preceding $i$ in permutation $\pi$.
+For a permutation $\pi$ of $N$, let $S_\pi^i$ be the features preceding $i$. We define
+\begin{align}
+\operatorname{MinSS}_i &= \min_{\pi}\Delta_i(S_\pi^i), \\
+\operatorname{MinBz}_i &= \min_{S\subseteq N\setminus\{i\}}\Delta_i(S).
+\end{align}
 
-\textbf{Definition 2 (Min Banzhaf, MinBz).}
-$\text{MinBz}_i = \min_{S \subseteq N \setminus \{i\}} [v_\alpha(S \cup \{i\}) - v_\alpha(S)]$.
+\textbf{Proposition 1 (exact semantics).}
+For every feature, $\operatorname{MinSS}_i=\operatorname{MinBz}_i\in\{-1,0,+1\}$. The value is $-1$ exactly when some coalition is winning before $i$ is added and losing afterward; it is $+1$ exactly when every coalition is losing before $i$ is added and winning afterward; otherwise it is $0$. We call these classes \emph{harmful}, \emph{decisive}, and \emph{neutral at the worst-case level}, respectively, always relative to the fixed model family, data split, utility, and quota. The last term means neither harmful nor universally decisive in the exact game; it does not mean that the feature has zero predictive value. The proof is in Appendix~\ref{app:proofs}.
 
-\textbf{Property 1 (Trinary Range).} $\text{MinSS}_i, \text{MinBz}_i \in \{-1, 0, +1\}$ (immediate from $v_\alpha \in \{0,1\}$).
+Every coalition $S\subseteq N\setminus\{i\}$ occurs as $S_\pi^i$ for at least one permutation, so the two support-level minima have the same distinct arguments. This does not assert equality of the standard weighted Shapley--Shubik and Banzhaf indices. We write $\operatorname{MinPPI}_i$ for either exact minimum analogue.
 
-\textbf{Property 2 (Three-Way Classification).} Under $(N, v_\alpha)$: (a)~$\text{MinSS}_i = +1$ (decisive) iff $\forall S: v_\alpha(S)=0, v_\alpha(S\cup\{i\})=1$; (b)~$\text{MinSS}_i = -1$ (harmful) iff $\exists S: v_\alpha(S)=1, v_\alpha(S\cup\{i\})=0$; (c)~$\text{MinSS}_i = 0$ (neutral) otherwise. A feature ``in every winning coalition'' need not be decisive---it can be neutral when its removal never creates a new winning coalition.
+\subsection{Finite-Budget Estimation}
 
-\textbf{Property 3 (MinSS = MinBz).} Both minima range over the same distinct marginals: every $S \subseteq N \setminus \{i\}$ occurs as the predecessor set of $i$ in at least one permutation, and repeated occurrences do not affect a minimum. We unify them as $\text{MinPPI}_i$.
+Exact evaluation requires at most $2^n$ distinct coalition utilities and $O(n2^{n-1})$ marginal comparisons. It is practical only at small $n$. For each feature, \textbf{Algorithm A} first samples a coalition size uniformly from $\{0,\ldots,n-1\}$ and then samples a subset of that size uniformly without replacement from $N\setminus\{i\}$. For $K\geq1$, it returns the minimum observed marginal over the frozen schedule $\mathcal{S}_K$:
+\begin{equation}
+\widehat{\operatorname{MinPPI}}_i
+=\min_{S\in\mathcal{S}_K}\Delta_i(S)
+\geq \min_{S\subseteq N\setminus\{i\}}\Delta_i(S).
+\label{eq:sample-min}
+\end{equation}
+Thus an observed $-1$ certifies a harmful witness, whereas a sampled $0$ or $+1$ does not exclude an unseen smaller marginal.
 
-The sign identifies $-1$ features as candidates for removal and $0$ features for downstream analysis; actual removal is subject to the pre-registered validation non-inferiority gate in Section~\ref{sec:protocol}. The three-way classification is threshold-free conditional on the configured $\alpha$: boundaries at $0$ and $\pm 1$ follow from $v_\alpha \in \{0,1\}$ with no further discretization step. Proofs are deferred to Appendix~\ref{app:proofs}.
+\textbf{Algorithm B} uses training-only mutual information and absolute correlation to construct a seed coalition: up to ten correlation neighbors are included and then padded from the mutual-information ranking toward $\min(20,\lfloor n/3\rfloor)$. In each trial, every seed member is removed independently with probability $.3$; an addition count is drawn uniformly from $\{0,\ldots,\min(5,n-1)\}$ and that many currently absent features are taken without replacement from a random order. The resulting support is restricted by this construction. Conditional on the training data and frozen guidance but before drawing the random schedule, let $P_i$ denote the distribution of one perturbation. If a harmful witness $S_i^*$ has mass $\rho_i=P_i(S_i^*)>0$ and the $K_{\mathrm{adv}}\geq1$ draws are independent, then
+\begin{equation}
+\Pr[\text{detect a harmful witness}]\geq 1-(1-\rho_i)^{K_{\mathrm{adv}}}.
+\label{eq:detection}
+\end{equation}
+This geometric statement does not imply that MI-correlation guidance gives larger $\rho_i$ than random sampling. To make the support probabilities in Figure~\ref{fig:overview}(a,b) auditable, consider $N=\{f_0,\ldots,f_4\}$ and the analytically specified game
+\begin{equation}
+v(S)=\mathbb{1}\!\left[f_0\in S\ \land\ \bigl(f_3\in S\ \lor\ f_4\in S\ \lor\ (f_2\in S\land f_1\notin S)\bigr)\right].
+\label{eq:constructed-game}
+\end{equation}
+Feature $f_1$ has the harmful witness $S^*=\{f_0,f_2\}$ and is the only feature with exact minimum marginal $-1$. Algorithm A samples this witness with probability $p_-=1/[5\binom{4}{2}]=1/30$. For illustration only, condition Algorithm B's perturbation kernel on the oracle seed $S^*$ rather than on learned MI-correlation guidance. Its probability of returning exactly $S^*$ is
+$\rho=.49/5+2[.21/(5\cdot3)]+.09/(5\cdot6)=.129$.
+Figure~\ref{fig:overview}(b) therefore isolates the perturbation kernel; it is not real-data evidence that learned guidance is better.
 
-\subsection{Estimation Algorithms}
+\subsection{Quota-Indexed Selection and Validation Gate}
+\label{sec:selection}
 
-Exact MinPPI requires $O(n\cdot 2^{n-1})$ evaluations. We give three approximation strategies.
+For each quota, the estimated harmful set $\widehat{\mathcal{H}}_\alpha=\{i:\widehat{\operatorname{MinPPI}}_i=-1\}$ proposes one compression--utility operating point. Sweeping $\alpha\in\{.85,.90,.95,.99\}$ does not solve a Pareto optimization problem and need not produce monotone or nondominated points. The formal removal rule uses the prespecified default $\alpha=.95$.
 
-\subsubsection{Algorithm~A (Random MC)}
+Every coalition model is fitted on the training split and its game utility is evaluated on validation data. The same validation split is therefore reused adaptively to construct the harmful set, apply the removal gate, and drive NSGA-II search; the held-out split is reserved for registered final evaluation. The candidate subset may trail the full model on validation by at most $.005$ for classification and $.01$ for regression. When the raw set fails, the frozen all-or-none backoff removes none of its candidates. The accepted count also defines the deletion budget for SHAP-bottom, MinShap-bottom, Banzhaf-bottom, and random-matched controls. This gate limits validation loss but is not a held-out non-inferiority guarantee.
 
-Draw $K$ random subsets (size-uniform stratified). Return $\widehat{\text{MinPPI}}_i = \min_k [v_\alpha(S^{(k)}\cup\{i\}) - v_\alpha(S^{(k)})]$. Lemma~1 (Appendix~\ref{app:proofs}): $\widehat{\text{MinPPI}}_i^{\text{MC}} \geq \text{MinPPI}_i$ almost surely (conservative: never falsely flags a neutral feature as harmful). If $\text{MinPPI}_i = -1$ and $p_-^i$ is the probability of a harmful marginal, $\Pr[\text{miss}] = (1-p_-^i)^K$. For sparse harmful events ($p_-^i \ll 1$), $K = \Omega(1/p_-)$ is required.
-
-\subsubsection{Algorithm~B (MI-Correlation-Guided Adversarial Search)}
-
-When harmful marginals are sparse, random sampling is inefficient. Harmful coalitions often concentrate where feature $i$ conflicts with correlated neighbors. Algorithm~B: (1)~build a maximum-weight spanning tree $G_{\text{corr}}$ of absolute Pearson correlations; (2)~rank features by mutual information (classification or regression); (3)~for each feature $i$, seed $S_{\text{seed}}$ from its strongest incident neighbors in $G_{\text{corr}}$ plus top mutual-information features; (4)~perturb $S_{\text{seed}}$ for $K_{\text{adv}}$ rounds, returning the minimum observed marginal.
-
-\textbf{Theorem 2 (Conditional Detection).} Let $P_i$ be the coalition distribution induced for feature $i$ by Algorithm~B's complete perturbation step, including both deletion from the seed and addition of features outside it. If a harmful witness $S_i^*$ has probability mass $\rho_i=P_i(S_i^*)>0$, and the $K_{\text{adv}}$ perturbations are independent draws from $P_i$, then $\Pr[\text{detection}] \geq 1-(1-\rho_i)^{K_{\text{adv}}}$. Positive mass is an explicit support assumption; merely having $S_i^*\subseteq S_{\text{seed}}$ is not sufficient because the addition step may also change the coalition. Ground-truth witnesses and their probability mass are unknown on real data, so the theorem does not assert a dataset-independent sample complexity and Algorithm~B remains a heuristic whose advantage must be measured by the formal guidance ablation.
-
-\subsubsection{Estimator Dispatch}
-
-The formal estimator stage compares exact enumeration, random MC, MI-correlation-guided search, and the hybrid dispatcher at the dataset-specific budgets frozen in the resolved protocol. Exact enumeration is permitted only up to 16 selected features and therefore applies to Abalone in the registered datasets. The hybrid combines the configured approximate estimators without changing their frozen coalition requests. The correlation graph and spanning tree are built once at $O(n^2\log n)$ cost.
-
-\subsection{$\alpha$-Parameterized Multi-Objective Selection}
-\label{sec:alpha-pareto}
-
-MinPPI constructs multi-objective trade-off points via parametric scalarization---the same principle as the $\varepsilon$-constraint method~\citep{haimes1971bicriterion}. For a fixed dataset and quota $\alpha$, estimation and retraining yield one (compression rate, utility preservation) operating point. Varying $\alpha \in \{0.85,0.90,0.95,0.99\}$ changes which fitted coalitions meet the threshold. Because the learned utility is non-monotone and estimation is finite-budget, the protocol does not impose a monotonic compression or preservation trend across this grid. Every estimated harmful label is accompanied by an observed coalition where $v_\alpha(S)=1$ but $v_\alpha(S\cup\{i\})=0$; whether that label is retained for removal is decided by the validation gate.
-
-\section{Experiments}
+\section{Experimental Design}
 \label{sec:experiments}
 
-\subsection{Setup}
+\subsection{Data, Models, and Scope}
 
-The empirical study is pre-registered over seven tabular datasets after training-only variance filtering and mutual-information selection to at most 100 features (Table~\ref{tab:datasets}). Each seed uses a 64/16/20 train/validation/test split, stratified for classification. Preprocessing choices, including feature selection and standardization, are fitted on the training partition only. The canonical seeds are 42, 123, 456, 789, and 1024.
+Table~\ref{tab:datasets} summarizes the six retained datasets. Each seed uses a 64/16/20 train/validation/test split, stratified for classification. Variance filtering, mutual-information selection to at most 100 features, and standardization are fitted on training data only. The frozen seeds are $42,123,456,789,1024$.
 
-Every task uses XGBoost with a configured reference and cap of 100 boosting rounds, maximum depth 4, learning rate 0.1, and \texttt{n\_jobs=1}. Before any formal test evaluation, training/validation-only calibration selects one dataset-specific round count from $\{10,20,40,100\}$; the resolved model policy freezes that choice, and every downstream variant for the dataset reuses it. Classification models produce probabilities. The dataset configuration selects the higher-is-better utility: ROC AUC for each binary dataset, OVR AUC for ISOLET, and $R^2$ for both regression datasets. Accuracy appears only in the ISOLET utility ablation and is not the formal ISOLET utility. The portable configuration defaults to the CPU histogram backend. A formal campaign may explicitly override the backend to CUDA, but the resolved protocol and frozen environment record must capture that override before any job is executed; backend changes during a run are invalid.
-
-The default quota is $\alpha=0.95$, with a registered grid $\{0.85,0.90,0.95,0.99\}$. The $\alpha$ stage covers all seven datasets at seed 42. Ablations cover Madelon, ISOLET, Credit-Card-Fraud, and Abalone at seed 42. All other formal comparisons use the complete five-seed scope. Because the repository currently contains no completed formal campaign, the remainder of this section states questions, outcomes, and acceptance rules without result values.
-
-\begin{table}[t]
-\caption{Dataset summary. MI = mutual-information filtering ($p\leq100$ keep all, $p>100$ keep top-100).}
+\begin{table}[H]
+\caption{Datasets and configured dimension cap. The realized analyzed dimension can be smaller after training-only variance filtering.}
 \label{tab:datasets}
-\begin{center}
+\centering
 \footnotesize
-\begin{tabular}{l r r r l}
+\begin{tabular}{lrrrl}
 \toprule
-\textbf{Dataset} & \textbf{Native dim.} & \textbf{After MI} & \textbf{Samples} & \textbf{Task} \\
+Dataset & Native $p$ & Cap & Samples & Task / utility \\
 \midrule
-Spambase & 57 & 56 & 4,601 & binary \\
-Madelon  & 500 & 100 & 2,600 & binary \\
-ISOLET   & 617 & 100 & 7,797 & 26-class \\
-Gisette  & 5,000 & 100 & 7,000 & binary \\
-Credit-Card & 29 & 29 & 284,807 & binary \\
-Crimedata & 128 & 100 & 1,994 & regression \\
-Abalone   & 8 & 8 & 4,177 & regression \\
+Spambase & 57 & 57 & 4,601 & binary / ROC AUC \\
+Madelon & 500 & 100 & 2,600 & binary / ROC AUC \\
+ISOLET & 617 & 100 & 7,797 & 26-class / OVR AUC \\
+Gisette & 5,000 & 100 & 7,000 & binary / ROC AUC \\
+Credit-Card-Fraud & 29 & 29 & 284,807 & binary / ROC AUC \\
+Abalone & 8 & 8 & 4,177 & regression / $R^2$ \\
 \bottomrule
 \end{tabular}
-\end{center}
 \end{table}
 
-\subsection{Harmful-Feature Removal}
-\label{sec:removal}
+The registered campaign completed seven datasets. A post-run integrity audit found that the Communities \& Crime response, \texttt{nonViolPerPop}, was within an absolute tolerance of $.1$ of the sum of four retained outcome-component columns in 2,118 of 2,215 raw rows (95.62\%). Those components were retained in every formal seed. We consequently exclude this dataset from all paper aggregates, tests, tables, and figures while preserving the complete original campaign artifacts. This post-hoc exclusion was based on target construction rather than observed method performance; notably, the excluded dataset had contributed a positive held-out hypervolume difference. All reported statistics were recomputed from the canonical row-level records, and the six-dataset derivative is hash-bound to its seven-dataset source.
 
-\textbf{RQ1: Does MinPPI removal retain predictive utility at a useful compression level?} For each dataset and seed, the selection plan estimates MinPPI at $\alpha=0.95$ and records the raw harmful set. Before the held-out test is accessed, that set must pass a validation non-inferiority gate: the retained subset's validation utility may be at most 0.005 below the full model for classification and at most 0.01 below it for regression. If the raw set fails, the frozen plan reduces the removal set according to the registered validation-gate procedure; the resulting accepted set, not the raw set, determines the matched deletion budget.
+All retained tasks use XGBoost with probabilities for classification, 100 boosting rounds, depth 4, learning rate $.1$, one CPU worker per fit, and the CUDA tree backend. The 100-round choice was selected from $\{10,20,40,100\}$ using training/validation-only calibration before formal test evaluation. Binary datasets use ROC AUC, ISOLET uses one-vs-rest AUC, and Abalone uses $R^2$; ISOLET accuracy appears only in a seed-42 utility ablation.
 
-The removal stage compares the full model, MinPPI removal, SHAP-bottom removal, MinShap-bottom removal, Banzhaf-bottom removal, and random matched removal. Each non-full control removes exactly the accepted number of features for that dataset and seed; random matched removal has 30 frozen repeats. Powershap and ShapG are related methods but are not registered removal controls, so this study will not present them as entries in a formal ranking table. Primary removal outcomes are compression, selected and full test utility, and $\Delta U=U_{\text{selected}}-U_{\text{full}}$. Model-fit, coalition, cache, and runtime accounting are diagnostic outcomes rather than evidence of predictive superiority.
+Removal and full-versus-prefiltered NSGA-II cover all six retained datasets and five seeds. Both NSGA-II variants minimize $|S|/p_0$ and $1-\operatorname{clip}(U,0,1)$, where $p_0$ is the realized analyzed dimension before optional prefiltering and is shared by both variants. They use population 40, 800 evaluations, and reference point $(1.1,1.1)$. Estimator budgets are $\{2,5,10,25\}$, except ISOLET, which omits 25; exact enumeration is restricted to at most 16 features and therefore provides formal ground truth only on Abalone. The registered $\alpha$ sweep covers the retained datasets at seed 42. Guidance and dispatcher ablations cover Madelon, ISOLET, Credit-Card-Fraud, and Abalone at seed 42; the utility ablation is restricted to ISOLET at seed 42.
 
-\subsection{$\alpha$-Sensitivity}
-\label{sec:alpha}
+\subsection{Comparisons, Statistics, and Provenance}
 
-\textbf{RQ2: How does the registered quota change compression and utility preservation?} At seed 42, the alpha stage evaluates $\alpha\in\{0.85,0.90,0.95,0.99\}$ on all seven datasets. It records harmful count, compression, validation utility, test utility, full-test utility, $\Delta U$, and the ratio of selected to full-test utility. These trajectories are descriptive operating points: the protocol does not assume monotonic harmful counts, monotonic compression, or universal preservation. The default $\alpha=0.95$ was frozen before the formal campaign and will not be chosen retrospectively from the sweep.
+The removal comparison includes full, MinPPI, SHAP-bottom, MinShap-bottom, Banzhaf-bottom, and random-matched subsets. Thirty random-matched subset trials are averaged within seed, preserving five paired seed-level replicates. Dataset-level tables report means and sample standard deviations. Across datasets, removal ranks use each method's five-seed dataset mean; a Friedman test and paired Wilcoxon tests with Holm adjustment are descriptive because there are only six blocks.
 
-\subsection{Pre-Filtered Multi-Objective Search}
-\label{sec:nsga2}
+NSGA-II endpoints are validation hypervolume, held-out hypervolume of the validation-selected front, and a post-hoc attainment count: the first evaluation at which cumulative-best validation hypervolume reaches 95\% of that run's final-best value. This diagnostic is neither a stopping time nor attainment of a common quality target. Exact paired sign-flip tests align the five seed replicates and rely on descriptive seed-level sign exchangeability; Holm correction is applied within each seven-comparison endpoint family (six datasets plus the dataset-averaged result). The campaign completed every registered job in the five-seed core stages and the seed-42 sensitivity stages, with no approved omissions or skipped jobs. The original seven-dataset summary remains immutable; the integrity-screened tables, tests, and figures were rederived and independently hash-verified before the paper was updated.
 
-\textbf{RQ3: Does MinPPI prefiltering change NSGA-II's Pareto search under a matched evaluation budget?} The registered comparison is only NSGA-II-full versus NSGA-II with the validation-gated MinPPI prefilter. Both variants use population 40, 800 evaluations, and hypervolume reference point $(1.1,1.1)$; their search settings and evaluation protocol are otherwise identical. The recorded endpoints are validation hypervolume, held-out test hypervolume of the validation-selected front, convergence evaluation count, dimensional reduction, and complete fit/cache/runtime accounting. This protocol does not support a formal six-baseline rank table or critical-difference analysis.
+\section{Results}
+\label{sec:results}
 
-\subsection{Estimator and Utility Ablations}
-\label{sec:ablation}
+\subsection{RQ1: Validation-Gated Removal}
 
-\textbf{RQ4: Which estimator, guidance, and utility choices change the recovered MinPPI labels?} The estimator stage covers all seven datasets and all five canonical seeds, comparing exact, random MC, MI-correlation-guided, and hybrid estimates at the dataset-specific budget ladders; exact comparisons are interpreted only where exact enumeration is allowed. Separately, the registered seed-42 ablation scope covers Madelon, ISOLET, Credit-Card-Fraud, and Abalone. Its guidance axis compares random, mutual-information-only, correlation-only, and MI-correlation seeds, while its dispatcher axis compares exact, random MC, MI-correlation-guided, and hybrid execution. Their outcomes include harmful fraction and the estimator agreement metrics emitted by the canonical summary. On ISOLET alone, the utility axis compares accuracy with formal OVR AUC while keeping the probability-producing classifier fixed. Accuracy results are reported as ablation evidence and cannot replace the OVR-AUC formal endpoint.
+Table~\ref{tab:removal} shows heterogeneous compression. Averaged over all 30 retained dataset--seed units, MinPPI removed 12.53\% of analyzed features; the descriptive mean held-out $\Delta U$ was $-.000313$ across heterogeneous AUC and $R^2$ scales, and 14 of 30 units removed at least one feature. Madelon had the largest mean compression (43.6\%) and a positive mean $\Delta U=+.00469$, whereas Abalone compressed by 27.5\% with mean $\Delta U=-.00565$. The raw harmful set passed its validation gate in 27 of 30 units, including 13 vacuous passes with no proposed removal; among the 17 nonempty candidate sets, 14 passed. The failed cases---Abalone seeds 42 and 1024 and Madelon seed 1024---backed off to zero removal, demonstrating that the gate is a substantive part of the procedure.
 
-\subsection{Pre-Registered Reporting and Acceptance Gates}
-\label{sec:protocol}
+\begin{table}[H]
+\caption{MinPPI removal at $\alpha=.95$ over five seeds. Compression and held-out $\Delta U=U_{\mathrm{selected}}-U_{\mathrm{full}}$ are mean $\pm$ sample SD. ``Raw pass'' counts validation-gate passes before backoff, including vacuous passes when no removal was proposed.}
+\label{tab:removal}
+\centering
+\footnotesize
+\begin{tabular}{lrrc}
+\toprule
+Dataset & Compression (\%) & Held-out $\Delta U$ & Raw pass \\
+\midrule
+Abalone & $27.50\pm25.62$ & $-.00565\pm.01077$ & $3/5$ \\
+Credit-Card-Fraud & $2.76\pm2.89$ & $-.00078\pm.00335$ & $5/5$ \\
+Gisette & $.60\pm.89$ & $-.00011\pm.00016$ & $5/5$ \\
+ISOLET & $.00\pm.00$ & $.00000\pm.00000$ & $5/5$ \\
+Madelon & $43.60\pm31.96$ & $+.00469\pm.00497$ & $4/5$ \\
+Spambase & $.72\pm.99$ & $-.00003\pm.00007$ & $5/5$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Formal removal and NSGA-II summaries use the five seeds as the independent units. For each dataset, method, parameter, and metric, the canonical summary reports $n=5$, mean, sample standard deviation, median, minimum, and maximum. The 30 random-removal repeats are averaged within seed before the five-seed aggregation, so they do not inflate the inferential sample size. NSGA-II-full and MinPPI-prefilter are compared by the exact paired sign-flip test on aligned seeds, with paired rank-biserial effect size. Holm adjustment is applied separately within each registered endpoint family: validation hypervolume, test hypervolume, and convergence evaluation count. These low-powered analyses will be labeled descriptive; no result will be promoted to a broad method ranking.
+The descriptive, unweighted mean of the six dataset-level utilities was $.877807$ for MinPPI and $.878121$ for the full model, a difference of $-.000313$ (Wilcoxon $p=.4375$, Holm $p=1$); because ROC AUC, OVR AUC, and $R^2$ are mixed, this mean has no single common utility unit. MinPPI's mean rank among all six variants was 4.08. The omnibus Friedman test found no evidence of a method effect ($\chi^2=1.686$, $p=.891$), and every MinPPI pairwise Holm-adjusted $p$-value was 1. Figure~\ref{fig:removal} therefore visualizes effect heterogeneity rather than a critical-difference or superiority result. Random matched deletion was particularly unfavorable on Madelon ($\Delta U=-.0732$), but the formal ranking does not establish MinPPI as globally best.
 
-Three gates precede any empirical claim. First, the frozen resolved protocol, source fingerprint, environment, manifest, and dataset identities must validate, and all reported rows must come from the formal rather than smoke run. Second, MinPPI removal must pass the pre-test validation non-inferiority gate described in Section~\ref{sec:removal}; held-out test values are reported outcomes, not inputs to subset choice. Third, the campaign summary must verify the complete canonical five-seed scope and every required upstream artifact and must mark the new provenance bundle as publication-eligible. If an approved omission exists, publication remains suppressed. Until all three gates pass, tables, figures, significance statements, runtime comparisons, and safety or superiority conclusions remain absent from the manuscript.
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{../figures/fig2_cd_heatmap.pdf}
+\caption{Validation-gated matched removal. (a) Descriptive mean descending ranks (1 is best) among all six methods across six retained datasets, computed from each method's five-seed mean $\Delta U$; the full model participates in the ranking but is omitted from the display. (b) Five-seed mean $\Delta U$, where positive values favor removal. Each control uses the accepted MinPPI-matched removal count, and 30 random-matched subset trials are averaged within seed. The display is descriptive and does not establish a broad method ordering.}
+\label{fig:removal}
+\end{figure}
 
-\section{Discussion and Conclusion}
+\FloatBarrier
+\subsection{RQ2: Quota Sensitivity}
+
+The $\alpha$ sweep is a seed-42 sensitivity analysis ($n=1$ per point), not a model-selection exercise. Its trajectories were dataset-dependent and non-monotone. On Madelon, compression across $\alpha=(.85,.90,.95,.99)$ was $(.24,.49,.56,.51)$ with held-out $\Delta U=(+.0077,+.0227,-.0003,-.0054)$. On Abalone, compression was $(.375,.50,.50,0)$, while on Credit-Card-Fraud it rose from 0 at $.85$ and $.90$ to $.034$ at $.95$ and $.586$ at $.99$. Figure~\ref{fig:overview}(c) overlays the registered points for Madelon and Credit-Card-Fraud on held-out evaluations of their seed-42 validation-selected fronts. The points illustrate quota sensitivity only; they do not prove monotonicity, held-out nondominance, or cross-seed safety.
+
+\FloatBarrier
+\subsection{RQ3: Prefiltered Multi-Objective Search}
+
+With the same 800-evaluation budget, MinPPI-prefiltered NSGA-II changed the dataset-averaged held-out hypervolume by $+.01584$ and validation hypervolume by $+.01741$. For each endpoint, all five seed-level pooled differences were positive (rank-biserial correlation 1), but the exact sign-flip $p=.0625$ became $.4375$ after the registered Holm correction. Dataset mean test-HV differences were $+.09515$ on Madelon, $+.00535$ on Credit-Card-Fraud, $+.00021$ on Abalone, 0 on ISOLET, $-.00191$ on Gisette, and $-.00378$ on Spambase. Thus the positive pooled direction is driven mainly by Madelon, with only small positive differences on Credit-Card-Fraud and Abalone.
+
+The post-hoc 95\%-of-final-HV attainment diagnostic occurred 22.67 evaluations earlier on average ($p=.4375$, Holm $p=1$), with the largest decreases on Madelon and Gisette and an increase on Spambase. Both variants nevertheless consumed the same registered total budget of 800 evaluations. Figure~\ref{fig:prefilter} therefore supports a directional, dataset-dependent change in search outcomes, not universal improvement, budget reduction, or runtime acceleration.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{../figures/fig3_prefilter.pdf}
+\caption{Full versus validation-gated MinPPI-prefiltered NSGA-II under the matched 800-evaluation budget. Bars are five-seed means and whiskers are sample standard deviations for (a) held-out hypervolume of the validation-selected front, using reference point $(1.1,1.1)$, and (b) the post-hoc first evaluation attaining 95\% of that run's final-best validation hypervolume, where lower is earlier. The latter is not a stopping time. No dataset-wise comparison survives the registered exact paired sign-flip tests with within-endpoint Holm correction.}
+\label{fig:prefilter}
+\end{figure}
+
+\FloatBarrier
+\subsection{RQ4: Estimator, Guidance, and Utility Sensitivity}
+
+Abalone is the only retained dataset small enough for exact enumeration. Averaged over the five seed-level F1 scores, at budgets $2,5,10,25$, random MC achieved $.100,.150,.230,.443$, while MI-correlation guidance achieved $.000,.080,.133,.313$. The hybrid dispatcher scored 1 at every budget because it selected exact enumeration at eight features; this does not validate the approximate guidance heuristic. Thus the five-seed mean F1 for learned guidance was lower than random sampling at every registered finite budget; this is not a claim about every individual seed.
+
+The seed-42 ablations likewise show sensitivity rather than a stable guidance ordering. On Madelon, random, MI-only, correlation-only, and MI-correlation seeds recovered 5, 16, 34, and 28 harmful labels; on Credit-Card-Fraud the counts were 6, 2, 2, and 1. On ISOLET, changing the utility while keeping the probability-producing classifier fixed changed the harmful count from 0 under the formal OVR AUC to 9 under accuracy. These single-seed results show that estimator and utility choices materially affect recovered labels, but they cannot support significance or cross-seed stability claims.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{../figures/fig1_overview.pdf}
+\caption{Overview of MinPPI. (a) Exact minimum marginals in the five-feature game of~\eqref{eq:constructed-game}: $f_1=-1$ and all other features are neutral at the worst-case level. (b) Geometric detection probabilities for the unique harmful witness under random MC ($p_-=1/30=.0333$) and Algorithm B's perturbation kernel conditional on the oracle seed $\{f_0,f_2\}$ ($\rho=.129$); this isolates the kernel and is not real-data guidance evidence. (c) Held-out evaluations of seed-42 validation-selected fronts for full and gated prefiltered NSGA-II, together with the registered $\alpha\in\{.85,.90,.95,.99\}$ operating points on Madelon and Credit-Card-Fraud. Connecting lines only order the $\alpha$ values and do not assert held-out nondominance.}
+\label{fig:overview}
+\end{figure}
+
+\FloatBarrier
+
+\section{Discussion}
 \label{sec:discussion}
 
-We introduced MinPPI, a game-theoretic framework that replaces the mean marginal contribution with the minimum under a binary utility-threshold voting game, yielding a principled three-way classification of features. The min--binary pairing occupies an empty cell in the design space of game-theoretic feature selectors and produces a discrete $\{-1,0,+1\}$ output requiring no arbitrary cutoff---unlike MinShap, whose continuous scores need a user-chosen threshold to decide which features to remove.
+The exact contribution of the MinPPI specialization is sharper than its empirical claim. Given $\alpha$, an exact or sampled $-1$ is existence-certified by an evaluated threshold-crossing coalition and needs no additional score threshold; the validation gate then separates witness discovery from the decision to remove a feature. Finite sampling preserves witness validity but not witness completeness, and sampled 0 or $+1$ does not certify the corresponding exact class. This distinction is important because the retained study does not support a universal selector ranking: MinPPI stayed close to full-model utility descriptively, yet had mean rank 4.08 among six methods, and Abalone exhibited a negative mean held-out effect.
 
-MinPPI's core contribution is the ensemble of three capabilities: (i)~threshold-free three-way classification via the min--binary pairing; (ii)~MI-correlation-guided adversarial search with a conditional geometric detection guarantee; and (iii)~$\alpha$-parameterized multi-objective selection via parametric scalarization. Unlike SHAP-based methods, which rank by mean marginal contribution and require a user-chosen $k$, MinPPI proposes a discrete candidate set that can be passed through a validation gate. Unlike MinShap, MinPPI's binary $v_\alpha$ eliminates an additional score cutoff. Unlike NSGA-II alone, MinPPI can provide structured prior information about harmful witnesses for evolutionary search.
+The downstream results are similarly conditional. Madelon accounts for most of the positive average hypervolume change; Credit-Card-Fraud and Abalone show only small positive differences, while Gisette and Spambase show small decreases. This pattern is compatible with prefiltering being useful when its accepted set removes distracting dimensions, but the study neither identifies a general dataset condition nor establishes statistical superiority. The registered validation gate also cannot guarantee held-out non-inferiority; it uses no test information by design.
 
-The empirical contribution in this draft is the pre-registered protocol in Section~\ref{sec:experiments}. It asks whether validation-gated MinPPI removal retains task utility, how quota and estimator choices change the selected set, and whether prefiltering alters NSGA-II hypervolume or convergence under a matched budget. The present evidence state does not answer those questions: the formal results directory is empty, and no publication-eligible provenance bundle is available. Consequently, this version makes no claim of empirical safety, superiority, monotonic quota behavior, computational acceleration, or downstream search improvement. Those conclusions, if supported, must be written from a newly validated formal bundle using the registered five-seed summaries and acceptance gates.
+Several limitations constrain interpretation. First, five paired seed replicates and six retained datasets give low-powered tests; seed-level sign-flip inference is descriptive and depends on sign exchangeability. The $\alpha$, guidance, dispatcher, and utility ablations use only seed 42. The necessary post-hoc integrity exclusion also means that the reported analysis set was not fully prespecified, despite the performance-independent exclusion rule and preservation of the original records; independent replication on prospectively screened data is needed. Second, the study uses one XGBoost family and utilities on different scales; a common multiplicative quota is not invariant to shifts of the utility scale. Third, exact estimator comparison is available only on eight-feature Abalone, where the five-seed mean F1 for guidance was lower than random sampling at every registered finite budget. The bound in~\eqref{eq:detection} is a support condition, not evidence that the guidance distribution assigns more mass to harmful witnesses. Fourth, shared caching and execution order complicate runtime attribution, so we make no computational speedup claim. Finally, the current figures summarize means and sample standard deviations; paired seed-level variation and broader model families remain important future work.
 
-\textbf{Limitations.} Theorem~2 is conditional on a harmful witness having positive probability under Algorithm~B's full perturbation distribution, an assumption that cannot be verified without ground-truth witnesses; it supplies no universal sample-complexity advantage over random sampling. On real data Algorithm~B remains a heuristic whose behavior must be measured by the registered ablations. The min estimator is conservatively biased upward when only a subset of coalitions is sampled (Lemma~1), so finite-budget estimates can miss harmful witnesses. The protocol uses XGBoost as the base learner and does not establish transfer to other model families. Finally, five seeds provide limited inferential power, which is why the registered statistical comparisons are explicitly descriptive.
+\section{Conclusion}
 
-\textbf{Future work.} The UTVG framework extends naturally to bipartite (feature $\times$ architecture) factored games, where cross-Shapley interaction values~\citep{grabisch1999axiomatic,rabitti2019shapley} could jointly select features and neural architectures. The min--binary pairing may also apply to adversarial robustness, where worst-case feature interactions under perturbation are the quantity of interest.
+Exact MinPPI specializes minimum marginal aggregation to a binary utility-threshold game and yields a quota-conditioned three-way classification; finite-budget estimators certify only observed harmful threshold crossings. The resulting candidates feed a validation-gated removal or prefiltering step. Across the six integrity-screened datasets, the method produced nonzero and sometimes substantial compression on some datasets and a positive descriptive average NSGA-II hypervolume change, but neither removal superiority nor a general guidance advantage was detected. The appropriate conclusion is therefore methodological and conditional: MinPPI is a transparent candidate generator whose value depends on the model, split, dataset, estimator, utility, quota, and validation decision.
 
-% ---- Appendix ----
 \bibliography{icomp2026_conference}
 \bibliographystyle{icomp2026_conference}
 
@@ -171,61 +225,98 @@ The empirical contribution in this draft is the pre-registered protocol in Secti
 \section{Proofs}
 \label{app:proofs}
 
-\begin{proof}[Proof of Property~1]
-For any $S \subseteq N$, the marginal $\Delta_i(S) = v_\alpha(S \cup \{i\}) - v_\alpha(S)$ takes values in $\{-1, 0, +1\}$ because $v_\alpha \in \{0,1\}$. Both $\text{MinSS}_i$ and $\text{MinBz}_i$ are minima of subsets of $\{-1, 0, +1\}$, hence remain in $\{-1, 0, +1\}$.
+\begin{proof}[Proof of Proposition~1]
+Because $v_\alpha\in\{0,1\}$, every marginal $\Delta_i(S)$ is in $\{-1,0,+1\}$, and so is any nonempty minimum of such marginals. For each $S\subseteq N\setminus\{i\}$ there are $|S|!(n-|S|-1)!\geq1$ permutations for which $S$ is exactly the predecessor set of $i$. Hence the distinct arguments of $\operatorname{MinSS}_i$ and $\operatorname{MinBz}_i$ coincide; multiplicity cannot change a minimum.
+
+The minimum equals $-1$ if and only if at least one marginal is $-1$, which is equivalent to the existence of $S$ with $v_\alpha(S)=1$ and $v_\alpha(S\cup\{i\})=0$. It equals $+1$ if and only if every marginal is $+1$, which is equivalent to $v_\alpha(S)=0$ and $v_\alpha(S\cup\{i\})=1$ for every $S$. If neither condition holds, the trinary range forces the minimum to be 0.
 \end{proof}
 
-\begin{proof}[Proof of Property~2]
-(a) $(\Rightarrow)$ $\text{MinSS}_i = +1$ means every permutation yields marginal $+1$, so $\forall S \subseteq N\setminus\{i\}: v_\alpha(S)=0, v_\alpha(S\cup\{i\})=1$. $(\Leftarrow)$ If the condition holds, every marginal is $+1$, so $\min = +1$. (b) $\text{MinSS}_i = -1$ iff $\exists \pi$ with $-1$ marginal, giving witness $S = S_\pi^i$. Conversely, any such $S$ yields $-1$ for every $\pi$ where $S$ is the prefix of $i$. (c) By Property~1, if not $+1$ or $-1$, the value must be $0$.
+\begin{proof}[Finite-sample one-sidedness]
+For any sampled collection $\mathcal{S}_K\subseteq2^{N\setminus\{i\}}$,
+\[
+\min_{S\in\mathcal{S}_K}\Delta_i(S)
+\geq
+\min_{S\subseteq N\setminus\{i\}}\Delta_i(S),
+\]
+because the left minimum is taken over a subset of the right minimum's arguments. An observed value $-1$ is therefore exact evidence of at least one harmful witness, but a larger sampled minimum can result from an unseen smaller marginal.
 \end{proof}
 
-\begin{proof}[Proof of Property~3]
-$\text{MinSS}_i = \min_{\pi} \Delta_i(S_\pi^i)$ and $\text{MinBz}_i = \min_{S} \Delta_i(S)$. For every $S\subseteq N\setminus\{i\}$ there are $|S|!\,(n-|S|-1)!\geq1$ permutations in which $S$ is exactly the predecessor set of $i$. Hence the set of distinct predecessor coalitions is $2^{N\setminus\{i\}}$; multiplicities vary with $|S|$ but do not change a minimum. Both definitions therefore minimize over the same distinct marginal values.
+\begin{proof}[Conditional detection bound]
+Let independent perturbations be drawn from $P_i$, and suppose a fixed harmful witness $S_i^*$ has mass $\rho_i>0$. One draw misses that witness with probability $1-\rho_i$; all $K_{\mathrm{adv}}$ draws miss it with probability $(1-\rho_i)^{K_{\mathrm{adv}}}$. Sampling $S_i^*$ implies detection, which yields~\eqref{eq:detection}. The statement is silent when $\rho_i=0$ and does not compare $P_i$ with the random-MC distribution.
 \end{proof}
 
-\begin{proof}[Proof of Lemma~1]
-The estimate $\widehat{\text{MinPPI}}_i^{\text{MC}} = \min_{S \in \mathcal{S}_K} \Delta_i(S)$ satisfies $\min \mathcal{S}_K \geq \min \mathcal{M}_i$ deterministically because $\mathcal{S}_K \subseteq \mathcal{M}_i$. Hence the estimate is conservatively biased upward: it may miss a harmful signal but never falsely flag a neutral feature as harmful.
-\end{proof}
+\section{Additional Formal Results}
 
-\begin{proof}[Proof of Theorem~2]
-For one complete perturbation draw $S\sim P_i$, the support assumption gives $\Pr[S=S_i^*]=\rho_i>0$. Because $S_i^*$ is harmful, the event $S=S_i^*$ implies detection. Thus one draw misses that particular witness with probability $1-\rho_i$. Independence of the $K_{\text{adv}}$ draws gives probability $(1-\rho_i)^{K_{\text{adv}}}$ of never sampling it, so $\Pr[\text{detection}]\geq1-(1-\rho_i)^{K_{\text{adv}}}$. The bound makes no claim when $\rho_i=0$ and no deterministic one-draw claim when the implementation perturbs rather than explicitly evaluates the seed coalition.
-\end{proof}
+\subsection{Quota Sweep}
 
-\section{Additional Experimental Details}
-\label{app:details}
-
-\textbf{Protocol.} For each canonical seed, the split fractions are train 0.64, validation 0.16, and test 0.20, with stratification for classification. Variance filtering, mutual-information selection to at most 100 features, and standardization are fitted without test leakage. The base learner is XGBoost with a 100-round configured reference/cap, maximum depth 4, learning rate 0.1, and \texttt{n\_jobs=1}. Training/validation-only calibration selects and freezes a dataset-specific round count from $\{10,20,40,100\}$ before formal test evaluation; classification evaluation consumes predicted probabilities. Binary utilities are ROC AUC, ISOLET's formal utility is OVR AUC, and regression utilities are $R^2$. The five formal seeds are 42, 123, 456, 789, and 1024. MinPPI uses $\alpha=0.95$ by default and $\{0.85,0.90,0.95,0.99\}$ for the registered alpha stage.
-
-The estimator methods are exact, random MC, MI-correlation-guided, and hybrid. The per-dataset budgets are $[2,5,10,25]$ except ISOLET, which uses $[2,5,10]$; exact enumeration is allowed only at 16 or fewer selected features. Removal controls are full, MinPPI, SHAP-bottom, MinShap-bottom, Banzhaf-bottom, and random matched, with 30 random repeats. Removal non-inferiority margins are 0.005 for classification and 0.01 for regression. NSGA-II compares only full and MinPPI-prefilter variants, with population 40, 800 evaluations, and reference point $(1.1,1.1)$. The alpha stage uses all datasets at seed 42; the ablation stage uses Madelon, ISOLET, Credit-Card-Fraud, and Abalone at seed 42, with the utility axis restricted to ISOLET.
-
-The portable protocol defaults to CPU. A formal campaign may explicitly select CUDA only before run creation; the resolved protocol, model policy, frozen environment, and source fingerprint must record that selection. Resume rejects protocol drift. Smoke artifacts, diagnostic benchmarks, runtime forecasts, and screening outputs are not formal evidence and cannot populate the paper. A formal result becomes eligible for reporting only after the summary verifies the canonical five-seed scope, all required upstream artifacts, and a publication-eligible provenance bundle.
-
-\textbf{Method design space.} Table~\ref{tab:op-table} classifies prior work and MinPPI along two axes: aggregation operator (mean vs.\ min) and value-function type (binary vs.\ continuous). In this comparison, MinPPI occupies the min $\times$ binary cell. Its discrete $\{-1,0,+1\}$ output follows from minimizing binary-game marginals; continuous-value methods instead retain the scale of their underlying value function.
+Table~\ref{tab:alpha} reports the seed-42 quota sweep for the six retained datasets. Compression is the accepted removed fraction and $\Delta U$ is held-out selected-minus-full utility. The non-monotone rows show why $\alpha=.95$ was fixed before the campaign rather than chosen retrospectively.
 
 \begin{table}[H]
-\caption{Design space of game-theoretic feature importance methods. MinPPI occupies the empty cell---min operator $\times$ binary value function---producing a discrete three-way output.}
-\label{tab:op-table}
-\begin{center}
-\begin{tabular}{lccc}
+\caption{Seed-42 quota operating points, shown as (compression, held-out $\Delta U$). Every cell has $n=1$.}
+\label{tab:alpha}
+\centering
+\scriptsize
+\begin{tabular}{lcccc}
 \toprule
-\textbf{Method} & \textbf{Aggregation} & $v(S)$~\textbf{type} & \textbf{Output range} \\
+Dataset & $\alpha=.85$ & $\alpha=.90$ & $\alpha=.95$ & $\alpha=.99$ \\
 \midrule
-Shapley-Shubik~\citep{shapley1954method} & mean & binary $\{0,1\}$ & $\subseteq [-1,1]$ \\
-Banzhaf~\citep{banzhaf1965weighted}       & mean & binary $\{0,1\}$ & $\subseteq [-1,1]$ \\
-Shapley/SHAP~\citep{lundberg2017unified} & mean & continuous & \shortstack{real-valued\\scale-dependent} \\
-MinShap~\citep{zheng2026minshap}         & min  & continuous & \shortstack{real-valued\\scale-dependent} \\
-\midrule
-\textbf{MinPPI (this work)} & \textbf{min} & \textbf{binary $\{0,1\}$} & $\mathbf{\{-1,\,0,\,+1\}}$ \\
+Abalone & $(.375,+.0041)$ & $(.500,-.0198)$ & $(.500,+.0010)$ & $(0,0)$ \\
+Credit-Card-Fraud & $(0,0)$ & $(0,0)$ & $(.034,-.0045)$ & $(.586,-.0057)$ \\
+Gisette & $(0,0)$ & $(0,0)$ & $(0,0)$ & $(.090,+.0002)$ \\
+ISOLET & $(0,0)$ & $(0,0)$ & $(0,0)$ & $(.010,-.000005)$ \\
+Madelon & $(.240,+.0077)$ & $(.490,+.0227)$ & $(.560,-.0003)$ & $(.510,-.0054)$ \\
+Spambase & $(0,0)$ & $(0,0)$ & $(0,0)$ & $(.196,-.0012)$ \\
 \bottomrule
 \end{tabular}
-\end{center}
 \end{table}
 
-\textbf{ISOLET utility choice.} On ISOLET (26-class), the formal voting-game and evaluation utility is OVR AUC computed from class probabilities. Accuracy is evaluated only as the registered seed-42 utility ablation. The ablation will report any agreement or disagreement between the two label sets; the protocol does not assume equivalence.
+\subsection{Estimator and Seed-42 Ablations}
 
-\section{Estimator Verification Plan}
-\label{app:verify}
+\begin{table}[H]
+\caption{Harmful-label F1 against exact Abalone labels over five seeds. Exact and hybrid equal 1 at all budgets because the hybrid dispatches to exact enumeration at eight features.}
+\label{tab:estimator}
+\centering
+\footnotesize
+\begin{tabular}{lcccc}
+\toprule
+Estimator & $K=2$ & $K=5$ & $K=10$ & $K=25$ \\
+\midrule
+Random MC & .100 & .150 & .230 & .443 \\
+MI-correlation guided & .000 & .080 & .133 & .313 \\
+Exact & 1.000 & 1.000 & 1.000 & 1.000 \\
+Hybrid dispatcher & 1.000 & 1.000 & 1.000 & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Constructed voting games may be used as software checks for Properties~1--3, Lemma~1, and the conditional bound in Theorem~2. Such checks are not part of the formal seven-dataset evidence and will not be mixed with campaign tables or figures. Any numerical verification included in a submission must be regenerated from an identified artifact and linked to its provenance; this draft therefore states only the analytic proofs above and the pre-registered real-data estimator comparisons in Section~\ref{sec:ablation}.
+\begin{table}[H]
+\caption{Seed-42 ablation harmful counts. A dash means exact enumeration was disallowed by the registered dimension limit, not that zero harmful features were found.}
+\label{tab:ablation}
+\centering
+\footnotesize
+\begin{tabular}{llrrrr}
+\toprule
+Axis & Variant & Abalone & Credit & ISOLET & Madelon \\
+\midrule
+Guidance & random & 2 & 6 & 1 & 5 \\
+ & MI only & 2 & 2 & 0 & 16 \\
+ & correlation only & 2 & 2 & 0 & 34 \\
+ & MI-correlation & 2 & 1 & 0 & 28 \\
+\midrule
+Dispatcher & exact & 4 & -- & -- & -- \\
+ & random MC & 2 & 2 & 0 & 34 \\
+ & MI-correlation & 2 & 1 & 0 & 28 \\
+ & hybrid & 4 & 1 & 0 & 56 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For ISOLET, the registered utility ablation found 0 harmful features with formal OVR AUC and 9 with accuracy. The classifier family and probability outputs were held fixed; the difference is therefore attributable to the utility definition within this seed-42 comparison.
+
+\section{Reproducibility Details}
+
+The formal splits contain 64\% training, 16\% validation, and 20\% test observations. Dataset identities, split indices, transformation metadata, model policy, source identity, and the scientific software environment are recorded with cryptographic digests. Resume operations reject protocol drift. Training data fit preprocessing, guidance, and every coalition model. Validation utility is reused adaptively for threshold-game construction, the removal gate, and NSGA-II selection. The held-out partition is not used to choose features, the removal backoff, $\alpha$, or NSGA-II individuals; it is read only for registered outcome evaluation after validation selection. The complete seven-dataset summary remains the historical record; the six-dataset publication view records the exclusion audit, source digest, regenerated tables, and regenerated figure digests.
+
+The formal estimator set comprises exact enumeration where permitted, random MC, MI-correlation guidance, and the hybrid dispatcher. Removal controls delete the accepted MinPPI-matched count. NSGA-II-full and NSGA-II-prefilter use identical population, variation, evaluation budget, reference point, and validation-selection logic. Runtime, cache-hit, and physical-fit counters are diagnostic only and are excluded from predictive superiority claims.
 
 \end{document}
