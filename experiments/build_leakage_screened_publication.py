@@ -20,11 +20,11 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 
+from minppi_mofs.experiment_protocol import atomic_write_json, read_canonical_json
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-
-from minppi_mofs.experiment_protocol import atomic_write_json, read_canonical_json
 
 try:
     from experiments.icomp2026_stages import (
