@@ -37,7 +37,7 @@ We completed a registered seven-dataset campaign, but a post-run integrity audit
 \section{Introduction}
 \label{sec:intro}
 
-Feature selection balances predictive utility against the number of retained variables and is therefore naturally multi-objective~\citep{guyon2003introduction,chandrashekar2014survey,xue2016survey}. Cooperative-game methods treat features as players and a fitted model's utility as the coalition value, a formulation introduced by~\citet{cohen2007feature}. The Shapley value and Banzhaf index summarize average marginal contributions~\citep{shapley1953value,banzhaf1965weighted}; SHAP made this view widely accessible for model explanation~\citep{lundberg2017unified}. Related selectors include Banzhaf-FS~\citep{karavas2017feature}, Powershap~\citep{verhaeghe2022powershap}, and ShapG~\citep{zhao2025shapg}. Evolutionary methods such as NSGA-II approximate empirical Pareto fronts but search a combinatorial feature space~\citep{deb2002fast,hamdani2007multi}.
+Feature selection balances predictive utility against the number of retained variables and is therefore naturally multi-objective~\citep{guyon2003introduction,chandrashekar2014survey,xue2016survey}. Cooperative-game methods treat features as players and a fitted model's utility as the coalition value, a formulation introduced by~\citet{cohen2007feature}. The Shapley value and Banzhaf index summarize average marginal contributions~\citep{shapley1953value,banzhaf1965weighted}; SHAP made this view widely accessible for model explanation~\citep{lundberg2017unified}. Related selectors include Banzhaf-FS~\citep{karavas2017feature}, Powershap~\citep{verhaeghe2022powershap}, and ShapG~\citep{zhao2025shapg}. Evolutionary methods such as NSGA-II approximate empirical Pareto fronts but search a combinatorial feature space.
 
 A mean marginal contribution answers whether a feature helps on average, not whether there exists a coalition in which the feature reverses an otherwise acceptable decision. MinShap replaces averaging by minimum aggregation for general conditional-importance functionals~\citep{zheng2026minshap}. We specialize that aggregation to a binary utility-threshold game. This pairing supplies trinary support-level semantics: an observed $-1$ is existence-certified by an evaluated threshold-crossing coalition and, for a configured quota $\alpha$, the exact output needs no additional real-valued score cutoff. The quota remains a substantive user choice and is not removed by the construction.
 
@@ -53,7 +53,7 @@ Let $N=\{1,\ldots,n\}$ denote the analyzed features. For $S\subseteq N$, let $\m
 v_\alpha(S)=\mathbb{1}\!\left[U(\mathcal{M}_S)\geq \alpha U_{\mathrm{full}}\right].
 \label{eq:utvg}
 \end{equation}
-Unlike a classical monotone simple game, $v_\alpha$ need not be monotone: adding a feature can move utility below the quota. Its marginal is
+Unlike a classical monotone simple game~\citep{owen1972multilinear,straffin1977shapley}, $v_\alpha$ need not be monotone: adding a feature can move utility below the quota. Its marginal is
 $\Delta_i(S)=v_\alpha(S\cup\{i\})-v_\alpha(S)\in\{-1,0,+1\}$.
 
 \subsection{Min-Marginal Power Indices}
@@ -67,11 +67,11 @@ For a permutation $\pi$ of $N$, let $S_\pi^i$ be the features preceding $i$. We 
 \textbf{Proposition 1 (exact semantics).}
 For every feature, $\operatorname{MinSS}_i=\operatorname{MinBz}_i\in\{-1,0,+1\}$. The value is $-1$ exactly when some coalition is winning before $i$ is added and losing afterward; it is $+1$ exactly when every coalition is losing before $i$ is added and winning afterward; otherwise it is $0$. We call these classes \emph{harmful}, \emph{decisive}, and \emph{neutral at the worst-case level}, respectively, always relative to the fixed model family, data split, utility, and quota. The last term means neither harmful nor universally decisive in the exact game; it does not mean that the feature has zero predictive value. The proof is in Appendix~\ref{app:proofs}.
 
-Every coalition $S\subseteq N\setminus\{i\}$ occurs as $S_\pi^i$ for at least one permutation, so the two support-level minima have the same distinct arguments. This does not assert equality of the standard weighted Shapley--Shubik and Banzhaf indices. We write $\operatorname{MinPPI}_i$ for either exact minimum analogue.
+Every coalition $S\subseteq N\setminus\{i\}$ occurs as $S_\pi^i$ for at least one permutation, so the two support-level minima have the same distinct arguments. This does not assert equality of the standard weighted Shapley--Shubik~\citep{shapley1954method} and Banzhaf~\citep{banzhaf1965weighted} indices. We write $\operatorname{MinPPI}_i$ for either exact minimum analogue.
 
 \subsection{Finite-Budget Estimation}
 
-Exact evaluation requires at most $2^n$ distinct coalition utilities and $O(n2^{n-1})$ marginal comparisons. It is practical only at small $n$. For each feature, \textbf{Algorithm A} first samples a coalition size uniformly from $\{0,\ldots,n-1\}$ and then samples a subset of that size uniformly without replacement from $N\setminus\{i\}$. For $K\geq1$, it returns the minimum observed marginal over the frozen schedule $\mathcal{S}_K$:
+Exact evaluation requires at most $2^n$ distinct coalition utilities and $O(n2^{n-1})$ marginal comparisons. It is practical only at small $n$. For each feature, \textbf{Algorithm A} first samples a coalition size uniformly from $\{0,\ldots,n-1\}$ and then samples a subset of that size uniformly without replacement from $N\setminus\{i\}$, in the permutation-sampling spirit of Shapley-effects estimation~\citep{song2016shapley}. For $K\geq1$, it returns the minimum observed marginal over the frozen schedule $\mathcal{S}_K$:
 \begin{equation}
 \widehat{\operatorname{MinPPI}}_i
 =\min_{S\in\mathcal{S}_K}\Delta_i(S)
@@ -80,7 +80,7 @@ Exact evaluation requires at most $2^n$ distinct coalition utilities and $O(n2^{
 \end{equation}
 Thus an observed $-1$ certifies a harmful witness, whereas a sampled $0$ or $+1$ does not exclude an unseen smaller marginal.
 
-\textbf{Algorithm B} uses training-only mutual information and absolute correlation to construct a seed coalition: up to ten correlation neighbors are included and then padded from the mutual-information ranking toward $\min(20,\lfloor n/3\rfloor)$. In each trial, every seed member is removed independently with probability $.3$; an addition count is drawn uniformly from $\{0,\ldots,\min(5,n-1)\}$ and that many currently absent features are taken without replacement from a random order. The resulting support is restricted by this construction. Conditional on the training data and frozen guidance but before drawing the random schedule, let $P_i$ denote the distribution of one perturbation. If a harmful witness $S_i^*$ has mass $\rho_i=P_i(S_i^*)>0$ and the $K_{\mathrm{adv}}\geq1$ draws are independent, then
+\textbf{Algorithm B} uses training-only mutual information and absolute correlation---along the lines of ShapG's correlation-graph guidance~\citep{zhao2025shapg}---to construct a seed coalition: up to ten correlation neighbors are included and then padded from the mutual-information ranking toward $\min(20,\lfloor n/3\rfloor)$. In each trial, every seed member is removed independently with probability $.3$; an addition count is drawn uniformly from $\{0,\ldots,\min(5,n-1)\}$ and that many currently absent features are taken without replacement from a random order. The resulting support is restricted by this construction. Conditional on the training data and frozen guidance but before drawing the random schedule, let $P_i$ denote the distribution of one perturbation. If a harmful witness $S_i^*$ has mass $\rho_i=P_i(S_i^*)>0$ and the $K_{\mathrm{adv}}\geq1$ draws are independent, then
 \begin{equation}
 \Pr[\text{detect a harmful witness}]\geq 1-(1-\rho_i)^{K_{\mathrm{adv}}}.
 \label{eq:detection}
@@ -131,11 +131,11 @@ The registered campaign completed seven datasets. A post-run integrity audit fou
 
 All retained tasks use XGBoost with probabilities for classification, 100 boosting rounds, depth 4, learning rate $.1$, one CPU worker per fit, and the CUDA tree backend. The 100-round choice was selected from $\{10,20,40,100\}$ using training/validation-only calibration before formal test evaluation. Binary datasets use ROC AUC, ISOLET uses one-vs-rest AUC, and Abalone uses $R^2$; ISOLET accuracy appears only in a seed-42 utility ablation.
 
-Removal and full-versus-prefiltered NSGA-II cover all six retained datasets and five seeds. Both NSGA-II variants minimize $|S|/p_0$ and $1-\operatorname{clip}(U,0,1)$, where $p_0$ is the realized analyzed dimension before optional prefiltering and is shared by both variants. They use population 40, 800 evaluations, and reference point $(1.1,1.1)$. Estimator budgets are $\{2,5,10,25\}$, except ISOLET, which omits 25; exact enumeration is restricted to at most 16 features and therefore provides formal ground truth only on Abalone. The registered $\alpha$ sweep covers the retained datasets at seed 42. Guidance and dispatcher ablations cover Madelon, ISOLET, Credit-Card-Fraud, and Abalone at seed 42; the utility ablation is restricted to ISOLET at seed 42.
+Removal and full-versus-prefiltered NSGA-II cover all six retained datasets and five seeds. Both NSGA-II~\citep{deb2002fast,hamdani2007multi} variants minimize $|S|/p_0$ and $1-\operatorname{clip}(U,0,1)$, where $p_0$ is the realized analyzed dimension before optional prefiltering and is shared by both variants. They use population 40, 800 evaluations, and reference point $(1.1,1.1)$. Estimator budgets are $\{2,5,10,25\}$, except ISOLET, which omits 25; exact enumeration is restricted to at most 16 features and therefore provides formal ground truth only on Abalone. The registered $\alpha$ sweep covers the retained datasets at seed 42. Guidance and dispatcher ablations cover Madelon, ISOLET, Credit-Card-Fraud, and Abalone at seed 42; the utility ablation is restricted to ISOLET at seed 42.
 
 \subsection{Comparisons, Statistics, and Provenance}
 
-The removal comparison includes full, MinPPI, SHAP-bottom, MinShap-bottom, Banzhaf-bottom, and random-matched subsets. Thirty random-matched subset trials are averaged within seed, preserving five paired seed-level replicates. Dataset-level tables report means and sample standard deviations. Across datasets, removal ranks use each method's five-seed dataset mean; a Friedman test and paired Wilcoxon tests with Holm adjustment are descriptive because there are only six blocks.
+The removal comparison includes full, MinPPI, SHAP-bottom~\citep{lundberg2017unified}, MinShap-bottom~\citep{zheng2026minshap}, Banzhaf-bottom~\citep{karavas2017feature}, and random-matched subsets. Thirty random-matched subset trials are averaged within seed, preserving five paired seed-level replicates. Dataset-level tables report means and sample standard deviations. Across datasets, removal ranks use each method's five-seed dataset mean; a Friedman test and paired Wilcoxon tests with Holm adjustment are descriptive because there are only six blocks.
 
 NSGA-II endpoints are validation hypervolume, held-out hypervolume of the validation-selected front, and a post-hoc attainment count: the first evaluation at which cumulative-best validation hypervolume reaches 95\% of that run's final-best value. This diagnostic is neither a stopping time nor attainment of a common quality target. Exact paired sign-flip tests align the five seed replicates and rely on descriptive seed-level sign exchangeability; Holm correction is applied within each seven-comparison endpoint family (six datasets plus the dataset-averaged result). The campaign completed every registered job in the five-seed core stages and the seed-42 sensitivity stages, with no approved omissions or skipped jobs. The original seven-dataset summary remains immutable; the integrity-screened tables, tests, and figures were rederived and independently hash-verified before the paper was updated.
 
@@ -144,9 +144,16 @@ NSGA-II endpoints are validation hypervolume, held-out hypervolume of the valida
 
 \subsection{RQ1: Validation-Gated Removal}
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{../figures/fig2_cd_heatmap.pdf}
+\caption{Validation-gated matched removal. (a) Descriptive mean descending ranks (1 is best) among all six methods across six retained datasets, computed from each method's five-seed mean $\Delta U$; the full model participates in the ranking but is omitted from the display. (b) Five-seed mean $\Delta U$, where positive values favor removal. Each control uses the accepted MinPPI-matched removal count, and 30 random-matched subset trials are averaged within seed. The display is descriptive and does not establish a broad method ordering.}
+\label{fig:removal}
+\end{figure}
+
 Table~\ref{tab:removal} shows heterogeneous compression. Averaged over all 30 retained dataset--seed units, MinPPI removed 12.53\% of analyzed features; the descriptive mean held-out $\Delta U$ was $-.000313$ across heterogeneous AUC and $R^2$ scales, and 14 of 30 units removed at least one feature. Madelon had the largest mean compression (43.6\%) and a positive mean $\Delta U=+.00469$, whereas Abalone compressed by 27.5\% with mean $\Delta U=-.00565$; Credit-Card-Fraud compressed by \CreditCompression{} with held-out $\Delta U=\CreditDeltaUtility{} $. The raw harmful set passed its validation gate in 27 of 30 units, including 13 vacuous passes with no proposed removal; among the 17 nonempty candidate sets, 14 passed. The failed cases---Abalone seeds 42 and 1024 and Madelon seed 1024---backed off to zero removal, demonstrating that the gate is a substantive part of the procedure.
 
-\begin{table}[H]
+\begin{table}[htbp]
 \caption{MinPPI removal at $\alpha=.95$ over five seeds. Compression and held-out $\Delta U=U_{\mathrm{selected}}-U_{\mathrm{full}}$ are mean $\pm$ sample SD. ``Raw pass'' counts validation-gate passes before backoff, including vacuous passes when no removal was proposed.}
 \label{tab:removal}
 \centering
@@ -166,13 +173,6 @@ Spambase & $.72\pm.99$ & $-.00003\pm.00007$ & $5/5$ \\
 \end{table}
 
 The descriptive, unweighted mean of the six dataset-level utilities was $.877807$ for MinPPI and $.878121$ for the full model, a difference of $-.000313$ (Wilcoxon $p=.4375$, Holm $p=1$); because ROC AUC, OVR AUC, and $R^2$ are mixed, this mean has no single common utility unit. MinPPI's mean rank among all six variants was 4.08. The omnibus Friedman test found no evidence of a method effect ($\chi^2=1.686$, $p=.891$), and every MinPPI pairwise Holm-adjusted $p$-value was 1. Figure~\ref{fig:removal} therefore visualizes effect heterogeneity rather than a critical-difference or superiority result. Random matched deletion was particularly unfavorable on Madelon ($\Delta U=-.0732$), but the formal ranking does not establish MinPPI as globally best.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=\linewidth]{../figures/fig2_cd_heatmap.pdf}
-\caption{Validation-gated matched removal. (a) Descriptive mean descending ranks (1 is best) among all six methods across six retained datasets, computed from each method's five-seed mean $\Delta U$; the full model participates in the ranking but is omitted from the display. (b) Five-seed mean $\Delta U$, where positive values favor removal. Each control uses the accepted MinPPI-matched removal count, and 30 random-matched subset trials are averaged within seed. The display is descriptive and does not establish a broad method ordering.}
-\label{fig:removal}
-\end{figure}
 
 \FloatBarrier
 \subsection{RQ2: Quota Sensitivity}
@@ -212,7 +212,7 @@ The seed-42 ablations likewise show sensitivity rather than a stable guidance or
 \section{Discussion}
 \label{sec:discussion}
 
-The exact contribution of the MinPPI specialization is sharper than its empirical claim. Given $\alpha$, an exact or sampled $-1$ is existence-certified by an evaluated threshold-crossing coalition and needs no additional score threshold; the validation gate then separates witness discovery from the decision to remove a feature. Finite sampling preserves witness validity but not witness completeness, and sampled 0 or $+1$ does not certify the corresponding exact class. This distinction is important because the retained study does not support a universal selector ranking: MinPPI stayed close to full-model utility descriptively, yet had mean rank 4.08 among six methods, and Abalone exhibited a negative mean held-out effect.
+The exact contribution of the MinPPI specialization is sharper than its empirical claim. Given $\alpha$, an exact or sampled $-1$ is existence-certified by an evaluated threshold-crossing coalition and needs no additional score threshold; the validation gate then separates witness discovery from the decision to remove a feature. Finite sampling preserves witness validity but not witness completeness, and sampled 0 or $+1$ does not certify the corresponding exact class. MinPPI is a worst-case support statistic rather than an interaction index: unlike Shapley interaction indices~\citep{grabisch1999axiomatic} and their Shapley--Owen specialization~\citep{rabitti2019shapley}, which quantify feature interactions beyond single-feature attribution, MinPPI certifies a single harmful threshold-crossing witness per feature. This distinction is important because the retained study does not support a universal selector ranking: MinPPI stayed close to full-model utility descriptively, yet had mean rank 4.08 among six methods, and Abalone exhibited a negative mean held-out effect.
 
 The downstream results are similarly conditional. Madelon accounts for most of the positive average hypervolume change; Credit-Card-Fraud and Abalone show only small positive differences, while Gisette and Spambase show small decreases. This pattern is compatible with prefiltering being useful when its accepted set removes distracting dimensions, but the study neither identifies a general dataset condition nor establishes statistical superiority. The registered validation gate also cannot guarantee held-out non-inferiority; it uses no test information by design.
 
