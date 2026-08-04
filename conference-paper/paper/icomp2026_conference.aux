@@ -10,7 +10,6 @@
 \citation{verhaeghe2022powershap}
 \citation{zhao2025shapg}
 \citation{lippl2024inductive}
-\citation{siam2026exploring}
 \citation{zheng2026minshap}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
 \newlabel{sec:intro}{{1}{1}{Introduction}{section.1}{}}
@@ -31,7 +30,7 @@
 \newlabel{eq:sample-min}{{4}{2}{Finite-Budget Estimation}{equation.4}{}}
 \newlabel{eq:sample-min@cref}{{[equation][4][]4}{[1][2][]2}{}{}{}}
 \newlabel{eq:detection}{{5}{3}{Finite-Budget Estimation}{equation.5}{}}
-\newlabel{eq:detection@cref}{{[equation][5][]5}{[1][3][]3}{}{}{}}
+\newlabel{eq:detection@cref}{{[equation][5][]5}{[1][2][]3}{}{}{}}
 \newlabel{eq:constructed-game}{{6}{3}{Finite-Budget Estimation}{equation.6}{}}
 \newlabel{eq:constructed-game@cref}{{[equation][6][]6}{[1][3][]3}{}{}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Quota-Indexed Selection and Validation Gate}{3}{subsection.2.4}\protected@file@percent }
@@ -59,8 +58,8 @@
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Validation-gated matched removal. (a) Descriptive mean descending ranks (1 is best) among all six methods across six benchmark datasets, computed from each method's five-seed mean $\Delta U$; the full model participates in the ranking but is omitted from the display. (b) Five-seed mean $\Delta U$, where positive values favor removal. Each control uses the accepted MinPPI-matched removal count, and 30 random-matched subset trials are averaged within seed. The display is descriptive and does not establish a broad method ordering.}}{5}{figure.1}\protected@file@percent }
 \newlabel{fig:removal}{{1}{5}{Validation-gated matched removal. (a) Descriptive mean descending ranks (1 is best) among all six methods across six benchmark datasets, computed from each method's five-seed mean $\Delta U$; the full model participates in the ranking but is omitted from the display. (b) Five-seed mean $\Delta U$, where positive values favor removal. Each control uses the accepted MinPPI-matched removal count, and 30 random-matched subset trials are averaged within seed. The display is descriptive and does not establish a broad method ordering}{figure.1}{}}
 \newlabel{fig:removal@cref}{{[figure][1][]1}{[1][4][]5}{}{}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Five-seed mean held-out utility achieved by each removal variant after deleting the accepted MinPPI-matched count of features. Utility is ROC AUC, one-vs-rest AUC, or $R^2$ by task; higher is better, and values are comparable only within a row. ``Full'' is the full-model utility, and all variants on a dataset use the same deletion budget. SHAP, MinShap, Banzhaf, and Random abbreviate SHAP-bottom, MinShap-bottom, Banzhaf-bottom, and random-matched; Credit abbreviates Credit-Card-Fraud.}}{5}{table.3}\protected@file@percent }
-\newlabel{tab:utility}{{3}{5}{Five-seed mean held-out utility achieved by each removal variant after deleting the accepted MinPPI-matched count of features. Utility is ROC AUC, one-vs-rest AUC, or $R^2$ by task; higher is better, and values are comparable only within a row. ``Full'' is the full-model utility, and all variants on a dataset use the same deletion budget. SHAP, MinShap, Banzhaf, and Random abbreviate SHAP-bottom, MinShap-bottom, Banzhaf-bottom, and random-matched; Credit abbreviates Credit-Card-Fraud}{table.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Five-seed mean held-out utility after each removal variant deletes the accepted MinPPI-matched count. Utility is ROC AUC, OVR AUC, or $R^2$ by task; higher is better and comparable within a row; Full is the full-model utility. SHAP/MinShap/Banzhaf/Random/Credit abbreviate SHAP-bottom/MinShap-bottom/Banzhaf-bottom/random-matched/Credit-Card-Fraud.}}{5}{table.3}\protected@file@percent }
+\newlabel{tab:utility}{{3}{5}{Five-seed mean held-out utility after each removal variant deletes the accepted MinPPI-matched count. Utility is ROC AUC, OVR AUC, or $R^2$ by task; higher is better and comparable within a row; Full is the full-model utility. SHAP/MinShap/Banzhaf/Random/Credit abbreviate SHAP-bottom/MinShap-bottom/Banzhaf-bottom/random-matched/Credit-Card-Fraud}{table.3}{}}
 \newlabel{tab:utility@cref}{{[table][3][]3}{[1][4][]5}{}{}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ2: Quota Sensitivity}{6}{subsection.4.2}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Overview of MinPPI. (a) Exact minimum marginals in the five-feature game of~equation~\ref {eq:constructed-game}: $f_1=-1$ and all other features are neutral at the worst-case level. (b) Geometric detection probabilities for the unique harmful witness under random MC ($p_-=1/30=.0333$) and Algorithm B's perturbation kernel conditional on the oracle seed $\{f_0,f_2\}$ ($\rho =.129$); this isolates the kernel and is not real-data guidance evidence. (c) Held-out evaluations of seed-42 validation-selected fronts for full and gated prefiltered NSGA-II, together with the registered $\alpha \in \{.85,.90,.95,.99\}$ operating points on Madelon and Credit-Card-Fraud. Connecting lines only order the $\alpha $ values and do not assert held-out nondominance.}}{6}{figure.2}\protected@file@percent }
@@ -69,17 +68,17 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.3}RQ3: Prefiltered Multi-Objective Search}{6}{subsection.4.3}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Hypervolume convergence of full versus validation-gated MinPPI-prefiltered NSGA-II under the matched 800-evaluation budget. Each panel is a dataset; blue and green lines are the five-seed means of cumulative-best validation hypervolume for the full and MinPPI-prefiltered variants, with shading $\pm $ one seed-level standard deviation and reference point $(1.1,1.1)$. Prefiltering leaves the curves essentially coincident on most datasets and produces a sustained improvement on Madelon; the dataset-averaged held-out hypervolume change is +0.016{}. Both variants consume the same 800 evaluations, and no dataset-wise comparison survives the registered exact paired sign-flip tests with within-endpoint Holm correction.}}{7}{figure.3}\protected@file@percent }
 \newlabel{fig:prefilter}{{3}{7}{Hypervolume convergence of full versus validation-gated MinPPI-prefiltered NSGA-II under the matched 800-evaluation budget. Each panel is a dataset; blue and green lines are the five-seed means of cumulative-best validation hypervolume for the full and MinPPI-prefiltered variants, with shading $\pm $ one seed-level standard deviation and reference point $(1.1,1.1)$. Prefiltering leaves the curves essentially coincident on most datasets and produces a sustained improvement on Madelon; the dataset-averaged held-out hypervolume change is \NsgaMeanHvChange {}. Both variants consume the same 800 evaluations, and no dataset-wise comparison survives the registered exact paired sign-flip tests with within-endpoint Holm correction}{figure.3}{}}
-\newlabel{fig:prefilter@cref}{{[figure][3][]3}{[1][7][]7}{}{}{}}
+\newlabel{fig:prefilter@cref}{{[figure][3][]3}{[1][6][]7}{}{}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.4}RQ4: Estimator, Guidance, and Utility Sensitivity}{7}{subsection.4.4}\protected@file@percent }
 \citation{grabisch1999axiomatic,rabitti2019shapley}
-\citation{lippl2024inductive,siam2026exploring}
+\citation{lippl2024inductive}
 \bibdata{icomp2026_conference}
 \bibcite{banzhaf1965weighted}{{1}{1965}{{Banzhaf}}{{}}}
+\bibcite{chandrashekar2014survey}{{2}{2014}{{Chandrashekar \& Sahin}}{{Chandrashekar and Sahin}}}
 \@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{8}{section.5}\protected@file@percent }
 \newlabel{sec:discussion}{{5}{8}{Discussion}{section.5}{}}
 \newlabel{sec:discussion@cref}{{[section][5][]5}{[1][8][]8}{}{}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{8}{section.6}\protected@file@percent }
-\bibcite{chandrashekar2014survey}{{2}{2014}{{Chandrashekar \& Sahin}}{{Chandrashekar and Sahin}}}
 \bibcite{cohen2007feature}{{3}{2007}{{Cohen et~al.}}{{Cohen, Dror, and Ruppin}}}
 \bibcite{deb2002fast}{{4}{2002}{{Deb et~al.}}{{Deb, Pratap, Agarwal, and Meyarivan}}}
 \bibcite{grabisch1999axiomatic}{{5}{1999}{{Grabisch \& Roubens}}{{Grabisch and Roubens}}}
@@ -92,20 +91,19 @@
 \bibcite{rabitti2019shapley}{{12}{2019}{{Rabitti \& Borgonovo}}{{Rabitti and Borgonovo}}}
 \bibcite{shapley1953value}{{13}{1953}{{Shapley}}{{}}}
 \bibcite{shapley1954method}{{14}{1954}{{Shapley \& Shubik}}{{Shapley and Shubik}}}
-\bibcite{siam2026exploring}{{15}{2026}{{Siam et~al.}}{{Siam, Tausif-Ul-Islam, Khan, Hossain, Amin, Khan, Farhan, and Sadeque}}}
-\bibcite{song2016shapley}{{16}{2016}{{Song et~al.}}{{Song, Nelson, and Staum}}}
-\bibcite{straffin1977shapley}{{17}{1977}{{Straffin}}{{}}}
-\bibcite{verhaeghe2022powershap}{{18}{2022}{{Verhaeghe et~al.}}{{Verhaeghe, Van Der~Donckt, Ongenae, and Van~Hoecke}}}
-\bibcite{xue2016survey}{{19}{2016}{{Xue et~al.}}{{Xue, Zhang, Browne, and Yao}}}
-\bibcite{zhao2025shapg}{{20}{2025}{{Zhao et~al.}}{{Zhao, Liu, and Parilina}}}
-\bibcite{zheng2026minshap}{{21}{2026}{{Zheng \& Raskutti}}{{Zheng and Raskutti}}}
+\bibcite{song2016shapley}{{15}{2016}{{Song et~al.}}{{Song, Nelson, and Staum}}}
+\bibcite{straffin1977shapley}{{16}{1977}{{Straffin}}{{}}}
+\bibcite{verhaeghe2022powershap}{{17}{2022}{{Verhaeghe et~al.}}{{Verhaeghe, Van Der~Donckt, Ongenae, and Van~Hoecke}}}
+\bibcite{xue2016survey}{{18}{2016}{{Xue et~al.}}{{Xue, Zhang, Browne, and Yao}}}
+\bibcite{zhao2025shapg}{{19}{2025}{{Zhao et~al.}}{{Zhao, Liu, and Parilina}}}
+\bibcite{zheng2026minshap}{{20}{2026}{{Zheng \& Raskutti}}{{Zheng and Raskutti}}}
 \bibstyle{icomp2026_conference}
 \@writefile{toc}{\contentsline {section}{\numberline {A}Proofs}{10}{appendix.A}\protected@file@percent }
 \newlabel{app:proofs}{{A}{10}{Proofs}{appendix.A}{}}
-\newlabel{app:proofs@cref}{{[section][1][]A}{[1][10][]10}{}{}{}}
+\newlabel{app:proofs@cref}{{[section][1][]A}{[1][9][]10}{}{}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {B}Quota Sweep}{10}{appendix.B}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Seed-42 quota operating points, shown as (compression, held-out $\Delta U$). Every cell has $n=1$.}}{10}{table.4}\protected@file@percent }
-\newlabel{tab:alpha}{{4}{10}{Seed-42 quota operating points, shown as (compression, held-out $\Delta U$). Every cell has $n=1$}{table.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Quota operating points, shown as (compression, held-out $\Delta U$). Every cell has $n=1$.}}{10}{table.4}\protected@file@percent }
+\newlabel{tab:alpha}{{4}{10}{Quota operating points, shown as (compression, held-out $\Delta U$). Every cell has $n=1$}{table.4}{}}
 \newlabel{tab:alpha@cref}{{[table][4][]4}{[1][10][]10}{}{}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {C}Reproducibility Details}{10}{appendix.C}\protected@file@percent }
-\gdef \@abspage@last{11}
+\gdef \@abspage@last{10}
