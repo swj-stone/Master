@@ -1,4 +1,4 @@
-\documentclass{article}
+\documentclass{article} % For LaTeX2e
 \usepackage{icomp2026_conference,times}
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -9,10 +9,15 @@
 \usepackage{amsthm}
 \usepackage{float}
 \usepackage{placeins}
+% Optional math command from https://github.com/goodfeli/dlbook_notation.
 \input{math_commands.tex}
+% Canonical publication values; bound to tables/publication/aggregate_metrics.csv
+% and paired_comparisons.csv via latex_macros_provenance.json. Do not edit by hand.
+\newcommand{\CreditCompression}{2.8\%}
+\newcommand{\CreditDeltaUtility}{-0.001}
+\newcommand{\NsgaMeanHvChange}{+0.016}
 
 \usepackage{hyperref}
-\hypersetup{hidelinks}
 \usepackage{url}
 \usepackage{cleveref}
 
@@ -32,7 +37,7 @@ We completed a registered seven-dataset campaign, but a post-run integrity audit
 \section{Introduction}
 \label{sec:intro}
 
-Feature selection balances predictive utility against the number of retained variables and is therefore naturally multi-objective~\citep{guyon2003introduction,chandrashekar2014survey,xue2016survey}. Cooperative-game methods treat features as players and a fitted model's utility as the coalition value~\citep{cohen2007feature}. The Shapley value and Banzhaf index summarize average marginal contributions~\citep{shapley1953value,banzhaf1965weighted}; SHAP made this view widely accessible for model explanation~\citep{lundberg2017unified}. Related selectors include Banzhaf-FS~\citep{karavas2017feature}, Powershap~\citep{verhaeghe2022powershap}, and ShapG~\citep{zhao2025shapg}. Evolutionary methods such as NSGA-II approximate empirical Pareto fronts but search a combinatorial feature space~\citep{deb2002fast,hamdani2007multi}.
+Feature selection balances predictive utility against the number of retained variables and is therefore naturally multi-objective~\citep{guyon2003introduction,chandrashekar2014survey,xue2016survey}. Cooperative-game methods treat features as players and a fitted model's utility as the coalition value, a formulation introduced by~\citet{cohen2007feature}. The Shapley value and Banzhaf index summarize average marginal contributions~\citep{shapley1953value,banzhaf1965weighted}; SHAP made this view widely accessible for model explanation~\citep{lundberg2017unified}. Related selectors include Banzhaf-FS~\citep{karavas2017feature}, Powershap~\citep{verhaeghe2022powershap}, and ShapG~\citep{zhao2025shapg}. Evolutionary methods such as NSGA-II approximate empirical Pareto fronts but search a combinatorial feature space~\citep{deb2002fast,hamdani2007multi}.
 
 A mean marginal contribution answers whether a feature helps on average, not whether there exists a coalition in which the feature reverses an otherwise acceptable decision. MinShap replaces averaging by minimum aggregation for general conditional-importance functionals~\citep{zheng2026minshap}. We specialize that aggregation to a binary utility-threshold game. This pairing supplies trinary support-level semantics: an observed $-1$ is existence-certified by an evaluated threshold-crossing coalition and, for a configured quota $\alpha$, the exact output needs no additional real-valued score cutoff. The quota remains a substantive user choice and is not removed by the construction.
 
@@ -139,7 +144,7 @@ NSGA-II endpoints are validation hypervolume, held-out hypervolume of the valida
 
 \subsection{RQ1: Validation-Gated Removal}
 
-Table~\ref{tab:removal} shows heterogeneous compression. Averaged over all 30 retained dataset--seed units, MinPPI removed 12.53\% of analyzed features; the descriptive mean held-out $\Delta U$ was $-.000313$ across heterogeneous AUC and $R^2$ scales, and 14 of 30 units removed at least one feature. Madelon had the largest mean compression (43.6\%) and a positive mean $\Delta U=+.00469$, whereas Abalone compressed by 27.5\% with mean $\Delta U=-.00565$. The raw harmful set passed its validation gate in 27 of 30 units, including 13 vacuous passes with no proposed removal; among the 17 nonempty candidate sets, 14 passed. The failed cases---Abalone seeds 42 and 1024 and Madelon seed 1024---backed off to zero removal, demonstrating that the gate is a substantive part of the procedure.
+Table~\ref{tab:removal} shows heterogeneous compression. Averaged over all 30 retained dataset--seed units, MinPPI removed 12.53\% of analyzed features; the descriptive mean held-out $\Delta U$ was $-.000313$ across heterogeneous AUC and $R^2$ scales, and 14 of 30 units removed at least one feature. Madelon had the largest mean compression (43.6\%) and a positive mean $\Delta U=+.00469$, whereas Abalone compressed by 27.5\% with mean $\Delta U=-.00565$; Credit-Card-Fraud compressed by \CreditCompression{} with held-out $\Delta U=\CreditDeltaUtility{} $. The raw harmful set passed its validation gate in 27 of 30 units, including 13 vacuous passes with no proposed removal; among the 17 nonempty candidate sets, 14 passed. The failed cases---Abalone seeds 42 and 1024 and Madelon seed 1024---backed off to zero removal, demonstrating that the gate is a substantive part of the procedure.
 
 \begin{table}[H]
 \caption{MinPPI removal at $\alpha=.95$ over five seeds. Compression and held-out $\Delta U=U_{\mathrm{selected}}-U_{\mathrm{full}}$ are mean $\pm$ sample SD. ``Raw pass'' counts validation-gate passes before backoff, including vacuous passes when no removal was proposed.}
@@ -184,7 +189,7 @@ The post-hoc 95\%-of-final-HV attainment diagnostic occurred 22.67 evaluations e
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{../figures/fig3_prefilter.pdf}
-\caption{Full versus validation-gated MinPPI-prefiltered NSGA-II under the matched 800-evaluation budget. Bars are five-seed means and whiskers are sample standard deviations for (a) held-out hypervolume of the validation-selected front, using reference point $(1.1,1.1)$, and (b) the post-hoc first evaluation attaining 95\% of that run's final-best validation hypervolume, where lower is earlier. The latter is not a stopping time. No dataset-wise comparison survives the registered exact paired sign-flip tests with within-endpoint Holm correction.}
+\caption{Full versus validation-gated MinPPI-prefiltered NSGA-II under the matched 800-evaluation budget. Bars are five-seed means and whiskers are sample standard deviations for (a) held-out hypervolume of the validation-selected front, using reference point $(1.1,1.1)$, where the dataset-averaged held-out change is \NsgaMeanHvChange{}, and (b) the post-hoc first evaluation attaining 95\% of that run's final-best validation hypervolume, where lower is earlier. The latter is not a stopping time. No dataset-wise comparison survives the registered exact paired sign-flip tests with within-endpoint Holm correction.}
 \label{fig:prefilter}
 \end{figure}
 
