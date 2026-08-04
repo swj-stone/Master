@@ -626,6 +626,22 @@ def _write_figure_tables(root: Path) -> tuple[Path, Path, Path, Path]:
                 "hypervolume": 0.7,
             },
         ]
+        + [
+            {
+                "run_kind": "smoke",
+                "dataset_id": "spambase",
+                "seed": 42,
+                "method": method,
+                "front_kind": "history",
+                "point_index": index,
+                "compression": 0.0,
+                "utility": 0.0,
+                "evaluation": 80 + 40 * index,
+                "hypervolume": base + 0.01 * index,
+            }
+            for method, base in (("full", 0.60), ("minppi_prefilter", 0.61))
+            for index in range(3)
+        ]
     ).to_csv(front, index=False, lineterminator="\n")
     return raw, aggregate, paired, front
 
@@ -1018,25 +1034,23 @@ def test_figures_reject_foreign_nsga_parameter(
     assert not (tmp_path / "foreign-nsga-parameter").exists()
 
 
-def test_prefilter_asset_retains_two_registered_endpoint_panels(
+def test_prefilter_asset_renders_per_dataset_convergence_grid(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    nsga = pd.DataFrame(
+    history = pd.DataFrame(
         [
             {
                 "dataset_id": "spambase",
+                "seed": seed,
                 "method": method,
-                "metric": metric,
-                "mean": value,
-                "sample_std": 0.1,
+                "point_index": index,
+                "evaluation": 80 + 40 * index,
+                "hypervolume": base + 0.001 * index,
             }
-            for method, metric, value in (
-                ("full", "test_hv", 0.6),
-                ("minppi_prefilter", "test_hv", 0.7),
-                ("full", "convergence_evaluation_count", 8.0),
-                ("minppi_prefilter", "convergence_evaluation_count", 4.0),
-            )
+            for method, base in (("full", 0.60), ("minppi_prefilter", 0.61))
+            for seed in (42, 123)
+            for index in range(5)
         ]
     )
     captured: dict[str, object] = {}
@@ -1046,27 +1060,18 @@ def test_prefilter_asset_retains_two_registered_endpoint_panels(
         return destination
 
     monkeypatch.setattr(figure_module, "_save", capture_figure)
-    figure_module._render_fig3({"nsga": nsga}, tmp_path, run_kind="smoke")
+    figure_module._render_fig3(
+        {"front_history": history}, tmp_path, run_kind="formal"
+    )
     fig = captured["figure"]
     try:
-        assert len(fig.axes) == 2
-        assert tuple(fig.get_size_inches()) == pytest.approx((7.5, 3.6))
-        assert [axis.get_title() for axis in fig.axes] == [
-            "(a) Held-out hypervolume",
-            "(b) Post-hoc 95%-HV attainment",
-        ]
-        for axis in fig.axes:
-            assert [label.get_text() for label in axis.get_xticklabels()] == [
-                "Spambase"
-            ]
-            assert min(label.get_fontsize() for label in axis.get_xticklabels()) >= 8
-            assert [text.get_text() for text in axis.get_legend().get_texts()] == [
-                "Full",
-                "MinPPI-prefiltered",
-            ]
-            assert min(
-                text.get_fontsize() for text in axis.get_legend().get_texts()
-            ) >= 8
+        assert len(fig.axes) == 6
+        assert tuple(fig.get_size_inches()) == pytest.approx((7.5, 5.0))
+        assert fig.axes[0].get_title() == "Spambase"
+        assert len(fig.axes[1].lines) == 0
+        handles, labels = fig.axes[0].get_legend_handles_labels()
+        assert labels == ["Full", "MinPPI-prefiltered"]
+        assert len(handles) == 2
     finally:
         figure_module.plt.close(fig)
 

@@ -426,6 +426,14 @@ def _prepare_panels(
         }
         if front_pairs != expected_front_pairs:
             raise ValueError("missing held-out Pareto front rows")
+    front_history = front[
+        (front["front_kind"] == "history") & front["method"].isin(_NSGA_METHODS)
+    ].copy()
+    _unique(
+        front_history,
+        ["dataset_id", "seed", "method", "point_index"],
+        "history front",
+    )
     if not paired.empty:
         if not paired["holm_family_id"].str.startswith("nsga2:").all():
             raise ValueError("paired comparison family is invalid")
@@ -441,6 +449,7 @@ def _prepare_panels(
         "ranks": ranks,
         "nsga": nsga,
         "front": test_front,
+        "front_history": front_history,
     }
 
 
@@ -927,49 +936,59 @@ def _render_fig2(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -
 
 def _render_fig3(panels: dict[str, pd.DataFrame], output: Path, run_kind: str) -> Path:
     with plt.rc_context(_RC):
-        fig, axes = plt.subplots(1, 2, figsize=(7.5, 3.6))
-        nsga = panels["nsga"]
-        datasets = sorted(nsga["dataset_id"].astype(str).unique())
-        x = np.arange(len(datasets), dtype=float)
-        width = 0.36
-        for axis, metric, title in (
-            (axes[0], "test_hv", "(a) Held-out hypervolume"),
-            (
-                axes[1],
-                "convergence_evaluation_count",
-                "(b) Post-hoc 95%-HV attainment",
-            ),
-        ):
-            for offset, method, color in (
-                (-width / 2, "full", "#999999"),
-                (width / 2, "minppi_prefilter", "#54a24b"),
+        history = panels["front_history"]
+        datasets = sorted(history["dataset_id"].astype(str).unique())
+        if not datasets:
+            raise ValueError("prefilter figure requires hypervolume history rows")
+        fig, axes = plt.subplots(
+            2,
+            3,
+            figsize=(7.5, 5.0),
+            sharex=True,
+            constrained_layout=True,
+            gridspec_kw={"hspace": 0.1, "wspace": 0.1},
+        )
+        for axis, dataset in zip(axes.ravel(), datasets):
+            for method, color, label in (
+                ("full", "#4c78a8", "Full"),
+                ("minppi_prefilter", "#54a24b", "MinPPI-prefiltered"),
             ):
-                rows = (
-                    nsga[(nsga["metric"] == metric) & (nsga["method"] == method)]
-                    .set_index("dataset_id")
-                    .loc[datasets]
-                )
-                errors = rows["sample_std"].to_numpy() if run_kind == "formal" else None
-                axis.bar(
-                    x + offset,
-                    rows["mean"].to_numpy(),
-                    width,
-                    yerr=errors,
-                    capsize=2 if errors is not None else 0,
-                    label=_DISPLAY_METHODS.get(method, method),
+                rows = history[
+                    (history["dataset_id"] == dataset) & (history["method"] == method)
+                ]
+                agg = rows.groupby("evaluation")["hypervolume"].agg(["mean", "std"])
+                axis.plot(
+                    agg.index,
+                    agg["mean"],
                     color=color,
+                    linewidth=1.6,
+                    label=label,
                 )
-            axis.set_xticks(
-                x,
-                [_DISPLAY_DATASETS.get(dataset, dataset) for dataset in datasets],
-                rotation=35,
-                ha="right",
-            )
-            axis.set_title(title)
-            axis.grid(True, axis="y", alpha=0.25)
-            axis.legend(fontsize=8)
+                if run_kind == "formal":
+                    axis.fill_between(
+                        agg.index,
+                        agg["mean"] - agg["std"],
+                        agg["mean"] + agg["std"],
+                        color=color,
+                        alpha=0.15,
+                    )
+            axis.set_title(_DISPLAY_DATASETS.get(dataset, dataset))
+            axis.set_box_aspect(1)
+            axis.grid(True, alpha=0.25)
+        for axis in axes.ravel()[len(datasets):]:
+            axis.axis("off")
+        axes[1, 0].set_xlabel("Evaluation count")
+        fig.supylabel("Cumulative-best hypervolume")
+        handles, labels = axes[0, 0].get_legend_handles_labels()
+        fig.legend(
+            handles,
+            labels,
+            loc="lower center",
+            ncol=2,
+            fontsize=8,
+            frameon=False,
+        )
         _smoke_label(fig, run_kind)
-        fig.tight_layout(rect=(0, 0, 1, 0.96))
         return _save(fig, output / "fig3_prefilter.pdf")
 
 
@@ -1015,15 +1034,16 @@ def make_fig2_cd_heatmap(
 def make_fig3_prefilter(
     aggregate_table_path: Path,
     comparison_table_path: Path,
+    front_table_path: Path,
     output_directory: Path,
     *,
     run_kind: str,
 ) -> Path:
     aggregate = _read_table(aggregate_table_path, _EXPECTED_AGGREGATE, run_kind)
     paired = _read_table(comparison_table_path, _EXPECTED_PAIRED, run_kind)
-    empty_front = pd.DataFrame(columns=_EXPECTED_FRONT)
+    front = _read_table(front_table_path, _EXPECTED_FRONT, run_kind)
     panels = _prepare_panels(
-        aggregate, paired, empty_front, run_kind=run_kind, require_front=False
+        aggregate, paired, front, run_kind=run_kind, require_front=False
     )
     return _render_fig3(panels, Path(output_directory), run_kind)
 
