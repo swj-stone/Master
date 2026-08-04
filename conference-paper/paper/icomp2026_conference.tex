@@ -145,6 +145,13 @@ NSGA-II endpoints are validation hypervolume, held-out hypervolume of the valida
 
 Table~\ref{tab:removal} shows heterogeneous compression. Averaged over all 30 dataset--seed units, MinPPI removed 12.53\% of analyzed features; the descriptive mean held-out $\Delta U$ was $-.000313$ across heterogeneous AUC and $R^2$ scales, and 14 of 30 units removed at least one feature. Madelon had the largest mean compression (43.6\%) and a positive mean $\Delta U=+.00469$, whereas Abalone compressed by 27.5\% with mean $\Delta U=-.00565$; Credit-Card-Fraud compressed by \CreditCompression{} with held-out $\Delta U=\CreditDeltaUtility{} $. The raw harmful set passed its validation gate in 27 of 30 units, including 13 vacuous passes with no proposed removal; among the 17 nonempty candidate sets, 14 passed. The failed cases backed off to zero removal, demonstrating that the gate is a substantive part of the procedure.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{../figures/fig2_cd_heatmap.pdf}
+\caption{Validation-gated matched removal. (a) Descriptive mean descending ranks (1 is best) among all six methods across six benchmark datasets, computed from each method's five-seed mean $\Delta U$; the full model participates in the ranking but is omitted from the display. (b) Five-seed mean $\Delta U$, where positive values favor removal. Each control uses the accepted MinPPI-matched removal count, and 30 random-matched subset trials are averaged within seed. The display is descriptive and does not establish a broad method ordering.}
+\label{fig:removal}
+\end{figure}
+
 \begin{table}[htbp]
 \caption{MinPPI removal at $\alpha=.95$ over five seeds. Compression and held-out $\Delta U=U_{\mathrm{selected}}-U_{\mathrm{full}}$ are mean $\pm$ sample SD. ``Raw pass'' counts validation-gate passes before backoff, including vacuous passes when no removal was proposed.}
 \label{tab:removal}
@@ -185,13 +192,6 @@ Spambase & .9858 & .9858 & .9858 & .9856 & .9859 & .9858 \\
 
 Table~\ref{tab:utility} lists the held-out utilities achieved by the removal variants as a baseline comparison on the same deletion budget.
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=\linewidth]{../figures/fig2_cd_heatmap.pdf}
-\caption{Validation-gated matched removal. (a) Descriptive mean descending ranks (1 is best) among all six methods across six benchmark datasets, computed from each method's five-seed mean $\Delta U$; the full model participates in the ranking but is omitted from the display. (b) Five-seed mean $\Delta U$, where positive values favor removal. Each control uses the accepted MinPPI-matched removal count, and 30 random-matched subset trials are averaged within seed. The display is descriptive and does not establish a broad method ordering.}
-\label{fig:removal}
-\end{figure}
-
 The descriptive, unweighted mean of the six dataset-level utilities was $.877807$ for MinPPI and $.878121$ for the full model, a difference of $-.000313$ (Wilcoxon $p=.4375$, Holm $p=1$); because ROC AUC, OVR AUC, and $R^2$ are mixed, this mean has no single common utility unit. MinPPI's mean rank among all six variants was 4.08. The omnibus Friedman test found no evidence of a method effect ($\chi^2=1.686$, $p=.891$), and every MinPPI pairwise Holm-adjusted $p$-value was 1. Figure~\ref{fig:removal} therefore visualizes effect heterogeneity rather than a critical-difference or superiority result. Random matched deletion was particularly unfavorable on Madelon ($\Delta U=-.0732$), but the formal ranking does not establish MinPPI as globally best.
 
 Together these results characterize MinPPI as a conservative feature-deletion strategy whose value scales with the amount of removable structure in the data. On Madelon, whose 500 features are dominated by irrelevant variables, MinPPI removed $43.6\%$ of analyzed features with a positive held-out $\Delta U$, indicating that it identifies genuinely harmful features. On ISOLET, where all 617 features carry signal, it correctly found nothing to remove. On Credit-Card-Fraud, Gisette, and Spambase---datasets with mostly relevant features---removals were small and near-lossless. The cautionary case is Abalone, a small regression dataset with a noisy target and only eight features, where MinPPI's $27.5\%$ removal slightly reduced held-out utility, suggesting that weakly informative features can be misclassified as harmful. The validation gate is a substantive safeguard in exactly this setting, vetoing the raw harmful set in the two Abalone seeds and one Madelon seed whose proposed removals failed the validation-loss bound. Compression is also seed-sensitive (standard deviations of roughly 25--32 percentage points on Madelon and Abalone), so the harmful set should be read as a five-seed aggregate rather than a single-run decision.
@@ -206,7 +206,7 @@ Together these results characterize MinPPI as a conservative feature-deletion st
 \label{fig:overview}
 \end{figure}
 
-The $\alpha$ sweep is a seed-42 sensitivity analysis ($n=1$ per point), not a model-selection exercise. Its trajectories were dataset-dependent and non-monotone. On Madelon, compression across $\alpha=(.85,.90,.95,.99)$ was $(.24,.49,.56,.51)$ with held-out $\Delta U=(+.0077,+.0227,-.0003,-.0054)$. On Abalone, compression was $(.375,.50,.50,0)$, while on Credit-Card-Fraud it rose from 0 at $.85$ and $.90$ to $.034$ at $.95$ and $.586$ at $.99$. Figure~\ref{fig:overview}(c) overlays the registered points for Madelon and Credit-Card-Fraud on held-out evaluations of their seed-42 validation-selected fronts; the complete six-dataset sweep is reported in Table~\ref{tab:alpha} in the appendix. The points illustrate quota sensitivity only; they do not prove monotonicity, held-out nondominance, or cross-seed safety.
+The $\alpha$ sweep is a seed-42 sensitivity analysis ($n=1$ per point), not a model-selection exercise. Its trajectories were dataset-dependent and non-monotone. On Madelon, compression across $\alpha=(.85,.90,.95,.99)$ was $(.24,.49,.56,.51)$ with held-out $\Delta U=(+.0077,+.0227,-.0003,-.0054)$. On Abalone, compression was $(.375,.50,.50,0)$, while on Credit-Card-Fraud it rose from 0 at $.85$ and $.90$ to $.034$ at $.95$ and $.586$ at $.99$. Figure~\ref{fig:overview}(c) overlays the registered points for Madelon and Credit-Card-Fraud on held-out evaluations of their seed-42 validation-selected fronts. The points illustrate quota sensitivity only; they do not prove monotonicity, held-out nondominance, or cross-seed safety.
 
 \FloatBarrier
 \subsection{RQ3: Prefiltered Multi-Objective Search}
@@ -225,9 +225,9 @@ The post-hoc 95\%-of-final-HV attainment diagnostic occurred 22.67 evaluations e
 \FloatBarrier
 \subsection{RQ4: Estimator, Guidance, and Utility Sensitivity}
 
-Abalone is the only dataset small enough for exact enumeration. Averaged over the five seed-level F1 scores, at budgets $2,5,10,25$, random MC achieved $.100,.150,.230,.443$, while MI-correlation guidance achieved $.000,.080,.133,.313$. The hybrid dispatcher scored 1 at every budget because it selected exact enumeration at eight features; this does not validate the approximate guidance heuristic. Thus the five-seed mean F1 for learned guidance was lower than random sampling at every registered finite budget; this is not a claim about every individual seed. Table~\ref{tab:estimator} in the appendix reports the full estimator comparison.
+Abalone is the only dataset small enough for exact enumeration. Averaged over the five seed-level F1 scores, at budgets $2,5,10,25$, random MC achieved $.100,.150,.230,.443$, while MI-correlation guidance achieved $.000,.080,.133,.313$. The hybrid dispatcher scored 1 at every budget because it selected exact enumeration at eight features; this does not validate the approximate guidance heuristic. Thus the five-seed mean F1 for learned guidance was lower than random sampling at every registered finite budget; this is not a claim about every individual seed.
 
-The seed-42 ablations likewise show sensitivity rather than a stable guidance ordering. On Madelon, random, MI-only, correlation-only, and MI-correlation seeds recovered 5, 16, 34, and 28 harmful labels; on Credit-Card-Fraud the counts were 6, 2, 2, and 1. On ISOLET, changing the utility while keeping the probability-producing classifier fixed changed the harmful count from 0 under the formal OVR AUC to 9 under accuracy. These single-seed results show that estimator and utility choices materially affect recovered labels, but they cannot support significance or cross-seed stability claims. Table~\ref{tab:ablation} summarizes the seed-42 harmful counts.
+The seed-42 ablations likewise show sensitivity rather than a stable guidance ordering. On Madelon, random, MI-only, correlation-only, and MI-correlation seeds recovered 5, 16, 34, and 28 harmful labels; on Credit-Card-Fraud the counts were 6, 2, 2, and 1. On ISOLET, changing the utility while keeping the probability-producing classifier fixed changed the harmful count from 0 under the formal OVR AUC to 9 under accuracy. These single-seed results show that estimator and utility choices materially affect recovered labels, but they cannot support significance or cross-seed stability claims.
 
 A practical reading follows. Exact enumeration and the hybrid dispatcher recover every harmful label on Abalone, so MinPPI's reliable value lies in the exact or hybrid path when the dimension is small enough; the MI-correlation guidance is best treated as a fallback for larger problems, where it is not validated to improve on random sampling. The sensitivity of the recovered harmful set to estimator, seed construction, and utility likewise reinforces that MinPPI should be consumed as a conservative, gate-protected, multi-seed aggregate rather than a single configuration.
 
@@ -278,78 +278,8 @@ because the left minimum is taken over a subset of the right minimum's arguments
 Let independent perturbations be drawn from $P_i$, and suppose a fixed harmful witness $S_i^*$ has mass $\rho_i>0$. One draw misses that witness with probability $1-\rho_i$; all $K_{\mathrm{adv}}$ draws miss it with probability $(1-\rho_i)^{K_{\mathrm{adv}}}$. Sampling $S_i^*$ implies detection, which yields~\eqref{eq:detection}. The statement is silent when $\rho_i=0$ and does not compare $P_i$ with the random-MC distribution.
 \end{proof}
 
-\section{Additional Formal Results}
-
-\subsection{Quota Sweep}
-
-Table~\ref{tab:alpha} reports the seed-42 quota sweep for the six benchmark datasets. Compression is the accepted removed fraction and $\Delta U$ is held-out selected-minus-full utility. The non-monotone rows show why $\alpha=.95$ was fixed before the campaign rather than chosen retrospectively.
-
-\begin{table}[H]
-\caption{Seed-42 quota operating points, shown as (compression, held-out $\Delta U$). Every cell has $n=1$.}
-\label{tab:alpha}
-\centering
-\scriptsize
-\begin{tabular}{lcccc}
-\toprule
-Dataset & $\alpha=.85$ & $\alpha=.90$ & $\alpha=.95$ & $\alpha=.99$ \\
-\midrule
-Abalone & $(.375,+.0041)$ & $(.500,-.0198)$ & $(.500,+.0010)$ & $(0,0)$ \\
-Credit-Card-Fraud & $(0,0)$ & $(0,0)$ & $(.034,-.0045)$ & $(.586,-.0057)$ \\
-Gisette & $(0,0)$ & $(0,0)$ & $(0,0)$ & $(.090,+.0002)$ \\
-ISOLET & $(0,0)$ & $(0,0)$ & $(0,0)$ & $(.010,-.000005)$ \\
-Madelon & $(.240,+.0077)$ & $(.490,+.0227)$ & $(.560,-.0003)$ & $(.510,-.0054)$ \\
-Spambase & $(0,0)$ & $(0,0)$ & $(0,0)$ & $(.196,-.0012)$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Estimator and Seed-42 Ablations}
-
-\begin{table}[H]
-\caption{Harmful-label F1 against exact Abalone labels over five seeds. Exact and hybrid equal 1 at all budgets because the hybrid dispatches to exact enumeration at eight features.}
-\label{tab:estimator}
-\centering
-\footnotesize
-\begin{tabular}{lcccc}
-\toprule
-Estimator & $K=2$ & $K=5$ & $K=10$ & $K=25$ \\
-\midrule
-Random MC & .100 & .150 & .230 & .443 \\
-MI-correlation guided & .000 & .080 & .133 & .313 \\
-Exact & 1.000 & 1.000 & 1.000 & 1.000 \\
-Hybrid dispatcher & 1.000 & 1.000 & 1.000 & 1.000 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[H]
-\caption{Seed-42 ablation harmful counts. A dash means exact enumeration was disallowed by the registered dimension limit, not that zero harmful features were found.}
-\label{tab:ablation}
-\centering
-\footnotesize
-\begin{tabular}{llrrrr}
-\toprule
-Axis & Variant & Abalone & Credit & ISOLET & Madelon \\
-\midrule
-Guidance & random & 2 & 6 & 1 & 5 \\
- & MI only & 2 & 2 & 0 & 16 \\
- & correlation only & 2 & 2 & 0 & 34 \\
- & MI-correlation & 2 & 1 & 0 & 28 \\
-\midrule
-Dispatcher & exact & 4 & -- & -- & -- \\
- & random MC & 2 & 2 & 0 & 34 \\
- & MI-correlation & 2 & 1 & 0 & 28 \\
- & hybrid & 4 & 1 & 0 & 56 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-For ISOLET, the registered utility ablation found 0 harmful features with formal OVR AUC and 9 with accuracy. The classifier family and probability outputs were held fixed; the difference is therefore attributable to the utility definition within this seed-42 comparison.
-
 \section{Reproducibility Details}
 
-The formal splits contain 64\% training, 16\% validation, and 20\% test observations. Dataset identities, split indices, transformation metadata, model policy, source identity, and the scientific software environment are recorded with cryptographic digests. Resume operations reject protocol drift. Training data fit preprocessing, guidance, and every coalition model. Validation utility is reused adaptively for threshold-game construction, the removal gate, and NSGA-II selection. The held-out partition is not used to choose features, the removal backoff, $\alpha$, or NSGA-II individuals; it is read only for registered outcome evaluation after validation selection. Tables and figures are rederived from canonical row-level records and independently hash-verified.
-
-The formal estimator set comprises exact enumeration where permitted, random MC, MI-correlation guidance, and the hybrid dispatcher. Removal controls delete the accepted MinPPI-matched count. NSGA-II-full and NSGA-II-prefilter use identical population, variation, evaluation budget, reference point, and validation-selection logic. Runtime, cache-hit, and physical-fit counters are diagnostic only and are excluded from predictive superiority claims.
+The formal splits contain 64\% training, 16\% validation, and 20\% test observations; dataset identities, split indices, transformation metadata, model policy, source identity, and the scientific software environment are recorded with cryptographic digests, and resume operations reject protocol drift. Training data fit preprocessing, guidance, and every coalition model; validation utility is reused adaptively for threshold-game construction, the removal gate, and NSGA-II selection, while the held-out partition is read only for registered outcome evaluation after validation selection. The estimator set, removal controls, and NSGA-II variants are as described in Section~3, and runtime, cache-hit, and physical-fit counters are diagnostic only and are excluded from predictive superiority claims. Tables and figures are rederived from canonical row-level records and independently hash-verified.
 
 \end{document}

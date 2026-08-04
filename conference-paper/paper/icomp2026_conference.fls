@@ -247,8 +247,6 @@ INPUT ../figures/fig3_prefilter.pdf
 INPUT ./icomp2026_conference.bbl
 INPUT ./icomp2026_conference.bbl
 INPUT icomp2026_conference.bbl
-INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
-INPUT c:/work/Latex/texlive/2026/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT icomp2026_conference.aux
 INPUT ./icomp2026_conference.out
 INPUT ./icomp2026_conference.out
