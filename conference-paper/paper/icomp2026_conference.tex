@@ -30,7 +30,7 @@
 
 \begin{abstract}
 Game-theoretic feature selection aggregates a feature's marginal contributions across coalitions by a mean, which can conceal a context in which adding that feature reverses an otherwise acceptable decision. Building on minimum marginal aggregation, we specialize it to a binary utility-threshold voting game and call the resulting quota-indexed support statistic the Min-Marginal Power Index (MinPPI). For a fixed quota $\alpha$, exact MinPPI lies in $\{-1,0,+1\}$, classifying each feature as harmful, neutral, or decisive at the worst-case level from witness-certified threshold crossings alone, without a second score cutoff. We pair exact computation with finite-budget estimators whose guarantees are stated only as conditional support-mass bounds, and pass MinPPI's harmful candidates through a validation gate before removal or multi-objective search.
-Across six benchmark datasets over five frozen seeds, MinPPI produced heterogeneous, low-powered evidence: it flagged harmful features on some datasets and none on others, and its validation-gated removals and prefiltering showed no significant average advantage over strong baselines. It is therefore best understood as a conservative feature-deletion strategy that removes only evidence-backed harmful features under a validation gate: removing little on some datasets while showing the clearest descriptive gains on others, particularly where the data contain abundant removable structure. We frame the contribution as methodological: an existence-guaranteed semantics for harmful features and a gate-protected removal procedure, rather than a claim of superior performance. 
+Across six benchmark datasets over five frozen seeds, MinPPI flagged harmful features on some datasets and none on others, removed 12.5\% of analyzed features at negligible held-out utility cost, markedly outperformed the same-budget random-matched control on the most-compressed datasets, and yielded a positive although non-significant average hypervolume change in prefiltered search. It is best understood as a conservative feature-deletion strategy that removes only evidence-backed harmful features under a validation gate, with the clearest descriptive gains where the data contain abundant removable structure. We frame the contribution as methodological: an existence-guaranteed semantics for harmful features and a gate-protected removal procedure. 
 \end{abstract}
 
 \section{Introduction}
@@ -136,6 +136,13 @@ The removal comparison includes full, MinPPI, SHAP-bottom~\citep{lundberg2017uni
 
 NSGA-II endpoints are validation hypervolume, held-out hypervolume of the validation-selected front, and a post-hoc attainment count: the first evaluation at which cumulative-best validation hypervolume reaches 95\% of that run's final-best value. This diagnostic is neither a stopping time nor attainment of a common quality target. Exact paired sign-flip tests align the five seed replicates and rely on descriptive seed-level sign exchangeability; Holm correction is applied within each seven-comparison endpoint family (six datasets plus the dataset-averaged result). The campaign completed every registered job in the five-seed core stages and the seed-42 sensitivity stages, with no approved omissions or skipped jobs. Protocol and provenance details are given in the Reproducibility Details in the appendix.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{../figures/fig2_cd_heatmap.pdf}
+\caption{Validation-gated matched removal. (a) Mean descending ranks (1 is best) of the six methods from their five-seed mean $\Delta U$ (full participates but is omitted). (b) Five-seed mean $\Delta U$; positive favors removal. Controls delete the accepted MinPPI-matched count, with 30 random-matched trials averaged per seed. Descriptive; no broad ordering claimed.}
+\label{fig:removal}
+\end{figure}
+
 \section{Results}
 \label{sec:results}
 
@@ -143,14 +150,9 @@ NSGA-II endpoints are validation hypervolume, held-out hypervolume of the valida
 
 
 
-Table~\ref{tab:removal} shows heterogeneous compression: averaged over the 30 dataset--seed units, MinPPI removed 12.53\% of analyzed features, with a descriptive mean held-out $\Delta U$ of $-.000313$ and nonzero removal in 14 of 30 units. Madelon had the largest compression (43.6\%) with a positive $\Delta U=+.00469$, Abalone compressed by 27.5\% with $\Delta U=-.00565$, and Credit-Card-Fraud by \CreditCompression{} with $\Delta U=\CreditDeltaUtility{} $. The raw harmful set passed the validation gate in 27 of 30 units (13 vacuous, 14 of 17 nonempty passed); the failed cases backed off to zero removal, showing the gate is substantive.
+Table~\ref{tab:removal} shows heterogeneous compression: averaged over the 30 dataset--seed units, MinPPI removed 12.53\% of analyzed features at a negligible mean held-out utility cost of $-.000313$ (nonzero removal in 14 of 30 units). Madelon had the largest compression (43.6\%) with a positive $\Delta U=+.00469$, Abalone compressed by 27.5\% with $\Delta U=-.00565$, and Credit-Card-Fraud by \CreditCompression{} with $\Delta U=\CreditDeltaUtility{} $; relative to the same-budget random-matched control, MinPPI's removals were markedly preferable on the two most-compressed datasets ($+.0047$ versus $-.0732$ on Madelon, $-.0056$ versus $-.0370$ on Abalone). The raw harmful set passed the validation gate in 27 of 30 units (13 vacuous, 14 of 17 nonempty passed); the failed cases backed off to zero removal, showing the gate is substantive.
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\linewidth]{../figures/fig2_cd_heatmap.pdf}
-\caption{Validation-gated matched removal. (a) Mean descending ranks (1 is best) of the six methods from their five-seed mean $\Delta U$ (full participates but is omitted). (b) Five-seed mean $\Delta U$; positive favors removal. Controls delete the accepted MinPPI-matched count, with 30 random-matched trials averaged per seed. Descriptive; no broad ordering claimed.}
-\label{fig:removal}
-\end{figure}
+
 
 \begin{table}[htbp]
 \caption{MinPPI removal at $\alpha=.95$ over five seeds. Compression and held-out $\Delta U$ are mean $\pm$ SD; ``raw pass'' counts validation-gate passes before backoff.}
@@ -252,7 +254,7 @@ Several limitations constrain interpretation. First, five paired seeds and six d
 
 \section{Conclusion}
 
-Exact MinPPI specializes minimum marginal aggregation to a binary utility-threshold game and yields a quota-conditioned three-way classification; finite-budget estimators certify only observed harmful threshold crossings. The resulting candidates feed a validation-gated removal or prefiltering step. Across the six benchmark datasets, the method produced nonzero and sometimes substantial compression on some datasets and a positive descriptive average NSGA-II hypervolume change, but neither removal superiority nor a general guidance advantage was detected. The appropriate conclusion is therefore methodological and conditional: MinPPI is a conservative feature-deletion strategy whose clearest descriptive gains are concentrated on datasets with abundant removable structure, and whose value otherwise depends on the model, split, dataset, estimator, utility, quota, and validation decision---consistent with the observation that harmful features are context-dependent rather than universally removable~\citep{lippl2024inductive}.
+Exact MinPPI specializes minimum marginal aggregation to a binary utility-threshold game and yields a quota-conditioned three-way classification; finite-budget estimators certify only observed harmful threshold crossings. The resulting candidates feed a validation-gated removal or prefiltering step. Across the six benchmark datasets, the method removed up to 44\% of features at negligible utility cost, markedly outperformed the same-budget random-matched control on the most-compressed datasets, and yielded a positive although non-significant average hypervolume change in prefiltered search; removal superiority and a general guidance advantage were not established. The appropriate conclusion is therefore methodological and conditional: MinPPI is a conservative feature-deletion strategy whose clearest descriptive gains are concentrated on datasets with abundant removable structure, and whose value otherwise depends on the model, split, dataset, estimator, utility, quota, and validation decision---consistent with the observation that harmful features are context-dependent rather than universally removable~\citep{lippl2024inductive}.
 
 \bibliography{icomp2026_conference}
 \bibliographystyle{icomp2026_conference}
