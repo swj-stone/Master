@@ -10,65 +10,50 @@ John~F. Banzhaf.
 \newblock Weighted voting doesn't work: A mathematical analysis.
 \newblock \emph{Rutgers Law Review}, 19:\penalty0 317--343, 1965.
 
-\bibitem[Chandrashekar \& Sahin(2014)Chandrashekar and
-  Sahin]{chandrashekar2014survey}
+\bibitem[Chandrashekar \& Sahin(2014)Chandrashekar and Sahin]{chandrashekar2014survey}
 Girish Chandrashekar and Ferat Sahin.
 \newblock A survey on feature selection methods.
-\newblock \emph{Computers \& Electrical Engineering}, 40\penalty0 (1):\penalty0
-  16--28, 2014.
+\newblock \emph{Computers \& Electrical Engineering}, 40\penalty0 (1):\penalty0 16--28, 2014.
 
 \bibitem[Cohen et~al.(2007)Cohen, Dror, and Ruppin]{cohen2007feature}
 Shay Cohen, Gideon Dror, and Eytan Ruppin.
 \newblock Feature selection via coalitional game theory.
-\newblock \emph{Neural Computation}, 19\penalty0 (7):\penalty0 1939--1961,
-  2007.
+\newblock \emph{Neural Computation}, 19\penalty0 (7):\penalty0 1939--1961, 2007.
 
 \bibitem[Deb et~al.(2002)Deb, Pratap, Agarwal, and Meyarivan]{deb2002fast}
 Kalyanmoy Deb, Amrit Pratap, Sameer Agarwal, and T.~Meyarivan.
 \newblock A fast and elitist multiobjective genetic algorithm: {NSGA-II}.
-\newblock \emph{IEEE Transactions on Evolutionary Computation}, 6\penalty0
-  (2):\penalty0 182--197, 2002.
+\newblock \emph{IEEE Transactions on Evolutionary Computation}, 6\penalty0 (2):\penalty0 182--197, 2002.
 
 \bibitem[Grabisch \& Roubens(1999)Grabisch and Roubens]{grabisch1999axiomatic}
 Michel Grabisch and Marc Roubens.
-\newblock An axiomatic approach to the concept of interaction among players in
-  cooperative games.
-\newblock \emph{International Journal of Game Theory}, 28:\penalty0 547--565,
-  1999.
+\newblock An axiomatic approach to the concept of interaction among players in cooperative games.
+\newblock \emph{International Journal of Game Theory}, 28:\penalty0 547--565, 1999.
 
 \bibitem[Guyon \& Elisseeff(2003)Guyon and Elisseeff]{guyon2003introduction}
 Isabelle Guyon and Andr{\'e} Elisseeff.
 \newblock An introduction to variable and feature selection.
-\newblock \emph{Journal of Machine Learning Research}, 3:\penalty0 1157--1182,
-  2003.
+\newblock \emph{Journal of Machine Learning Research}, 3:\penalty0 1157--1182, 2003.
 
 \bibitem[Hamdani et~al.(2007)Hamdani, Won, Alimi, and Karray]{hamdani2007multi}
 Tarek~M. Hamdani, Jin-Myung Won, Adel~M. Alimi, and Fakhri Karray.
 \newblock Multi-objective feature selection with {NSGA II}.
-\newblock In \emph{Proceedings of the 8th International Conference on Adaptive
-  and Natural Computing Algorithms (ICANNGA)}, volume 4431 of \emph{Lecture
-  Notes in Computer Science}, pp.\  240--247. Springer, 2007.
+\newblock In \emph{Proceedings of the 8th International Conference on Adaptive and Natural Computing Algorithms (ICANNGA)}, volume 4431 of \emph{Lecture Notes in Computer Science}, pp.\  240--247. Springer, 2007.
 
-\bibitem[Karavas et~al.(2017)Karavas, Michaloliakos, Diamantaras, and
-  Diakonikolas]{karavas2017feature}
-Vasileios Karavas, Antonis Michaloliakos, Konstantinos Diamantaras, and Ilias
-  Diakonikolas.
-\newblock Feature importance scores and lossless feature pruning using
-  {Banzhaf} power indices.
+\bibitem[Karavas et~al.(2017)Karavas, Michaloliakos, Diamantaras, and Diakonikolas]{karavas2017feature}
+Vasileios Karavas, Antonis Michaloliakos, Konstantinos Diamantaras, and Ilias Diakonikolas.
+\newblock Feature importance scores and lossless feature pruning using {Banzhaf} power indices.
 \newblock \emph{arXiv preprint arXiv:1711.04992}, 2017.
 
 \bibitem[Lippl \& Lindsey(2024)Lippl and Lindsey]{lippl2024inductive}
 Samuel Lippl and Jack Lindsey.
-\newblock Inductive biases of multi-task learning and finetuning: multiple
-  regimes of feature reuse.
-\newblock \emph{Advances in Neural Information Processing Systems},
-  37:\penalty0 118745--118776, 2024.
+\newblock Inductive biases of multi-task learning and finetuning: multiple regimes of feature reuse.
+\newblock \emph{Advances in Neural Information Processing Systems}, 37:\penalty0 118745--118776, 2024.
 
 \bibitem[Lundberg \& Lee(2017)Lundberg and Lee]{lundberg2017unified}
 Scott~M. Lundberg and Su-In Lee.
 \newblock A unified approach to interpreting model predictions.
-\newblock In \emph{Advances in Neural Information Processing Systems
-  (NeurIPS)}, volume~30, 2017.
+\newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS)}, volume~30, 2017.
 
 \bibitem[Owen(1972)]{owen1972multilinear}
 Guillermo Owen.
@@ -78,55 +63,42 @@ Guillermo Owen.
 \bibitem[Rabitti \& Borgonovo(2019)Rabitti and Borgonovo]{rabitti2019shapley}
 Giovanni Rabitti and Emanuele Borgonovo.
 \newblock A {Shapley-Owen} index for interaction quantification.
-\newblock \emph{SIAM/ASA Journal on Uncertainty Quantification}, 7\penalty0
-  (3):\penalty0 1060--1075, 2019.
+\newblock \emph{SIAM/ASA Journal on Uncertainty Quantification}, 7\penalty0 (3):\penalty0 1060--1075, 2019.
 
 \bibitem[Shapley(1953)]{shapley1953value}
 Lloyd~S. Shapley.
 \newblock A value for {$n$}-person games.
-\newblock In Harold~W. Kuhn and Albert~W. Tucker (eds.), \emph{Contributions to
-  the Theory of Games}, volume~2, pp.\  307--317. Princeton University Press,
-  1953.
+\newblock In Harold~W. Kuhn and Albert~W. Tucker (eds.), \emph{Contributions to the Theory of Games}, volume~2, pp.\  307--317. Princeton University Press, 1953.
 
 \bibitem[Shapley \& Shubik(1954)Shapley and Shubik]{shapley1954method}
 Lloyd~S. Shapley and Martin Shubik.
-\newblock A method for evaluating the distribution of power in a committee
-  system.
-\newblock \emph{American Political Science Review}, 48\penalty0 (3):\penalty0
-  787--792, 1954.
+\newblock A method for evaluating the distribution of power in a committee system.
+\newblock \emph{American Political Science Review}, 48\penalty0 (3):\penalty0 787--792, 1954.
 
 \bibitem[Song et~al.(2016)Song, Nelson, and Staum]{song2016shapley}
 Eunhye Song, Barry~L. Nelson, and Jeremy Staum.
-\newblock {Shapley} effects for global sensitivity analysis: Theory and
-  computation.
-\newblock \emph{SIAM/ASA Journal on Uncertainty Quantification}, 4:\penalty0
-  1060--1083, 2016.
+\newblock {Shapley} effects for global sensitivity analysis: Theory and computation.
+\newblock \emph{SIAM/ASA Journal on Uncertainty Quantification}, 4:\penalty0 1060--1083, 2016.
 
 \bibitem[Straffin(1977)]{straffin1977shapley}
 Philip~D. Straffin.
 \newblock The {Shapley-Shubik} and {Banzhaf} power indices as probabilities.
-\newblock In Alvin~E. Roth (ed.), \emph{The Shapley Value: Essays in Honor of
-  {Lloyd S. Shapley}}, pp.\  71--81. Cambridge University Press, 1977.
+\newblock In Alvin~E. Roth (ed.), \emph{The Shapley Value: Essays in Honor of {Lloyd S. Shapley}}, pp.\  71--81. Cambridge University Press, 1977.
 
-\bibitem[Verhaeghe et~al.(2022)Verhaeghe, Van Der~Donckt, Ongenae, and
-  Van~Hoecke]{verhaeghe2022powershap}
+\bibitem[Verhaeghe et~al.(2022)Verhaeghe, Van Der~Donckt, Ongenae, and Van~Hoecke]{verhaeghe2022powershap}
 Jarne Verhaeghe, Jonas Van Der~Donckt, Femke Ongenae, and Sofie Van~Hoecke.
 \newblock {Powershap}: A power-full {Shapley} feature selection method.
-\newblock In \emph{Proceedings of the European Conference on Machine Learning
-  and Principles and Practice of Knowledge Discovery in Databases (ECML PKDD)},
-  2022.
+\newblock In \emph{Proceedings of the European Conference on Machine Learning and Principles and Practice of Knowledge Discovery in Databases (ECML PKDD)}, 2022.
 
 \bibitem[Xue et~al.(2016)Xue, Zhang, Browne, and Yao]{xue2016survey}
 Bing Xue, Mengjie Zhang, Will~N. Browne, and Xin Yao.
 \newblock A survey on evolutionary computation approaches to feature selection.
-\newblock \emph{IEEE Transactions on Evolutionary Computation}, 20\penalty0
-  (4):\penalty0 606--626, 2016.
+\newblock \emph{IEEE Transactions on Evolutionary Computation}, 20\penalty0 (4):\penalty0 606--626, 2016.
 
 \bibitem[Zhao et~al.(2025)Zhao, Liu, and Parilina]{zhao2025shapg}
 Chi Zhao, Jiapeng Liu, and Elena Parilina.
 \newblock {ShapG}: New feature importance method based on the {Shapley} value.
-\newblock \emph{Engineering Applications of Artificial Intelligence}, 148,
-  2025.
+\newblock \emph{Engineering Applications of Artificial Intelligence}, 148, 2025.
 
 \bibitem[Zheng \& Raskutti(2026)Zheng and Raskutti]{zheng2026minshap}
 Chenghui Zheng and Garvesh Raskutti.
