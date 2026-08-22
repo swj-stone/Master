@@ -1,0 +1,106 @@
+{"kind":"deck","id":"pr/fjxa8j","name":"Deck"}
+{"kind":"layout","layoutId":"de9feb3a-76f5-4a32-b7b0-74739444bd27","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"bd76f8a4-874e-4897-8225-0109b5192baa","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/6v6phm","slide":1,"title":"MINPPI · MULTI-OBJECTIVE FEATURE SELECTION","textShapes":71}
+{"kind":"shape","id":"sh/5ovi9wzq","slide":1,"bbox":[0,0,4494,555]}
+{"kind":"shape","id":"sh/i14zeh0f","slide":1,"bbox":[0,0,34,555]}
+{"kind":"textbox","id":"sh/j2d07mh0","slide":1,"text":"MINPPI · MULTI-OBJECTIVE FEATURE SELECTION","textPreview":"MINPPI · MULTI-OBJECTIVE FEATURE SELECTION","textChars":42,"textLines":1,"bbox":[165,52,2880,58]}
+{"kind":"textbox","id":"sh/wzmhc7i9","slide":1,"text":"When average feature importance hides\ncontext-dependent harm","textPreview":"When average feature importance hides | context-dependent harm","textChars":60,"textLines":2,"bbox":[160,126,2940,235]}
+{"kind":"textbox","id":"sh/x0vi5czu","slide":1,"text":"When MinPPI returns −1, it records a concrete coalition where adding one feature makes an acceptable model fail the utility quota; a prespecified validation rule decides whether to use the proposed removal set.","textPreview":"When MinPPI returns −1, it records a concrete coalition where adding one feature makes an acceptable model fail the utility quota; a pres...","textChars":210,"textLines":1,"bbox":[165,386,2880,112]}
+{"kind":"shape","id":"sh/axkzax03","slide":1,"bbox":[3190,78,4,370]}
+{"kind":"textbox","id":"sh/vyt032ho","slide":1,"text":"Wenjie SHI","textPreview":"Wenjie SHI","textChars":10,"textLines":1,"bbox":[3270,92,1050,80]}
+{"kind":"textbox","id":"sh/gv618bid","slide":1,"text":"Saint Petersburg State University","textPreview":"Saint Petersburg State University","textChars":33,"textLines":1,"bbox":[3270,187,1065,67]}
+{"kind":"textbox","id":"sh/1wfihgzy","slide":1,"text":"Applied Mathematics and Control Processes (AMCP)","textPreview":"Applied Mathematics and Control Processes (AMCP)","textChars":48,"textLines":1,"bbox":[3270,270,1065,62]}
+{"kind":"textbox","id":"sh/x8jed4zm","slide":1,"text":"st147487@student.spbu.ru","textPreview":"st147487@student.spbu.ru","textChars":24,"textLines":1,"bbox":[3270,356,1065,62]}
+{"kind":"textbox","id":"sh/w7adkzi1","slide":1,"text":"APPLICATION FOR PARTICIPATION\nIN THE ASCOMP GRADUATE SCHOOL","textPreview":"APPLICATION FOR PARTICIPATION | IN THE ASCOMP GRADUATE SCHOOL","textChars":59,"textLines":2,"bbox":[3270,435,1065,88]}
+{"kind":"shape","id":"sh/b6hwbehw","slide":1,"bbox":[0,555,4494,270]}
+{"kind":"textbox","id":"sh/a58vi90b","slide":1,"text":"THE RESEARCH QUESTION","textPreview":"THE RESEARCH QUESTION","textChars":21,"textLines":1,"bbox":[160,610,540,48]}
+{"kind":"textbox","id":"sh/94ze94zq","slide":1,"text":"Can a feature be harmful only in context, and can it be removed without consulting the test set?","textPreview":"Can a feature be harmful only in context, and can it be removed without consulting the test set?","textChars":96,"textLines":1,"bbox":[160,664,2820,112]}
+{"kind":"shape","id":"sh/ojqdgzi5","slide":1,"bbox":[3118,608,3,166]}
+{"kind":"textbox","id":"sh/nihc7uhk","slide":1,"text":"STUDY SCOPE","textPreview":"STUDY SCOPE","textChars":11,"textLines":1,"bbox":[3195,607,1050,46]}
+{"kind":"textbox","id":"sh/mh8vep0z","slide":1,"text":"Six retained benchmarks\nFive frozen seeds\nOne model family","textPreview":"Six retained benchmarks | Five frozen seeds | One model family","textChars":58,"textLines":3,"bbox":[3195,662,1050,132]}
+{"kind":"textbox","id":"sh/t03elozu","slide":1,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[155,884,64,64]}
+{"kind":"textbox","id":"sh/8fuds3y9","slide":1,"text":"Why averages can miss harm","textPreview":"Why averages can miss harm","textChars":26,"textLines":1,"bbox":[223,882,1212,70]}
+{"kind":"shape","id":"sh/sv2p4rax","slide":1,"bbox":[155,959,1280,4]}
+{"kind":"textbox","id":"sh/dwv6dwbi","slide":1,"text":"A feature can look harmless on average yet make one otherwise acceptable coalition fail the utility quota. MinPPI searches for that concrete counterexample.","textPreview":"A feature can look harmless on average yet make one otherwise acceptable coalition fail the utility quota. MinPPI searches for that concr...","textChars":156,"textLines":1,"bbox":[155,990,1280,136]}
+{"kind":"textbox","id":"sh/qtk721sr","slide":1,"text":"ONE FOUND COALITION CERTIFIES HARM","textPreview":"ONE FOUND COALITION CERTIFIES HARM","textChars":34,"textLines":1,"bbox":[155,1152,1280,46]}
+{"kind":"shape","id":"sh/rutobmtc","slide":1,"bbox":[155,1217,340,112]}
+{"kind":"textbox","id":"sh/4r2p0ral","slide":1,"text":"ACCEPTABLE\nCOALITION","textPreview":"ACCEPTABLE | COALITION","textChars":20,"textLines":2,"bbox":[155,1217,340,112]}
+{"kind":"textbox","id":"sh/5sb69wb6","slide":1,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[510,1227,85,92]}
+{"kind":"shape","id":"sh/ipk7yhsv","slide":1,"bbox":[609,1217,286,112]}
+{"kind":"textbox","id":"sh/3qto7mt0","slide":1,"text":"ADD THE\nFEATURE","textPreview":"ADD THE | FEATURE","textChars":15,"textLines":2,"bbox":[609,1217,286,112]}
+{"kind":"textbox","id":"sh/gnipw7ap","slide":1,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[908,1227,85,92]}
+{"kind":"shape","id":"sh/hob65cba","slide":1,"bbox":[1007,1217,390,112]}
+{"kind":"textbox","id":"sh/jy98f2dw","slide":1,"text":"BELOW THE\nUTILITY THRESHOLD","textPreview":"BELOW THE | UTILITY THRESHOLD","textChars":27,"textLines":2,"bbox":[1007,1217,390,112]}
+{"kind":"textbox","id":"sh/yx076xwb","slide":1,"text":"The observed threshold flip is the witness: it explains exactly why the feature entered the removal candidate set.","textPreview":"The observed threshold flip is the witness: it explains exactly why the feature entered the removal candidate set.","textChars":114,"textLines":1,"bbox":[155,1364,1280,112]}
+{"kind":"shape","id":"sh/l0rqhcv2","slide":1,"bbox":[155,1510,1280,374]}
+{"kind":"textbox","id":"sh/kzip87eh","slide":1,"text":"EXACT FORM · BANZHAF REPRESENTATION","textPreview":"EXACT FORM · BANZHAF REPRESENTATION","textChars":35,"textLines":1,"bbox":[193,1536,1204,46]}
+{"kind":"textbox","id":"sh/7m98jmd8","slide":1,"text":"v_(α)(S) = 𝟙[U(𝓜_(S)) ≥ αU_(full)] , U_(full) = U(𝓜_(N)) , α ∈ (0 , 1]","textPreview":"v_(α)(S) = 𝟙[U(𝓜_(S)) ≥ αU_(full)] , U_(full) = U(𝓜_(N)) , α ∈ (0 , 1]","textChars":73,"textLines":1,"bbox":[193,1580,1204,68]}
+{"kind":"textbox","id":"sh/6l07ahwn","slide":1,"text":"MinPPIᵢ ≡ MinBzᵢ = min_(S ⊆ N ∖ { i } ) [v_(α)(S ∪ { i }) − v_(α)(S)]","textPreview":"MinPPIᵢ ≡ MinBzᵢ = min_(S ⊆ N ∖ { i } ) [v_(α)(S ∪ { i }) − v_(α)(S)]","textChars":69,"textLines":1,"bbox":[193,1646,1204,74]}
+{"kind":"textbox","id":"sh/torqlwvy","slide":1,"text":"S = feature coalition · U = validation utility · α = quota · 𝟙[·] = 1 if quota met, 0 otherwise","textPreview":"S = feature coalition · U = validation utility · α = quota · 𝟙[·] = 1 if quota met, 0 otherwise","textChars":96,"textLines":1,"bbox":[195,1724,1200,48]}
+{"kind":"textbox","id":"sh/8nipcred","slide":1,"text":"A found −1 certifies a threshold flip; sampled 0 or +1 may still miss a witness. Deletion requires the prespecified validation gate.","textPreview":"A found −1 certifies a threshold flip; sampled 0 or +1 may still miss a witness. Deletion requires the prespecified validation gate.","textChars":132,"textLines":1,"bbox":[201,1782,1188,96]}
+{"kind":"shape","id":"sh/vqt8nmd4","slide":1,"bbox":[155,1912,1280,443]}
+{"kind":"textbox","id":"sh/upk7ehwj","slide":1,"text":"WHY THE DECISION IS AUDITABLE","textPreview":"WHY THE DECISION IS AUDITABLE","textChars":29,"textLines":1,"bbox":[193,1944,1204,54]}
+{"kind":"textbox","id":"sh/etsrq5kv","slide":1,"text":"• The witness is a concrete evaluated coalition.\n• Harm is relative to the fixed model family, split, utility, and quota.\n• A removal candidate is proposed, not automatically deleted.","textPreview":"• The witness is a concrete evaluated coalition. | • Harm is relative to the fixed model family, split, utility, and quota. | • A removal...","textChars":183,"textLines":3,"bbox":[193,2007,1204,300]}
+{"kind":"textbox","id":"sh/fu1sjalg","slide":1,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1537,884,64,64]}
+{"kind":"textbox","id":"sh/0va9sv21","slide":1,"text":"How the decision is made","textPreview":"How the decision is made","textChars":24,"textLines":1,"bbox":[1605,882,1252,70]}
+{"kind":"shape","id":"sh/1wjal036","slide":1,"bbox":[1537,959,1320,4]}
+{"kind":"textbox","id":"sh/2xsru5kr","slide":1,"text":"MinPPI separates finding evidence from deciding whether to act on it.","textPreview":"MinPPI separates finding evidence from deciding whether to act on it.","textChars":69,"textLines":1,"bbox":[1537,990,1320,92]}
+{"kind":"shape","id":"sh/ny1snalc","slide":1,"bbox":[1568,1120,4,730]}
+{"kind":"shape","id":"sh/ozatwf2x","slide":1,"bbox":[1537,1105,66,66]}
+{"kind":"textbox","id":"sh/p03apk3i","slide":1,"text":"1","textPreview":"1","textChars":1,"textLines":1,"bbox":[1537,1105,66,66]}
+{"kind":"textbox","id":"sh/i18ril4n","slide":1,"text":"Freeze the decision rule","textPreview":"Freeze the decision rule","textChars":24,"textLines":1,"bbox":[1629,1102,1228,56]}
+{"kind":"textbox","id":"sh/j2hsbql8","slide":1,"text":"Fix the model, split, utility, quota, and validation tolerance before selection.","textPreview":"Fix the model, split, utility, quota, and validation tolerance before selection.","textChars":80,"textLines":1,"bbox":[1629,1160,1228,100]}
+{"kind":"shape","id":"sh/lwnuhonq","slide":1,"bbox":[1537,1300,66,66]}
+{"kind":"textbox","id":"sh/kvedojm5","slide":1,"text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[1537,1300,66,66]}
+{"kind":"textbox","id":"sh/zu5cfe5k","slide":1,"text":"Find a harm witness","textPreview":"Find a harm witness","textChars":19,"textLines":1,"bbox":[1629,1297,1228,56]}
+{"kind":"textbox","id":"sh/ytwvm94z","slide":1,"text":"Find a coalition that meets the quota before feature i is added and falls below it afterwards.","textPreview":"Find a coalition that meets the quota before feature i is added and falls below it afterwards.","textChars":94,"textLines":1,"bbox":[1629,1355,1228,100]}
+{"kind":"shape","id":"sh/9k7ulonm","slide":1,"bbox":[1537,1495,66,66]}
+{"kind":"textbox","id":"sh/8jydsjm1","slide":1,"text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[1537,1495,66,66]}
+{"kind":"textbox","id":"sh/7i5cje5w","slide":1,"text":"Apply the validation rule","textPreview":"Apply the validation rule","textChars":25,"textLines":1,"bbox":[1629,1492,1228,56]}
+{"kind":"textbox","id":"sh/mhwvqt4b","slide":1,"text":"Accept or veto the entire proposed removal set under the prespecified validation-utility tolerance.","textPreview":"Accept or veto the entire proposed removal set under the prespecified validation-utility tolerance.","textChars":99,"textLines":1,"bbox":[1629,1550,1228,100]}
+{"kind":"shape","id":"sh/po3u94ni","slide":1,"bbox":[1537,1690,66,66]}
+{"kind":"textbox","id":"sh/onudgzmx","slide":1,"text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[1537,1690,66,66]}
+{"kind":"textbox","id":"sh/0jilc3i5","slide":1,"text":"Open the held-out test last","textPreview":"Open the held-out test last","textChars":27,"textLines":1,"bbox":[1629,1687,1228,56]}
+{"kind":"textbox","id":"sh/1krmlozq","slide":1,"text":"Measure the frozen decision only after selection is complete.","textPreview":"Measure the frozen decision only after selection is complete.","textChars":61,"textLines":1,"bbox":[1629,1745,1228,100]}
+{"kind":"shape","id":"sh/ehg3at0z","slide":1,"bbox":[1537,1922,1320,480]}
+{"kind":"textbox","id":"sh/fip4jyhk","slide":1,"text":"SEPARATION OF ROLES","textPreview":"SEPARATION OF ROLES","textChars":19,"textLines":1,"bbox":[1579,1954,1236,50]}
+{"kind":"textbox","id":"sh/oni5g3i1","slide":1,"text":"Witness search asks what can be harmful.\nValidation asks whether removal is acceptable.\nHeld-out data asks what happened after the decision.","textPreview":"Witness search asks what can be harmful. | Validation asks whether removal is acceptable. | Held-out data asks what happened after the de...","textChars":140,"textLines":3,"bbox":[1579,2024,1236,300]}
+{"kind":"textbox","id":"sh/p8rmp8zm","slide":1,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[2958,884,64,64]}
+{"kind":"textbox","id":"sh/2l03et0b","slide":1,"text":"Results were selective and dataset-dependent","textPreview":"Results were selective and dataset-dependent","textChars":44,"textLines":1,"bbox":[3026,882,1308,70]}
+{"kind":"shape","id":"sh/nm94nyhg","slide":1,"bbox":[2958,959,1376,4]}
+{"kind":"textbox","id":"sh/cb25knyd","slide":1,"text":"OVERALL PATTERN","textPreview":"OVERALL PATTERN","textChars":15,"textLines":1,"bbox":[2958,998,1376,46]}
+{"kind":"textbox","id":"sh/xcbmt8zy","slide":1,"text":"Descriptively, average reductions were modest, while held-out utility stayed close to that of the full model. Effects nevertheless differed substantially by dataset.","textPreview":"Descriptively, average reductions were modest, while held-out utility stayed close to that of the full model. Effects nevertheless differ...","textChars":165,"textLines":1,"bbox":[2958,1056,1376,190]}
+{"kind":"shape","id":"sh/76dojm10","slide":1,"bbox":[2958,1272,1376,2]}
+{"kind":"textbox","id":"sh/m547ahkf","slide":1,"text":"FIVE-SEED CASE CONTRAST","textPreview":"FIVE-SEED CASE CONTRAST","textChars":23,"textLines":1,"bbox":[2958,1302,1376,50]}
+{"kind":"textbox","id":"sh/98v6lcj6","slide":1,"text":"MEAN FEATURE-SET REDUCTION","textPreview":"MEAN FEATURE-SET REDUCTION","textChars":26,"textLines":1,"bbox":[3188,1362,690,42]}
+{"kind":"textbox","id":"sh/87mpcril","slide":1,"text":"HELD-OUT UTILITY","textPreview":"HELD-OUT UTILITY","textChars":16,"textLines":1,"bbox":[3908,1362,426,42]}
+{"kind":"textbox","id":"sh/z2dof21o","slide":1,"text":"MADELON","textPreview":"MADELON","textChars":7,"textLines":1,"bbox":[2958,1428,205,54]}
+{"kind":"shape","id":"sh/yhk76xkj","slide":1,"bbox":[3188,1442,400,42]}
+{"kind":"shape","id":"sh/l4v6hcju","slide":1,"bbox":[3188,1442,176,42]}
+{"kind":"textbox","id":"sh/k3mp8729","slide":1,"text":"44% fewer features","textPreview":"44% fewer features","textChars":18,"textLines":1,"bbox":[3618,1420,255,82]}
+{"kind":"textbox","id":"sh/jyx8r618","slide":1,"text":"Held-out utility remained close to the full model.","textPreview":"Held-out utility remained close to the full model.","textChars":50,"textLines":1,"bbox":[3908,1408,426,112]}
+{"kind":"shape","id":"sh/ido7i10n","slide":1,"bbox":[2958,1534,1376,2]}
+{"kind":"textbox","id":"sh/e94vat4f","slide":1,"text":"ABALONE","textPreview":"ABALONE","textChars":7,"textLines":1,"bbox":[2958,1602,205,54]}
+{"kind":"shape","id":"sh/fadw3yl0","slide":1,"bbox":[3188,1616,400,42]}
+{"kind":"shape","id":"sh/gbmxcjml","slide":1,"bbox":[3188,1616,112,42]}
+{"kind":"textbox","id":"sh/1cve5o36","slide":1,"text":"28% fewer features","textPreview":"28% fewer features","textChars":18,"textLines":1,"bbox":[3618,1594,255,82]}
+{"kind":"textbox","id":"sh/6lkv694j","slide":1,"text":"Held-out utility was lower than the full model.","textPreview":"Held-out utility was lower than the full model.","textChars":47,"textLines":1,"bbox":[3908,1582,426,112]}
+{"kind":"shape","id":"sh/rmtwzel4","slide":1,"bbox":[2958,1708,1376,2]}
+{"kind":"textbox","id":"sh/sn2d8jmp","slide":1,"text":"Bars show five-seed mean reduction after the validation gate.","textPreview":"Bars show five-seed mean reduction after the validation gate.","textChars":61,"textLines":1,"bbox":[2958,1726,1376,52]}
+{"kind":"textbox","id":"sh/t8be1o3a","slide":1,"text":"ELSEWHERE","textPreview":"ELSEWHERE","textChars":9,"textLines":1,"bbox":[2958,1802,1376,46]}
+{"kind":"textbox","id":"sh/ihkv294n","slide":1,"text":"Changes were small or mixed across the other four benchmarks.","textPreview":"Changes were small or mixed across the other four benchmarks.","textChars":61,"textLines":1,"bbox":[2958,1858,1376,90]}
+{"kind":"shape","id":"sh/jitwvels","slide":1,"bbox":[2958,1972,1376,460]}
+{"kind":"textbox","id":"sh/lczy1cna","slide":1,"text":"SEARCH NOTE","textPreview":"SEARCH NOTE","textChars":11,"textLines":1,"bbox":[2998,2004,1296,46]}
+{"kind":"textbox","id":"sh/kbqh8765","slide":1,"text":"Under the matched search budget, the clearest descriptive difference between prefiltered and full search appeared on Madelon. The pooled comparison was not statistically significant after correction, so recurrence elsewhere remains open.","textPreview":"Under the matched search budget, the clearest descriptive difference between prefiltered and full search appeared on Madelon. The pooled ...","textChars":237,"textLines":1,"bbox":[2998,2072,1296,300]}
+{"kind":"shape","id":"sh/zahgz25k","slide":1,"bbox":[0,2595,4494,584]}
+{"kind":"textbox","id":"sh/y98z6xoz","slide":1,"text":"THE PRACTICAL TAKEAWAY","textPreview":"THE PRACTICAL TAKEAWAY","textChars":22,"textLines":1,"bbox":[160,2647,1100,54]}
+{"kind":"textbox","id":"sh/d8zyxsne","slide":1,"text":"An observed MinPPI value of −1 links a concrete threshold flip to an auditable removal candidate.","textPreview":"An observed MinPPI value of −1 links a concrete threshold flip to an auditable removal candidate.","textChars":97,"textLines":1,"bbox":[160,2719,2440,92]}
+{"kind":"textbox","id":"sh/c76h4n6t","slide":1,"text":"Feature removal is validation-gated and inspectable, not automatic.","textPreview":"Feature removal is validation-gated and inspectable, not automatic.","textChars":67,"textLines":1,"bbox":[160,2833,2440,56]}
+{"kind":"shape","id":"sh/b6xgvi58","slide":1,"bbox":[2760,2659,3,306]}
+{"kind":"textbox","id":"sh/q5oz2xon","slide":1,"text":"WHERE THIS LEADS","textPreview":"WHERE THIS LEADS","textChars":16,"textLines":1,"bbox":[2860,2647,1200,54]}
+{"kind":"textbox","id":"sh/p4fytsni","slide":1,"text":"• Adaptive witness search\n• Broader replication across models and domains\n• Stronger leakage screening","textPreview":"• Adaptive witness search | • Broader replication across models and domains | • Stronger leakage screening","textChars":102,"textLines":3,"bbox":[2860,2721,1370,210]}
+{"kind":"shape","id":"sh/o36h0n6x","slide":1,"bbox":[160,3015,4175,2]}
+{"kind":"textbox","id":"sh/9ojadova","slide":1,"text":"SCOPE & INTEGRITY","textPreview":"SCOPE & INTEGRITY","textChars":17,"textLines":1,"bbox":[160,3043,390,45]}
+{"kind":"textbox","id":"sh/8na9kjup","slide":1,"text":"Six retained benchmarks · five frozen seeds · one XGBoost model family.\nCommunities & Crime was excluded post hoc for outcome-component leakage; all aggregates were recomputed.","textPreview":"Six retained benchmarks · five frozen seeds · one XGBoost model family. | Communities & Crime was excluded post hoc for outcome-component...","textChars":176,"textLines":2,"bbox":[510,3033,3825,82]}
+{"kind":"notes","id":"nt/6v6phm","slide":1,"text":"[Sources]\n- conference-paper/paper/icomp2026_conference.pdf\n- results/icomp2026_formal/icomp2026-formal-v1/tables/publication/aggregate_metrics.csv\n- results/icomp2026_formal/icomp2026-formal-v1/tables/publication/paired_comparisons.csv\n- results/icomp2026_formal/icomp2026-formal-v1/tables/publication/latex_macros_provenance.json\n[/Sources]\n[Evidence details]\n- Main campaign: six retained benchmarks x five frozen seeds.\n- Mean compression: 12.53%; mean held-out delta utility: -0.000313 (descriptive).\n- Madelon: 43.60% mean compression; held-out delta utility +0.00469.\n- Abalone: 27.50% mean compression; held-out delta utility -0.00565.\n- Prefiltered and full NSGA-II used the same 800-evaluation budget; the pooled held-out HV comparison was not significant after Holm correction (adjusted p=.4375).\n- A found -1 certifies a witnessed threshold flip; finite sampling does not make sampled 0/+1 complete.\n[/Evidence details]"}
