@@ -1,0 +1,693 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/y7jv98",
+    "id": "y7jv98",
+    "slide": 2,
+    "layoutId": "0100aa30-dfa1-41eb-922f-532ecc24cb4b",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "5e06f903-6c25-419c-8b10-948f7c9cefaa",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "0100aa30-dfa1-41eb-922f-532ecc24cb4b",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "5e06f903-6c25-419c-8b10-948f7c9cefaa",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "5e06f903-6c25-419c-8b10-948f7c9cefaa",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/p8vy1g7m",
+      "id": "1",
+      "name": "text-11",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Why study contextual harm?",
+      "textPreview": "Why study contextual harm?",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Why study contextual harm?"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Why study contextual harm?",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Why study contextual harm?",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/254f6l8b",
+      "id": "2",
+      "name": "rule-12",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/n6dgzqpw",
+      "id": "3",
+      "name": "text-13",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "02",
+      "textPreview": "02",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "02"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "02",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "02",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/cb6hcvqd",
+      "id": "4",
+      "name": "text-14",
+      "bbox": [
+        80,
+        225.33,
+        1440,
+        146.67
+      ],
+      "geometry": "rect",
+      "text": "A feature can help on average and still break\nan acceptable model in a particular subset.",
+      "textPreview": "A feature can help on average and still break | an acceptable model in a particular subset.",
+      "resolvedFontSize": 49.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 49.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A feature can help on average and still break"
+          },
+          {
+            "index": 2,
+            "text": "an acceptable model in a particular subset."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A feature can help on average and still break",
+          "resolvedTextStyle": {
+            "fontSize": 49.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A feature can help on average and still break",
+              "fontSize": 49.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "an acceptable model in a particular subset.",
+          "resolvedTextStyle": {
+            "fontSize": 49.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "an acceptable model in a particular subset.",
+              "fontSize": 49.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/xcfy507y",
+      "id": "5",
+      "name": "rule-15",
+      "bbox": [
+        80,
+        425.33,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#D7DEDF",
+      "lineWidth": 1.33
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/a94zal87",
+      "id": "6",
+      "name": "text-16",
+      "bbox": [
+        80,
+        461.33,
+        673.33,
+        53.33
+      ],
+      "geometry": "rect",
+      "text": "Scientific motivation",
+      "textPreview": "Scientific motivation",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Scientific motivation"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Scientific motivation",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Scientific motivation",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/baxg3qps",
+      "id": "7",
+      "name": "text-17",
+      "bbox": [
+        80,
+        534.67,
+        673.33,
+        180
+      ],
+      "geometry": "rect",
+      "text": "Redundancy, interactions and finite-sample fitting can make a variable useful in one subset and harmful in another.",
+      "textPreview": "Redundancy, interactions and finite-sample fitting can make a variable useful in one subset and harmful in another.",
+      "resolvedFontSize": 33.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 33.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Redundancy, interactions and finite-sample"
+          },
+          {
+            "index": 2,
+            "text": "fitting can make a variable useful in one"
+          },
+          {
+            "index": 3,
+            "text": "subset and harmful in another."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Redundancy, interactions and finite-sample fitting can make a variable useful in one subset and harmful in another.",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Redundancy, interactions and finite-sample fitting can make a variable useful in one subset and harmful in another.",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/sf2x0rq9",
+      "id": "8",
+      "name": "text-18",
+      "bbox": [
+        860,
+        461.33,
+        660,
+        53.33
+      ],
+      "geometry": "rect",
+      "text": "Practical motivation",
+      "textPreview": "Practical motivation",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Practical motivation"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Practical motivation",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Practical motivation",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/dgbytw7u",
+      "id": "9",
+      "name": "text-19",
+      "bbox": [
+        860,
+        534.67,
+        660,
+        180
+      ],
+      "geometry": "rect",
+      "text": "Fewer input variables may reduce measurement and model cost. A checked failure context gives a concrete reason to test removal.",
+      "textPreview": "Fewer input variables may reduce measurement and model cost. A checked failure context gives a concrete reason to test removal.",
+      "resolvedFontSize": 33.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 33.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 4,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Fewer input variables may reduce"
+          },
+          {
+            "index": 2,
+            "text": "measurement and model cost. A checked"
+          },
+          {
+            "index": 3,
+            "text": "failure context gives a concrete reason to"
+          },
+          {
+            "index": 4,
+            "text": "test removal."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Fewer input variables may reduce measurement and model cost. A checked failure context gives a concrete reason to test removal.",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Fewer input variables may reduce measurement and model cost. A checked failure context gives a concrete reason to test removal.",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tgz2xob6",
+      "id": "10",
+      "name": "text-20",
+      "bbox": [
+        80,
+        748,
+        1420,
+        69.33
+      ],
+      "geometry": "rect",
+      "text": "Potential value: traceable evidence for a selection decision, with utility loss checked separately.",
+      "textPreview": "Potential value: traceable evidence for a selection decision, with utility loss checked separately.",
+      "resolvedFontSize": 32,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 32,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Potential value: traceable evidence for a selection decision, with utility loss checked"
+          },
+          {
+            "index": 2,
+            "text": "separately."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Potential value: traceable evidence for a selection decision, with utility loss checked separately.",
+          "resolvedTextStyle": {
+            "fontSize": 32,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Potential value: traceable evidence for a selection decision, with utility loss checked separately.",
+              "fontSize": 32,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

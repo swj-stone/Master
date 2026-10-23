@@ -1,0 +1,158 @@
+{
+  "schemaVersion": "presentation-finalization.v1",
+  "finalSha256": "38e58ad1d57b02d4a75b6b7de8c7a33884d407b1d5c159510c209d9550c1de71",
+  "byteCount": 67049,
+  "packageIntegrity": {
+    "chart_count": 0,
+    "claim_boundary": "Structural package checks only; no slide text, notes, formulas, chart values, or native PowerPoint execution were inspected.",
+    "finding_count": 0,
+    "findings": [],
+    "notes_parts_skipped": 15,
+    "relationship_part_count": 35,
+    "slide_count": 15,
+    "status": "pass",
+    "exitCode": 0,
+    "findingCount": 0,
+    "warnings": []
+  },
+  "presentationLayout": {
+    "finding_count": 0,
+    "findings": [],
+    "font_policy": {
+      "checked_text_script_count": 204,
+      "native_font_rendering_verified": false,
+      "observed_font_families": [
+        "Arial"
+      ],
+      "observed_font_use_counts": {
+        "Arial": 204
+      },
+      "passed": true,
+      "performed": true
+    },
+    "slide_count": 15,
+    "slide_size_in": [
+      16.6667,
+      9.375
+    ],
+    "warning_count": 0,
+    "warnings": [],
+    "exitCode": 0,
+    "findingCount": 0,
+    "fontPolicy": {
+      "checked_text_script_count": 204,
+      "native_font_rendering_verified": false,
+      "observed_font_families": [
+        "Arial"
+      ],
+      "observed_font_use_counts": {
+        "Arial": 204
+      },
+      "passed": true,
+      "performed": true
+    }
+  },
+  "fontSelection": {
+    "basis": "design",
+    "approvedFamilies": [
+      "Arial"
+    ],
+    "scriptFonts": {
+      "ea": "Microsoft YaHei"
+    },
+    "referenceSha256": null,
+    "referenceFontsVerifiedInEncodedText": false,
+    "checked_text_script_count": 204,
+    "native_font_rendering_verified": false,
+    "observed_font_families": [
+      "Arial"
+    ],
+    "observed_font_use_counts": {
+      "Arial": 204
+    },
+    "passed": true,
+    "performed": true
+  },
+  "firstPartyImport": {
+    "performed": true,
+    "passed": true,
+    "slideCount": 15,
+    "sha256": "38e58ad1d57b02d4a75b6b7de8c7a33884d407b1d5c159510c209d9550c1de71",
+    "runtimeNodeModules": "C:/Users/swj17/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules",
+    "nodeExecutable": "C:\\Users\\swj17\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe"
+  },
+  "nativeTableArithmetic": {
+    "performed": true,
+    "checked_column_count": 0,
+    "checks": [],
+    "claim_boundary": "Displayed-value arithmetic with rounding tolerance; not source-data verification.",
+    "eligible_table_count": 0,
+    "finding_count": 0,
+    "findings": [],
+    "native_table_count": 3,
+    "passed": true,
+    "schema_version": "presentation-native-table-arithmetic.v1",
+    "skipped_tables": [
+      {
+        "reason": "no_numeric_amounts",
+        "slide": 7,
+        "table": 1
+      },
+      {
+        "reason": "no_numeric_amounts",
+        "slide": 9,
+        "table": 1
+      },
+      {
+        "reason": "no_numeric_amounts",
+        "slide": 12,
+        "table": 1
+      }
+    ],
+    "slide_count": 15,
+    "warning_count": 0,
+    "warnings": []
+  },
+  "nativeChartTitles": {
+    "performed": true,
+    "checks": [],
+    "finding_count": 0,
+    "findings": [],
+    "native_chart_count": 0,
+    "native_powerpoint_verified": false,
+    "passed": true,
+    "presentation_sha256": "38e58ad1d57b02d4a75b6b7de8c7a33884d407b1d5c159510c209d9550c1de71",
+    "schema_version": "presentation-native-chart-titles.v1",
+    "slide_count": 15,
+    "source_text_emitted": false,
+    "unresolved_linked_title_count": 0
+  },
+  "sourceDerivedPolicyFlags": [
+    "--expected-slide-size-emu",
+    "15240000,8572500",
+    "--validate-bullet-geometry",
+    "--validate-heading-fit",
+    "--require-native-table-slide",
+    "7",
+    "--require-native-table-slide",
+    "9",
+    "--require-native-table-slide",
+    "12",
+    "--cover-role",
+    "none",
+    "--expected-slide-count",
+    "15",
+    "--approved-font-family",
+    "Arial",
+    "--approved-script-font",
+    "ea=Microsoft YaHei"
+  ],
+  "nativeChartValidation": {
+    "detectedOwnerSlides": [],
+    "detectedChartCount": 0,
+    "targetApplication": "portable",
+    "sourceChartOwnersExplicitlyDeclared": true,
+    "validatorRan": false,
+    "passed": true
+  }
+}

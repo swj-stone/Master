@@ -1,0 +1,124 @@
+SLIDE 1
+讲述提示
+建议用时 30 秒。开场不念长标题。我的研究关注一个具体问题：我们往模型里增加一个输入变量时，它是否可能让原本达到要求的模型反而达不到要求？我希望保存这种失败的具体证据，再检验它能否帮助我们选择更小的特征集合。本次重点介绍研究设计，实验仍在推进。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex
+
+SLIDE 2
+讲述提示
+建议用时 60 秒。用垃圾邮件解释输入、模型和目标。每封邮件是一行数据，词频、标点、大写统计是输入，是否垃圾邮件是标签。实际使用时我们希望减少输入采集和维护成本。但固定学习器在有限样本下训练时，增加或删除输入的效果取决于其他输入，不能只凭直觉。减少特征能否节省总成本仍需要把审计开销一起测量。本研究希望为删除测试提供可复查的理由。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex Introduction
+https://archive.ics.uci.edu/dataset/94/spambase
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §1
+
+SLIDE 3
+讲述提示
+建议用时 55 秒。第三页直接介绍两个互补验证步骤。第一步，加入检查：用同样的训练配置，比较某个特征组合S以及加入i后的组合，看是否由达标变成不达标。这说明i对该组合有害，不等于它对全部特征或所有情境都天然有害。第二步，删除验证：从当前完整分析输入集合D提出删除候选，在独立数据上检验缩小模型之后的预测损失、压缩程度和总成本，判断整体是否值得。这一步属于计划中的删除决策实验。两步可以概括为先发现问题，再验证行动是否有价值。它们不是随机A与引导B那两个搜索算法，A/B只是第一步寻找上下文的不同方式。整个过程保持监督分类或回归任务不变。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §1–3 and §7
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §22.4
+
+SLIDE 4
+讲述提示
+建议用时 70 秒。按四行讲清公式。先定义D是本次分析的完整输入集合，S是其中一个不包含目标变量i的输入子集，这里的i是待检查的输入特征，不是预测标签y。U(S)表示用S训练模型后的验证集表现，分数越高越好。第一行，完整输入得分U(D)乘上比例alpha得到门槛q，默认alpha是0.95。这里取的是完整输入基准分数的95%，不是要求95%的分类准确率。D仅指本次分析的完整特征范围，例如八维面板，并不必然等于全部原始变量。第二行把连续分数转成是否达标：方括号中的条件成立取1，否则取0。第三行比较加入i前后两个达标状态，变化为负一表示从达标变为不达标。第四行MinPPI在所有不含i的子集上取最小变化，所以只要发现一次负一，精确MinPPI就是负一。找不到负一不等于已证明安全，因为有限采样可能漏掉上下文。所有比较固定数据划分、预处理、学习器、随机性、效用和门槛，要求U(D)>0且分数有限。下一页直接把0.90、0.95、0.87和0.84代入，不再引入新符号。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §3
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex Utility-Threshold Voting Game and Min-Marginal Power Indices
+
+SLIDE 5
+讲述提示
+建议用时 70 秒。只讲这一个数值例子。完整输入模型假设为0.90，取其95%得到门槛0.855。集合S训练的模型得分0.87，加入i重新训练后为0.84。除了输入集合之外，训练、验证和模型配置保持一致。这个由达标到不达标的变化，就是后面所有方法和实验围绕的证据。数字仅为教学示例，不是实验结果。必须强调，S可能只是完整输入的一部分，不能据此推出从完整集合删除i一定有益。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §3
+Illustrative utilities, not observed experimental results.
+
+SLIDE 6
+讲述提示
+建议用时 80 秒。这是整场答辩最重要的一页。按箭头走上排，再从右向左走下排。上排是审计：选一个变量i与上下文S，用两组输入分别训练相同类型的监督模型，检查有没有负向跨越门槛，保存可以复查的记录。有限预算下不断重复前三步。下排是独立的应用验证：把见证转化为一个待删除候选，交给没有参与候选选择的验证集，通过才采用，否则回到完整输入。最后在未用过的测试集上测压缩、预测损失和总成本。两排分别回答“发生过什么”和“是否值得采取行动”。下排属于计划中的决策实验。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §3–7 and §22.4
+
+SLIDE 7
+讲述提示
+建议用时 60 秒。合作博弈提供一种组织问题的语言：特征是参与者，输入集合是联盟，边际贡献是加入一个变量带来的变化。这里先把分数转成是否达标，再找所有上下文中最差的边际。出现从1到0的变化，最小值就是负一。经典Shapley或Banzhaf关注加权平均边际，本项目关注是否存在一个失败上下文。MinShap已有最小聚合思路，因此不把min本身说成首创。这里对应前面公式页的最小边际定义。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §2–3
+Shapley (1953), A Value for n-Person Games.
+Banzhaf (1965), Weighted Voting Doesn’t Work.
+Zheng & Raskutti (2026), https://arxiv.org/abs/2604.15107
+
+SLIDE 8
+讲述提示
+建议用时 60 秒。困难不在检查一对模型，而在输入组合太多。A先抽子集大小，再抽该大小内的子集。B使用训练侧互信息和相关结构引导候选上下文。两者只改变“去哪里找”，不会改变监督任务或判定标准。引导是否更有效是实验问题，不能因为使用了相关性就假定更好。找到负见证可以确认固定游戏中的这次失败；没有找到则可能是搜索遗漏。共同查询预算不等于共同实际耗时，因此还要测模型拟合和全流程成本。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §4
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md §5
+
+SLIDE 9
+讲述提示
+建议用时 85 秒。按研究用途解释选择，而不是报六组数字。Abalone只有八个输入，我们可以检查所有组合，且提供回归任务。Madelon是有标签的合成分类数据，包含有信息变量、冗余和干扰，但生成角色不等于MinPPI真值。Spambase的词频和字符统计容易对应到实际输入。Fraud提供稀有正类任务，其28个PCA主成分加金额仍用于有标签监督分类。当前35个精确游戏只来自这四套数据；Gisette和ISOLET属于更广的原始基准范围，并未加入这35个游戏。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §4
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md §2–3
+https://archive.ics.uci.edu/dataset/1/abalone
+https://archive.ics.uci.edu/dataset/171/madelon
+https://archive.ics.uci.edu/dataset/94/spambase
+https://www.openml.org/api/v1/json/data/1597
+
+SLIDE 10
+讲述提示
+建议用时 45 秒。这三项研究形成证据链，而不是三组互不相关的实验。第一层有精确参照，能判断发现是否充分，已经完成。第二层控制数据结构，解释为什么会漏，处于计划阶段。第三层独立验证删除收益，回答实际使用是否值得，也处于计划阶段。每层的结论都有边界，不能用第一层的结果替代第三层。项目内部对应E1、E2和E4，为答辩按研究问题顺序称Study1、2、3。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §4, §6, §7, §22
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md
+
+SLIDE 11
+讲述提示
+建议用时 60 秒。八个输入共有256个子集，因此能计算完整参照。这是为什么使用小面板：我们需要知道漏了多少，而不是只展示几个找到的案例。A和B不能看到完整答案，只能按预算查询自己选的子集。最后才由评价程序与精确标签比较，主要看整个预算过程的召回。已经完成四数据集、七面板、五划分组成的35个固定游戏。这里的精确答案仅针对各八维面板，不能外推成原始高维任务的真值。没有有害输入时召回没有定义，仍保留这些案例，不挑更容易展示成功的数据。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §4
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md §2–4
+
+SLIDE 12
+讲述提示
+建议用时 55 秒。真实数据看到差异后很难解释原因，所以第二项研究有目的地构造三个监督二分类机制。第一个是信号加无关变量，第二个增加带噪声的相关副本，第三个是两变量异或交互。仍然做完整枚举作为参照，再比较同预算A/B。每种五个预先固定实例，不根据结果换随机种子。这里“无关”或“冗余”是生成角色，不能直接当成有害标签。研究要检验这些结构如何改变见证和搜索难度，而不是预先假定任何一种一定有害。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §22.3–23
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_E2_PLAN.md
+
+SLIDE 13
+讲述提示
+建议用时 80 秒。第三项研究最接近实际使用价值。每个策略在选择验证集上只提交一个候选，再由独立gate判断是否满足事先设定的预测损失容忍度。通过采用候选，不通过回完整输入，不能反复试到通过。冻结决定后在非测试数据上重训，再测试。比较包括互信息、TreeSHAP、LOFO、RFE和由验证集选择这些候选的组合策略，主比较是MinPPI-A与该组合策略。公平性要求同一数据集内固定目标、划分、学习器、预处理规则、指标和容忍度，并纳入所有成本。分类AUC和回归R²分开解释，不能把其原始分数混合平均。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §7 and §22.4
+
+SLIDE 14
+讲述提示
+建议用时 45 秒。结果只讲三个认识。第一，35个小型游戏已完成，能够检查见证和遗漏。第二，当前这种B引导没有稳定优于随机A，不能包装成已证实的加速或优势。第三，是否值得删除还没有独立决策证据，因此接下来先做机制实验，再做独立删除实验。这里的负结果让我们更准确地限定算法适用条件，不推翻固定游戏中的见证定义。证据状态参考2026年9月26日台账。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md §1–8
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_WORKPLAN.md
+
+SLIDE 15
+讲述提示
+建议用时 45 秒。结尾回到价值。希望交付的不只是一个重要性分数，而是一组可以核查的理由：哪个输入在什么组合下造成达标失败；有限预算搜索遗漏多少；采取删除行动是否值得其成本。前两者属于方法与发现评价，最后一项需要下一步实验支持。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §1, §7 and §22
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md

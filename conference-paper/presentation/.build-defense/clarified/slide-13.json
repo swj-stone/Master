@@ -1,0 +1,854 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/jk33sc",
+    "id": "jk33sc",
+    "slide": 13,
+    "layoutId": "12e59a04-1f32-493b-b1bc-583bae36d0f4",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "ece9f690-d676-4f1a-a3f2-39b9a4f734cb",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "12e59a04-1f32-493b-b1bc-583bae36d0f4",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "ece9f690-d676-4f1a-a3f2-39b9a4f734cb",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "ece9f690-d676-4f1a-a3f2-39b9a4f734cb",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/7m1wruh0",
+      "id": "1",
+      "name": "text-107",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Planned experiment 2: controlled mechanisms",
+      "textPreview": "Planned experiment 2: controlled mechanisms",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Planned experiment 2: controlled mechanisms"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Planned experiment 2: controlled mechanisms",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Planned experiment 2: controlled mechanisms",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/s7axkzyl",
+      "id": "2",
+      "name": "rule-108",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/t8jet4zq",
+      "id": "3",
+      "name": "text-109",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "13",
+      "textPreview": "13",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "13"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "13",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "13",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ih8fepg3",
+      "id": "4",
+      "name": "text-110",
+      "bbox": [
+        80,
+        225.33,
+        1440,
+        65.33
+      ],
+      "geometry": "rect",
+      "text": "15 prespecified instances: 3 mechanisms × 5 instances",
+      "textPreview": "15 prespecified instances: 3 mechanisms × 5 instances",
+      "resolvedFontSize": 41.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 41.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "15 prespecified instances: 3 mechanisms × 5 instances"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "15 prespecified instances: 3 mechanisms × 5 instances",
+          "resolvedTextStyle": {
+            "fontSize": 41.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "15 prespecified instances: 3 mechanisms × 5 instances",
+              "fontSize": 41.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "table",
+      "scope": "slide",
+      "aid": "tb/6x0ja58j",
+      "id": "5",
+      "bbox": [
+        80,
+        325.33,
+        1440,
+        377.33
+      ],
+      "text": "Mechanism | Construction | Question it isolates\nAdditive signal | Two signal variables + six irrelevant variables | Does irrelevant input produce harmful contexts?\nCorrelated redundancy | Two signal variables + two noisy proxies + four irrelevant variables | How does redundancy change witness discovery?\nInteraction | Noisy XOR of two variables + six irrelevant variables | Can sampling recover contexts driven by interactions?",
+      "textPreview": "Mechanism | Construction | Question it isolates | Additive signal | Two signal variables + six irrelevant variables | Does irrelevant inp...",
+      "rows": 4,
+      "cols": 3,
+      "cells": [
+        {
+          "index": 1,
+          "row": 1,
+          "column": 1,
+          "bbox": [
+            80,
+            325.33,
+            333.33,
+            94.33
+          ],
+          "text": "Mechanism",
+          "textPreview": "Mechanism",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Mechanism",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Mechanism",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "row": 1,
+          "column": 2,
+          "bbox": [
+            413.33,
+            325.33,
+            566.67,
+            94.33
+          ],
+          "text": "Construction",
+          "textPreview": "Construction",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Construction",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Construction",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "row": 1,
+          "column": 3,
+          "bbox": [
+            980,
+            325.33,
+            540,
+            94.33
+          ],
+          "text": "Question it isolates",
+          "textPreview": "Question it isolates",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Question it isolates",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Question it isolates",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "row": 2,
+          "column": 1,
+          "bbox": [
+            80,
+            419.67,
+            333.33,
+            94.33
+          ],
+          "text": "Additive signal",
+          "textPreview": "Additive signal",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Additive signal",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Additive signal",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "row": 2,
+          "column": 2,
+          "bbox": [
+            413.33,
+            419.67,
+            566.67,
+            94.33
+          ],
+          "text": "Two signal variables + six irrelevant variables",
+          "textPreview": "Two signal variables + six irrelevant variables",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Two signal variables + six irrelevant variables",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Two signal variables + six irrelevant variables",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "row": 2,
+          "column": 3,
+          "bbox": [
+            980,
+            419.67,
+            540,
+            94.33
+          ],
+          "text": "Does irrelevant input produce harmful contexts?",
+          "textPreview": "Does irrelevant input produce harmful contexts?",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Does irrelevant input produce harmful contexts?",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Does irrelevant input produce harmful contexts?",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "row": 3,
+          "column": 1,
+          "bbox": [
+            80,
+            514,
+            333.33,
+            94.33
+          ],
+          "text": "Correlated redundancy",
+          "textPreview": "Correlated redundancy",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Correlated redundancy",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Correlated redundancy",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "row": 3,
+          "column": 2,
+          "bbox": [
+            413.33,
+            514,
+            566.67,
+            94.33
+          ],
+          "text": "Two signal variables + two noisy proxies + four irrelevant variables",
+          "textPreview": "Two signal variables + two noisy proxies + four irrelevant variables",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Two signal variables + two noisy proxies + four irrelevant variables",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Two signal variables + two noisy proxies + four irrelevant variables",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "row": 3,
+          "column": 3,
+          "bbox": [
+            980,
+            514,
+            540,
+            94.33
+          ],
+          "text": "How does redundancy change witness discovery?",
+          "textPreview": "How does redundancy change witness discovery?",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "How does redundancy change witness discovery?",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "How does redundancy change witness discovery?",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "row": 4,
+          "column": 1,
+          "bbox": [
+            80,
+            608.33,
+            333.33,
+            94.33
+          ],
+          "text": "Interaction",
+          "textPreview": "Interaction",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Interaction",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Interaction",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "row": 4,
+          "column": 2,
+          "bbox": [
+            413.33,
+            608.33,
+            566.67,
+            94.33
+          ],
+          "text": "Noisy XOR of two variables + six irrelevant variables",
+          "textPreview": "Noisy XOR of two variables + six irrelevant variables",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Noisy XOR of two variables + six irrelevant variables",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Noisy XOR of two variables + six irrelevant variables",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "row": 4,
+          "column": 3,
+          "bbox": [
+            980,
+            608.33,
+            540,
+            94.33
+          ],
+          "text": "Can sampling recover contexts driven by interactions?",
+          "textPreview": "Can sampling recover contexts driven by interactions?",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Can sampling recover contexts driven by interactions?",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Can sampling recover contexts driven by interactions?",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/kjqxgzy9",
+      "id": "6",
+      "name": "text-111",
+      "bbox": [
+        80,
+        732,
+        1440,
+        57.33
+      ],
+      "geometry": "rect",
+      "text": "Each instance: 2,000 rows, 8 features, full enumeration and the same A/B budget.",
+      "textPreview": "Each instance: 2,000 rows, 8 features, full enumeration and the same A/B budget.",
+      "resolvedFontSize": 32,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 32,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Each instance: 2,000 rows, 8 features, full enumeration and the same A/B budget."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Each instance: 2,000 rows, 8 features, full enumeration and the same A/B budget.",
+          "resolvedTextStyle": {
+            "fontSize": 32,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Each instance: 2,000 rows, 8 features, full enumeration and the same A/B budget.",
+              "fontSize": 32,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5kjep4zu",
+      "id": "7",
+      "name": "text-112",
+      "bbox": [
+        80,
+        804,
+        1440,
+        38.67
+      ],
+      "geometry": "rect",
+      "text": "A variable’s generating role does not determine its MinPPI label.",
+      "textPreview": "A variable’s generating role does not determine its MinPPI label.",
+      "resolvedFontSize": 26.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 26.67,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A variable’s generating role does not determine its MinPPI label."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A variable’s generating role does not determine its MinPPI label.",
+          "resolvedTextStyle": {
+            "fontSize": 26.67,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A variable’s generating role does not determine its MinPPI label.",
+              "fontSize": 26.67,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

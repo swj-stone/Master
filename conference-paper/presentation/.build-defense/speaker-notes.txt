@@ -1,0 +1,187 @@
+SLIDE 1
+讲述提示
+建议用时 25 秒。研究主题是 MinPPI：在给定模型、数据划分和效用门槛下寻找特征的上下文有害证据，并研究它能否支持特征选择。本次重点讲研究意义、理论和实验设计，实验结果仍在优化，不把阶段性观察当作最终优势。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_WORKPLAN.md
+Original presentation PDF, slide 1
+
+SLIDE 2
+讲述提示
+建议用时 40 秒。先解释为什么“多一个特征”不一定更好：我们讨论的是有限数据和固定学习算法下，重新拟合不同子集的实际表现。平均重要性会概括许多上下文，而研究希望保留一个可具体复查的失败上下文。实际意义是为压缩、后续模型维护提供证据，但是否降低成本或改善预测需要单独实验。这里并不声称相关变量都必须删除，也不把负 SHAP 当成有害标签。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §1–3
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex Introduction
+
+SLIDE 3
+讲述提示
+建议用时 35 秒。项目的目标分为三个可检验的问题。第一，有限预算能找全多少有害见证；第二，删除策略在统一容忍度下是否值得；第三，给出的证据能否复查、代价是否透明。这三个问题互相联系，但第一个见证成立并不能直接推出联合删除安全。预期产出是配额条件下的审计方法、精确参照评价以及独立的删除决策证据。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §1.1–1.3
+
+SLIDE 4
+讲述提示
+建议用时 60 秒。这一页明确学习范式。我们手里有成对的输入 X 和标签 y，模型根据已知标签学习映射，所以六个任务都是监督学习。特征是作为预测输入的一列，不是一个样本，也不是目标标签。以邮件为例，每一行是一封邮件，free 的词频、感叹号频率是输入列，是否垃圾邮件是目标。MinPPI 中的参与者就是当前表示的一列，联盟是一组列。每选一个联盟，都用相同的监督学习模型重新训练，再通过验证标签计算效用。数据集可以被用于其他研究，但当前项目并未执行无监督聚类或强化学习。PCA 是部分数据的表示来源，也不会改变这里的监督分类任务。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §3
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/configs/spambase.yaml
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/experiments/preprocess_data/preprocess_Spambase.py
+
+SLIDE 5
+讲述提示
+建议用时 40 秒。按用途介绍理论，不逐个念名词。合作博弈把特征看作参与者。Shapley 和 Banzhaf 的经典思想是平均边际贡献，而本研究问是否存在负向阈值翻转。最小聚合已有 MinShap 等直接前驱，因此不把 min 本身宣称为首创。本文将其特化为固定效用配额的二值博弈。概率论说明发现能力受见证概率限制；多目标优化用于后续的压缩与效用权衡。SHAP 对模型预测的归因与重新训练后的效用博弈需要区分。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §2–3
+Shapley (1953), A Value for n-Person Games; Banzhaf (1965), Weighted Voting Doesn’t Work: A Mathematical Analysis.
+Zheng & Raskutti (2026), MinShap: https://arxiv.org/abs/2604.15107
+Lundberg & Lee (2017), SHAP: https://arxiv.org/abs/1705.07874
+Deb et al. (2002), NSGA-II: https://doi.org/10.1109/4235.996017
+
+SLIDE 6
+讲述提示
+建议用时 45 秒。本页数字仅为教学示例。假设完整特征效用为 0.90，配额为它的 95%，即 0.855。集合 S 的效用 0.87 达标，加上 i 后效用 0.84 不达标，二元边际就是负一。保存特征集合、两侧模型效用和配额就能复查这次负翻转。注意，见证只说明在 S 这个上下文中出现过问题，并没有直接评价从完整集合删除 i 的结果。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §3
+All numerical utilities on this slide are explicitly illustrative.
+
+SLIDE 7
+讲述提示
+建议用时 50 秒。固定数据划分、预处理、学习器、随机种子、效用和配额，才得到本研究讨论的一个固定博弈。这里 U 是验证集上的表现，训练仍只使用训练集。二元博弈可非单调，所以增加特征可能从达标变成不达标。三个值是精确枚举下的定义，0 并不意味着没有预测价值；+1 要求所有上下文都是正向决定，是非常强的条件。MinSS 与 MinBz 的最小值相同，因为各目标排除子集都能作为某种排列的前驱集合，这不意味着经典加权指数相同。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §3
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex Method / Proposition 1
+
+SLIDE 8
+讲述提示
+建议用时 45 秒。算法 A 并不是对所有子集等概率，而是先等概率抽集合大小，再在该大小内等概率抽子集。算法 B 只使用训练侧的互信息和相关结构，不使用精确标签来指导寻找。采样最小值不低于真实最小值，所以负一一旦出现就有证据，但没有出现负一可能只是漏检。最新协议用总边际查询预算统一 A/B，找到了见证的特征会退出轮转。引导是否更好要看数据，不由理论公式自动保证。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §4.4–4.6
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md §5
+
+SLIDE 9
+讲述提示
+建议用时 50 秒。数据集中有标签，使我们能够把模型预测与真实目标进行比较，从而定义每个子集的效用。四个二分类使用 ROC AUC，ISOLET 是 26 分类并使用宏平均 one-vs-rest AUC，Abalone 在项目中将 Rings 作为回归目标并用 R² 评价。Madelon 虽然是人工生成数据，仍有标签，因而是监督分类。Abalone 的 Rings 与年龄有关，但本项目直接预测环数，不把年龄另加为输入。行数是项目使用的有标签样本量，列数不含目标。较高维池还会进行训练侧 MI 预筛选到最多100列。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex Table: Datasets
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/configs/credit_card_fraud.yaml
+https://archive.ics.uci.edu/dataset/94/spambase
+https://archive.ics.uci.edu/dataset/171/madelon
+https://archive.ics.uci.edu/dataset/170/gisette
+https://archive.ics.uci.edu/dataset/54/isolet
+https://archive.ics.uci.edu/dataset/1/abalone
+https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud
+
+SLIDE 10
+讲述提示
+建议用时 85 秒。详细说明三类变量。Spambase 的48维词频指某词占邮件单词数的百分比，6维字符频率和3维连续大写统计共同构成57列。目标 is_spam 不属于特征。Madelon 的5个信息维度加15个线性组合构成20个相关信息变量，另480个干扰列，总计500列。Gisette 把手写4和9图像转成数值描述，含像素及高阶乘积等衍生变量，再加入2500个干扰变量。这里的特征既可能是可解释的原始统计量，也可能是变换后的数值坐标。Madelon、Gisette 的原始变量身份并未按语义逐列公开，不能给 f_i 编造实际含义。已知生成角色也不能替代固定模型下的精确有害标签。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §3–4
+https://archive.ics.uci.edu/dataset/94/spambase
+https://archive.ics.uci.edu/dataset/171/madelon
+https://archive.ics.uci.edu/dataset/170/gisette
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/experiments/preprocess_data/preprocess_Spambase.py
+
+SLIDE 11
+讲述提示
+建议用时 85 秒。ISOLET 的617个数值是已经提取好的声学描述，不是原始音频波形；原始资料没有给出每列的具体语义顺序，所以只说明可核实的特征族。Fraud 是监督二分类，V1到V28是匿名PCA主成分，加上金额构成项目的29列，Time不进入本项目输入。PCA作为表示处理不意味着当前任务是无监督学习，标签 Class 仍用于训练和效用评价。PCA成分的负见证也不能直接解释成某个原始金融行为有害。Abalone 的八列全部列出，其中Sex是原始类别变量在现有数据中的数值表示，其余七列是尺寸和重量。Rings是目标，不是第九个输入。完整八维枚举提供精确参照。这些数据能用于项目的共同原因是标签、可选择的有限列集合，以及可计算的监督预测效用。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §3–4
+https://archive.ics.uci.edu/dataset/54/isolet
+https://www.openml.org/api/v1/json/data/1597
+https://archive-beta.ics.uci.edu/dataset/1/abalone
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/data/raw/abalone.csv
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/data/raw/credit_card_fraud.csv
+
+SLIDE 12
+讲述提示
+建议用时 55 秒。E1 的 35 个游戏已经完成，这是当前最直接的发现能力评价。组成是 Abalone 1 面板、其余三个数据集各 2 面板，再乘 5 个划分。每个八维游戏完整计算 256 个效用，之后 A/B 通过盲查询接口采样，不能访问完整表或精确标签。每个游戏 30 次日程重复，总上限 800 个边际查询。主终点为每次查询后的召回率平均值，也就是归一化召回面积。没有 harmful 的游戏不是失败，召回应记 NA，并保留分母。30 次日程重复也不是 30 个独立数据集。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §4
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md §2–4
+
+SLIDE 13
+讲述提示
+建议用时 50 秒。E2 尚未实施。真实数据很难解释哪些结构导致漏检，所以补三个受控机制。S1 是 logistic(x1+x2) 的二元任务；S2 额外加入 x3=x1+0.1e3、x4=x2+0.1e4；S3 是两变量符号的 XOR，再独立翻转 10% 的标签。每种五个固定实例，各 2,000 行八列。仍用同一模型和完整枚举，避免把生成角色当成审计真值：生成上无关不等于固定样本、模型、配额下有害。所有 15 个槽位都保留，不根据效果更换 seed。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §22.3 and §23
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_E2_PLAN.md
+
+SLIDE 14
+讲述提示
+建议用时 65 秒。这是应用层面最关键的改进，而且尚未完成。旧方案反复用同一验证集寻找见证和做 gate，新 E4 把验证部分分成独立的选择集与 gate。每种策略只能提交一个候选，gate 不通过就回 full，不能继续尝试直到通过。子集冻结后，统一在非测试 80% 上重新拟合模型，预处理参数仍来自原 64% train。分类允许损失 0.005 AUC，回归 0.01 raw R²。这只是预先固定的有限样本点估计规则，不等于统计上的无损或非劣保证。首批为四数据集各五划分，共 20 个八维决策游戏。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §7 and §22.4
+
+SLIDE 15
+讲述提示
+建议用时 50 秒。不能只赢过随机删除就认为有实用价值，因此引入简单、可解释的强对照。MI 按互信息，TreeSHAP 按平均绝对归因，静态 LOFO 逐一去掉特征后只计算一次得分，RFE 是同一 XGBoost 上的递归特征消除。portfolio 在选择验证集上合并三种排名的可行前缀，取最大压缩，并计入三个排名的全成本。主比较预先固定为 A 对 portfolio，不能看到 B 的效果后换主比较。逐数据集报告测试效用差，不将 AUC 和 R² 的原始差值直接平均成总体结论。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §7.3–7.4 and §22.4
+
+SLIDE 16
+讲述提示
+建议用时 40 秒。题目中的多目标特征选择由两个目标构成：保留特征比例和预测损失。一个解只有在至少一项更好、另一项不更差时才支配另一个解，所以最终得到多个折中解。NSGA-II 通过非支配排序和拥挤距离保持这些解的多样性。MinPPI 可在搜索前给出候选过滤，但这是次要应用。p0 必须使用过滤前相同的维数分母。旧实验的种群是 40、每个变体 800 evaluations，超体积参照点 (1.1,1.1)。相同搜索评价次数不代表同端到端耗时，重新比较前要把审计成本纳入。最新路线先完成发现和独立删除实验，再决定是否扩展搜索。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex Experimental design
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §7
+Deb et al. (2002), https://doi.org/10.1109/4235.996017
+
+SLIDE 17
+讲述提示
+建议用时 40 秒。按用户要求结果简要带过。以 9 月 26 日最新台账为准：35 个游戏完整完成，其中 22 个有 harmful，13 个为空；A/B 宏平均召回面积为 0.4012/0.3718，不能宣称 B 更优。该宏平均先在同游戏平均 30 日程，再到面板、数据集，最后四数据集等权，仅有定义游戏进入召回，空游戏仍保留覆盖分母。冷缓存六次检查只表明已访问的效用及轨迹可重现，不证明稳定加速。旧六数据集结果也不建立普遍选择优势。下一步的 E2 和独立 gate/test 决策实验仍未完成。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md §1–6
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_WORKPLAN.md Latest recovery entry
+
+SLIDE 18
+讲述提示
+建议用时 30 秒。结尾回到意义：提供一个可以复查的负向阈值翻转上下文，让特征选择的理由更具体；用精确参照衡量遗漏；再独立评价删除收益与成本。预期贡献不依赖必须证明 B 胜过 A，也不承诺通用选择优势。接下来按固定计划完成合成机制和独立决策实验。主讲至此结束，附录只在提问时使用。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §1 and §22
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md Next steps
+
+SLIDE 19
+讲述提示
+备用页。第一个结论只针对 support-level minimum，不针对经典带权平均 Shapley–Shubik 与 Banzhaf 指数。对于第二个结论，有限采样子集上的最小值大于等于全域最小值。若固定指导条件下，某个负见证每次被抽到的概率是 rho，独立 K 次至少命中它的概率为 1-(1-rho)^K，因此发现任意负见证的概率至少是这个值。若 rho=0 就没有正的发现保证。条件概率公式不保证引导 B 的 rho 高于随机 A，也不能把自适应全局轮转预算 Q 直接替代局部 IID 次数 K。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md §3–4
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md §5
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex Proposition 1 and finite-budget estimation
+
+SLIDE 20
+讲述提示
+备用页。正文数据集属性参考原始发布方；实验数字和状态参考当前项目文件。精确参照游戏使用 64/16/20 划分但不访问 test；计划中的决策实验为 64/8/8/20，两者不是同一个效用博弈。新审计中回归效用为 max(raw R²,0)，同时保存 raw R²，删除 gate 和测试评价使用 raw R²。全部引用和每页中文提示在备注中。
+
+资料来源
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_PROTOCOL.md
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MAJOR_REVISION_WORKPLAN.md
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master-mr2/MR3_P3_FINDINGS.md
+C:/work/学校/A.SPBU/paper/ZhaoCHI/Paper/Master/conference-paper/paper/icomp2026_conference.tex
+https://arxiv.org/abs/1705.07874
+https://arxiv.org/abs/2604.15107
+https://doi.org/10.1109/4235.996017
+https://archive.ics.uci.edu/dataset/94/spambase
+https://archive.ics.uci.edu/dataset/171/madelon
+https://archive.ics.uci.edu/dataset/170/gisette
+https://archive.ics.uci.edu/dataset/54/isolet
+https://archive.ics.uci.edu/dataset/1/abalone
+https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud

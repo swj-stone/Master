@@ -1,0 +1,863 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/s7shew",
+    "id": "s7shew",
+    "slide": 15,
+    "layoutId": "12e59a04-1f32-493b-b1bc-583bae36d0f4",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "ece9f690-d676-4f1a-a3f2-39b9a4f734cb",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "12e59a04-1f32-493b-b1bc-583bae36d0f4",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "ece9f690-d676-4f1a-a3f2-39b9a4f734cb",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "ece9f690-d676-4f1a-a3f2-39b9a4f734cb",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/pov2x8ny",
+      "id": "1",
+      "name": "text-118",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Practical baselines and success criteria",
+      "textPreview": "Practical baselines and success criteria",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Practical baselines and success criteria"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Practical baselines and success criteria",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Practical baselines and success criteria",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/2l4j2t47",
+      "id": "2",
+      "name": "rule-119",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3mdkvy5s",
+      "id": "3",
+      "name": "text-120",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "15",
+      "textPreview": "15",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "15"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "15",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "15",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gjm10jm1",
+      "id": "4",
+      "name": "text-121",
+      "bbox": [
+        80,
+        228,
+        1440,
+        104
+      ],
+      "geometry": "rect",
+      "text": "Primary comparison: MinPPI-A versus a validation-only portfolio",
+      "textPreview": "Primary comparison: MinPPI-A versus a validation-only portfolio",
+      "resolvedFontSize": 42.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 42.67,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Primary comparison: MinPPI-A versus a validation-only portfolio"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Primary comparison: MinPPI-A versus a validation-only portfolio",
+          "resolvedTextStyle": {
+            "fontSize": 42.67,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Primary comparison: MinPPI-A versus a validation-only portfolio",
+              "fontSize": 42.67,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hkv2tonm",
+      "id": "5",
+      "name": "text-122",
+      "bbox": [
+        80,
+        360,
+        673.33,
+        53.33
+      ],
+      "geometry": "rect",
+      "text": "Eight strategies",
+      "textPreview": "Eight strategies",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Eight strategies"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Eight strategies",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Eight strategies",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/uxkjy94b",
+      "id": "6",
+      "name": "text-123",
+      "bbox": [
+        80,
+        433.33,
+        673.33,
+        180
+      ],
+      "geometry": "rect",
+      "text": "Full, MinPPI-A, MinPPI-B, MI, TreeSHAP, static LOFO, RFE and the portfolio.",
+      "textPreview": "Full, MinPPI-A, MinPPI-B, MI, TreeSHAP, static LOFO, RFE and the portfolio.",
+      "resolvedFontSize": 33.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 33.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Full, MinPPI-A, MinPPI-B, MI, TreeSHAP,"
+          },
+          {
+            "index": 2,
+            "text": "static LOFO, RFE and the portfolio."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Full, MinPPI-A, MinPPI-B, MI, TreeSHAP, static LOFO, RFE and the portfolio.",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Full, MinPPI-A, MinPPI-B, MI, TreeSHAP, static LOFO, RFE and the portfolio.",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fit0re5g",
+      "id": "7",
+      "name": "text-124",
+      "bbox": [
+        860,
+        360,
+        660,
+        53.33
+      ],
+      "geometry": "rect",
+      "text": "A demanding practical control",
+      "textPreview": "A demanding practical control",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A demanding practical control"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A demanding practical control",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A demanding practical control",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0f61cnml",
+      "id": "8",
+      "name": "text-125",
+      "bbox": [
+        860,
+        433.33,
+        660,
+        180
+      ],
+      "geometry": "rect",
+      "text": "The portfolio selects among MI, TreeSHAP and LOFO candidates using selection validation only.",
+      "textPreview": "The portfolio selects among MI, TreeSHAP and LOFO candidates using selection validation only.",
+      "resolvedFontSize": 33.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 33.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "The portfolio selects among MI, TreeSHAP"
+          },
+          {
+            "index": 2,
+            "text": "and LOFO candidates using selection"
+          },
+          {
+            "index": 3,
+            "text": "validation only."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "The portfolio selects among MI, TreeSHAP and LOFO candidates using selection validation only.",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "The portfolio selects among MI, TreeSHAP and LOFO candidates using selection validation only.",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1gf25snq",
+      "id": "9",
+      "name": "rule-126",
+      "bbox": [
+        80,
+        594.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#D7DEDF",
+      "lineWidth": 1.33
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hcvedgv6",
+      "id": "10",
+      "name": "text-127",
+      "bbox": [
+        80,
+        626.67,
+        553.33,
+        57.33
+      ],
+      "geometry": "rect",
+      "text": "Measure decision value",
+      "textPreview": "Measure decision value",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Measure decision value"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Measure decision value",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Measure decision value",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/wbmxkbel",
+      "id": "11",
+      "name": "text-128",
+      "bbox": [
+        640,
+        626.67,
+        880,
+        101.33
+      ],
+      "geometry": "rect",
+      "text": "Compression, test utility loss, tolerance violations and gate rejection.",
+      "textPreview": "Compression, test utility loss, tolerance violations and gate rejection.",
+      "resolvedFontSize": 33.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 33.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Compression, test utility loss, tolerance violations and"
+          },
+          {
+            "index": 2,
+            "text": "gate rejection."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Compression, test utility loss, tolerance violations and gate rejection.",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Compression, test utility loss, tolerance violations and gate rejection.",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vadwb6d0",
+      "id": "12",
+      "name": "text-129",
+      "bbox": [
+        80,
+        753.33,
+        553.33,
+        57.33
+      ],
+      "geometry": "rect",
+      "text": "Measure actual cost",
+      "textPreview": "Measure actual cost",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Measure actual cost"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Measure actual cost",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Measure actual cost",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/u94fi1wv",
+      "id": "13",
+      "name": "text-130",
+      "bbox": [
+        640,
+        749.33,
+        880,
+        86.67
+      ],
+      "geometry": "rect",
+      "text": "Count queries and model fits. Include guidance, selection, gate and refit time.",
+      "textPreview": "Count queries and model fits. Include guidance, selection, gate and refit time.",
+      "resolvedFontSize": 32,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 32,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Count queries and model fits. Include guidance, selection,"
+          },
+          {
+            "index": 2,
+            "text": "gate and refit time."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Count queries and model fits. Include guidance, selection, gate and refit time.",
+          "resolvedTextStyle": {
+            "fontSize": 32,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Count queries and model fits. Include guidance, selection, gate and refit time.",
+              "fontSize": 32,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

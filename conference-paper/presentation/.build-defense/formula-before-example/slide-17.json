@@ -1,0 +1,935 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/qfef6n",
+    "id": "qfef6n",
+    "slide": 17,
+    "layoutId": "7b5a74e3-afe4-40d4-84c0-d73ee5dff7f4",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "d0e9b1bf-ee1a-47eb-9de2-4fc634ee76f7",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "7b5a74e3-afe4-40d4-84c0-d73ee5dff7f4",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "d0e9b1bf-ee1a-47eb-9de2-4fc634ee76f7",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "d0e9b1bf-ee1a-47eb-9de2-4fc634ee76f7",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/6x8baxk3",
+      "id": "1",
+      "name": "text-185",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Backup: dataset inputs (2/2)",
+      "textPreview": "Backup: dataset inputs (2/2)",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Backup: dataset inputs (2/2)"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Backup: dataset inputs (2/2)",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Backup: dataset inputs (2/2)",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tkza5sju",
+      "id": "2",
+      "name": "rule-186",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/8jqtcn29",
+      "id": "3",
+      "name": "text-187",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "17",
+      "textPreview": "17",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "17"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "17",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "17",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "table",
+      "scope": "slide",
+      "aid": "tb/q9ovq98r",
+      "id": "4",
+      "bbox": [
+        80,
+        230.67,
+        1440,
+        543.99
+      ],
+      "text": "Dataset | What the input columns represent | Why this structure fits the study\nISOLET\n7,797 rows\n617 inputs | Acoustic descriptors: spectral coefficients, contours, sonorant and surrounding-segment features\nTarget: the spoken letter | Tests whether witness auditing extends to multiclass utility. Individual column order has no published semantic map.\nCredit-card fraud\n284,807 rows\n29 inputs | 28 anonymized PCA components V1–V28\nAmount: transaction value\nTime is excluded from project inputs | Large labeled data with rare fraud cases tests AUC-based decisions and cost. Witnesses concern components, not raw financial attributes.\nAbalone\n4,177 rows\n8 inputs | Sex; Length; Diameter; Height\nWhole weight; Shucked weight\nViscera weight; Shell weight\nTarget: Rings, excluded from inputs | Physical measurements provide a regression task. Eight variables permit all 256 subsets and exact harmful labels.",
+      "textPreview": "Dataset | What the input columns represent | Why this structure fits the study | ISOLET | 7,797 rows | 617 inputs | Acoustic descriptors:...",
+      "rows": 4,
+      "cols": 3,
+      "cells": [
+        {
+          "index": 1,
+          "row": 1,
+          "column": 1,
+          "bbox": [
+            80,
+            230.67,
+            246.67,
+            60
+          ],
+          "text": "Dataset",
+          "textPreview": "Dataset",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Dataset",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Dataset",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "row": 1,
+          "column": 2,
+          "bbox": [
+            326.67,
+            230.67,
+            640,
+            60
+          ],
+          "text": "What the input columns represent",
+          "textPreview": "What the input columns represent",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "What the input columns represent",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "What the input columns represent",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "row": 1,
+          "column": 3,
+          "bbox": [
+            966.67,
+            230.67,
+            553.33,
+            60
+          ],
+          "text": "Why this structure fits the study",
+          "textPreview": "Why this structure fits the study",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Why this structure fits the study",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Why this structure fits the study",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "row": 2,
+          "column": 1,
+          "bbox": [
+            80,
+            290.67,
+            246.67,
+            161.33
+          ],
+          "text": "ISOLET\n7,797 rows\n617 inputs",
+          "textPreview": "ISOLET | 7,797 rows | 617 inputs",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "ISOLET",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "ISOLET",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "7,797 rows",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "7,797 rows",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "617 inputs",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "617 inputs",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "row": 2,
+          "column": 2,
+          "bbox": [
+            326.67,
+            290.67,
+            640,
+            161.33
+          ],
+          "text": "Acoustic descriptors: spectral coefficients, contours, sonorant and surrounding-segment features\nTarget: the spoken letter",
+          "textPreview": "Acoustic descriptors: spectral coefficients, contours, sonorant and surrounding-segment features | Target: the spoken letter",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Acoustic descriptors: spectral coefficients, contours, sonorant and surrounding-segment features",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Acoustic descriptors: spectral coefficients, contours, sonorant and surrounding-segment features",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "Target: the spoken letter",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Target: the spoken letter",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "row": 2,
+          "column": 3,
+          "bbox": [
+            966.67,
+            290.67,
+            553.33,
+            161.33
+          ],
+          "text": "Tests whether witness auditing extends to multiclass utility. Individual column order has no published semantic map.",
+          "textPreview": "Tests whether witness auditing extends to multiclass utility. Individual column order has no published semantic map.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Tests whether witness auditing extends to multiclass utility. Individual column order has no published semantic map.",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Tests whether witness auditing extends to multiclass utility. Individual column order has no published semantic map.",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "row": 3,
+          "column": 1,
+          "bbox": [
+            80,
+            452,
+            246.67,
+            161.33
+          ],
+          "text": "Credit-card fraud\n284,807 rows\n29 inputs",
+          "textPreview": "Credit-card fraud | 284,807 rows | 29 inputs",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Credit-card fraud",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Credit-card fraud",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "284,807 rows",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "284,807 rows",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "29 inputs",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "29 inputs",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "row": 3,
+          "column": 2,
+          "bbox": [
+            326.67,
+            452,
+            640,
+            161.33
+          ],
+          "text": "28 anonymized PCA components V1–V28\nAmount: transaction value\nTime is excluded from project inputs",
+          "textPreview": "28 anonymized PCA components V1–V28 | Amount: transaction value | Time is excluded from project inputs",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "28 anonymized PCA components V1–V28",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "28 anonymized PCA components V1–V28",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "Amount: transaction value",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Amount: transaction value",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "Time is excluded from project inputs",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Time is excluded from project inputs",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "row": 3,
+          "column": 3,
+          "bbox": [
+            966.67,
+            452,
+            553.33,
+            161.33
+          ],
+          "text": "Large labeled data with rare fraud cases tests AUC-based decisions and cost. Witnesses concern components, not raw financial attributes.",
+          "textPreview": "Large labeled data with rare fraud cases tests AUC-based decisions and cost. Witnesses concern components, not raw financial attributes.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Large labeled data with rare fraud cases tests AUC-based decisions and cost. Witnesses concern components, not raw financial attributes.",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Large labeled data with rare fraud cases tests AUC-based decisions and cost. Witnesses concern components, not raw financial attributes.",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "row": 4,
+          "column": 1,
+          "bbox": [
+            80,
+            613.33,
+            246.67,
+            161.33
+          ],
+          "text": "Abalone\n4,177 rows\n8 inputs",
+          "textPreview": "Abalone | 4,177 rows | 8 inputs",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Abalone",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Abalone",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "4,177 rows",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "4,177 rows",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "8 inputs",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "8 inputs",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "row": 4,
+          "column": 2,
+          "bbox": [
+            326.67,
+            613.33,
+            640,
+            161.33
+          ],
+          "text": "Sex; Length; Diameter; Height\nWhole weight; Shucked weight\nViscera weight; Shell weight\nTarget: Rings, excluded from inputs",
+          "textPreview": "Sex; Length; Diameter; Height | Whole weight; Shucked weight | Viscera weight; Shell weight | Target: Rings, excluded from inputs",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Sex; Length; Diameter; Height",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Sex; Length; Diameter; Height",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "Whole weight; Shucked weight",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Whole weight; Shucked weight",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "Viscera weight; Shell weight",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Viscera weight; Shell weight",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 4,
+              "text": "Target: Rings, excluded from inputs",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Target: Rings, excluded from inputs",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "row": 4,
+          "column": 3,
+          "bbox": [
+            966.67,
+            613.33,
+            553.33,
+            161.33
+          ],
+          "text": "Physical measurements provide a regression task. Eight variables permit all 256 subsets and exact harmful labels.",
+          "textPreview": "Physical measurements provide a regression task. Eight variables permit all 256 subsets and exact harmful labels.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Physical measurements provide a regression task. Eight variables permit all 256 subsets and exact harmful labels.",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Physical measurements provide a regression task. Eight variables permit all 256 subsets and exact harmful labels.",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ytob6dk7",
+      "id": "5",
+      "name": "text-188",
+      "bbox": [
+        80,
+        798.67,
+        1440,
+        41.33
+      ],
+      "geometry": "rect",
+      "text": "PCA describes the input representation. Fraud labels still define a supervised classification task.",
+      "textPreview": "PCA describes the input representation. Fraud labels still define a supervised classification task.",
+      "resolvedFontSize": 26.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 26.67,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "PCA describes the input representation. Fraud labels still define a supervised classification task."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "PCA describes the input representation. Fraud labels still define a supervised classification task.",
+          "resolvedTextStyle": {
+            "fontSize": 26.67,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "PCA describes the input representation. Fraud labels still define a supervised classification task.",
+              "fontSize": 26.67,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

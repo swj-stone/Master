@@ -1,0 +1,855 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/20ijwk",
+    "id": "20ijwk",
+    "slide": 8,
+    "layoutId": "0100aa30-dfa1-41eb-922f-532ecc24cb4b",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "5e06f903-6c25-419c-8b10-948f7c9cefaa",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "0100aa30-dfa1-41eb-922f-532ecc24cb4b",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "5e06f903-6c25-419c-8b10-948f7c9cefaa",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "5e06f903-6c25-419c-8b10-948f7c9cefaa",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3yl8zetc",
+      "id": "1",
+      "name": "text-67",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Finite-budget witness search",
+      "textPreview": "Finite-budget witness search",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Finite-budget witness search"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Finite-budget witness search",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Finite-budget witness search",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4zupsjax",
+      "id": "2",
+      "name": "rule-68",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/p0nq1obi",
+      "id": "3",
+      "name": "text-69",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "08",
+      "textPreview": "08",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "08"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "08",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "08",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/u9c7m9sv",
+      "id": "4",
+      "name": "text-70",
+      "bbox": [
+        80,
+        228,
+        666.67,
+        53.33
+      ],
+      "geometry": "rect",
+      "text": "Algorithm A: random contexts",
+      "textPreview": "Algorithm A: random contexts",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Algorithm A: random contexts"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Algorithm A: random contexts",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Algorithm A: random contexts",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/falovetg",
+      "id": "5",
+      "name": "text-71",
+      "bbox": [
+        80,
+        301.33,
+        666.67,
+        180
+      ],
+      "geometry": "rect",
+      "text": "Sample a subset size uniformly, then sample a subset of that size.",
+      "textPreview": "Sample a subset size uniformly, then sample a subset of that size.",
+      "resolvedFontSize": 34.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 34.67,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Sample a subset size uniformly, then"
+          },
+          {
+            "index": 2,
+            "text": "sample a subset of that size."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Sample a subset size uniformly, then sample a subset of that size.",
+          "resolvedTextStyle": {
+            "fontSize": 34.67,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Sample a subset size uniformly, then sample a subset of that size.",
+              "fontSize": 34.67,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gbupoza1",
+      "id": "6",
+      "name": "text-72",
+      "bbox": [
+        860,
+        228,
+        660,
+        53.33
+      ],
+      "geometry": "rect",
+      "text": "Algorithm B: guided contexts",
+      "textPreview": "Algorithm B: guided contexts",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Algorithm B: guided contexts"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Algorithm B: guided contexts",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Algorithm B: guided contexts",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hw3qx4b6",
+      "id": "7",
+      "name": "text-73",
+      "bbox": [
+        860,
+        301.33,
+        660,
+        180
+      ],
+      "geometry": "rect",
+      "text": "Build a seed using training mutual information (MI) and correlations, then perturb it.",
+      "textPreview": "Build a seed using training mutual information (MI) and correlations, then perturb it.",
+      "resolvedFontSize": 33.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 33.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Build a seed using training mutual"
+          },
+          {
+            "index": 2,
+            "text": "information (MI) and correlations, then"
+          },
+          {
+            "index": 3,
+            "text": "perturb it."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Build a seed using training mutual information (MI) and correlations, then perturb it.",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Build a seed using training mutual information (MI) and correlations, then perturb it.",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/65s7ipcj",
+      "id": "8",
+      "name": "rule-74",
+      "bbox": [
+        80,
+        496,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#D7DEDF",
+      "lineWidth": 1.33
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/761orut4",
+      "id": "9",
+      "name": "text-75",
+      "bbox": [
+        80,
+        534.67,
+        440,
+        61.33
+      ],
+      "geometry": "rect",
+      "text": "Observed −1",
+      "textPreview": "Observed −1",
+      "resolvedFontSize": 40,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 40,
+        "typeface": "Arial",
+        "color": "#C63E40",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Observed −1"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Observed −1",
+          "resolvedTextStyle": {
+            "fontSize": 40,
+            "typeface": "Arial",
+            "color": "#C63E40",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Observed −1",
+              "fontSize": 40,
+              "typeface": "Arial",
+              "color": "#C63E40",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/va50v65o",
+      "id": "10",
+      "name": "text-76",
+      "bbox": [
+        553.33,
+        536,
+        946.67,
+        93.33
+      ],
+      "geometry": "rect",
+      "text": "A checked negative crossing certifies this fixed game.",
+      "textPreview": "A checked negative crossing certifies this fixed game.",
+      "resolvedFontSize": 34.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 34.67,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A checked negative crossing certifies this fixed game."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A checked negative crossing certifies this fixed game.",
+          "resolvedTextStyle": {
+            "fontSize": 34.67,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A checked negative crossing certifies this fixed game.",
+              "fontSize": 34.67,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/u9wj21o3",
+      "id": "11",
+      "name": "text-77",
+      "bbox": [
+        80,
+        662.67,
+        440,
+        61.33
+      ],
+      "geometry": "rect",
+      "text": "No observed −1",
+      "textPreview": "No observed −1",
+      "resolvedFontSize": 40,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 40,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "No observed −1"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "No observed −1",
+          "resolvedTextStyle": {
+            "fontSize": 40,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "No observed −1",
+              "fontSize": 40,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hc7ixgne",
+      "id": "12",
+      "name": "text-78",
+      "bbox": [
+        553.33,
+        664,
+        946.67,
+        93.33
+      ],
+      "geometry": "rect",
+      "text": "An unvisited context may still contain a harmful witness.",
+      "textPreview": "An unvisited context may still contain a harmful witness.",
+      "resolvedFontSize": 34.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 34.67,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "An unvisited context may still contain a harmful witness."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "An unvisited context may still contain a harmful witness.",
+          "resolvedTextStyle": {
+            "fontSize": 34.67,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "An unvisited context may still contain a harmful witness.",
+              "fontSize": 34.67,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/wby14b69",
+      "id": "13",
+      "name": "text-79",
+      "bbox": [
+        80,
+        777.33,
+        1420,
+        52
+      ],
+      "geometry": "rect",
+      "text": "Compare A and B at the same total query cap. Guidance is a hypothesis to test.",
+      "textPreview": "Compare A and B at the same total query cap. Guidance is a hypothesis to test.",
+      "resolvedFontSize": 30.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 30.67,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Compare A and B at the same total query cap. Guidance is a hypothesis to test."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Compare A and B at the same total query cap. Guidance is a hypothesis to test.",
+          "resolvedTextStyle": {
+            "fontSize": 30.67,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Compare A and B at the same total query cap. Guidance is a hypothesis to test.",
+              "fontSize": 30.67,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

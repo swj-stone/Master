@@ -1,0 +1,927 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/bspmkr",
+    "id": "bspmkr",
+    "slide": 12,
+    "layoutId": "0100aa30-dfa1-41eb-922f-532ecc24cb4b",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "5e06f903-6c25-419c-8b10-948f7c9cefaa",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "0100aa30-dfa1-41eb-922f-532ecc24cb4b",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "5e06f903-6c25-419c-8b10-948f7c9cefaa",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "5e06f903-6c25-419c-8b10-948f7c9cefaa",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/p0jmtsni",
+      "id": "1",
+      "name": "text-94",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Experiment 1: discovery against exact references",
+      "textPreview": "Experiment 1: discovery against exact references",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Experiment 1: discovery against exact references"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Experiment 1: discovery against exact references",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Experiment 1: discovery against exact references",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/2x8nydor",
+      "id": "2",
+      "name": "rule-95",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3yh4ri5c",
+      "id": "3",
+      "name": "text-96",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "12",
+      "textPreview": "12",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "12"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "12",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "12",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gvq5w36l",
+      "id": "4",
+      "name": "text-97",
+      "bbox": [
+        80,
+        226.67,
+        700,
+        89.33
+      ],
+      "geometry": "rect",
+      "text": "35 fixed games",
+      "textPreview": "35 fixed games",
+      "resolvedFontSize": 60,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 60,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "35 fixed games"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "35 fixed games",
+          "resolvedTextStyle": {
+            "fontSize": 60,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "35 fixed games",
+              "fontSize": 60,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1wzmp8n6",
+      "id": "5",
+      "name": "text-98",
+      "bbox": [
+        80,
+        309.33,
+        733.33,
+        86.67
+      ],
+      "geometry": "rect",
+      "text": "Abalone, Spambase, Madelon, credit-card fraud\n7 panels × 5 fixed data splits",
+      "textPreview": "Abalone, Spambase, Madelon, credit-card fraud | 7 panels × 5 fixed data splits",
+      "resolvedFontSize": 29.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 29.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Abalone, Spambase, Madelon, credit-card fraud"
+          },
+          {
+            "index": 2,
+            "text": "7 panels × 5 fixed data splits"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Abalone, Spambase, Madelon, credit-card fraud",
+          "resolvedTextStyle": {
+            "fontSize": 29.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Abalone, Spambase, Madelon, credit-card fraud",
+              "fontSize": 29.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "7 panels × 5 fixed data splits",
+          "resolvedTextStyle": {
+            "fontSize": 29.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "7 panels × 5 fixed data splits",
+              "fontSize": 29.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/e983udov",
+      "id": "6",
+      "name": "text-99",
+      "bbox": [
+        80,
+        393.33,
+        753.33,
+        64
+      ],
+      "geometry": "rect",
+      "text": "256 subset utilities per game",
+      "textPreview": "256 subset utilities per game",
+      "resolvedFontSize": 38.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 38.67,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "256 subset utilities per game"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "256 subset utilities per game",
+          "resolvedTextStyle": {
+            "fontSize": 38.67,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "256 subset utilities per game",
+              "fontSize": 38.67,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fah4ni5g",
+      "id": "7",
+      "name": "text-100",
+      "bbox": [
+        80,
+        468,
+        733.33,
+        117.33
+      ],
+      "geometry": "rect",
+      "text": "Abalone: all 8 inputs. Other datasets: MI top8 and MI top4 + random4 panels.",
+      "textPreview": "Abalone: all 8 inputs. Other datasets: MI top8 and MI top4 + random4 panels.",
+      "resolvedFontSize": 32,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 32,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Abalone: all 8 inputs. Other datasets: MI top8 and"
+          },
+          {
+            "index": 2,
+            "text": "MI top4 + random4 panels."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Abalone: all 8 inputs. Other datasets: MI top8 and MI top4 + random4 panels.",
+          "resolvedTextStyle": {
+            "fontSize": 32,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Abalone: all 8 inputs. Other datasets: MI top8 and MI top4 + random4 panels.",
+              "fontSize": 32,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0ru5s7m5",
+      "id": "8",
+      "name": "text-101",
+      "bbox": [
+        900,
+        240,
+        620,
+        65.33
+      ],
+      "geometry": "rect",
+      "text": "Fair A/B comparison",
+      "textPreview": "Fair A/B comparison",
+      "resolvedFontSize": 40,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 40,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Fair A/B comparison"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Fair A/B comparison",
+          "resolvedTextStyle": {
+            "fontSize": 40,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Fair A/B comparison",
+              "fontSize": 40,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ls3m1cnq",
+      "id": "9",
+      "name": "text-102",
+      "bbox": [
+        900,
+        332,
+        606.67,
+        201.33
+      ],
+      "geometry": "rect",
+      "text": "30 paired sampling schedules per game\nTotal marginal-query cap Q = 800\nSampler sees only its requested utilities",
+      "textPreview": "30 paired sampling schedules per game | Total marginal-query cap Q = 800 | Sampler sees only its requested utilities",
+      "resolvedFontSize": 33.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 33.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 4,
+        "lines": [
+          {
+            "index": 1,
+            "text": "30 paired sampling schedules per"
+          },
+          {
+            "index": 2,
+            "text": "game"
+          },
+          {
+            "index": 3,
+            "text": "Total marginal-query cap Q = 800"
+          },
+          {
+            "index": 4,
+            "text": "Sampler sees only its requested utilities"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "30 paired sampling schedules per game",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "30 paired sampling schedules per game",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "Total marginal-query cap Q = 800",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Total marginal-query cap Q = 800",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 3,
+          "text": "Sampler sees only its requested utilities",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Sampler sees only its requested utilities",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1cbqtwry",
+      "id": "10",
+      "name": "rule-103",
+      "bbox": [
+        80,
+        621.33,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#D7DEDF",
+      "lineWidth": 1.33
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gb2p0bad",
+      "id": "11",
+      "name": "text-104",
+      "bbox": [
+        80,
+        650.67,
+        513.33,
+        58.67
+      ],
+      "geometry": "rect",
+      "text": "Primary endpoint",
+      "textPreview": "Primary endpoint",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Primary endpoint"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Primary endpoint",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Primary endpoint",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fat8r69s",
+      "id": "12",
+      "name": "text-105",
+      "bbox": [
+        613.33,
+        650.67,
+        906.67,
+        98.67
+      ],
+      "geometry": "rect",
+      "text": "Recall across the full query budget, summarized by recall area.",
+      "textPreview": "Recall across the full query budget, summarized by recall area.",
+      "resolvedFontSize": 34.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 34.67,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Recall across the full query budget, summarized by recall"
+          },
+          {
+            "index": 2,
+            "text": "area."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Recall across the full query budget, summarized by recall area.",
+          "resolvedTextStyle": {
+            "fontSize": 34.67,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Recall across the full query budget, summarized by recall area.",
+              "fontSize": 34.67,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/e9k7y1s7",
+      "id": "13",
+      "name": "text-106",
+      "bbox": [
+        80,
+        777.33,
+        1440,
+        48
+      ],
+      "geometry": "rect",
+      "text": "Exact labels belong to each 8-feature panel. Empty harmful sets have undefined recall.",
+      "textPreview": "Exact labels belong to each 8-feature panel. Empty harmful sets have undefined recall.",
+      "resolvedFontSize": 29.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 29.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Exact labels belong to each 8-feature panel. Empty harmful sets have undefined recall."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Exact labels belong to each 8-feature panel. Empty harmful sets have undefined recall.",
+          "resolvedTextStyle": {
+            "fontSize": 29.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Exact labels belong to each 8-feature panel. Empty harmful sets have undefined recall.",
+              "fontSize": 29.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

@@ -1,0 +1,808 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/ixmd5z",
+    "id": "ixmd5z",
+    "slide": 18,
+    "layoutId": "38dcce15-afb7-4eca-9fd2-26c5d003379c",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "cc563190-be63-4bc0-8efa-cac47218d8f0",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "38dcce15-afb7-4eca-9fd2-26c5d003379c",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "cc563190-be63-4bc0-8efa-cac47218d8f0",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "cc563190-be63-4bc0-8efa-cac47218d8f0",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/be14r6tg",
+      "id": "1",
+      "name": "text-181",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Backup: experimental protocol and evidence",
+      "textPreview": "Backup: experimental protocol and evidence",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Backup: experimental protocol and evidence"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Backup: experimental protocol and evidence",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Backup: experimental protocol and evidence",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/cfulkbu1",
+      "id": "2",
+      "name": "rule-182",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/xg3mtgbm",
+      "id": "3",
+      "name": "text-183",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "18",
+      "textPreview": "18",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "18"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "18",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "18",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "table",
+      "scope": "slide",
+      "aid": "tb/jmlwr69g",
+      "id": "4",
+      "bbox": [
+        80,
+        226.67,
+        1440,
+        460
+      ],
+      "text": "Item | Prespecified design or current evidence\nStudy 1: complete | 35 eight-input games from 4 datasets. Full references, paired A/B search.\nStudy 2: planned | 3 mechanisms × 5 instances. Each has 2,000 rows and 8 inputs.\nStudy 3: planned | 20 games. Train / selection / gate / test = 64 / 8 / 8 / 20%.\nFixed learner | XGBoost: 100 rounds, depth 4, learning rate 0.1.\nDecision tolerance | AUC loss ≤ 0.005 for classification. Raw R² loss ≤ 0.01 for regression.",
+      "textPreview": "Item | Prespecified design or current evidence | Study 1: complete | 35 eight-input games from 4 datasets. Full references, paired A/B se...",
+      "rows": 6,
+      "cols": 2,
+      "cells": [
+        {
+          "index": 1,
+          "row": 1,
+          "column": 1,
+          "bbox": [
+            80,
+            226.67,
+            413.33,
+            76.67
+          ],
+          "text": "Item",
+          "textPreview": "Item",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Item",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Item",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "row": 1,
+          "column": 2,
+          "bbox": [
+            493.33,
+            226.67,
+            1026.67,
+            76.67
+          ],
+          "text": "Prespecified design or current evidence",
+          "textPreview": "Prespecified design or current evidence",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Prespecified design or current evidence",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Prespecified design or current evidence",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "row": 2,
+          "column": 1,
+          "bbox": [
+            80,
+            303.33,
+            413.33,
+            76.67
+          ],
+          "text": "Study 1: complete",
+          "textPreview": "Study 1: complete",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Study 1: complete",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Study 1: complete",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "row": 2,
+          "column": 2,
+          "bbox": [
+            493.33,
+            303.33,
+            1026.67,
+            76.67
+          ],
+          "text": "35 eight-input games from 4 datasets. Full references, paired A/B search.",
+          "textPreview": "35 eight-input games from 4 datasets. Full references, paired A/B search.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "35 eight-input games from 4 datasets. Full references, paired A/B search.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "35 eight-input games from 4 datasets. Full references, paired A/B search.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "row": 3,
+          "column": 1,
+          "bbox": [
+            80,
+            380,
+            413.33,
+            76.67
+          ],
+          "text": "Study 2: planned",
+          "textPreview": "Study 2: planned",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Study 2: planned",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Study 2: planned",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "row": 3,
+          "column": 2,
+          "bbox": [
+            493.33,
+            380,
+            1026.67,
+            76.67
+          ],
+          "text": "3 mechanisms × 5 instances. Each has 2,000 rows and 8 inputs.",
+          "textPreview": "3 mechanisms × 5 instances. Each has 2,000 rows and 8 inputs.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "3 mechanisms × 5 instances. Each has 2,000 rows and 8 inputs.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "3 mechanisms × 5 instances. Each has 2,000 rows and 8 inputs.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "row": 4,
+          "column": 1,
+          "bbox": [
+            80,
+            456.67,
+            413.33,
+            76.67
+          ],
+          "text": "Study 3: planned",
+          "textPreview": "Study 3: planned",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Study 3: planned",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Study 3: planned",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "row": 4,
+          "column": 2,
+          "bbox": [
+            493.33,
+            456.67,
+            1026.67,
+            76.67
+          ],
+          "text": "20 games. Train / selection / gate / test = 64 / 8 / 8 / 20%.",
+          "textPreview": "20 games. Train / selection / gate / test = 64 / 8 / 8 / 20%.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "20 games. Train / selection / gate / test = 64 / 8 / 8 / 20%.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "20 games. Train / selection / gate / test = 64 / 8 / 8 / 20%.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "row": 5,
+          "column": 1,
+          "bbox": [
+            80,
+            533.33,
+            413.33,
+            76.67
+          ],
+          "text": "Fixed learner",
+          "textPreview": "Fixed learner",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Fixed learner",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Fixed learner",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "row": 5,
+          "column": 2,
+          "bbox": [
+            493.33,
+            533.33,
+            1026.67,
+            76.67
+          ],
+          "text": "XGBoost: 100 rounds, depth 4, learning rate 0.1.",
+          "textPreview": "XGBoost: 100 rounds, depth 4, learning rate 0.1.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "XGBoost: 100 rounds, depth 4, learning rate 0.1.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "XGBoost: 100 rounds, depth 4, learning rate 0.1.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "row": 6,
+          "column": 1,
+          "bbox": [
+            80,
+            610,
+            413.33,
+            76.67
+          ],
+          "text": "Decision tolerance",
+          "textPreview": "Decision tolerance",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Decision tolerance",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Decision tolerance",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "row": 6,
+          "column": 2,
+          "bbox": [
+            493.33,
+            610,
+            1026.67,
+            76.67
+          ],
+          "text": "AUC loss ≤ 0.005 for classification. Raw R² loss ≤ 0.01 for regression.",
+          "textPreview": "AUC loss ≤ 0.005 for classification. Raw R² loss ≤ 0.01 for regression.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "AUC loss ≤ 0.005 for classification. Raw R² loss ≤ 0.01 for regression.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "AUC loss ≤ 0.005 for classification. Raw R² loss ≤ 0.01 for regression.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/jil4vqts",
+      "id": "5",
+      "name": "text-184",
+      "bbox": [
+        80,
+        722.67,
+        1440,
+        58.67
+      ],
+      "geometry": "rect",
+      "text": "Study 1 recall area: A = 0.4012, B = 0.3718. No stable advantage for B.",
+      "textPreview": "Study 1 recall area: A = 0.4012, B = 0.3718. No stable advantage for B.",
+      "resolvedFontSize": 32,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 32,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Study 1 recall area: A = 0.4012, B = 0.3718. No stable advantage for B."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Study 1 recall area: A = 0.4012, B = 0.3718. No stable advantage for B.",
+          "resolvedTextStyle": {
+            "fontSize": 32,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Study 1 recall area: A = 0.4012, B = 0.3718. No stable advantage for B.",
+              "fontSize": 32,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/kjulovud",
+      "id": "6",
+      "name": "text-185",
+      "bbox": [
+        80,
+        792,
+        1440,
+        62.67
+      ],
+      "geometry": "rect",
+      "text": "22 of 35 games have harmful inputs. The other 13 have undefined recall.\nThese results describe small fixed games, not deletion benefit or high-dimensional truth.",
+      "textPreview": "22 of 35 games have harmful inputs. The other 13 have undefined recall. | These results describe small fixed games, not deletion benefit ...",
+      "resolvedFontSize": 25.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 25.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "22 of 35 games have harmful inputs. The other 13 have undefined recall."
+          },
+          {
+            "index": 2,
+            "text": "These results describe small fixed games, not deletion benefit or high-dimensional truth."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "22 of 35 games have harmful inputs. The other 13 have undefined recall.",
+          "resolvedTextStyle": {
+            "fontSize": 25.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "22 of 35 games have harmful inputs. The other 13 have undefined recall.",
+              "fontSize": 25.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "These results describe small fixed games, not deletion benefit or high-dimensional truth.",
+          "resolvedTextStyle": {
+            "fontSize": 25.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "These results describe small fixed games, not deletion benefit or high-dimensional truth.",
+              "fontSize": 25.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

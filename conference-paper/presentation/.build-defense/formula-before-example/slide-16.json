@@ -1,0 +1,935 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/64b6gr",
+    "id": "64b6gr",
+    "slide": 16,
+    "layoutId": "7b5a74e3-afe4-40d4-84c0-d73ee5dff7f4",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "d0e9b1bf-ee1a-47eb-9de2-4fc634ee76f7",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "7b5a74e3-afe4-40d4-84c0-d73ee5dff7f4",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "d0e9b1bf-ee1a-47eb-9de2-4fc634ee76f7",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "d0e9b1bf-ee1a-47eb-9de2-4fc634ee76f7",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/nidk72d4",
+      "id": "1",
+      "name": "text-181",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Backup: dataset inputs (1/2)",
+      "textPreview": "Backup: dataset inputs (1/2)",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Backup: dataset inputs (1/2)"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Backup: dataset inputs (1/2)",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Backup: dataset inputs (1/2)",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ojm107up",
+      "id": "2",
+      "name": "rule-182",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/9kv29cva",
+      "id": "3",
+      "name": "text-183",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "16",
+      "textPreview": "16",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "16"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "16",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "16",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "table",
+      "scope": "slide",
+      "aid": "tb/jyt83yps",
+      "id": "4",
+      "bbox": [
+        80,
+        230.67,
+        1440,
+        543.99
+      ],
+      "text": "Dataset | What the input columns represent | Why this structure fits the study\nSpambase\n4,601 rows\n57 inputs | 48 word frequencies, e.g. free, money\n6 character frequencies, e.g. !, $\n3 capital-run statistics: mean, max, total | Target: spam / non-spam. Observable text statistics make witnesses easier to interpret.\nMadelon\n2,600 rows\n500 inputs | 5 informative coordinates\n15 linear combinations of them\n480 irrelevant probe variables | Target: synthetic class ±1. Redundancy and distractors challenge discovery. Generating roles are not MinPPI labels.\nGisette\n7,000 rows\n5,000 inputs | 2,500 image-derived variables, including pixel products\n2,500 distractor probes\nNumeric columns encode digit images | Target: digit 4 / 9. High-dimensional inputs stress screening and cost. Outside the current 35-game study.",
+      "textPreview": "Dataset | What the input columns represent | Why this structure fits the study | Spambase | 4,601 rows | 57 inputs | 48 word frequencies,...",
+      "rows": 4,
+      "cols": 3,
+      "cells": [
+        {
+          "index": 1,
+          "row": 1,
+          "column": 1,
+          "bbox": [
+            80,
+            230.67,
+            246.67,
+            60
+          ],
+          "text": "Dataset",
+          "textPreview": "Dataset",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Dataset",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Dataset",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "row": 1,
+          "column": 2,
+          "bbox": [
+            326.67,
+            230.67,
+            640,
+            60
+          ],
+          "text": "What the input columns represent",
+          "textPreview": "What the input columns represent",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "What the input columns represent",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "What the input columns represent",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "row": 1,
+          "column": 3,
+          "bbox": [
+            966.67,
+            230.67,
+            553.33,
+            60
+          ],
+          "text": "Why this structure fits the study",
+          "textPreview": "Why this structure fits the study",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Why this structure fits the study",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Why this structure fits the study",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "row": 2,
+          "column": 1,
+          "bbox": [
+            80,
+            290.67,
+            246.67,
+            161.33
+          ],
+          "text": "Spambase\n4,601 rows\n57 inputs",
+          "textPreview": "Spambase | 4,601 rows | 57 inputs",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Spambase",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Spambase",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "4,601 rows",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "4,601 rows",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "57 inputs",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "57 inputs",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "row": 2,
+          "column": 2,
+          "bbox": [
+            326.67,
+            290.67,
+            640,
+            161.33
+          ],
+          "text": "48 word frequencies, e.g. free, money\n6 character frequencies, e.g. !, $\n3 capital-run statistics: mean, max, total",
+          "textPreview": "48 word frequencies, e.g. free, money | 6 character frequencies, e.g. !, $ | 3 capital-run statistics: mean, max, total",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "48 word frequencies, e.g. free, money",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "48 word frequencies, e.g. free, money",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "6 character frequencies, e.g. !, $",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "6 character frequencies, e.g. !, $",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "3 capital-run statistics: mean, max, total",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "3 capital-run statistics: mean, max, total",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "row": 2,
+          "column": 3,
+          "bbox": [
+            966.67,
+            290.67,
+            553.33,
+            161.33
+          ],
+          "text": "Target: spam / non-spam. Observable text statistics make witnesses easier to interpret.",
+          "textPreview": "Target: spam / non-spam. Observable text statistics make witnesses easier to interpret.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Target: spam / non-spam. Observable text statistics make witnesses easier to interpret.",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Target: spam / non-spam. Observable text statistics make witnesses easier to interpret.",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "row": 3,
+          "column": 1,
+          "bbox": [
+            80,
+            452,
+            246.67,
+            161.33
+          ],
+          "text": "Madelon\n2,600 rows\n500 inputs",
+          "textPreview": "Madelon | 2,600 rows | 500 inputs",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Madelon",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Madelon",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "2,600 rows",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "2,600 rows",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "500 inputs",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "500 inputs",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "row": 3,
+          "column": 2,
+          "bbox": [
+            326.67,
+            452,
+            640,
+            161.33
+          ],
+          "text": "5 informative coordinates\n15 linear combinations of them\n480 irrelevant probe variables",
+          "textPreview": "5 informative coordinates | 15 linear combinations of them | 480 irrelevant probe variables",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "5 informative coordinates",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "5 informative coordinates",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "15 linear combinations of them",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "15 linear combinations of them",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "480 irrelevant probe variables",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "480 irrelevant probe variables",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "row": 3,
+          "column": 3,
+          "bbox": [
+            966.67,
+            452,
+            553.33,
+            161.33
+          ],
+          "text": "Target: synthetic class ±1. Redundancy and distractors challenge discovery. Generating roles are not MinPPI labels.",
+          "textPreview": "Target: synthetic class ±1. Redundancy and distractors challenge discovery. Generating roles are not MinPPI labels.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Target: synthetic class ±1. Redundancy and distractors challenge discovery. Generating roles are not MinPPI labels.",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Target: synthetic class ±1. Redundancy and distractors challenge discovery. Generating roles are not MinPPI labels.",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "row": 4,
+          "column": 1,
+          "bbox": [
+            80,
+            613.33,
+            246.67,
+            161.33
+          ],
+          "text": "Gisette\n7,000 rows\n5,000 inputs",
+          "textPreview": "Gisette | 7,000 rows | 5,000 inputs",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Gisette",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Gisette",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "7,000 rows",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "7,000 rows",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "5,000 inputs",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "5,000 inputs",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "row": 4,
+          "column": 2,
+          "bbox": [
+            326.67,
+            613.33,
+            640,
+            161.33
+          ],
+          "text": "2,500 image-derived variables, including pixel products\n2,500 distractor probes\nNumeric columns encode digit images",
+          "textPreview": "2,500 image-derived variables, including pixel products | 2,500 distractor probes | Numeric columns encode digit images",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "2,500 image-derived variables, including pixel products",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "2,500 image-derived variables, including pixel products",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "text": "2,500 distractor probes",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "2,500 distractor probes",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "text": "Numeric columns encode digit images",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Numeric columns encode digit images",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "row": 4,
+          "column": 3,
+          "bbox": [
+            966.67,
+            613.33,
+            553.33,
+            161.33
+          ],
+          "text": "Target: digit 4 / 9. High-dimensional inputs stress screening and cost. Outside the current 35-game study.",
+          "textPreview": "Target: digit 4 / 9. High-dimensional inputs stress screening and cost. Outside the current 35-game study.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Target: digit 4 / 9. High-dimensional inputs stress screening and cost. Outside the current 35-game study.",
+              "resolvedTextStyle": {
+                "fontSize": 28,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Target: digit 4 / 9. High-dimensional inputs stress screening and cost. Outside the current 35-game study.",
+                  "fontSize": 28,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/bmdkb2d0",
+      "id": "5",
+      "name": "text-184",
+      "bbox": [
+        80,
+        798.67,
+        1440,
+        41.33
+      ],
+      "geometry": "rect",
+      "text": "A MinPPI player is an analyzed column. A coalition selects columns while retaining the same target.",
+      "textPreview": "A MinPPI player is an analyzed column. A coalition selects columns while retaining the same target.",
+      "resolvedFontSize": 26.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 26.67,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A MinPPI player is an analyzed column. A coalition selects columns while retaining the same target."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A MinPPI player is an analyzed column. A coalition selects columns while retaining the same target.",
+          "resolvedTextStyle": {
+            "fontSize": 26.67,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A MinPPI player is an analyzed column. A coalition selects columns while retaining the same target.",
+              "fontSize": 26.67,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

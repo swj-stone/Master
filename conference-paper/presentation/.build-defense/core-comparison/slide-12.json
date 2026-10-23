@@ -1,0 +1,960 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/xxtu8y",
+    "id": "xxtu8y",
+    "slide": 12,
+    "layoutId": "c0aa18ec-5c6c-4743-8d35-27a3799fa1c7",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "7ed3990b-800c-45f7-bcd1-7d5787e7a07d",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "c0aa18ec-5c6c-4743-8d35-27a3799fa1c7",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "7ed3990b-800c-45f7-bcd1-7d5787e7a07d",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "7ed3990b-800c-45f7-bcd1-7d5787e7a07d",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/i98ny18v",
+      "id": "1",
+      "name": "text-131",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Why these datasets fit the research",
+      "textPreview": "Why these datasets fit the research",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Why these datasets fit the research"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Why these datasets fit the research",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Why these datasets fit the research",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5wzm9grm",
+      "id": "2",
+      "name": "rule-132",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4vq50bq1",
+      "id": "3",
+      "name": "text-133",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "12",
+      "textPreview": "12",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "12"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "12",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "12",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ryh4b69s",
+      "id": "4",
+      "name": "text-134",
+      "bbox": [
+        80,
+        210.67,
+        1440,
+        74.67
+      ],
+      "geometry": "rect",
+      "text": "The core studies need checkable cases, known structure and real prediction tasks.",
+      "textPreview": "The core studies need checkable cases, known structure and real prediction tasks.",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 37.33,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "The core studies need checkable cases, known structure and real prediction"
+          },
+          {
+            "index": 2,
+            "text": "tasks."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "The core studies need checkable cases, known structure and real prediction tasks.",
+          "resolvedTextStyle": {
+            "fontSize": 37.33,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "The core studies need checkable cases, known structure and real prediction tasks.",
+              "fontSize": 37.33,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "table",
+      "scope": "slide",
+      "aid": "tb/r614rql8",
+      "id": "5",
+      "bbox": [
+        80,
+        309.33,
+        1440,
+        430.67
+      ],
+      "text": "Dataset | Inputs and target | Reason for inclusion\nAbalone | Physical measurements predict ring count. | Eight inputs allow every subset to be checked. Covers regression.\nMadelon | Signal, redundant and distractor columns predict a synthetic class. | Known generating structure challenges feature search.\nSpambase | Word and character statistics predict spam. | Real inputs give interpretable classification examples.\nCredit-card fraud | PCA components and amount predict fraud. | Rare positive cases test a different classification setting.",
+      "textPreview": "Dataset | Inputs and target | Reason for inclusion | Abalone | Physical measurements predict ring count. | Eight inputs allow every subse...",
+      "rows": 5,
+      "cols": 3,
+      "cells": [
+        {
+          "index": 1,
+          "row": 1,
+          "column": 1,
+          "bbox": [
+            80,
+            309.33,
+            320,
+            57.33
+          ],
+          "text": "Dataset",
+          "textPreview": "Dataset",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Dataset",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Dataset",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "row": 1,
+          "column": 2,
+          "bbox": [
+            400,
+            309.33,
+            560,
+            57.33
+          ],
+          "text": "Inputs and target",
+          "textPreview": "Inputs and target",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Inputs and target",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Inputs and target",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "row": 1,
+          "column": 3,
+          "bbox": [
+            960,
+            309.33,
+            560,
+            57.33
+          ],
+          "text": "Reason for inclusion",
+          "textPreview": "Reason for inclusion",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Reason for inclusion",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Reason for inclusion",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "row": 2,
+          "column": 1,
+          "bbox": [
+            80,
+            366.67,
+            320,
+            93.33
+          ],
+          "text": "Abalone",
+          "textPreview": "Abalone",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Abalone",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Abalone",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "row": 2,
+          "column": 2,
+          "bbox": [
+            400,
+            366.67,
+            560,
+            93.33
+          ],
+          "text": "Physical measurements predict ring count.",
+          "textPreview": "Physical measurements predict ring count.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Physical measurements predict ring count.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Physical measurements predict ring count.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "row": 2,
+          "column": 3,
+          "bbox": [
+            960,
+            366.67,
+            560,
+            93.33
+          ],
+          "text": "Eight inputs allow every subset to be checked. Covers regression.",
+          "textPreview": "Eight inputs allow every subset to be checked. Covers regression.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Eight inputs allow every subset to be checked. Covers regression.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Eight inputs allow every subset to be checked. Covers regression.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "row": 3,
+          "column": 1,
+          "bbox": [
+            80,
+            460,
+            320,
+            93.33
+          ],
+          "text": "Madelon",
+          "textPreview": "Madelon",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Madelon",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Madelon",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "row": 3,
+          "column": 2,
+          "bbox": [
+            400,
+            460,
+            560,
+            93.33
+          ],
+          "text": "Signal, redundant and distractor columns predict a synthetic class.",
+          "textPreview": "Signal, redundant and distractor columns predict a synthetic class.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Signal, redundant and distractor columns predict a synthetic class.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Signal, redundant and distractor columns predict a synthetic class.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "row": 3,
+          "column": 3,
+          "bbox": [
+            960,
+            460,
+            560,
+            93.33
+          ],
+          "text": "Known generating structure challenges feature search.",
+          "textPreview": "Known generating structure challenges feature search.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Known generating structure challenges feature search.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Known generating structure challenges feature search.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "row": 4,
+          "column": 1,
+          "bbox": [
+            80,
+            553.33,
+            320,
+            93.33
+          ],
+          "text": "Spambase",
+          "textPreview": "Spambase",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Spambase",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Spambase",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "row": 4,
+          "column": 2,
+          "bbox": [
+            400,
+            553.33,
+            560,
+            93.33
+          ],
+          "text": "Word and character statistics predict spam.",
+          "textPreview": "Word and character statistics predict spam.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Word and character statistics predict spam.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Word and character statistics predict spam.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "row": 4,
+          "column": 3,
+          "bbox": [
+            960,
+            553.33,
+            560,
+            93.33
+          ],
+          "text": "Real inputs give interpretable classification examples.",
+          "textPreview": "Real inputs give interpretable classification examples.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Real inputs give interpretable classification examples.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Real inputs give interpretable classification examples.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 13,
+          "row": 5,
+          "column": 1,
+          "bbox": [
+            80,
+            646.67,
+            320,
+            93.33
+          ],
+          "text": "Credit-card fraud",
+          "textPreview": "Credit-card fraud",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Credit-card fraud",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Credit-card fraud",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 14,
+          "row": 5,
+          "column": 2,
+          "bbox": [
+            400,
+            646.67,
+            560,
+            93.33
+          ],
+          "text": "PCA components and amount predict fraud.",
+          "textPreview": "PCA components and amount predict fraud.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "PCA components and amount predict fraud.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "PCA components and amount predict fraud.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 15,
+          "row": 5,
+          "column": 3,
+          "bbox": [
+            960,
+            646.67,
+            560,
+            93.33
+          ],
+          "text": "Rare positive cases test a different classification setting.",
+          "textPreview": "Rare positive cases test a different classification setting.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Rare positive cases test a different classification setting.",
+              "resolvedTextStyle": {
+                "fontSize": 29.33,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Rare positive cases test a different classification setting.",
+                  "fontSize": 29.33,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d0jmdgri",
+      "id": "6",
+      "name": "text-135",
+      "bbox": [
+        80,
+        764,
+        1440,
+        48
+      ],
+      "geometry": "rect",
+      "text": "All four are supervised tasks. PCA describes inputs, not a change of learning task.",
+      "textPreview": "All four are supervised tasks. PCA describes inputs, not a change of learning task.",
+      "resolvedFontSize": 30.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 30.67,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "All four are supervised tasks. PCA describes inputs, not a change of learning task."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "All four are supervised tasks. PCA describes inputs, not a change of learning task.",
+          "resolvedTextStyle": {
+            "fontSize": 30.67,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "All four are supervised tasks. PCA describes inputs, not a change of learning task.",
+              "fontSize": 30.67,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/sza54bqx",
+      "id": "7",
+      "name": "text-136",
+      "bbox": [
+        80,
+        826.67,
+        1440,
+        33.33
+      ],
+      "geometry": "rect",
+      "text": "The broader benchmark also includes Gisette and ISOLET.",
+      "textPreview": "The broader benchmark also includes Gisette and ISOLET.",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 24,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "The broader benchmark also includes Gisette and ISOLET."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "The broader benchmark also includes Gisette and ISOLET.",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "The broader benchmark also includes Gisette and ISOLET.",
+              "fontSize": 24,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

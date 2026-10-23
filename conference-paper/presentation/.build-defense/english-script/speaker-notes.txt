@@ -1,0 +1,128 @@
+SLIDE 1
+Good afternoon. My name is Wenjie Shi, and my supervisor is Chi Zhao. Today I will present my research, Min-Marginal Power Indices for Multi-Objective Feature Selection.
+
+The central question is simple: when can an extra feature make a model worse? I will explain why this question matters, how the proposed method finds evidence of harm, and how the experiments will test its practical value. The research is still in progress, so I will focus mainly on the method and experimental design.
+
+SLIDE 2
+Let me begin with a familiar example: detecting spam emails. Each email is described by input features, such as word frequencies, punctuation, and statistics about capital letters. During training, we also know whether each email is spam or a legitimate email. The model learns from these labeled examples and predicts the category of new emails.
+
+We may want to use fewer features to reduce measurement, storage, or model costs. However, removing inputs can also damage prediction performance. Similarly, adding another input does not always improve a model trained on a finite sample. Its effect can depend on the other inputs already present.
+
+This motivates my research: can we provide a concrete, checkable reason to consider a feature for removal, and then test whether that removal is worthwhile?
+
+SLIDE 3
+The research separates two complementary checks.
+
+The first is the addition check. We take a group of features, called S, train a model with that group, and compare it with a model trained after adding feature i. We ask whether adding i makes the score fall below the performance requirement. This identifies harm in that particular feature group.
+
+The second is the removal check. We start from the full input set and propose a smaller set. On independent data, we then examine whether the smaller model provides an acceptable balance of prediction performance, size, and cost.
+
+These are different questions. A feature that causes harm in one combination is not automatically beneficial to remove from the full model. The removal decision therefore needs its own evidence.
+
+SLIDE 4
+Before the example, let me explain the formulas. D is the full set of inputs being analyzed. S is a subset that does not contain feature i. U of S is the validation score of a model trained using S, with higher scores meaning better performance.
+
+First, we set the required score, q, by multiplying the full-set score by alpha. The default alpha is zero point nine five. We therefore require ninety-five percent of the full-set score. This does not mean ninety-five percent classification accuracy.
+
+Second, v converts the score into a pass or fail result. It equals one when the score reaches q, and zero otherwise.
+
+Third, delta compares these results after and before adding i. A change from one to zero gives minus one.
+
+Finally, MinPPI takes the minimum delta across all feature groups without i. If any group produces minus one, a harmful context exists. We can now apply these definitions to a concrete example.
+
+SLIDE 5
+These numbers are an illustration, not an experimental result. Suppose the model using the full input set has a validation score of zero point nine zero. With alpha set to zero point nine five, the required score is zero point eight five five.
+
+On the left, the model using subset S scores zero point eight seven. It passes the requirement, so its binary value is one.
+
+We then add feature i and retrain using the same training rows and learner settings. The score falls to zero point eight four. It now fails, so its binary value is zero. Delta is therefore zero minus one, which equals minus one.
+
+We save this pair as a witness of harm. It records what happened in this context. Whether removing i from the full model helps is a separate question.
+
+SLIDE 6
+This diagram brings the research together. The upper row shows the feature audit. We first choose an input i and a group of other inputs, S. We then train and evaluate the models using S and S plus i. If adding i changes a pass into a fail, we record the feature, the group, both scores, and the threshold. We repeat this process within a fixed query budget.
+
+The lower row shows the planned deletion evaluation. Following the arrows from right to left, we use the audit evidence to propose one removal candidate. An independent validation check decides whether to accept it or keep the full input set.
+
+After freezing that decision, we evaluate the chosen model on held-out test data. We measure how many inputs remain, how much prediction performance changes, and the total computational cost. This keeps the discovery of a harmful context separate from the evaluation of a removal decision.
+
+SLIDE 7
+The theoretical framework comes from cooperative game theory. A player corresponds to one input column. A coalition is a group of columns used together to train a model. The marginal contribution is the change caused by adding another column.
+
+Classical Shapley and Banzhaf measures summarize marginal contributions through weighted averages. Here, the question is whether any feature group changes from passing to failing. MinPPI therefore considers the minimum change in the threshold outcome.
+
+Minimum aggregation has predecessors, including MinShap. The focus of this project is its use with a fixed performance requirement, together with a record of the evaluated failure and a procedure for testing removal. A negative witness gives a specific context that can be checked again.
+
+SLIDE 8
+The previous slides explain how we check whether adding a feature causes harm. The next question is how to find such cases efficiently.
+
+As the number of features grows, checking every combination becomes expensive. We therefore compare two search strategies. Method A selects feature groups randomly. Method B uses information from the training data, including associations with the target and relationships between features, to guide this selection.
+
+Both methods use the same addition check and the same query budget. We then compare how many harmful cases they discover. Guidance is a hypothesis to test, rather than a guaranteed improvement.
+
+A discovered witness provides evidence of harm in that specific context. However, finding no witness does not prove safety, because some combinations remain unchecked. We also measure computational cost separately, since equal query budgets do not necessarily mean equal running times.
+
+SLIDE 9
+The datasets were chosen to serve different parts of the research.
+
+Abalone uses physical measurements to predict ring count. It provides a regression task, and its eight inputs allow us to check every possible subset.
+
+Madelon is a labeled synthetic classification dataset. It contains informative variables, redundant combinations, and distractor variables. This structure helps us investigate difficult feature combinations, although a variable's generating role does not automatically determine whether MinPPI finds it harmful.
+
+Spambase uses word and character statistics to predict whether an email is spam. Its inputs make the feature combinations easier to explain.
+
+Credit-card fraud provides a classification task with rare positive cases. Its inputs include anonymized PCA components and transaction amount. PCA describes the input representation. The prediction task still uses known fraud labels and remains supervised.
+
+The current exact-reference study uses these four datasets. Gisette and ISOLET belong to the broader benchmark, but they are not part of the current thirty-five small reference problems.
+
+SLIDE 10
+The experimental plan follows three questions.
+
+First, how much does the search miss? We compare its discoveries with a complete reference on small problems. This study has been completed.
+
+Second, what makes discovery difficult? We plan to control the structure of synthetic data so that we can examine signal, redundancy, and interaction separately.
+
+Third, is removal worthwhile? We plan to test the selected smaller models using independent validation and test data, while accounting for the full cost.
+
+These studies provide different kinds of evidence. Finding valid witnesses and measuring missed cases does not, by itself, establish that deleting features improves a model.
+
+SLIDE 11
+The first study uses small problems because we need a complete reference. With eight inputs, there are two hundred and fifty-six possible subsets. We can evaluate all of them and determine which inputs have at least one harmful context.
+
+We then let methods A and B search under the same query budget. They cannot see the complete reference or its harmful-feature labels. They can only request the subset evaluations selected by their own search strategy.
+
+After the search, we compare the discovered harmful inputs with the reference. This allows us to measure what was found and what was missed across the query budget.
+
+The completed study contains thirty-five fixed problems across four datasets. Each reference applies to its own eight-input problem, model, split, and threshold. It does not provide a complete answer for the original high-dimensional dataset.
+
+SLIDE 12
+The second study is planned to help explain the discovery results. Real datasets contain many overlapping influences, which makes it difficult to identify why a search succeeds or fails.
+
+We therefore use three controlled structures. The first combines useful variables with unrelated distractors. The second adds noisy copies of informative variables, creating correlated redundancy. The third uses an interaction in which the target depends on a combination of variables.
+
+For each structure, we keep the learning and evaluation procedure fixed, construct a complete reference, and compare A and B under the same budget.
+
+The aim is to understand how data structure affects harmful contexts and their discovery. We do not assume that an irrelevant or redundant variable must be harmful. Its MinPPI status still depends on the evaluated model and threshold.
+
+SLIDE 13
+The third study addresses practical value. It is planned, because a harmful witness alone does not establish that removal is useful.
+
+First, each strategy proposes one candidate input set using training and selection-validation data. A separate validation set then checks whether the candidate stays within a predefined tolerance for prediction loss. If it fails this check, the strategy keeps the full input set. We do not repeatedly try candidates until one passes.
+
+After fixing the decision, we refit the chosen model and evaluate it on held-out test data. We compare the result with established feature-ranking and elimination methods, using consistent learning and evaluation conditions.
+
+We judge three outcomes together: the number of retained inputs, prediction loss, and total computational cost, including the audit. Classification and regression results are evaluated with their appropriate metrics. A smaller model is valuable only when the reduction justifies its performance trade-off and cost.
+
+SLIDE 14
+At this stage, the complete reference audit has been carried out for the small fixed problems. It provides checkable witnesses and shows that a limited search can miss harmful cases.
+
+The current guided strategy does not show a stable advantage over random exploration. Relationships found in the training data do not consistently lead the search toward the contexts where the threshold fails.
+
+The practical value of deletion remains an open question. The next steps are the controlled mechanism study and the independent removal evaluation. These results will help define when the method is useful and where its limitations lie.
+
+SLIDE 15
+The expected contribution is a feature-selection decision supported by evidence that can be inspected.
+
+A concrete failure context shows which input caused a threshold crossing and in which combination. An exact reference measures how much the search missed. An independent evaluation tests whether acting on the evidence produces a useful smaller model.
+
+Together, these steps connect the mathematical definition to a practical decision. The next work is to complete the controlled mechanism experiments and the independent deletion evaluation. Thank you for your attention. I welcome your questions.

@@ -1,0 +1,512 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/djrvuv",
+    "id": "djrvuv",
+    "slide": 15,
+    "layoutId": "70b5e543-eeb3-4e5a-9914-15a5a73d3a39",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "37707fb1-9ba4-42dd-acaa-639393d1d626",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#0B2033",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "70b5e543-eeb3-4e5a-9914-15a5a73d3a39",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "37707fb1-9ba4-42dd-acaa-639393d1d626",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "37707fb1-9ba4-42dd-acaa-639393d1d626",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1kbylgje",
+      "id": "1",
+      "name": "text-174",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Expected contribution",
+      "textPreview": "Expected contribution",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Expected contribution"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Expected contribution",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Expected contribution",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/exkza1kn",
+      "id": "2",
+      "name": "rule-175",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#75D0C9",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fitgj618",
+      "id": "3",
+      "name": "text-176",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "15",
+      "textPreview": "15",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#75D0C9",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "15"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "15",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#75D0C9",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "15",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#75D0C9",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/sv2h8b2h",
+      "id": "4",
+      "name": "text-177",
+      "bbox": [
+        80,
+        226.67,
+        1440,
+        165.33
+      ],
+      "geometry": "rect",
+      "text": "A feature-selection decision\nwith evidence that can be inspected.",
+      "textPreview": "A feature-selection decision | with evidence that can be inspected.",
+      "resolvedFontSize": 60,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 60,
+        "typeface": "Arial",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A feature-selection decision"
+          },
+          {
+            "index": 2,
+            "text": "with evidence that can be inspected."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A feature-selection decision",
+          "resolvedTextStyle": {
+            "fontSize": 60,
+            "typeface": "Arial",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A feature-selection decision",
+              "fontSize": 60,
+              "typeface": "Arial",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "with evidence that can be inspected.",
+          "resolvedTextStyle": {
+            "fontSize": 60,
+            "typeface": "Arial",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "with evidence that can be inspected.",
+              "fontSize": 60,
+              "typeface": "Arial",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/dwbyhgj2",
+      "id": "5",
+      "name": "text-178",
+      "bbox": [
+        80,
+        457.33,
+        1440,
+        240
+      ],
+      "geometry": "rect",
+      "text": "A concrete failure context explains what happened.\nAn exact reference shows what the search missed.\nAn independent test shows whether removal is worthwhile.",
+      "textPreview": "A concrete failure context explains what happened. | An exact reference shows what the search missed. | An independent test shows whether...",
+      "resolvedFontSize": 38.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 38.67,
+        "typeface": "Arial",
+        "color": "#75D0C9",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A concrete failure context explains what happened."
+          },
+          {
+            "index": 2,
+            "text": "An exact reference shows what the search missed."
+          },
+          {
+            "index": 3,
+            "text": "An independent test shows whether removal is worthwhile."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A concrete failure context explains what happened.",
+          "resolvedTextStyle": {
+            "fontSize": 38.67,
+            "typeface": "Arial",
+            "color": "#75D0C9",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A concrete failure context explains what happened.",
+              "fontSize": 38.67,
+              "typeface": "Arial",
+              "color": "#75D0C9",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "An exact reference shows what the search missed.",
+          "resolvedTextStyle": {
+            "fontSize": 38.67,
+            "typeface": "Arial",
+            "color": "#75D0C9",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "An exact reference shows what the search missed.",
+              "fontSize": 38.67,
+              "typeface": "Arial",
+              "color": "#75D0C9",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 3,
+          "text": "An independent test shows whether removal is worthwhile.",
+          "resolvedTextStyle": {
+            "fontSize": 38.67,
+            "typeface": "Arial",
+            "color": "#75D0C9",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "An independent test shows whether removal is worthwhile.",
+              "fontSize": 38.67,
+              "typeface": "Arial",
+              "color": "#75D0C9",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/qt0z61kr",
+      "id": "6",
+      "name": "rule-179",
+      "bbox": [
+        80,
+        737.33,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#496174",
+      "lineWidth": 1.33
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/rutgf61c",
+      "id": "7",
+      "name": "text-180",
+      "bbox": [
+        80,
+        770.67,
+        1440,
+        70.67
+      ],
+      "geometry": "rect",
+      "text": "Next: controlled mechanisms, then independent deletion evaluation.",
+      "textPreview": "Next: controlled mechanisms, then independent deletion evaluation.",
+      "resolvedFontSize": 33.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 33.33,
+        "typeface": "Arial",
+        "color": "#FFFFFF",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Next: controlled mechanisms, then independent deletion evaluation."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Next: controlled mechanisms, then independent deletion evaluation.",
+          "resolvedTextStyle": {
+            "fontSize": 33.33,
+            "typeface": "Arial",
+            "color": "#FFFFFF",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Next: controlled mechanisms, then independent deletion evaluation.",
+              "fontSize": 33.33,
+              "typeface": "Arial",
+              "color": "#FFFFFF",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

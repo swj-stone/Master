@@ -1,0 +1,1130 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/apqugg",
+    "id": "apqugg",
+    "slide": 7,
+    "layoutId": "c0aa18ec-5c6c-4743-8d35-27a3799fa1c7",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "7ed3990b-800c-45f7-bcd1-7d5787e7a07d",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "c0aa18ec-5c6c-4743-8d35-27a3799fa1c7",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "7ed3990b-800c-45f7-bcd1-7d5787e7a07d",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "7ed3990b-800c-45f7-bcd1-7d5787e7a07d",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/x4jehszq",
+      "id": "1",
+      "name": "text-67",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "MinPPI: retain the worst marginal effect",
+      "textPreview": "MinPPI: retain the worst marginal effect",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "MinPPI: retain the worst marginal effect"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "MinPPI: retain the worst marginal effect",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "MinPPI: retain the worst marginal effect",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/a18fmd0z",
+      "id": "2",
+      "name": "rule-68",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/b21wfi1k",
+      "id": "3",
+      "name": "text-69",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "07",
+      "textPreview": "07",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "07"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "07",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "07",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/kraxs7i1",
+      "id": "4",
+      "name": "text-70",
+      "bbox": [
+        80,
+        210.67,
+        1440,
+        66.67
+      ],
+      "geometry": "rect",
+      "text": "The game and marginal effects stay the same. The aggregation changes.",
+      "textPreview": "The game and marginal effects stay the same. The aggregation changes.",
+      "resolvedFontSize": 36,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 36,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "The game and marginal effects stay the same. The aggregation changes."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "The game and marginal effects stay the same. The aggregation changes.",
+          "resolvedTextStyle": {
+            "fontSize": 36,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "The game and marginal effects stay the same. The aggregation changes.",
+              "fontSize": 36,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/lsjelszm",
+      "id": "5",
+      "name": "text-71",
+      "bbox": [
+        80,
+        306.67,
+        1440,
+        60
+      ],
+      "geometry": "rect",
+      "text": "M₁ = min {+1, −1, +1, 0} = −1",
+      "textPreview": "M₁ = min {+1, −1, +1, 0} = −1",
+      "resolvedFontSize": 41.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 41.33,
+        "typeface": "Arial",
+        "color": "#C63E40",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "M₁ = min {+1, −1, +1, 0} = −1"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "M₁ = min {+1, −1, +1, 0} = −1",
+          "resolvedTextStyle": {
+            "fontSize": 41.33,
+            "typeface": "Arial",
+            "color": "#C63E40",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "M₁ = min {+1, −1, +1, 0} = −1",
+              "fontSize": 41.33,
+              "typeface": "Arial",
+              "color": "#C63E40",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/y5sfqx0v",
+      "id": "6",
+      "name": "text-72",
+      "bbox": [
+        80,
+        384,
+        1440,
+        60
+      ],
+      "geometry": "rect",
+      "text": "M₂ = min {+1, −1, +1, 0} = −1",
+      "textPreview": "M₂ = min {+1, −1, +1, 0} = −1",
+      "resolvedFontSize": 41.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 41.33,
+        "typeface": "Arial",
+        "color": "#C63E40",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "M₂ = min {+1, −1, +1, 0} = −1"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "M₂ = min {+1, −1, +1, 0} = −1",
+          "resolvedTextStyle": {
+            "fontSize": 41.33,
+            "typeface": "Arial",
+            "color": "#C63E40",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "M₂ = min {+1, −1, +1, 0} = −1",
+              "fontSize": 41.33,
+              "typeface": "Arial",
+              "color": "#C63E40",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/z61wj2hg",
+      "id": "7",
+      "name": "text-73",
+      "bbox": [
+        80,
+        461.33,
+        1440,
+        60
+      ],
+      "geometry": "rect",
+      "text": "M₃ = min {0, 0, 0, +1} = 0",
+      "textPreview": "M₃ = min {0, 0, 0, +1} = 0",
+      "resolvedFontSize": 41.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 41.33,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "M₃ = min {0, 0, 0, +1} = 0"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "M₃ = min {0, 0, 0, +1} = 0",
+          "resolvedTextStyle": {
+            "fontSize": 41.33,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "M₃ = min {0, 0, 0, +1} = 0",
+              "fontSize": 41.33,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "table",
+      "scope": "slide",
+      "aid": "tb/xsnupcra",
+      "id": "8",
+      "bbox": [
+        80,
+        557.33,
+        1440,
+        208
+      ],
+      "text": "Input | Shapley φᵢ | MinPPI Mᵢ | Interpretation in this game\nx₁ | +1/3 | −1 | Has a harmful context\nx₂ | +1/3 | −1 | Has a harmful context\nx₃ | +1/3 | 0 | No negative crossing, but can help",
+      "textPreview": "Input | Shapley φᵢ | MinPPI Mᵢ | Interpretation in this game | x₁ | +1/3 | −1 | Has a harmful context | x₂ | +1/3 | −1 | Has a harmful co...",
+      "rows": 4,
+      "cols": 4,
+      "cells": [
+        {
+          "index": 1,
+          "row": 1,
+          "column": 1,
+          "bbox": [
+            80,
+            557.33,
+            206.67,
+            52
+          ],
+          "text": "Input",
+          "textPreview": "Input",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Input",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Input",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "row": 1,
+          "column": 2,
+          "bbox": [
+            286.67,
+            557.33,
+            280,
+            52
+          ],
+          "text": "Shapley φᵢ",
+          "textPreview": "Shapley φᵢ",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Shapley φᵢ",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Shapley φᵢ",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "row": 1,
+          "column": 3,
+          "bbox": [
+            566.67,
+            557.33,
+            280,
+            52
+          ],
+          "text": "MinPPI Mᵢ",
+          "textPreview": "MinPPI Mᵢ",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "MinPPI Mᵢ",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "MinPPI Mᵢ",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "row": 1,
+          "column": 4,
+          "bbox": [
+            846.67,
+            557.33,
+            673.33,
+            52
+          ],
+          "text": "Interpretation in this game",
+          "textPreview": "Interpretation in this game",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Interpretation in this game",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Interpretation in this game",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "row": 2,
+          "column": 1,
+          "bbox": [
+            80,
+            609.33,
+            206.67,
+            52
+          ],
+          "text": "x₁",
+          "textPreview": "x₁",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "x₁",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "x₁",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "row": 2,
+          "column": 2,
+          "bbox": [
+            286.67,
+            609.33,
+            280,
+            52
+          ],
+          "text": "+1/3",
+          "textPreview": "+1/3",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "+1/3",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "+1/3",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "row": 2,
+          "column": 3,
+          "bbox": [
+            566.67,
+            609.33,
+            280,
+            52
+          ],
+          "text": "−1",
+          "textPreview": "−1",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "−1",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "−1",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "row": 2,
+          "column": 4,
+          "bbox": [
+            846.67,
+            609.33,
+            673.33,
+            52
+          ],
+          "text": "Has a harmful context",
+          "textPreview": "Has a harmful context",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Has a harmful context",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Has a harmful context",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "row": 3,
+          "column": 1,
+          "bbox": [
+            80,
+            661.33,
+            206.67,
+            52
+          ],
+          "text": "x₂",
+          "textPreview": "x₂",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "x₂",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "x₂",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "row": 3,
+          "column": 2,
+          "bbox": [
+            286.67,
+            661.33,
+            280,
+            52
+          ],
+          "text": "+1/3",
+          "textPreview": "+1/3",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "+1/3",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "+1/3",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "row": 3,
+          "column": 3,
+          "bbox": [
+            566.67,
+            661.33,
+            280,
+            52
+          ],
+          "text": "−1",
+          "textPreview": "−1",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "−1",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "−1",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "row": 3,
+          "column": 4,
+          "bbox": [
+            846.67,
+            661.33,
+            673.33,
+            52
+          ],
+          "text": "Has a harmful context",
+          "textPreview": "Has a harmful context",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Has a harmful context",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Has a harmful context",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 13,
+          "row": 4,
+          "column": 1,
+          "bbox": [
+            80,
+            713.33,
+            206.67,
+            52
+          ],
+          "text": "x₃",
+          "textPreview": "x₃",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "x₃",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "x₃",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 14,
+          "row": 4,
+          "column": 2,
+          "bbox": [
+            286.67,
+            713.33,
+            280,
+            52
+          ],
+          "text": "+1/3",
+          "textPreview": "+1/3",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "+1/3",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "+1/3",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 15,
+          "row": 4,
+          "column": 3,
+          "bbox": [
+            566.67,
+            713.33,
+            280,
+            52
+          ],
+          "text": "0",
+          "textPreview": "0",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "0",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "0",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 16,
+          "row": 4,
+          "column": 4,
+          "bbox": [
+            846.67,
+            713.33,
+            673.33,
+            52
+          ],
+          "text": "No negative crossing, but can help",
+          "textPreview": "No negative crossing, but can help",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "No negative crossing, but can help",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "No negative crossing, but can help",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1wze98ji",
+      "id": "9",
+      "name": "text-74",
+      "bbox": [
+        80,
+        782.67,
+        1440,
+        50.67
+      ],
+      "geometry": "rect",
+      "text": "The same positive average can hide different worst-case behavior.",
+      "textPreview": "The same positive average can hide different worst-case behavior.",
+      "resolvedFontSize": 34.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 34.67,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "The same positive average can hide different worst-case behavior."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "The same positive average can hide different worst-case behavior.",
+          "resolvedTextStyle": {
+            "fontSize": 34.67,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "The same positive average can hide different worst-case behavior.",
+              "fontSize": 34.67,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

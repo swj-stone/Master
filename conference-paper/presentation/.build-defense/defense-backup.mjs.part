@@ -1,0 +1,28 @@
+// Formal definition for questions, not the opening explanation.
+{
+ const s=slide('Backup: formal definition and assumptions');
+ text(s,'q = α U(D)       vα(S) = 1[U(S) ≥ q]',60,170,1080,62,34,C.navy,true);
+ text(s,'Mi = min { vα(S ∪ {i}) − vα(S) : S ⊆ D \\ {i} }',60,248,1080,62,32,C.teal,true);
+ text(s,'D: analyzed input set. S: a subset without i. U: validation utility.\nDefault α = 0.95, with U(D) > 0 and finite utilities.',60,339,1080,90,25);
+ text(s,'−1: a negative witness exists.\n0: no negative context, but at least one zero marginal.\n+1: every context changes from fail to pass.',60,450,1080,115,25);
+ text(s,'Sampled minima bound the exact minimum from above. No sampled witness does not certify safety.',60,587,1080,49,22,C.gray);
+ note(s,'备用页。固定数据、划分、预处理、学习器、随机种子、效用和配额才定义一个固定博弈。二分类ROC AUC，多分类macro OVR AUC，回归审计max(raw R²,0)，gate/test用raw R²。零值并非无预测价值。MinSS和MinBz在完整上下文支持上的最小值相等，这不表示经典加权指数相等。采样最小值不小于全域最小值，观察到负一足以证实固定游戏中的存在性，采样零或正一无法认证全局类别。改变任务或条件必须形成新实验与新结果。',[P+' §3','Zheng & Raskutti (2026), https://arxiv.org/abs/2604.15107']);
+}
+{
+ const s=slide('Backup: experimental protocol and evidence');
+ table(s,[['Item','Prespecified design or current evidence'],['Study 1: complete','35 eight-input games from 4 datasets. Full references, paired A/B search.'],['Study 2: planned','3 mechanisms × 5 instances. Each has 2,000 rows and 8 inputs.'],['Study 3: planned','20 games. Train / selection / gate / test = 64 / 8 / 8 / 20%.'],['Fixed learner','XGBoost: 100 rounds, depth 4, learning rate 0.1.'],['Decision tolerance','AUC loss ≤ 0.005 for classification. Raw R² loss ≤ 0.01 for regression.']],[310,770],{y:170,h:345,font:22});
+ text(s,'Study 1 recall area: A = 0.4012, B = 0.3718. No stable advantage for B.',60,542,1080,44,24,C.teal,true);
+ text(s,'22 of 35 games have harmful inputs. The other 13 have undefined recall.\nThese results describe small fixed games, not deletion benefit or high-dimensional truth.',60,594,1080,47,19,C.gray);
+ note(s,'备用页。最新证据日期为2026年9月26日。Study1为7面板×5划分，每游戏30对采样日程，共同边际查询上限800。该研究使用64/16/20划分，不访问test。召回面积先在同游戏平均日程，再到面板、数据集，最后四数据集等权；空有害集合保留覆盖率、召回为NA。Study3不可复用Study1效用表，独立gate需要重新定义数据角色。候选冻结后非测试80%重新拟合，预处理仍来自原64%训练。成本含指导、审计、选择、gate及最终refit。该页数值不能与旧高维实验混为同一游戏。',[P+' §4, §7, §22–23',F+' §1–4']);
+}
+{
+ const s=slide('Backup: multi-objective selection as an extension');
+ text(s,'A possible later use of the audit',60,165,1080,53,31,C.navy,true);
+ const a=node(s,60,276,300,159,'MinPPI evidence','Propose a smaller\nsearch space.');
+ const b=node(s,450,276,300,159,'NSGA-II search','Trade input count against\nprediction performance.',{accent:true,size:23});
+ const c=node(s,840,276,300,159,'Candidate models','Offer different\nsize–performance choices.');
+ connect(s,a,b);connect(s,b,c);
+ claim(s,'The supervised prediction task stays fixed throughout the search.',487);
+ text(s,'Any benefit must include the preceding audit cost. This extension is outside the core evidence.',60,583,1080,57,24,C.gray);
+ note(s,'备用页。NSGA-II是进化多目标搜索方法，不是强化学习，也不是MinPPI必需组成。目标为保留特征比例|S|/p0和1-clip(U(S),0,1)，p0固定为过滤前维数。非支配解表达压缩与预测表现的折中。旧应用实验不能证明加上审计后必然加速，重新比较需要把审计和指导成本全部计入。当前核心路线先完成机制和独立删除决策，再决定是否扩展多目标搜索。相关理论来源：Shapley 1953，Banzhaf 1965，Lundberg & Lee 2017，Zheng & Raskutti 2026以及Deb et al. 2002。各页备注给出资料来源。',[paper+' Experimental design',P+' §7','Deb et al. (2002), https://doi.org/10.1109/4235.996017','https://arxiv.org/abs/1705.07874','https://arxiv.org/abs/2604.15107']);
+}

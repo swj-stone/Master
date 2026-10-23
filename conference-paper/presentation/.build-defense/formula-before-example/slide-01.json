@@ -1,0 +1,608 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/nantdc",
+    "id": "nantdc",
+    "slide": 1,
+    "layoutId": "7b5a74e3-afe4-40d4-84c0-d73ee5dff7f4",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "d0e9b1bf-ee1a-47eb-9de2-4fc634ee76f7",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#0B2033",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "7b5a74e3-afe4-40d4-84c0-d73ee5dff7f4",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "d0e9b1bf-ee1a-47eb-9de2-4fc634ee76f7",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "d0e9b1bf-ee1a-47eb-9de2-4fc634ee76f7",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ov6p4j2d",
+      "id": "1",
+      "name": "text-1",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "01",
+      "textPreview": "01",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#75D0C9",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "01"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "01",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#75D0C9",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "01",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#75D0C9",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/nux8vel8",
+      "id": "2",
+      "name": "text-2",
+      "bbox": [
+        80,
+        78.67,
+        1440,
+        100
+      ],
+      "geometry": "rect",
+      "text": "MinPPI",
+      "textPreview": "MinPPI",
+      "resolvedFontSize": 64,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 64,
+        "typeface": "Arial",
+        "color": "#75D0C9",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "MinPPI"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "MinPPI",
+          "resolvedTextStyle": {
+            "fontSize": 64,
+            "typeface": "Arial",
+            "color": "#75D0C9",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "MinPPI",
+              "fontSize": 64,
+              "typeface": "Arial",
+              "color": "#75D0C9",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/mto729kn",
+      "id": "3",
+      "name": "text-3",
+      "bbox": [
+        80,
+        230.67,
+        1440,
+        200
+      ],
+      "geometry": "rect",
+      "text": "Min-Marginal Power Indices for\nMulti-Objective Feature Selection",
+      "textPreview": "Min-Marginal Power Indices for | Multi-Objective Feature Selection",
+      "resolvedFontSize": 58.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 58.67,
+        "typeface": "Arial",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Min-Marginal Power Indices for"
+          },
+          {
+            "index": 2,
+            "text": "Multi-Objective Feature Selection"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Min-Marginal Power Indices for",
+          "resolvedTextStyle": {
+            "fontSize": 58.67,
+            "typeface": "Arial",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Min-Marginal Power Indices for",
+              "fontSize": 58.67,
+              "typeface": "Arial",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "Multi-Objective Feature Selection",
+          "resolvedTextStyle": {
+            "fontSize": 58.67,
+            "typeface": "Arial",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Multi-Objective Feature Selection",
+              "fontSize": 58.67,
+              "typeface": "Arial",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1sfqt432",
+      "id": "4",
+      "name": "text-4",
+      "bbox": [
+        80,
+        468,
+        1440,
+        86.67
+      ],
+      "geometry": "rect",
+      "text": "When can an extra feature make a model worse?",
+      "textPreview": "When can an extra feature make a model worse?",
+      "resolvedFontSize": 36,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 36,
+        "typeface": "Arial",
+        "color": "#75D0C9",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "When can an extra feature make a model worse?"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "When can an extra feature make a model worse?",
+          "resolvedTextStyle": {
+            "fontSize": 36,
+            "typeface": "Arial",
+            "color": "#75D0C9",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "When can an extra feature make a model worse?",
+              "fontSize": 36,
+              "typeface": "Arial",
+              "color": "#75D0C9",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0r6p0z2h",
+      "id": "5",
+      "name": "rule-5",
+      "bbox": [
+        80,
+        601.33,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#496174",
+      "lineWidth": 1.33
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/zqx8rulw",
+      "id": "6",
+      "name": "text-6",
+      "bbox": [
+        80,
+        633.33,
+        640,
+        62.67
+      ],
+      "geometry": "rect",
+      "text": "Wenjie SHI",
+      "textPreview": "Wenjie SHI",
+      "resolvedFontSize": 38.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 38.67,
+        "typeface": "Arial",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Wenjie SHI"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Wenjie SHI",
+          "resolvedTextStyle": {
+            "fontSize": 38.67,
+            "typeface": "Arial",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Wenjie SHI",
+              "fontSize": 38.67,
+              "typeface": "Arial",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/epo7y9kb",
+      "id": "7",
+      "name": "text-7",
+      "bbox": [
+        893.33,
+        633.33,
+        626.67,
+        62.67
+      ],
+      "geometry": "rect",
+      "text": "Supervisor: Chi ZHAO",
+      "textPreview": "Supervisor: Chi ZHAO",
+      "resolvedFontSize": 34.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 34.67,
+        "typeface": "Arial",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Supervisor: Chi ZHAO"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Supervisor: Chi ZHAO",
+          "resolvedTextStyle": {
+            "fontSize": 34.67,
+            "typeface": "Arial",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Supervisor: Chi ZHAO",
+              "fontSize": 34.67,
+              "typeface": "Arial",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5ojq58j6",
+      "id": "8",
+      "name": "text-8",
+      "bbox": [
+        80,
+        718.67,
+        1066.67,
+        98.67
+      ],
+      "geometry": "rect",
+      "text": "Saint Petersburg State University\nApplied Mathematics and Control Processes",
+      "textPreview": "Saint Petersburg State University | Applied Mathematics and Control Processes",
+      "resolvedFontSize": 29.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 29.33,
+        "typeface": "Arial",
+        "color": "#75D0C9",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Saint Petersburg State University"
+          },
+          {
+            "index": 2,
+            "text": "Applied Mathematics and Control Processes"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Saint Petersburg State University",
+          "resolvedTextStyle": {
+            "fontSize": 29.33,
+            "typeface": "Arial",
+            "color": "#75D0C9",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Saint Petersburg State University",
+              "fontSize": 29.33,
+              "typeface": "Arial",
+              "color": "#75D0C9",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "Applied Mathematics and Control Processes",
+          "resolvedTextStyle": {
+            "fontSize": 29.33,
+            "typeface": "Arial",
+            "color": "#75D0C9",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Applied Mathematics and Control Processes",
+              "fontSize": 29.33,
+              "typeface": "Arial",
+              "color": "#75D0C9",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

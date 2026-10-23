@@ -1,0 +1,785 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/8cgsgb",
+    "id": "8cgsgb",
+    "slide": 11,
+    "layoutId": "299947dc-f774-4233-b85b-cd5703b59087",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "768a27f6-cb86-4273-9a68-a3f433e62d54",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#F6F3EB",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1600,
+      "height": 900
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Arial"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "299947dc-f774-4233-b85b-cd5703b59087",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "768a27f6-cb86-4273-9a68-a3f433e62d54",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "768a27f6-cb86-4273-9a68-a3f433e62d54",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ovadof21",
+      "id": "1",
+      "name": "text-128",
+      "bbox": [
+        80,
+        58.67,
+        1453.33,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Study 2: explain why some witnesses are harder to find",
+      "textPreview": "Study 2: explain why some witnesses are harder to find",
+      "resolvedFontSize": 52,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 52,
+        "typeface": "Arial",
+        "color": "#0B2033",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Study 2: explain why some witnesses are harder to find"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Study 2: explain why some witnesses are harder to find",
+          "resolvedTextStyle": {
+            "fontSize": 52,
+            "typeface": "Arial",
+            "color": "#0B2033",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Study 2: explain why some witnesses are harder to find",
+              "fontSize": 52,
+              "typeface": "Arial",
+              "color": "#0B2033",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/nu1cfalg",
+      "id": "2",
+      "name": "rule-129",
+      "bbox": [
+        80,
+        178.67,
+        1440,
+        0
+      ],
+      "geometry": "line",
+      "lineColor": "#0C7C78",
+      "lineWidth": 2
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/mtsvm5kv",
+      "id": "3",
+      "name": "text-130",
+      "bbox": [
+        1482.67,
+        848,
+        48,
+        32
+      ],
+      "geometry": "rect",
+      "text": "11",
+      "textPreview": "11",
+      "resolvedFontSize": 21.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 21.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "11"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "11",
+          "resolvedTextStyle": {
+            "fontSize": 21.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "11",
+              "fontSize": 21.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1sjud03q",
+      "id": "4",
+      "name": "text-131",
+      "bbox": [
+        80,
+        206.67,
+        1440,
+        53.33
+      ],
+      "geometry": "rect",
+      "text": "Planned controlled experiment",
+      "textPreview": "Planned controlled experiment",
+      "resolvedFontSize": 29.33,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 29.33,
+        "typeface": "Arial",
+        "color": "#526675",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Planned controlled experiment"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Planned controlled experiment",
+          "resolvedTextStyle": {
+            "fontSize": 29.33,
+            "typeface": "Arial",
+            "color": "#526675",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Planned controlled experiment",
+              "fontSize": 29.33,
+              "typeface": "Arial",
+              "color": "#526675",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "table",
+      "scope": "slide",
+      "aid": "tb/hoj6dkvu",
+      "id": "5",
+      "bbox": [
+        80,
+        298.67,
+        1440,
+        396
+      ],
+      "text": "Controlled structure | What changes in the inputs | What we learn\nSignal with distractors | Useful variables plus unrelated columns. | Whether extra noise creates difficult contexts.\nCorrelated redundancy | Add noisy copies of informative variables. | How overlapping information affects discovery.\nInteraction | The target depends on a combination of variables. | Whether the search reaches important combinations.",
+      "textPreview": "Controlled structure | What changes in the inputs | What we learn | Signal with distractors | Useful variables plus unrelated columns. | ...",
+      "rows": 4,
+      "cols": 3,
+      "cells": [
+        {
+          "index": 1,
+          "row": 1,
+          "column": 1,
+          "bbox": [
+            80,
+            298.67,
+            386.67,
+            64
+          ],
+          "text": "Controlled structure",
+          "textPreview": "Controlled structure",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Controlled structure",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Controlled structure",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "row": 1,
+          "column": 2,
+          "bbox": [
+            466.67,
+            298.67,
+            566.67,
+            64
+          ],
+          "text": "What changes in the inputs",
+          "textPreview": "What changes in the inputs",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "What changes in the inputs",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "What changes in the inputs",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "row": 1,
+          "column": 3,
+          "bbox": [
+            1033.33,
+            298.67,
+            486.67,
+            64
+          ],
+          "text": "What we learn",
+          "textPreview": "What we learn",
+          "fillColor": "#0B2033",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "What we learn",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#FFFFFF",
+                "bold": true
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "What we learn",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#FFFFFF",
+                  "bold": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "row": 2,
+          "column": 1,
+          "bbox": [
+            80,
+            362.67,
+            386.67,
+            110.67
+          ],
+          "text": "Signal with distractors",
+          "textPreview": "Signal with distractors",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Signal with distractors",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Signal with distractors",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "row": 2,
+          "column": 2,
+          "bbox": [
+            466.67,
+            362.67,
+            566.67,
+            110.67
+          ],
+          "text": "Useful variables plus unrelated columns.",
+          "textPreview": "Useful variables plus unrelated columns.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Useful variables plus unrelated columns.",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Useful variables plus unrelated columns.",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "row": 2,
+          "column": 3,
+          "bbox": [
+            1033.33,
+            362.67,
+            486.67,
+            110.67
+          ],
+          "text": "Whether extra noise creates difficult contexts.",
+          "textPreview": "Whether extra noise creates difficult contexts.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Whether extra noise creates difficult contexts.",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Whether extra noise creates difficult contexts.",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "row": 3,
+          "column": 1,
+          "bbox": [
+            80,
+            473.33,
+            386.67,
+            110.67
+          ],
+          "text": "Correlated redundancy",
+          "textPreview": "Correlated redundancy",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Correlated redundancy",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Correlated redundancy",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "row": 3,
+          "column": 2,
+          "bbox": [
+            466.67,
+            473.33,
+            566.67,
+            110.67
+          ],
+          "text": "Add noisy copies of informative variables.",
+          "textPreview": "Add noisy copies of informative variables.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Add noisy copies of informative variables.",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Add noisy copies of informative variables.",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "row": 3,
+          "column": 3,
+          "bbox": [
+            1033.33,
+            473.33,
+            486.67,
+            110.67
+          ],
+          "text": "How overlapping information affects discovery.",
+          "textPreview": "How overlapping information affects discovery.",
+          "fillColor": "#EEEEE7",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "How overlapping information affects discovery.",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "How overlapping information affects discovery.",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "row": 4,
+          "column": 1,
+          "bbox": [
+            80,
+            584,
+            386.67,
+            110.67
+          ],
+          "text": "Interaction",
+          "textPreview": "Interaction",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Interaction",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Interaction",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "row": 4,
+          "column": 2,
+          "bbox": [
+            466.67,
+            584,
+            566.67,
+            110.67
+          ],
+          "text": "The target depends on a combination of variables.",
+          "textPreview": "The target depends on a combination of variables.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "The target depends on a combination of variables.",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "The target depends on a combination of variables.",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "row": 4,
+          "column": 3,
+          "bbox": [
+            1033.33,
+            584,
+            486.67,
+            110.67
+          ],
+          "text": "Whether the search reaches important combinations.",
+          "textPreview": "Whether the search reaches important combinations.",
+          "fillColor": "#F6F3EB",
+          "paragraphs": [
+            {
+              "index": 1,
+              "text": "Whether the search reaches important combinations.",
+              "resolvedTextStyle": {
+                "fontSize": 30.67,
+                "typeface": "Arial",
+                "color": "#0B2033"
+              },
+              "runs": [
+                {
+                  "index": 1,
+                  "text": "Whether the search reaches important combinations.",
+                  "fontSize": 30.67,
+                  "typeface": "Arial",
+                  "color": "#0B2033"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/zq1cbalk",
+      "id": "6",
+      "name": "text-132",
+      "bbox": [
+        80,
+        764,
+        1440,
+        80
+      ],
+      "geometry": "rect",
+      "text": "Keep the model and evaluation fixed. Change the data structure deliberately.",
+      "textPreview": "Keep the model and evaluation fixed. Change the data structure deliberately.",
+      "resolvedFontSize": 34.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 34.67,
+        "typeface": "Arial",
+        "color": "#0C7C78",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "autoFit": "none",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Keep the model and evaluation fixed. Change the data structure deliberately."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Keep the model and evaluation fixed. Change the data structure deliberately.",
+          "resolvedTextStyle": {
+            "fontSize": 34.67,
+            "typeface": "Arial",
+            "color": "#0C7C78",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Keep the model and evaluation fixed. Change the data structure deliberately.",
+              "fontSize": 34.67,
+              "typeface": "Arial",
+              "color": "#0C7C78",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

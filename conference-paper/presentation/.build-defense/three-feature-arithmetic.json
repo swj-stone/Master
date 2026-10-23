@@ -1,0 +1,75 @@
+{
+  "illustrative": true,
+  "quota": "171/200",
+  "results": [
+    {
+      "feature": 1,
+      "contexts": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "deltas": [
+        1,
+        -1,
+        1,
+        0
+      ],
+      "weights": [
+        "1/3",
+        "1/6",
+        "1/6",
+        "1/3"
+      ],
+      "shapley": "1/3",
+      "minppi": -1
+    },
+    {
+      "feature": 2,
+      "contexts": [
+        0,
+        1,
+        4,
+        5
+      ],
+      "deltas": [
+        1,
+        -1,
+        1,
+        0
+      ],
+      "weights": [
+        "1/3",
+        "1/6",
+        "1/6",
+        "1/3"
+      ],
+      "shapley": "1/3",
+      "minppi": -1
+    },
+    {
+      "feature": 3,
+      "contexts": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "deltas": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "weights": [
+        "1/3",
+        "1/6",
+        "1/6",
+        "1/3"
+      ],
+      "shapley": "1/3",
+      "minppi": 0
+    }
+  ]
+}
