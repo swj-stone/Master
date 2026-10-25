@@ -31,6 +31,9 @@ dist/
 # QA/scratch outputs
 tmp/
 
+# Historical submission/review bundles and duplicated experiment data (local only)
+/packages/
+
 # LaTeX build products; keep the source, bibliography, styles, and final PDF
 conference-paper/build/
 conference-paper/*.zip

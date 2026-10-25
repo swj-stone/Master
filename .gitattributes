@@ -1,0 +1,2 @@
+# Preserve PDF bytes: line-ending conversion can invalidate cross-reference offsets.
+*.pdf binary
