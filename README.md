@@ -1,3 +1,43 @@
+# Master's thesis workspace / 硕士论文工作区
+
+本工作树从最终会议论文版本 `9086ddc071c3e173f5ba3b1a0b61b123677b2605`
+复制而来，专用于后续硕士论文撰写与实验。原 `../Master` 保持在 `main`
+分支，仅作为最终版本参考；本工作树使用独立分支 `thesis/masters`，共享同一
+Git 仓库和远程 `origin`，文件与暂存区彼此独立。
+
+数据、结果和历史材料 `data/`、`results/`、`packages/` 已复制为独立文件，
+继续按原规则被 Git 忽略；不是指向原目录的链接。Git 提交只保存未被忽略的文件。
+
+## 共享 Python 环境
+
+复用现有 `../venv`，无需安装依赖。其可编辑安装仍指向原 `Master/src`，
+所以在本工作树中统一使用以下入口，确保加载本工作树的源码：
+
+```powershell
+cd 'C:\work\学校\A.SPBU\paper\ZhaoCHI\Paper\MastersThesis'
+.\thesis-python.ps1 -c "import minppi_mofs; print(minppi_mofs.__file__)"
+.\thesis-python.ps1 -m pytest tests -q -p no:cacheprovider --basetemp ".t$PID"
+```
+
+该入口仅在当前命令期间设置源码路径、禁用 Python 字节码写入，并将
+Matplotlib / Numba 缓存放在本工作树的 `tmp/` 中；退出后恢复原环境和目录。
+执行下方历史说明中的 Python 命令时，将 `& $PY` 换成 `./thesis-python.ps1`。
+不要重复执行下方的环境安装步骤，也不要执行 `pip install -e .`，否则会改变
+共享环境的源码指向。共享依赖的升级会同时影响两份项目。
+
+## Git 使用
+
+```powershell
+git status --short --branch
+# 在本工作树提交后，将硕士论文分支推送到原仓库：
+git push -u origin thesis/masters
+```
+
+所有硕士论文修改均在这里完成，使用新的实验 run ID；不向 `main` 合并。
+下面保留会议论文原始项目说明，供研究和复现实验参考。
+
+---
+
 # MinPI — Min-Marginal Power Indices for Multi-Objective Feature Selection
 
 Research code and experimental materials accompanying the manuscript by **Wenjie Shi and
