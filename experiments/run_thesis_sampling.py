@@ -53,8 +53,9 @@ def _worker_entry(dataset, directory, rounds, sample_seconds, selection_policy, 
 
 
 def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbeat_s=10.0, heartbeat_formatter=None):
+    """Monitor the worker to completion. A numeric time limit arms the independent kill timer."""
     started = time.monotonic()
-    deadline = started + seconds
+    deadline = None if seconds is None else started + seconds
     process.start()
     kill_requested = []
 
@@ -64,22 +65,29 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
             kill_requested.append(time.monotonic() - started)
             process.kill()
 
-    timer = threading.Timer(max(0.0, deadline - time.monotonic()), expire)
-    timer.start()
+    timer = None
+    if deadline is not None:
+        timer = threading.Timer(max(0.0, deadline - time.monotonic()), expire)
+        timer.start()
     try:
         while process.is_alive():
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                process.join()
-                break
-            process.join(timeout=min(heartbeat_s, remaining))
-            if not process.is_alive() or time.monotonic() >= deadline:
+            wait = heartbeat_s
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    process.join()
+                    break
+                wait = min(heartbeat_s, remaining)
+            process.join(timeout=wait)
+            if not process.is_alive() or (deadline is not None and time.monotonic() >= deadline):
                 continue
             p = _read(directory / "progress.json")
             elapsed = time.monotonic() - started
+            left = max(0.0, seconds - elapsed) if seconds is not None else None
             if heartbeat_formatter is not None:
-                log(heartbeat_formatter(p, elapsed, max(0.0, seconds - elapsed)))
+                log(heartbeat_formatter(p, elapsed, left))
                 continue
+            deadline_text = f" | deadline in {left:.0f}s" if left is not None else ""
             if "fit_recipe" in p or p.get("source_partition") == "train":
                 total_fits = 2
                 if "fit_recipe" in p:
@@ -89,14 +97,16 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
                 done = p["validation_fits"] + p["test_fits"]
                 eta = f"~{elapsed * (total_fits - done) / done:.0f}s" if done else "pending"
                 log(f"{directory.name} phase={p['phase']} | recipe={p.get('fit_recipe', 'rounds')} | elapsed={elapsed:.0f}s"
-                    f" | fits={done}/{total_fits} | estimated remaining={eta} | deadline in {max(0, seconds-elapsed):.0f}s")
+                    f" | fits={done}/{total_fits} | estimated remaining={eta}{deadline_text}")
                 continue
             eta = p.get("sampling_eta_s") if p.get("phase") == "sampling" else None
             if p.get("phase") == "sampling" and eta is None and p.get("resolved_trials") and p.get("planned_trials"):
                 done = p["resolved_trials"]
                 eta = p.get("sample_elapsed_s", 0) * (p["planned_trials"] - done) / done
             if eta is not None and sample_seconds is not None:
-                eta = max(0.0, min(eta, sample_seconds - p.get("sample_elapsed_s", 0), seconds - elapsed))
+                eta = max(0.0, min(eta, sample_seconds - p.get("sample_elapsed_s", 0)))
+            if eta is not None and left is not None:
+                eta = min(eta, left)
             eta_text = "pending" if eta is None else f"~{max(0, eta):.0f}s"
             pool = (p.get("proposed_count", 0) if p.get("selection_policy") in ("sign_aware", "confirmed", "guarded", *REFINEMENTS)
                     else p.get("structured_proposed_count", p.get("proposed_count", 0)))
@@ -105,11 +115,11 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
                 f" | sample_fits={p.get('sample_fits', 0)} | skipped={p.get('skipped_after', 0)}"
                 f" | witnesses={p.get('witness_count', len(p.get('witnesses', {})))}"
                 f" | nominees={pool} | masks checked={len(p.get('selection_trials', []))}"
-                f" | sampling ETA={eta_text}"
-                f" | deadline in {max(0, seconds-elapsed):.0f}s")
+                f" | sampling ETA={eta_text}{deadline_text}")
     finally:
-        timer.cancel()
-        timer.join()
+        if timer is not None:
+            timer.cancel()
+            timer.join()
         if process.is_alive():
             process.kill()
         process.join()
@@ -211,7 +221,7 @@ def main():
         parser.error("Use distinct datasets, positive rounds, and 0 < sample-seconds < dataset-seconds <= 900.")
     budgets = {dataset: reuse_budget(args.reuse_sampling_run, dataset, args.dataset_seconds,
                                      args.rounds, args.sample_seconds) for dataset in args.datasets}
-    output = ROOT / "results/thesis_sampling" / datetime.now(MSK).strftime(f"seed42-{args.selection_policy}-%Y%m%d-%H%M%S-%f")
+    output = ROOT / "results/test/thesis_sampling" / datetime.now(MSK).strftime(f"seed42-{args.selection_policy}-%Y%m%d-%H%M%S-%f")
     output.mkdir(parents=True, exist_ok=False)
     def selection_sources():
         files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",

@@ -22,6 +22,43 @@ def _late_write(path, when):
     time.sleep(60)
 
 
+def test_unlimited_supervision_outlives_900_seconds_and_never_creates_timer(tmp_path, monkeypatch):
+    now = 10.
+    def no_timer(*args):
+        pytest.fail("unlimited run installed a timer")
+    monkeypatch.setattr(runner.threading, "Timer", no_timer)
+    monkeypatch.setattr(runner.time, "monotonic", lambda: now)
+
+    class LongFit:
+        exitcode = None
+
+        def start(self):
+            (tmp_path / "progress.json").write_text('{"phase":"sampling"}')
+
+        def is_alive(self):
+            return self.exitcode is None
+
+        def join(self, timeout=None):
+            nonlocal now
+            if timeout is None:
+                assert not self.is_alive()
+                return
+            now += timeout
+            if now >= 2010.:
+                (tmp_path / "result.json").write_text('{"phase":"complete"}')
+                self.exitcode = 0
+
+        def kill(self):
+            pytest.fail("unlimited run killed a healthy worker")
+
+    messages = []
+    outcome = supervise(LongFit(), tmp_path, None, messages.append, heartbeat_s=1000.,
+                        heartbeat_formatter=lambda p,t,left: (p["phase"], t, left))
+    assert messages == [("sampling", 1000., None)]
+    assert outcome["status"] == "completed" and outcome["elapsed_s"] == 2000.
+    assert outcome["kill_requested_s"] is None and outcome["limit_s"] is None
+
+
 def test_deadline_kills_worker_and_keeps_partial_progress(tmp_path):
     process = multiprocessing.get_context("spawn").Process(target=_stalled_fit, args=(tmp_path,))
     outcome = supervise(process, tmp_path, 2.0, lambda *_: None)

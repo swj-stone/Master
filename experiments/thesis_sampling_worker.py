@@ -344,24 +344,27 @@ def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=tim
     active_round = 0
     partial = None
     start = clock()
-    deadline = start + seconds
-    deadline_utc = (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat()
+    deadline = None if seconds is None else start + seconds
+    deadline_utc = None if seconds is None else (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat()
     planned = n * rounds
 
     def snapshot():
         draws = sum(counts.values())
         resolved = draws + sum(rounds - counts[f] for f in witnesses)
         elapsed = clock() - start
-        remaining = max(0.0, seconds - elapsed)
-        eta = None if resolved == 0 else min(remaining, elapsed * (planned - resolved) / resolved)
+        eta = elapsed * (planned - resolved) / resolved if resolved else None
+        if seconds is not None:
+            remaining = max(0.0, seconds - elapsed)
+            if remaining == 0 or eta is not None:
+                eta = 0.0 if remaining == 0 else min(remaining, eta)
         return dict(round=active_round, completed_rounds=completed, coverage=sum(x > 0 for x in counts.values()),
                     marginals=draws, sampled_draws=draws, observed_marginals=draws - skipped,
                     witness_count=len(witnesses), proposed_count=len(witnesses), skipped_after=skipped, resolved_trials=resolved,
-                    planned_trials=planned, sample_elapsed_s=elapsed, sampling_eta_s=0.0 if remaining == 0 else eta,
+                    planned_trials=planned, sample_elapsed_s=elapsed, sampling_eta_s=eta,
                     sampling_deadline_utc=deadline_utc)
 
     def check_time():
-        if clock() >= deadline:
+        if deadline is not None and clock() >= deadline:
             raise SamplingDeadline
 
     stop = "round_limit"
@@ -411,6 +414,8 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
     if selection_policy not in SELECTION_POLICIES:
         raise ValueError("Unknown selection policy")
     combined = selection_policy == "guarded_rounds"
+    if seconds is None and not combined:
+        raise ValueError("A sampling time limit is required for trial policies")
     if combined and reuse_sampling is not None:
         raise ValueError("guarded_rounds requires cold sampling on the run's own prepared partition")
     if not combined and (seed != SEED or (source is not None and Path(source).resolve() != SOURCE.resolve())):
@@ -426,6 +431,9 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
                  validation_fits=0, sample_fits=0, test_fits=0, cache_hits=0, sample_elapsed_s=0.0,
                  witness_count=0, ranking_fits=0, extra_ranking_fits=0, sampling_reused=reuse_sampling is not None,
                  sampling_source_sha256=None, inherited_sample_fits=0, inherited_sampling_s=0.0, new_sampling_s=0.0)
+
+    if combined:
+        state["run_mode"] = "formal" if seconds is None else "test"
 
     def publish(**changes):
         state.update(changes, elapsed_s=time.monotonic() - start, updated_utc=datetime.now(timezone.utc).isoformat())
@@ -506,6 +514,10 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
                                                             protocol["alpha_default"], full_val, rounds, seconds, pooled)
             state.update(sampling_source_sha256=digest, sampling_source=str(Path(reuse_sampling).resolve()),
                          inherited_sampling_s=sampled["sample_elapsed_s"], inherited_sample_fits=inherited_fits)
+        if seconds is None and (sampled["stop"] not in {"round_limit", "all_witnessed"}
+                                or sampled["partial_pair"] is not None
+                                or sampled["resolved_trials"] != n * rounds):
+            raise RuntimeError("Formal sampling ended before all scheduled trials were resolved")
         witness_names = [f for f in features if f in sampled["witnesses"]]
         state["sampling_evidence_verification_fits"] = state["validation_fits"] - 1 if reuse_sampling is not None else 0
         sampled["witness_count"] = len(witness_names)
@@ -730,13 +742,16 @@ if __name__ == "__main__":
     parser.add_argument("--source", type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--rounds", type=int, default=3)
-    parser.add_argument("--sample-seconds", required=True, type=float)
+    parser.add_argument("--sample-seconds", type=float, help="Sampling limit for trials; omit for a full guarded_rounds run.")
     parser.add_argument("--selection-policy", choices=SELECTION_POLICIES, default="structured")
     parser.add_argument("--reuse-sampling", type=Path)
     args = parser.parse_args()
     if args.dataset not in DATASETS and args.selection_policy != "guarded_rounds":
         parser.error("Choose a legacy dataset or use guarded_rounds with a prepared source.")
-    if args.rounds <= 0 or not np.isfinite(args.sample_seconds) or args.sample_seconds <= 0:
-        parser.error("rounds and sample-seconds must be positive and finite")
+    if args.sample_seconds is None and args.selection_policy != "guarded_rounds":
+        parser.error("Trial policies require --sample-seconds.")
+    if args.rounds <= 0 or (args.sample_seconds is not None and
+                            (not np.isfinite(args.sample_seconds) or args.sample_seconds <= 0)):
+        parser.error("rounds and any supplied sample-seconds must be positive and finite")
     run(args.dataset, args.output_dir, args.rounds, args.sample_seconds,
         selection_policy=args.selection_policy, reuse_sampling=args.reuse_sampling, seed=args.seed, source=args.source)

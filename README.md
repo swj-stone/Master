@@ -42,9 +42,10 @@ Abalone、Spambase、Madelon、Gisette、Credit Card Fraud 和 ISOLET；seed 为
 本次核验的输入清单指纹为
 `3fb4b9716759de8b3d4ebede5422a41a9a618e9b833f2437fa83bd29d252c0f3`。
 
-30 组共用 CUDA XGBoost（100 轮、深度 4、学习率 0.1、`n_jobs=1`）。每组在自己的
-划分上从头运行 MinPI 采样与 `guarded` 选列，最多 5 轮采样、780 秒；整个任务
-含加载、选列、预测器验证与最终测试，硬上限为 900 秒。全特征和所选子集分别在
+30 组共用 CUDA XGBoost（100 轮、深度 4、学习率 0.1、`n_jobs=1`）。正式实验
+对采样和整组任务均不设时长上限。每组在自己的划分上从头执行 MinPI 的 5 轮
+数值采样计划：获得 −1 见证后，该特征的最小值已经确定；其余特征完成全部轮次。
+所有计划项均已完成或由见证确定后，再完成 `guarded` 子集验证。全特征和所选子集分别在
 验证集上决定使用 100 轮预测或 150 与 200 轮预测的平均值，规则相同。回归以 R²
 计分，二分类以 ROC AUC 计分，ISOLET 以宏平均 OvR AUC 计分。Spambase 的
 seed 123 保留了 55 个预处理输入列，其余四个 seed 为 56 列；每组压缩率使用
@@ -60,103 +61,22 @@ Get-Content -LiteralPath '.\MastersThesis\results\thesis_benchmark\<本次运行
 `config_audit.json` 保存本轮配置核对结果。每组结束后，`summary.csv` 记录
 数据集、seed、实际耗时、状态、删除数和测试分数。`selection_delta` 比较原 100 轮
 预测器在两套特征上的差异，`predictor_delta` 比较同一选集上轮数选择带来的变化。
-`dataset_summary.csv` 按数据集列出完成组数、均值及 seed 间的样本标准差，超时或
-未完成的组单独计数。30 组按顺序执行，各组硬上限合计为 7 小时 30 分钟。
+`dataset_summary.csv` 按数据集列出完成组数、均值及 seed 间的样本标准差。
+终端与 `run.log` 每 10 秒更新当前阶段、已用时间，数据足够时显示预计剩余时间。
+整轮成功以 30 组全部完成为准。
 
-## 硕士实验：限时 MinPI 采样（单 seed 研究入口）
+## 限时试验（test）
 
-从本目录运行以下命令，在六个正式数据集上各测试 seed 42。输入来自已冻结的预处理
-CSV，加载时校验文件哈希。每轮为每个仍在搜索的特征抽一次联盟，按原配额判定胜负，
-并缓存联盟的验证效用。已有最小值为 0 且基础联盟未达标时，可以跳过新增特征后的
-那次评估。发现负见证时记录两个端点，停止该特征的搜索。
-
-Python 入口 `estimate_minppi(...)` 默认使用 `method="sampled", K=5`。指定
-`method="exact"` 或 `method="hybrid"` 可调用原有的对照方法。分组实验配置
-`grouped_nested_v2` 逐轮执行 A/B 的固定采样计划，原始存档使用其记录的
-`grouped_nested_v1` 执行与计数规则。需要同时计算多个指标的配对实验按完整计划
-读取端点，以便各指标使用相同的模型预测。
+试跑使用单独的入口和结果目录。从 `Paper` 目录运行下面的命令可在单个数据集和 seed
+上测试整条流程。试跑默认采样时限 780 秒，单组硬截止 900 秒。
 
 ```powershell
-.\thesis-python.ps1 experiments/run_thesis_sampling.py --rounds 5 --sample-seconds 780 --dataset-seconds 900
+.\MastersThesis\thesis-python.ps1 experiments/test/run_thesis_benchmark.py --datasets abalone --seeds 42
 ```
 
-每个数据集独立计时。上例最多采样 13 分钟，加载数据、采样、选集和最终测试合计
-最多 15 分钟，由父进程执行硬截止。提前结束时记录实际覆盖数和完成轮数。
-
-默认的 `--selection-policy structured` 将所有观测到 −1 的特征提名为有害候选，再从
-观测到 0 的特征中扩充候选池。候选目标为预处理后列数的 75%，优先提名与更高优先级
-代表列的训练集绝对相关系数达到 0.95 的零分列，再按全特征模型的训练增益从低到高
-补足。依次复核不同大小的联合删除子集；如果这些子集都被否决，就保留负见证列，
-把零分候选分块，重新验证累计删除结果。记录分别标识有害见证和补充的零分候选。
-
-`--selection-policy wide` 运行完整的方法对比，增加对零分候选的 TreeSHAP 排名及
-分块搜索路径。独立的 TreeSHAP 和模型增益排名使用相同的删除比例和验证门槛作为对照。
-TreeSHAP 的排名取同一全特征模型在至多 1,024 条训练样本上的平均绝对贡献。
-
-实验选项 `--selection-policy sign_aware` 保留采样最小值为 +1 的列及尚未采到的列。
-单独验证负见证组，再对两种排序取前缀做联合删除。第一种排序先列负见证，再按
-Gain 与 TreeSHAP 平均名次从低到高排列零分列；第二种按 Gain 排列所有负见证与
-零分列，允许保留删除后损失较大的负见证。单次候选删除量为 1 列、约 25%、50%、
-75% 或 87.5%，至少保留一列。
-
-主策略 `sign_worst` 在通过三项验证门槛的方案中，最大化“删除比例减去较差验证半集
-的效用损失 / 容差”。效用提高时损失按零计，全特征方案也参与比较。
-`sign_pooled` 只把损失项换成整个验证集的效用损失。独立的 `matched_gain` 和
-`matched_treeshap` 在所有列上各自排序，与主策略共用删除配额、验证门槛和评分公式。
-四个子集在读取测试集前固定，重复的子集共用一次模型拟合。
-
-实验选项 `--selection-policy confirmed` 在正式验证集上分别求出 `structured` 与
-`sign_worst` 的子集，再将原训练分区按 seed 42 划出 25% 的行做复核（分类按标签
-分层）。在其余 75% 的行上，重新训练这两个子集及全特征参照，每个不同子集只拟合
-一次。在原先三个验证门槛和本次复核都通过的候选中，优先选择删除数较多的子集，
-同数时比较复核效用，再比较原验证半集的最差表现。全特征参照始终可选。
-复核行来自用于初始特征排序的训练分区，正式测试分区继续只用于最后的评估。
-
-`--selection-policy guarded` 直接比较 `structured` 和 `sign_worst` 已通过原门槛的
-两个子集。只有当后者的删除数、整体验证分数及两个半集分数都至少持平，且其中一项
-严格提高时，才采用后者。这一规则共用已拟合的候选模型，发生取舍或完全持平时保留
-`structured`。在 seed 42 上，这一规则是探索性回顾比较后提出的。
-六个数据集的删除数、测试表现与计时见[分值筛选实验记录](docs/thesis/experiments/sign-aware-seed42.md)。
-
-实验选项 `--selection-policy local_refine` 从 `guarded` 的子集开始。它用训练分区的
-75% 拟合当前子集，在其余 25% 上把已删除的零分列按与预测残差的相关性排序。
-随后尝试单列交换、两列交换或再删一列，每个数据集最多验证八个不同的新子集。
-保留已删除的负见证，不删除 +1 或未观测列。新子集的整体验证分数和两个半集
-分数都必须至少持平，且两个半集的平均改善为正。主策略 `local_robust` 在符合
-条件的子集中优先选择较差半集改善最多的方案。父进程以 900 秒为硬截止，子进程
-会为最后的重训预留时间。日志记录实际完成和因预算跳过的候选。
-
-`--selection-policy fold_consensus` 使用同一 `guarded` 起点，分别在训练分区的一半
-上拟合模型，在另一半计算 TreeSHAP，结合训练 Gain 生成两份重要性排名。优先提名
-两半排名都低的特征，最多验证五个子集。
-
-固定列后可单独测试预测器。下面的命令复用 seed 42 下冻结的列，在全特征和
-`guarded` 子集上各自比较原预测及增加提升轮数后的预测。将 `rounds` 替换为
-`column_blend` 可比较每个节点随机采样一半特征的第二个模型与原模型的平均预测。
-
-```powershell
-.\thesis-python.ps1 experiments/run_thesis_predictor.py results/thesis_sampling/seed42-confirmed-20261110-191743-946395 --recipe rounds
-```
-
-在 `--recipe rounds` 后附加 `--training-check`，可只在原训练分区内部按 60/20/20
-重新划分，复核固定特征子集上的预测效果。两种预测实验均把已消耗的选列准备时间
-计入每个数据集的 15 分钟硬截止。[稳定性实验结果](docs/thesis/experiments/stability-seed42.md)
-
-每个候选子集重训一次，分别计算整个验证集与两个固定半集的效用。三处都要满足与
-各自全特征基线相比的损失上限，分类为 0.005，回归为 0.01。`structured` 与
-`wide` 的 MinPI 路径优先比较删除的负见证数，再比较总删除数。全部方法的掩码在读取
-测试集前冻结，随后合并训练集与验证集重训，记录各方法的测试表现。
-
-使用 `--selection-policy witness_only` 可复现原负见证提名和整组验证。
-给 `--reuse-sampling-run` 传入先前运行目录，可核验并复用相同的 MinPI 抽样。
-复用模式把原采样耗时计入每个数据集的硬上限，同时单独记录本次新增耗时。
-
-每次运行都会打印新的 `results/thesis_sampling/seed42-…/` 目录。终端和
-`run.log` 显示当前阶段、耗时、采样 ETA、硬截止剩余时间、拟合次数和见证数。
-另开 PowerShell 可用 `Get-Content -LiteralPath '<本次运行目录>\run.log' -Tail 10 -Wait` 追踪。
-`summary.csv` 汇总每个数据集的训练效果和墙钟耗时，各数据集子目录保存
-`progress.json`、`watchdog.json` 和成功完成时的 `result.json`。`methods.csv` 列出
-每种策略的删除数量、比例及验证和测试效用变化，具体特征名见数据集结果。
+试跑结果写入 `results/test/thesis_benchmark/`。此前单 seed 方案比较的运行脚本、
+实验记录和已核验结果分别集中在 `experiments/test/`、`docs/thesis/test/` 和
+`results/test/`。[试验入口清单](experiments/test/README.md) · [采样与方案说明](docs/thesis/test/sampling-methods.md)
 
 ## Git 使用
 

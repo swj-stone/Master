@@ -6,6 +6,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 import hashlib
 import json
+import math
 import multiprocessing
 import os
 from pathlib import Path
@@ -19,6 +20,8 @@ from minppi_mofs.experiment_protocol import canonical_hash
 
 
 POLICY = "guarded_rounds"
+FORMAL_OUTPUT = ROOT / "results/thesis_benchmark"
+TEST_OUTPUT = ROOT / "results/test/thesis_benchmark"
 SCIENCE_FILES = (
     "experiments/run_thesis_benchmark.py", "experiments/run_thesis_sampling.py",
     "experiments/thesis_prepared_catalog.py", "experiments/thesis_sampling_worker.py", "experiments/thesis_fixed_predictor.py",
@@ -81,24 +84,31 @@ def _batch_eta(pending, rows, current_elapsed, limit):
     for row in rows:
         if row["status"] == "completed":
             observations[row["dataset"]].append(row["wall_s"])
-    upper = max(len(pending) * limit - current_elapsed, 0.)
+    bound = ""
+    if limit is not None:
+        upper = max(len(pending) * limit - current_elapsed, 0.)
+        bound = f" | remaining job-budget upper bound={_clock(upper)}"
     if any(ds not in observations for ds, _ in pending):
-        return f"batch ETA=pending | remaining job-budget upper bound={_clock(upper)}"
-    predicted = [min(limit, sum(observations[ds]) / len(observations[ds])) for ds, _ in pending]
+        return f"batch ETA=pending{bound}"
+    predicted = [sum(observations[ds]) / len(observations[ds]) for ds, _ in pending]
     remaining = max(predicted[0] - current_elapsed, 0.) + sum(predicted[1:])
-    return f"batch ETA=~{_clock(remaining)} | remaining job-budget upper bound={_clock(upper)}"
+    return f"batch ETA=~{_clock(remaining)}{bound}"
 
 
 def _heartbeat(progress, elapsed, remaining, sample_seconds, rounds):
     phase = progress.get("phase", "starting")
-    status = [f"phase={phase}", f"elapsed={_clock(elapsed)}", f"deadline in {_clock(remaining)}"]
+    status = [f"phase={phase}", f"elapsed={_clock(elapsed)}"]
+    if remaining is not None:
+        status.append(f"deadline in {_clock(remaining)}")
     if phase == "sampling":
         status.extend([f"round={progress.get('round', 0)}/{rounds}",
                        f"coverage={progress.get('coverage', 0)}/{progress.get('n_features', '?')}",
+                       f"resolved={progress.get('resolved_trials', 0)}/{progress.get('planned_trials', '?')}",
                        f"fits={progress.get('sample_fits', 0)}", f"witnesses={progress.get('witness_count', 0)}"])
         eta = progress.get("sampling_eta_s")
         if eta is not None:
-            eta = min(eta, sample_seconds - progress.get("sample_elapsed_s", 0.), remaining)
+            if sample_seconds is not None:
+                eta = min(eta, sample_seconds - progress.get("sample_elapsed_s", 0.), remaining)
             status.append(f"sampling ETA=~{_clock(eta)}")
     elif phase.startswith("predictor_"):
         status.append(f"fits={progress.get('predictor_fits_done', 0)}/{progress.get('predictor_fits_planned', '?')}")
@@ -108,7 +118,7 @@ def _heartbeat(progress, elapsed, remaining, sample_seconds, rounds):
     return " | ".join(status)
 
 
-def _summary_row(dataset, seed, outcome):
+def _summary_row(dataset, seed, outcome, mode):
     progress = outcome["progress"]
     result = outcome["result"] if outcome["status"] == "completed" else {}
     data = {**progress, **result}
@@ -120,16 +130,18 @@ def _summary_row(dataset, seed, outcome):
 
     n = data.get("n_features")
     removed = data.get("removed_count")
-    row = dict(dataset=dataset, seed=seed, scope="formal", status=outcome["status"],
+    row = dict(dataset=dataset, seed=seed, scope=mode, status=outcome["status"],
                wall_s=round(outcome["elapsed_s"], 3), phase=data.get("failed_phase") or data.get("phase", "starting"),
                metric=data.get("policy", {}).get("utility"), n_features=n, removed_count=removed,
                retained_count=result.get("retained_count"), compression_fraction=removed/n if n and removed is not None else None,
                sampling_s=data.get("sample_elapsed_s"), sampling_stop=data.get("sampling_stop"),
+               planned_trials=data.get("planned_trials"), resolved_trials=data.get("resolved_trials"),
+               sampled_draws=data.get("sampled_draws"),
                coverage=data.get("coverage"), completed_rounds=data.get("completed_rounds"), sample_fits=data.get("sample_fits"),
                witnesses=data.get("witness_count"), nominees=data.get("proposed_count"),
                selection_delta=delta("guarded_original", "full_original"), predictor_delta=delta("guarded_chosen", "guarded_original"),
                net_delta=delta("guarded_chosen", "full_original"), matched_full_delta=delta("guarded_chosen", "full_chosen"),
-               error=data.get("error"))
+               error=outcome.get("error") or data.get("error"))
     for role in ("full", "guarded"):
         row[f"{role}_recipe"] = None
         if role in decisions:
@@ -152,13 +164,41 @@ def _configuration_line(config):
             f" | catalog SHA256={catalog['sha256']}")
 
 
+def _formal_completion_error(result, dataset, seed, rounds):
+    if (result.get("dataset"), result.get("seed"), result.get("run_mode"), result.get("phase")) != (
+            dataset, seed, "formal", "complete"):
+        return "Worker did not return a completed formal result for this dataset and seed"
+    n = result.get("n_features", 0)
+    expected = rounds * n
+    stop = result.get("sampling_stop")
+    finished = ((stop == "round_limit" and result.get("completed_rounds") == rounds)
+                or (stop == "all_witnessed" and result.get("witness_count") == n))
+    if (not finished or n <= 0 or result.get("sample_seconds") is not None
+            or result.get("planned_trials") != expected or result.get("resolved_trials") != expected):
+        return "Worker did not resolve the entire formal sampling plan"
+    scores = result.get("method_test_utilities", {})
+    decisions = result.get("predictor_decisions", {})
+    for role in ("full", "guarded"):
+        if not isinstance(decisions.get(role, {}).get("adopt_blend"), bool):
+            return f"Worker did not provide the validation decision for {role}"
+        for variant in ("original", "blend", "chosen"):
+            method = f"{role}_{variant}"
+            if not isinstance(scores.get(method), (int, float)) or not math.isfinite(scores[method]):
+                return f"Worker did not provide a finite held-out score for {method}"
+    if result.get("selected_method") != "guarded_chosen":
+        return "Worker did not report the selected guarded predictor"
+    return None
+
+
 def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
     code = _code_hashes()
     verified_inputs = {**pins, **{ROOT / name: digest for name, digest in code.items()}}
-    run = output_root / datetime.now(MSK).strftime("guarded-rounds-%Y%m%d-%H%M%S-%f")
+    mode = config["experiment"]["mode"]
+    prefix = "test-guarded-rounds" if mode == "test" else "guarded-rounds-formal"
+    run = output_root / datetime.now(MSK).strftime(f"{prefix}-%Y%m%d-%H%M%S-%f")
     run.mkdir(parents=True, exist_ok=False)
     _save(run / "config_audit.json", config)
-    _save(run / "protocol.json", dict(selection_policy=POLICY, predictor_recipe="rounds", rounds=rounds,
+    _save(run / "protocol.json", dict(mode=mode, selection_policy=POLICY, predictor_recipe="rounds", rounds=rounds,
           sample_seconds=sample_seconds, dataset_seconds=limit, heartbeat_seconds=10,
           jobs=[dict(dataset=ds, seed=seed, source=str(source)) for (ds, seed), source in jobs.items()],
           catalog_sha256=config["prepared"]["sha256"], config_sha256=config["sha256"], source_sha256=code))
@@ -176,8 +216,8 @@ def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
         print(line, flush=True)
 
     log(_configuration_line(config))
-    log(f"{len(jobs)} jobs | {POLICY} | rounds={rounds} | sample <= {sample_seconds}s"
-        f" | per-job hard limit={limit}s | log={run / 'run.log'}")
+    timing = "time limits=none" if limit is None else f"sample <= {sample_seconds}s | per-job hard limit={limit}s"
+    log(f"{len(jobs)} jobs | mode={mode} | {POLICY} | rounds={rounds} | {timing} | log={run / 'run.log'}")
     for index, ((ds, seed), source) in enumerate(jobs.items()):
         changed = _changed_file(verified_inputs)
         if changed:
@@ -192,7 +232,7 @@ def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
             eta = _batch_eta(order[index:], rows, time.monotonic() - job_start, limit)
             log(f"{prefix} | {message} | batch elapsed={_clock(time.monotonic()-started)} | {eta}", folder)
 
-        job_log(f"start | deadline={limit}s")
+        job_log("start" if limit is None else f"start | deadline={limit}s")
         process = multiprocessing.get_context("spawn").Process(
             target=_worker, args=(ds, seed, source, folder, rounds, sample_seconds))
         try:
@@ -207,7 +247,12 @@ def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
             _save(folder / "watchdog.json", outcome)
         finally:
             process.close()
-        row = _summary_row(ds, seed, outcome)
+        if mode == "formal" and outcome["status"] == "completed":
+            error = _formal_completion_error(outcome["result"], ds, seed, rounds)
+            if error:
+                outcome.update(status="error", error=error, result={})
+                _save(folder / "watchdog.json", outcome)
+        row = _summary_row(ds, seed, outcome, mode)
         rows.append(row)
         write_summary(run, rows)
         write_dataset_summary(run, rows, order)
@@ -222,21 +267,31 @@ def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
     return int(completed != len(jobs))
 
 
-def main(argv=None):
+def main(argv=None, *, test_mode=False):
+    mode = "test" if test_mode else "formal"
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", action="store_true", help="Validate the frozen input catalog and display jobs without training.")
     parser.add_argument("--prepared-root", type=Path, default=FORMAL_ROOT)
-    parser.add_argument("--output-root", type=Path, default=ROOT / "results/thesis_benchmark")
+    parser.add_argument("--output-root", type=Path, default=TEST_OUTPUT if test_mode else FORMAL_OUTPUT)
     parser.add_argument("--datasets", nargs="+")
     parser.add_argument("--seeds", nargs="+", type=int)
     parser.add_argument("--rounds", type=int, default=5)
-    parser.add_argument("--sample-seconds", type=int, default=780)
-    parser.add_argument("--dataset-seconds", type=int, default=900)
+    if test_mode:
+        parser.add_argument("--sample-seconds", type=int, default=780)
+        parser.add_argument("--dataset-seconds", type=int, default=900)
+    else:
+        parser.set_defaults(sample_seconds=None, dataset_seconds=None)
     args = parser.parse_args(argv)
-    if args.rounds < 1 or not 0 < args.sample_seconds < args.dataset_seconds <= 900:
-        parser.error("Require positive rounds and 0 < sample-seconds < dataset-seconds <= 900.")
-    if args.output_root.resolve().is_relative_to((ROOT.parent / "Master").resolve()):
+    if args.rounds < 1:
+        parser.error("--rounds must be positive.")
+    if test_mode and not 0 < args.sample_seconds < args.dataset_seconds <= 900:
+        parser.error("Test runs require 0 < sample-seconds < dataset-seconds <= 900.")
+    output_root = args.output_root.resolve()
+    if output_root.is_relative_to((ROOT.parent / "Master").resolve()):
         parser.error("Use a thesis output directory outside the frozen conference checkout.")
+    other = FORMAL_OUTPUT if test_mode else ROOT / "results/test"
+    if output_root.is_relative_to(other.resolve()):
+        parser.error(f"The {mode} entry cannot write into the other mode's result directory.")
     root = args.prepared_root.resolve()
     try:
         catalog, audit = audit_prepared_catalog(root)
@@ -253,20 +308,22 @@ def main(argv=None):
             if (not args.datasets or ds in args.datasets) and (not args.seeds or seed in args.seeds)}
     if not jobs:
         parser.error("No matching prepared jobs.")
-    config = {"status": "PASS", "prepared": audit, "experiment": dict(selection_policy=POLICY, predictor_recipe="rounds",
+    config = {"status": "PASS", "prepared": audit, "experiment": dict(mode=mode, selection_policy=POLICY, predictor_recipe="rounds",
         balanced_rounds=args.rounds, sampling_seconds=args.sample_seconds, job_limit_seconds=args.dataset_seconds,
         heartbeat_seconds=10, jobs_requested=len(jobs), seeds_requested=sorted({s for _,s in jobs}),
         datasets_requested=sorted({ds for ds,_ in jobs}))}
     config["sha256"] = canonical_hash(config)
     if args.plan:
         print(_configuration_line(config))
-        print(f"{len(jobs)} jobs | guarded MinPI + validation-selected rounds | sample rounds={args.rounds}"
-              f" | sample <= {args.sample_seconds}s | hard limit={args.dataset_seconds}s/job"
-              f" | total job-budget upper bound={_clock(len(jobs)*args.dataset_seconds)}")
+        timing = (f"sample <= {args.sample_seconds}s | hard limit={args.dataset_seconds}s/job"
+                  f" | total job-budget upper bound={_clock(len(jobs)*args.dataset_seconds)}"
+                  if test_mode else "time limits=none")
+        print(f"{len(jobs)} jobs | mode={mode} | guarded MinPI + validation-selected rounds | sample rounds={args.rounds}"
+              f" | {timing}")
         for i, ((ds, seed), source) in enumerate(jobs.items(), 1):
             print(f"[{i}/{len(jobs)}] dataset={ds} seed={seed} | {source}")
         return 0
-    return _run(jobs, args.output_root.resolve(), args.rounds, args.sample_seconds, args.dataset_seconds, config, pins)
+    return _run(jobs, output_root, args.rounds, args.sample_seconds, args.dataset_seconds, config, pins)
 
 
 if __name__ == "__main__":

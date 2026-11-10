@@ -72,6 +72,29 @@ def test_cutoff_after_base_leaves_unvisited_feature_unscored(monkeypatch):
     assert report["partial_pair"]["after_mask"] == "0x3"
 
 
+def test_unlimited_sampling_completes_all_rounds_or_certifies_the_minimum(monkeypatch):
+    monkeypatch.setattr(worker, "sample_random_round", lambda *_: iter([(0, 0, 1), (1, 1, 3)]))
+    now = 0.
+    snapshots = []
+
+    def evaluate(mask):
+        nonlocal now
+        now += 1000.
+        return {0: 0., 1: 1., 3: 0.}[mask]
+
+    report = worker.sample(("a", "b"), 5, None, .5, evaluate, lambda **s: snapshots.append(s),
+                           clock=lambda: now)
+    first = next(s for s in snapshots if s["pair_state"] == "complete")
+    assert first["sampling_eta_s"] > 900 and np.isfinite(first["sampling_eta_s"])
+    assert first["sampling_deadline_utc"] is None
+    assert report["sample_elapsed_s"] > 900 and report["sampling_eta_s"] == 0
+    assert report["stop"] == "round_limit" and report["completed_rounds"] == 5
+    assert report["sample_minima"] == {"a": 1, "b": -1}
+    assert report["draws_per_feature"] == {"a": 5, "b": 1}
+    assert report["planned_trials"] == report["resolved_trials"] == 10
+    assert report["partial_pair"] is None
+
+
 def test_skips_losing_augmentation_but_keeps_first_negative_witness(monkeypatch):
     monkeypatch.setattr(worker, "sample_random_round", lambda *args: iter([(0, 0, 1), (1, 1, 3)]))
     queries = []
