@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+from contextlib import contextmanager
 from collections.abc import Callable, Mapping, Set as AbstractSet, Sequence
 from dataclasses import dataclass, replace
 import hashlib
@@ -30,6 +31,7 @@ from minppi_mofs.coalition_cache import (
     hash_numeric_frame,
 )
 from minppi_mofs.experiment_protocol import (
+    GROUPED_EXECUTION_MODES,
     _validate_data_manifest_row,
     atomic_write_json,
     estimator_budgets_for,
@@ -91,7 +93,6 @@ _TASK_UTILITIES = {
     "regression": frozenset({"r2", "rmse"}),
 }
 _BACKENDS = frozenset({"cpu", "cuda"})
-_GROUPED_EXECUTION_MODE = "grouped_nested_v1"
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _SAFE_DATASET_RE = re.compile(
     r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?"
@@ -290,8 +291,11 @@ class EstimatorGroupRequest:
     cache_schema: str
     checkpoint_every_fits: int
     progress_every_seconds: int
+    execution_mode: str = "grouped_nested_v1"
 
     def __post_init__(self) -> None:
+        if self.execution_mode not in GROUPED_EXECUTION_MODES:
+            raise ValueError("unsupported grouped execution mode")
         _validate_sha256(self.protocol_hash, "protocol_hash")
         dataset_id = _safe_dataset_id(self.dataset_id)
         if not _is_exact_int(self.seed) or self.seed < 0:
@@ -552,6 +556,9 @@ def group_request_to_document(
         "cache_schema": request.cache_schema,
         "checkpoint_every_fits": request.checkpoint_every_fits,
         "progress_every_seconds": request.progress_every_seconds,
+        # Preserve the canonical bytes of historical v1 requests.
+        **({"execution_mode": request.execution_mode}
+           if request.execution_mode != "grouped_nested_v1" else {}),
     }
 
 
@@ -628,7 +635,7 @@ def group_request_from_context(
     ):
         raise ValueError("run layout cache or bundle root is not canonical")
     if (
-        protocol.execution.mode != _GROUPED_EXECUTION_MODE
+        protocol.execution.mode not in GROUPED_EXECUTION_MODES
         or protocol.execution.cache_schema != CACHE_SCHEMA_VERSION
     ):
         raise ValueError("execution mode or cache schema is unsupported")
@@ -754,6 +761,7 @@ def group_request_from_context(
         cache_schema=protocol.execution.cache_schema,
         checkpoint_every_fits=protocol.execution.checkpoint_every_fits,
         progress_every_seconds=protocol.execution.progress_every_seconds,
+        execution_mode=protocol.execution.mode,
     )
 
 
@@ -949,7 +957,8 @@ class _TracingCoalitionUtilityView(CoalitionUtilityView):
             self._fit_hook(after.physical_model_fit_count)
         return result
 
-    def eval_marginal(self, coalition: set[str], feature: str) -> int:
+    @contextmanager
+    def _trial(self, feature: str):
         ordinal = self._feature_trial_counts.get(feature, 0) + 1
         self._feature_trial_counts[feature] = ordinal
         previous_feature = self._active_feature
@@ -957,7 +966,7 @@ class _TracingCoalitionUtilityView(CoalitionUtilityView):
         self._active_feature = feature
         self._active_trial_ordinal = ordinal
         try:
-            result = super().eval_marginal(coalition, feature)
+            yield
             if self._trial_observer is not None:
                 feature_index = self.feature_order.index(feature) + 1
                 self._trial_observer(
@@ -967,10 +976,19 @@ class _TracingCoalitionUtilityView(CoalitionUtilityView):
                     len(self.feature_order),
                     self._traced_cache.stats,
                 )
-            return result
         finally:
             self._active_feature = previous_feature
             self._active_trial_ordinal = previous_ordinal
+
+    def eval_marginal(self, coalition: set[str], feature: str) -> int:
+        with self._trial(feature):
+            return super().eval_marginal(coalition, feature)
+
+    def update_minimum(self, current: int, coalition: set[str], feature: str) -> int:
+        if current == -1:
+            return current
+        with self._trial(feature):
+            return super().update_minimum(current, coalition, feature)
 
 
 def _validate_builder_authority(
@@ -1292,6 +1310,7 @@ def build_estimator_bundle(
             random_schedule,
             random_view,
             progress=progress_sink,
+            round_robin=request.execution_mode == "grouped_nested_v2",
         )
         random_runtime_s = time.perf_counter() - component_started
 
@@ -1317,6 +1336,7 @@ def build_estimator_bundle(
             mi_scores=mi_scores,
             correlation_neighbors=correlation_neighbors,
             progress=progress_sink,
+            round_robin=request.execution_mode == "grouped_nested_v2",
         )
         guided_runtime_s = time.perf_counter() - component_started
 

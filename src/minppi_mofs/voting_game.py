@@ -36,6 +36,7 @@ import numpy as np
 import pandas as pd
 from xgboost import XGBClassifier, XGBRegressor
 
+from minppi_mofs.minimum_sampling import ThresholdMinimumView
 from minppi_mofs.utility import _ALL_METRICS, compute_utility, is_classification_metric
 
 _VALID_TASKS = frozenset({"binary", "multiclass", "regression"})
@@ -78,7 +79,7 @@ def _validate_task_utility(task: str, utility: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-class AccFullCache:
+class AccFullCache(ThresholdMinimumView):
     """Trains XGBoost once per coalition and caches the raw predictions.
 
     The cache key is the sorted tuple of feature names.  The cached value
@@ -259,7 +260,7 @@ class AccFullCache:
 # ---------------------------------------------------------------------------
 
 
-class UtilityView:
+class UtilityView(ThresholdMinimumView):
     """A lightweight metric-specific view of an :class:`AccFullCache`.
 
     Shares the **same** trained models and cached predictions as the parent

@@ -12,6 +12,7 @@ from typing import Protocol
 import numpy as np
 
 from minppi_mofs.min_ppi import AlgorithmBPerturbationTrial
+from minppi_mofs.minimum_sampling import advance_minimum
 
 
 NESTED_SCHEDULE_SCHEMA_VERSION = 1
@@ -538,6 +539,62 @@ def guided_seed_coalition(
     )
 
 
+def _scheduled_minima(
+    schedule: NestedGuidedSchedule | NestedRandomSchedule,
+    view: MarginalUtilityView,
+    coalition_at: Callable[[int, int], set[str]],
+    algorithm: str,
+    progress: Callable[[NestedProgress], None] | None,
+    round_robin: bool,
+) -> dict[int, dict[str, int]]:
+    features = schedule.features
+    minima = [1] * len(features)
+    scores = {budget: {} for budget in schedule.checkpoints}
+
+    def trial(index: int, draw: int) -> None:
+        feature = features[index]
+        coalition = coalition_at(index, draw)
+        if round_robin:
+            minima[index] = advance_minimum(view, minima[index], coalition, feature)
+        else:
+            # Frozen grouped_nested_v1 retains its original two-endpoint trace.
+            minima[index] = min(minima[index], view.eval_marginal(coalition, feature))
+
+    def checkpoint(index: int, budget: int) -> None:
+        scores[budget][features[index]] = minima[index]
+        if progress is not None:
+            progress(NestedProgress(algorithm, index + 1, len(features),
+                                    budget, schedule.checkpoints[-1]))
+
+    trial_count = len(schedule.trials[0])
+    if round_robin:
+        start = 0
+        active = list(range(len(features)))
+        for budget in schedule.checkpoints:
+            end = min(budget, trial_count)
+            for draw in range(start, end):
+                if not active:
+                    break
+                for index in active:
+                    trial(index, draw)
+                active = [index for index in active if minima[index] != -1]
+            for index in range(len(features)):
+                checkpoint(index, budget)
+            start = end
+    else:
+        for index in range(len(features)):
+            start = 0
+            for budget in schedule.checkpoints:
+                end = min(budget, trial_count)
+                for draw in range(start, end):
+                    if minima[index] == -1:
+                        break
+                    trial(index, draw)
+                checkpoint(index, budget)
+                start = end
+    return scores
+
+
 def estimate_guided_checkpoints(
     schedule: NestedGuidedSchedule,
     view: MarginalUtilityView,
@@ -545,8 +602,9 @@ def estimate_guided_checkpoints(
     mi_scores: Mapping[str, float] | None,
     correlation_neighbors: Mapping[str, Sequence[str]] | None,
     progress: Callable[[NestedProgress], None] | None = None,
+    round_robin: bool = True,
 ) -> dict[int, dict[str, int]]:
-    """Evaluate guided checkpoint prefixes while advancing each cursor once."""
+    """Evaluate frozen guided draws, interleaving active features by default."""
     if not isinstance(schedule, NestedGuidedSchedule):
         raise TypeError("schedule must be NestedGuidedSchedule")
     _validate_guided_schedule(schedule)
@@ -554,53 +612,24 @@ def estimate_guided_checkpoints(
         raise ValueError("view feature order does not match the schedule")
     if progress is not None and not callable(progress):
         raise ValueError("progress must be callable")
-    validated_scores, validated_neighbors = _validated_guidance(
-        schedule.features, mi_scores, correlation_neighbors
-    )
+    guidance = _validated_guidance(schedule.features, mi_scores, correlation_neighbors)
+    seeds = [
+        _guided_seed_coalition_unchecked(feature, schedule.features, seed_order, *guidance)
+        for feature, seed_order in zip(schedule.features, schedule.seed_orders, strict=True)
+    ]
 
-    scores_at: dict[int, dict[str, int]] = {
-        budget: {} for budget in schedule.checkpoints
-    }
-    for feature_index, feature in enumerate(schedule.features):
-        seed_coalition = _guided_seed_coalition_unchecked(
-            feature,
-            schedule.features,
-            schedule.seed_orders[feature_index],
-            validated_scores,
-            validated_neighbors,
-        )
-        best = 1
-        trials = schedule.trials[feature_index]
-        cursor = 0
-        for budget in schedule.checkpoints:
-            while cursor < min(budget, len(trials)) and best != -1:
-                trial = trials[cursor]
-                coalition = set(seed_coalition)
-                for candidate, draw in zip(
-                    schedule.features, trial.removal_draws, strict=True
-                ):
-                    if candidate in coalition and draw < 0.3:
-                        coalition.discard(candidate)
-                outside = [
-                    item
-                    for item in trial.add_order
-                    if item not in coalition and item != feature
-                ]
-                coalition.update(outside[: min(trial.add_count, len(outside))])
-                best = min(best, view.eval_marginal(coalition, feature))
-                cursor += 1
-            scores_at[budget][feature] = best
-            if progress is not None:
-                progress(
-                    NestedProgress(
-                        algorithm="guided",
-                        feature_index=feature_index + 1,
-                        feature_count=len(schedule.features),
-                        budget=budget,
-                        max_budget=schedule.checkpoints[-1],
-                    )
-                )
-    return scores_at
+    def coalition_at(index: int, draw: int) -> set[str]:
+        trial = schedule.trials[index][draw]
+        coalition = set(seeds[index])
+        for candidate, removal in zip(schedule.features, trial.removal_draws, strict=True):
+            if removal < 0.3:
+                coalition.discard(candidate)
+        outside = [item for item in trial.add_order
+                   if item not in coalition and item != schedule.features[index]]
+        coalition.update(outside[:trial.add_count])
+        return coalition
+
+    return _scheduled_minima(schedule, view, coalition_at, "guided", progress, round_robin)
 
 
 def estimate_random_checkpoints(
@@ -608,37 +637,17 @@ def estimate_random_checkpoints(
     view: MarginalUtilityView,
     *,
     progress: Callable[[NestedProgress], None] | None = None,
+    round_robin: bool = True,
 ) -> dict[int, dict[str, int]]:
-    """Evaluate all nested checkpoints while advancing each trial cursor once."""
+    """Evaluate frozen random draws, interleaving active features by default."""
     _validate_random_schedule(schedule)
     if _view_feature_order(view) != schedule.features:
         raise ValueError("view feature order does not match the schedule")
 
-    checkpoints = schedule.checkpoints
-    scores_at: dict[int, dict[str, int]] = {
-        budget: {} for budget in checkpoints
-    }
-    for feature_index, feature in enumerate(schedule.features):
-        best = 1
-        trials = schedule.trials[feature_index]
-        cursor = 0
-        for budget in checkpoints:
-            target = min(budget, len(trials))
-            while cursor < target and best != -1:
-                best = min(best, view.eval_marginal(set(trials[cursor]), feature))
-                cursor += 1
-            scores_at[budget][feature] = best
-            if progress is not None:
-                progress(
-                    NestedProgress(
-                        algorithm="random",
-                        feature_index=feature_index + 1,
-                        feature_count=len(schedule.features),
-                        budget=budget,
-                        max_budget=checkpoints[-1],
-                    )
-                )
-    return scores_at
+    def coalition_at(index: int, draw: int) -> set[str]:
+        return set(schedule.trials[index][draw])
+
+    return _scheduled_minima(schedule, view, coalition_at, "random", progress, round_robin)
 
 
 def materialize_exact_checkpoints(

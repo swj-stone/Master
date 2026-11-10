@@ -25,6 +25,34 @@ Matplotlib / Numba 缓存放在本工作树的 `tmp/` 中；退出后恢复原�
 不要重复执行下方的环境安装步骤，也不要执行 `pip install -e .`，否则会改变
 共享环境的源码指向。共享依赖的升级会同时影响两份项目。
 
+## 硕士实验：限时 MinPI 采样
+
+从本目录运行以下命令，在六个正式数据集上各测试 seed 42。输入来自已冻结的预处理
+CSV，加载时校验文件哈希。每轮为每个仍在搜索的特征抽一次联盟，按原配额判定胜负，
+并缓存联盟的验证效用。已有最小值为 0 且基础联盟未达标时，可以跳过新增特征后的
+那次评估。发现负见证时记录两个端点，停止该特征的搜索。
+
+Python 入口 `estimate_minppi(...)` 默认使用 `method="sampled", K=5`。指定
+`method="exact"` 或 `method="hybrid"` 可调用原有的对照方法。分组实验配置
+`grouped_nested_v2` 逐轮执行 A/B 的固定采样计划，原始存档使用其记录的
+`grouped_nested_v1` 执行与计数规则。需要同时计算多个指标的配对实验按完整计划
+读取端点，以便各指标使用相同的模型预测。
+
+```powershell
+.\thesis-python.ps1 experiments/run_thesis_sampling.py --rounds 5 --sample-seconds 780 --dataset-seconds 900
+```
+
+每个数据集独立计时。上例最多采样 13 分钟，加载数据、采样、验证和最终测试合计
+最多 15 分钟，由父进程执行硬截止。采样提前截止时按已找到的见证进行删除验证，
+记录实际覆盖数和完成轮数。候选集合通过原验证门槛后，用训练集与验证集合并重训，
+在原测试集上报告全特征和最终保留子集的效用。
+
+每次运行都会打印新的 `results/thesis_sampling/seed42-…/` 目录。终端和
+`run.log` 显示当前阶段、耗时、采样 ETA、硬截止剩余时间、拟合次数和见证数。
+另开 PowerShell 可用 `Get-Content -LiteralPath '<本次运行目录>\run.log' -Tail 10 -Wait` 追踪。
+`summary.csv` 汇总每个数据集的训练效果和墙钟耗时，各数据集子目录保存
+`progress.json`、`watchdog.json` 和成功完成时的 `result.json`。
+
 ## Git 使用
 
 ```powershell

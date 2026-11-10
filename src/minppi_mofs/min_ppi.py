@@ -1,7 +1,10 @@
 """
 MinPPI estimation — MinSS / MinBz computation (§4.2–4.3).
 
-Provides three estimation strategies for the Min-Marginal Power Index:
+The default sampled estimator proposes one size-uniform context per feature
+in each of five shuffled rounds. It applies at every feature count. The
+conference methods below are available explicitly, including their hybrid
+dispatcher.
 
 1. **Exact enumeration** (n ≤ 20): enumerate all 2^{n-1} coalitions per feature.
 2. **Algorithm A — Random MC** (§4.3.1): sample K random coalitions, take min.
@@ -19,8 +22,7 @@ Key theoretical results implemented here:
 Usage::
 
     from minppi_mofs.min_ppi import estimate_minppi
-    minppi = estimate_minppi(X_train, X_val, y_train, y_val, alpha=0.95,
-                              method="mi_correlation_guided", seed=42)
+    minppi = estimate_minppi(X_train, X_val, y_train, y_val, alpha=0.95, seed=42)
     # minppi: dict {feature_name: minppi_value}  (values ∈ {-1, 0, +1})
 """
 
@@ -36,6 +38,7 @@ from typing import Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from minppi_mofs.minimum_sampling import advance_minimum, sample_random_round, update_sample_minimum
 from minppi_mofs.voting_game import AccFullCache, make_acc_full_cache
 
 
@@ -440,7 +443,10 @@ def estimate_minppi_random_mc(
             (shared-coalition mode only).
         shared_plan: Optional immutable evaluation plan for shared-coalition
             mode. Supplying one guarantees identical coalition-feature
-            comparisons across utility views.
+            comparisons across utility views. Explicit plans evaluate both
+            endpoints of every scheduled comparison, including after a witness.
+            Generated single-view plans may skip endpoints that cannot lower
+            the current minimum.
         acc_cache: Optional pre-built accuracy cache.
         seed: Random seed.
         verbose: Print progress.
@@ -450,6 +456,7 @@ def estimate_minppi_random_mc(
     """
     features = list(X_train.columns)
     n = len(features)
+    force_all_endpoints = shared_plan is not None
     if shared_plan is not None and not shared_coalitions:
         raise ValueError("shared_plan requires shared_coalitions=True")
     if shared_coalitions:
@@ -475,8 +482,6 @@ def estimate_minppi_random_mc(
     if shared_coalitions:
         assert shared_plan is not None
         # ── fixed shared-coalition mode (Banzhaf-style) ──
-        # Execute every pre-generated step.  Supplemental coverage steps
-        # are included in the plan and cannot depend on utility outcomes.
         if verbose:
             print(
                 f"  Algorithm A (shared): K={K}, per_cc={per_coalition}, "
@@ -488,17 +493,25 @@ def estimate_minppi_random_mc(
         hits = {f: 0 for f in features}
         n_eval = 0
 
-        for coalition, evaluated in shared_plan:
-            S = set(coalition)
-            vS = 1 if acc_cache.is_winning(S) else 0
+        def winning(coalition: set[str]) -> bool:
+            nonlocal n_eval
             n_eval += 1
+            return acc_cache.is_winning(coalition)
 
+        for coalition, evaluated in shared_plan:
+            if not force_all_endpoints and all(minppi[feat] == -1 for feat in evaluated):
+                continue
+            S = set(coalition)
+            before = winning(S)
             for feat in evaluated:
-                vSi = 1 if acc_cache.is_winning(S | {feat}) else 0
-                n_eval += 1
-                marg = vSi - vS
-                if marg < minppi[feat]:
-                    minppi[feat] = marg
+                if force_all_endpoints:
+                    # Paired metrics must see the same coalition predictions.
+                    delta = int(winning(S | {feat})) - int(before)
+                    minppi[feat] = min(minppi[feat], delta)
+                else:
+                    minppi[feat] = update_sample_minimum(
+                        minppi[feat], before, lambda: winning(S | {feat}),
+                    )
                 hits[feat] += 1
 
         minppi = {f: minppi[f] if hits[f] > 0 else 0 for f in features}
@@ -525,11 +538,9 @@ def estimate_minppi_random_mc(
         for _ in range(actual_K):
             s_size = rng.integers(0, n_others + 1)
             S = set(rng.choice(others, size=s_size, replace=False).tolist())
-            marg = acc_cache.eval_marginal(S, feat)
-            if marg < best_marg:
-                best_marg = marg
-                if best_marg == -1:
-                    break
+            best_marg = advance_minimum(acc_cache, best_marg, S, feat)
+            if best_marg == -1:
+                break
 
         minppi[feat] = best_marg
         if verbose and (idx + 1) % max(1, n // 5) == 0:
@@ -686,11 +697,9 @@ def estimate_minppi_mi_correlation_guided(
             if outside:
                 S.update(outside[: min(trial.add_count, len(outside))])
 
-            marg = acc_cache.eval_marginal(S, feat)
-            if marg < best_marg:
-                best_marg = marg
-                if best_marg == -1:
-                    break
+            best_marg = advance_minimum(acc_cache, best_marg, S, feat)
+            if best_marg == -1:
+                break
 
         minppi[feat] = best_marg
         if verbose and (idx + 1) % max(1, n // 5) == 0:
@@ -908,6 +917,55 @@ def estimate_minppi_hybrid(
 # ---------------------------------------------------------------------------
 
 
+def estimate_minppi_sampled(
+    X_train: pd.DataFrame,
+    X_val: pd.DataFrame,
+    y_train: np.ndarray,
+    y_val: np.ndarray,
+    *,
+    alpha: float = 0.95,
+    task: str = "binary",
+    K: int = 5,
+    utility: Optional[str] = None,
+    acc_cache: Optional[AccFullCache] = None,
+    model_params: Optional[dict] = None,
+    seed: int = 42,
+    verbose: bool = False,
+) -> dict[str, int]:
+    """Sample K shuffled rounds, for any feature count, including small games.
+
+    Each round proposes one size-uniform context per feature. A feature with
+    a witnessed -1 needs no further endpoint reads, but remains eligible in
+    other features' contexts. K counts rounds, not model fits or elapsed time.
+    Scores are minima over sampled comparisons.
+    """
+    if isinstance(K, bool) or not isinstance(K, (int, np.integer)) or K < 1:
+        raise ValueError("K must be a positive integer number of sampling rounds")
+    features = tuple(X_train.columns)
+    if not features or len(set(features)) != len(features):
+        raise ValueError("sampling requires nonempty, unique feature columns")
+    if acc_cache is None:
+        acc_cache = make_acc_full_cache(
+            X_train, X_val, y_train, y_val, task=task, seed=seed,
+            utility=utility, model_params=model_params,
+        )
+    acc_cache.set_threshold(alpha)
+    rng = np.random.default_rng(seed)
+    minima = dict.fromkeys(features, 1)
+    for round_number in range(1, K + 1):
+        for index, mask, _ in sample_random_round(len(features), rng):
+            feature = features[index]
+            if minima[feature] == -1:
+                continue
+            coalition = {name for j, name in enumerate(features) if mask & (1 << j)}
+            minima[feature] = advance_minimum(acc_cache, minima[feature], coalition, feature)
+        if all(score == -1 for score in minima.values()):
+            break
+    if verbose:
+        print(f"Sampled MinPI: {round_number} rounds, {sum(v == -1 for v in minima.values())} witnessed.")
+    return minima
+
+
 def estimate_minppi(
     X_train: pd.DataFrame,
     X_val: pd.DataFrame,
@@ -916,10 +974,10 @@ def estimate_minppi(
     *,
     alpha: float = 0.95,
     task: str = "binary",
-    method: str = "hybrid",
-    K: int = 200,
-    K_adv: int = 30,
-    shared_coalitions: bool = False,
+    method: Optional[str] = None,
+    K: Optional[int] = None,
+    K_adv: Optional[int] = None,
+    shared_coalitions: Optional[bool] = None,
     correlation_neighbors: Optional[dict[str, list[str]]] = None,
     mi_scores: Optional[dict[str, float]] = None,
     perturbation_schedule: Optional[AlgorithmBPerturbationSchedule] = None,
@@ -932,8 +990,10 @@ def estimate_minppi(
 ) -> dict[str, int]:
     """Estimate MinPPI for all features.
 
-    This is the main entry point for MinPPI computation. Dispatches to one
-    of four strategies based on *method*.
+    Without method-specific options, the default samples five balanced rounds
+    at every input dimension. Supplying guidance, K_adv, a perturbation schedule,
+    or an explicit shared_coalitions setting without a method preserves the
+    historical hybrid dispatch.
 
     Args:
         X_train: Training feature matrix.
@@ -943,13 +1003,15 @@ def estimate_minppi(
         alpha: Quota parameter α ∈ (0, 1].
         method: Estimation strategy:
 
+            - ``"sampled"`` — size-uniform sampling in balanced rounds (default)
             - ``"exact"`` — enumerate all coalitions (n ≤ 20 only)
             - ``"random_mc"`` — Algorithm A, random MC sampling
             - ``"mi_correlation_guided"`` — Algorithm B,
               MI-correlation-guided adversarial search
-            - ``"hybrid"`` — auto-select based on *n* (§4.3.3, default)
-        K: Number of random samples per feature (Algorithm A).
-        K_adv: Adversarial search budget per feature (Algorithm B).
+            - ``"hybrid"`` — conference dispatcher based on *n* (§4.3.3)
+        K: Sampling rounds (default 5) or legacy Algorithm A budget (default 200).
+        K_adv: Adversarial search budget per feature for guided or hybrid
+            methods (default 30).
         shared_coalitions: Forwarded to Algorithm A (shared-coalition mode).
         correlation_neighbors: Correlation-neighbor dict for Algorithm B.
         mi_scores: MI scores for seed coalition construction.
@@ -960,8 +1022,9 @@ def estimate_minppi(
 
     Returns:
         Dict ``{feature_name: minppi}`` where each value ∈ {-1, 0, +1},
-        corresponding to the three-way classification of Theorem 1:
-        ``+1`` = decisive, ``0`` = neutral, ``-1`` = harmful.
+        the minimum marginal in the examined contexts. A sampled -1 names
+        a witnessed harmful feature. Sampled 0 and +1 may decrease as new
+        contexts are examined.
 
     Examples:
         >>> minppi = estimate_minppi(X_tr, X_val, y_tr, y_val, alpha=0.95)
@@ -978,13 +1041,14 @@ def estimate_minppi(
         method = "mi_correlation_guided"
 
     methods = {
+        "sampled": estimate_minppi_sampled,
         "exact": estimate_minppi_exact,
         "random_mc": estimate_minppi_random_mc,
         "mi_correlation_guided": estimate_minppi_mi_correlation_guided,
         "hybrid": estimate_minppi_hybrid,
     }
 
-    if method not in methods:
+    if method is not None and method not in methods:
         raise ValueError(
             f"Unknown method '{method}'. Choose from {sorted(methods.keys())}."
         )
@@ -995,6 +1059,29 @@ def estimate_minppi(
         shapg_neighbors,
         shapg_scores,
     )
+
+    has_guided_options = any(value is not None for value in (
+        correlation_neighbors, mi_scores, perturbation_schedule, K_adv,
+    ))
+    if method is None:
+        method = "hybrid" if shared_coalitions is not None or has_guided_options else "sampled"
+    if shared_coalitions is None:
+        shared_coalitions = False
+    if method == "sampled":
+        if shared_coalitions or has_guided_options:
+            raise ValueError(
+                "For shared coalitions use method='random_mc' or 'hybrid'; "
+                "for guided options use method='mi_correlation_guided' or 'hybrid'."
+            )
+        return estimate_minppi_sampled(
+            X_train, X_val, y_train, y_val, alpha=alpha, task=task,
+            K=5 if K is None else K, utility=utility, model_params=model_params,
+            seed=seed, verbose=verbose,
+        )
+    if K is None:
+        K = 200
+    if K_adv is None:
+        K_adv = 30
 
     # Build acc_cache once and reuse
     acc_cache = make_acc_full_cache(

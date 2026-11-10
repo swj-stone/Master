@@ -37,6 +37,33 @@ RANDOM = {"a": 0, "b": 1}
 GUIDED = {"a": 1, "b": -1}
 
 
+@pytest.mark.parametrize("guided", [False, True])
+def test_round_robin_checkpoint_minima_preserve_positive_and_absorbing_scores(guided):
+    features = ("a", "b", "c")
+    make = make_nested_guided_schedule if guided else make_nested_random_schedule
+    estimate = estimate_guided_checkpoints if guided else estimate_random_checkpoints
+    schedule = make(features, (1, 3), 42)
+    calls = []
+
+    class View:
+        feature_order = features
+
+        def update_minimum(self, best, coalition, feature):
+            calls.append(feature)
+            histories = {"a": [-1], "b": [1, 1, 1], "c": [0, 0, -1]}
+            delta = histories[feature][calls.count(feature) - 1]
+            return min(best, delta)
+
+        def eval_marginal(self, coalition, feature):
+            pytest.fail("optimized path must use the lazy minimum update")
+
+    kwargs = {"mi_scores": None, "correlation_neighbors": None} if guided else {}
+    result = estimate(schedule, View(), **kwargs)
+    assert calls == ["a", "b", "c", "b", "c", "b", "c"]
+    assert result == {1: {"a": -1, "b": 1, "c": 0},
+                      3: {"a": -1, "b": 1, "c": -1}}
+
+
 class RecordingView:
     def __init__(
         self,
@@ -410,7 +437,10 @@ def test_guided_checkpoints_match_direct_reference_for_every_checkpoint(
     )
 
     assert actual == expected
-    assert actual_view.calls == reference_view.calls
+    for feature in schedule.features:
+        assert [c for c, f in actual_view.calls if f == feature] == [
+            c for c, f in reference_view.calls if f == feature
+        ]
     assert mi_scores == mi_before
     assert correlation_neighbors == neighbors_before
 
@@ -487,8 +517,8 @@ def test_guided_progress_is_emitted_at_feature_checkpoint_boundaries() -> None:
 
     assert events == [
         NestedProgress("guided", 1, 2, 1, 2),
-        NestedProgress("guided", 1, 2, 2, 2),
         NestedProgress("guided", 2, 2, 1, 2),
+        NestedProgress("guided", 1, 2, 2, 2),
         NestedProgress("guided", 2, 2, 2, 2),
     ]
 
@@ -820,8 +850,8 @@ def test_progress_is_emitted_only_after_each_feature_checkpoint() -> None:
 
     assert events == [
         NestedProgress("random", 1, 2, 1, 2),
-        NestedProgress("random", 1, 2, 2, 2),
         NestedProgress("random", 2, 2, 1, 2),
+        NestedProgress("random", 1, 2, 2, 2),
         NestedProgress("random", 2, 2, 2, 2),
     ]
 
@@ -1121,8 +1151,13 @@ def test_hybrid_checkpoints_equal_independent_direct_dispatcher_reference() -> N
     }
 
     assert actual == expected
-    assert random_view.calls == reference_random_view.calls
-    assert guided_view.calls == reference_guided_view.calls
+    for actual_view, reference_view in (
+        (random_view, reference_random_view), (guided_view, reference_guided_view)
+    ):
+        for feature in features:
+            assert [c for c, f in actual_view.calls if f == feature] == [
+                c for c, f in reference_view.calls if f == feature
+            ]
 
 
 def test_hybrid_derivation_does_not_mutate_or_alias_component_scores() -> None:

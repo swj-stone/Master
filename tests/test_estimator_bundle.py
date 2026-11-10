@@ -574,6 +574,7 @@ def test_group_request_deeply_owns_identity_and_is_mapping_order_independent(
         ("alpha", 0.9),
         ("checkpoint_every_fits", 51),
         ("progress_every_seconds", 31),
+        ("execution_mode", "grouped_nested_v2"),
     ],
 )
 def test_every_group_request_field_changes_digest(
@@ -1231,6 +1232,32 @@ class _FakeSharedCache:
         return 1.0
 
 
+def test_lazy_trial_accounting_matches_each_executed_lookup():
+    from experiments.icomp2026_estimator_bundle import _TracingCoalitionUtilityView
+
+    class Cache(_FakeSharedCache):
+        def evaluate(self, coalition, utility):
+            super().evaluate(coalition, utility)
+            return float(coalition in ({"b"}, {"a", "b", "c"}))
+
+    cache = Cache(SimpleNamespace(ordered_features=("a", "b", "c"), task="binary"))
+    trials = []
+    view = _TracingCoalitionUtilityView(
+        cache, algorithm="random", alpha=0.95, utility="accuracy",
+        trial_observer=lambda _, index, ordinal, count, stats: trials.append(ordinal),
+    )
+    assert view.update_minimum(1, set(), "a") == 0
+    assert view.update_minimum(0, set(), "a") == 0
+    assert view.update_minimum(0, {"b"}, "a") == -1
+    assert [call.coalition for call in view.call_trace] == [
+        ("a", "b", "c"), (), ("a",), (), ("b",), ("a", "b"),
+    ]
+    assert [call.trial_ordinal for call in view.call_trace] == [None, 1, 1, 2, 3, 3]
+    assert sum(call.physical_model_fit_count for call in view.call_trace) == 4
+    assert sum(call.cache_hit_count for call in view.call_trace) == 1
+    assert trials == [1, 2, 3]
+
+
 def _install_group_builder_fakes(
     monkeypatch: pytest.MonkeyPatch,
     request: EstimatorGroupRequest,
@@ -1719,15 +1746,27 @@ def test_group_build_real_multiclass_cache_shares_prediction_digests(
     assert validate_estimator_bundle(result, request) is result
 
 
+@pytest.mark.parametrize(
+    ("mode", "methods", "budgets"),
+    [
+        ("grouped_nested_v1", ("exact",), (1, 2)),
+        ("grouped_nested_v2", ("random_mc",), (10, 20)),
+    ],
+)
 def test_interrupted_ensure_resumes_committed_cache_without_cold_refit(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    mode: str,
+    methods: tuple[str, ...],
+    budgets: tuple[int, ...],
 ) -> None:
     import minppi_mofs.coalition_cache as cache_module
 
     request = replace(
         _builder_request(8),
-        methods=("exact",),
+        execution_mode=mode,
+        methods=methods,
+        budgets=budgets,
         checkpoint_every_fits=10,
     )
     X_train = pd.DataFrame(
@@ -1827,6 +1866,9 @@ def test_interrupted_ensure_resumes_committed_cache_without_cold_refit(
         fit_hook=None,
     )
     cold_physical_fits = len(physical_fits) - before_cold
+    assert [checkpoint.scores for checkpoint in resumed.checkpoints] == [
+        checkpoint.scores for checkpoint in cold.checkpoints
+    ]
 
     final_progress = progress_from_document(
         read_canonical_json(

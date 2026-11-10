@@ -26,6 +26,7 @@ from minppi_mofs.coalition_cache import (
     hash_numeric_frame,
 )
 from minppi_mofs.experiment_protocol import (
+    GROUPED_EXECUTION_MODES,
     AuditLog,
     IncompleteRunError,
     JobSpec,
@@ -1168,7 +1169,7 @@ def run_estimator_job(context: StageContext) -> ResultRecord:
     """Dispatch one estimator job solely by its frozen execution mode."""
     if context.protocol.execution.mode == "legacy":
         return _run_legacy_estimator_job(context)
-    if context.protocol.execution.mode == "grouped_nested_v1":
+    if context.protocol.execution.mode in GROUPED_EXECUTION_MODES:
         return _run_grouped_estimator_job(context)
     raise ValueError("unsupported execution mode")
 
@@ -1366,7 +1367,14 @@ def _run_legacy_estimator_job(context: StageContext) -> ResultRecord:
     model_params = model_params_for(context.protocol, context.job.dataset_id)
     model_params["tree_method"] = "hist"
     model_params["device"] = "cuda" if context.protocol.backend == "cuda" else "cpu"
-    cache = AccFullCache(
+
+    class LegacyEstimatorCache(AccFullCache):
+        """Keep both endpoint evaluations in historical cost measurements."""
+
+        def update_minimum(self, current, coalition, feature):
+            return min(current, self.eval_marginal(coalition, feature))
+
+    cache = LegacyEstimatorCache(
         X_train,
         X_val,
         y_train,
@@ -1538,7 +1546,7 @@ def _completed_estimator_checkpoint(
         raise ValueError("estimator checkpoint budget is invalid")
     protocol_hash = resolved_protocol_hash(context.protocol)
     if (
-        context.protocol.execution.mode != "grouped_nested_v1"
+        context.protocol.execution.mode not in GROUPED_EXECUTION_MODES
         or context.layout != context.status.layout
         or context.job not in context.status.manifest
         or context.job.protocol_hash != protocol_hash
@@ -1603,7 +1611,7 @@ def _completed_estimator_checkpoint(
         budget=budget,
         expected_features=features,
         expected_metrics=record.metrics,
-        expected_execution_mode="grouped_nested_v1",
+        expected_execution_mode=context.protocol.execution.mode,
     )
 
     estimator_context = StageContext(
@@ -1719,13 +1727,13 @@ def _read_score_artifact(
         )
     metrics_grouped = expected_grouped_fields == grouped_fields
     if expected_execution_mode not in {
-        None, "legacy", "grouped_nested_v1"
+        None, "legacy", *GROUPED_EXECUTION_MODES
     }:
         raise ValueError("estimator expected execution mode is invalid")
     if expected_execution_mode is None:
         grouped = metrics_grouped
     else:
-        grouped = expected_execution_mode == "grouped_nested_v1"
+        grouped = expected_execution_mode in GROUPED_EXECUTION_MODES
         if expected_metrics is not None and grouped != metrics_grouped:
             raise ValueError(
                 "estimator ResultRecord metrics conflict with execution mode"
@@ -2331,6 +2339,7 @@ def _run_guidance_ablation(context: StageContext) -> ResultRecord:
             view,
             mi_scores=mi_scores,
             correlation_neighbors=correlation_neighbors,
+            round_robin=context.protocol.execution.mode == "grouped_nested_v2",
         )[budget]
         after = cache.stats
         logical_coalitions = view.logical_coalitions
@@ -4517,7 +4526,8 @@ def _run_alpha_plan(context: StageContext) -> ResultRecord:
                             "alpha random schedule authority is missing"
                         )
                     random_scores = estimate_random_checkpoints(
-                        schedules.random_schedule, view
+                        schedules.random_schedule, view,
+                        round_robin=context.protocol.execution.mode == "grouped_nested_v2",
                     )
                 if schedules.guided_schedule is None:
                     raise RuntimeError(
@@ -4526,6 +4536,7 @@ def _run_alpha_plan(context: StageContext) -> ResultRecord:
                 guided_scores = estimate_guided_checkpoints(
                     schedules.guided_schedule,
                     view,
+                    round_robin=context.protocol.execution.mode == "grouped_nested_v2",
                     mi_scores=mi_scores,
                     correlation_neighbors=neighbors,
                 )
@@ -5962,7 +5973,7 @@ def _validated_summary_rows(
                 coalition_count=int(record.metrics["coalition_count"]),
                 execution_mode=context.protocol.execution.mode,
             )
-            if context.protocol.execution.mode == "grouped_nested_v1":
+            if context.protocol.execution.mode in GROUPED_EXECUTION_MODES:
                 grouped_estimator_entries.append(
                     (sequence, item, validated_metrics)
                 )

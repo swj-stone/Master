@@ -126,7 +126,7 @@ def test_group1_stops_if_tree_changes_after_preflight(
         executed.append(tuple(tuple(command) for command in commands))
 
     monkeypatch.setattr(module, "_require_clean_source_tree", fake_clean)
-    monkeypatch.setattr(module, "_preflight_commands", lambda: (("preflight",),))
+    monkeypatch.setattr(module, "_preflight_commands", lambda _: (("preflight",),))
     monkeypatch.setattr(module, "_acquisition_commands", lambda: (("acquire",),))
     monkeypatch.setattr(module, "run_checked_command_sequence", fake_run)
     monkeypatch.setattr(module, "_verify_registered_raw_snapshots", lambda _: None)
@@ -241,14 +241,9 @@ def test_group1_output_root_is_normalized_relative_to_project(tmp_path: Path) ->
     assert module._normalize_output_root(tmp_path, tmp_path / expected) == expected
 
 
-def test_group1_pytest_basetemp_preserves_windows_path_budget(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_group1_pytest_basetemp_preserves_windows_path_budget() -> None:
     """Catches the runner reintroducing MAX_PATH failures in artifact tests."""
     module = importlib.import_module("experiments.run_icomp2026_group1")
-    monkeypatch.setattr(module.os, "getpid", lambda: 52276)
-    pytest_command = module._preflight_commands()[2]
-    basetemp = Path(pytest_command[pytest_command.index("--basetemp") + 1])
     representative_artifact = (
         Path("test_status_store_resume_decis3")
         / "results"
@@ -258,4 +253,16 @@ def test_group1_pytest_basetemp_preserves_windows_path_budget(
         / f".{('3' * 64)}.json.{('0' * 32)}.tmp"
     )
 
-    assert len(str(module.PROJECT_ROOT / basetemp / representative_artifact)) <= 240
+    with module._pytest_basetemp(module.PROJECT_ROOT) as first:
+        command = module._preflight_commands(first)[2]
+        assert Path(command[command.index("--basetemp") + 1]) == first
+        assert first.is_absolute() and not first.exists()
+        assert len(str(first / representative_artifact)) <= 240
+        first.mkdir()
+        sentinel = first / "active"
+        sentinel.touch()
+        with module._pytest_basetemp(module.PROJECT_ROOT) as second:
+            assert first.parent != second.parent
+            assert not second.exists()
+        assert sentinel.is_file()
+    assert not first.parent.exists()

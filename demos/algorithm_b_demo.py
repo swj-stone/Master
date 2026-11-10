@@ -16,7 +16,7 @@ The hand-crafted correlation matrix W encodes
 the structural conflict between f_1 and {f_0, f_2}.
 
 Run:
-    ../venv/Scripts/python.exe demos/algorithm_b_demo.py
+    ./thesis-python.ps1 demos/algorithm_b_demo.py
 """
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ from __future__ import annotations
 from typing import Iterable, Tuple
 
 import numpy as np
+
+from minppi_mofs.minimum_sampling import update_sample_minimum
 
 
 # ---------------------------------------------------------------------------
@@ -89,9 +91,7 @@ def algorithm_a(target: int, K: int, rng: np.random.Generator) -> Tuple[int, int
             S = set()
         else:
             S = set(rng.choice(other, size=k, replace=False).tolist())
-        marg = v_alpha(S | {target}) - v_alpha(S)
-        if marg < min_marg:
-            min_marg = marg
+        min_marg = update_sample_minimum(min_marg, bool(v_alpha(S)), lambda: bool(v_alpha(S | {target})))
         if min_marg == -1:
             return min_marg, r + 1
     return min_marg, K
@@ -131,9 +131,7 @@ def algorithm_b(
                         S.discard(j)
                     else:
                         S.add(j)
-        marg = v_alpha(S | {target}) - v_alpha(S)
-        if marg < min_marg:
-            min_marg = marg
+        min_marg = update_sample_minimum(min_marg, bool(v_alpha(S)), lambda: bool(v_alpha(S | {target})))
         if min_marg == -1:
             return min_marg, r + 1
     return min_marg, K

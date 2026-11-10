@@ -15,6 +15,8 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 
+from minppi_mofs.experiment_protocol import GROUPED_EXECUTION_MODES
+
 
 BOOTSTRAP_SEED = 42
 BOOTSTRAP_RESAMPLES = 10_000
@@ -80,19 +82,19 @@ def validate_estimator_reporting_schema(
     exact_scores_available: bool,
 ) -> dict[str, object]:
     """Validate the mode-aware estimator metric fields consumed by reporting."""
-    if execution_mode not in {"legacy", "grouped_nested_v1"}:
+    if execution_mode not in {"legacy", *GROUPED_EXECUTION_MODES}:
         raise ValueError("estimator reporting execution mode is invalid")
     if type(exact_scores_available) is not bool:
         raise TypeError("exact_scores_available must be a bool")
     required = set(ESTIMATOR_BASE_METRIC_FIELDS)
-    if execution_mode == "grouped_nested_v1":
+    if execution_mode in GROUPED_EXECUTION_MODES:
         required.update(GROUPED_ESTIMATOR_METRIC_FIELDS)
     allowed_schemas = {frozenset(required)}
-    if execution_mode == "grouped_nested_v1":
+    if execution_mode in GROUPED_EXECUTION_MODES:
         allowed_schemas.add(frozenset(required | {"schedule_digest"}))
     if exact_scores_available:
         allowed_schemas.add(frozenset(required | ESTIMATOR_AGREEMENT_METRIC_FIELDS))
-        if execution_mode == "grouped_nested_v1":
+        if execution_mode in GROUPED_EXECUTION_MODES:
             allowed_schemas.add(
                 frozenset(
                     required

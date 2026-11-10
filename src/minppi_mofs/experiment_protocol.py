@@ -38,7 +38,8 @@ _CLASSIFICATION_UTILITIES = frozenset(
 )
 _REGRESSION_UTILITIES = frozenset({"r2", "rmse"})
 _VALID_BACKENDS = frozenset({"cpu", "cuda"})
-_VALID_EXECUTION_MODES = frozenset({"legacy", "grouped_nested_v1"})
+GROUPED_EXECUTION_MODES = frozenset({"grouped_nested_v1", "grouped_nested_v2"})
+_VALID_EXECUTION_MODES = {"legacy"} | GROUPED_EXECUTION_MODES
 _EXECUTION_CACHE_SCHEMA = "coalition_utility_v1"
 _VALID_ESTIMATORS = frozenset(
     {"exact", "random_mc", "mi_correlation_guided", "hybrid"}

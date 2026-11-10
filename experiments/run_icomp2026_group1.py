@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 from minppi_mofs.multifidelity import CalibrationRules, load_model_policy
 
@@ -150,8 +152,22 @@ def _load_group1_model_policy(policy_path: Path) -> None:
         )
 
 
-def _preflight_commands() -> tuple[tuple[str, ...], ...]:
-    basetemp = f".t{os.getpid()}"
+@contextmanager
+def _pytest_basetemp(project_root: Path) -> Iterator[Path]:
+    """Give pytest an unused child of our own short, unique temporary directory."""
+    system_temp = Path(tempfile.gettempdir()).resolve()
+    parent = min((system_temp, project_root.resolve().parent), key=lambda p: len(str(p)))
+    try:
+        temporary = tempfile.TemporaryDirectory(prefix=".t", dir=parent)
+    except PermissionError:
+        if parent == system_temp:
+            raise
+        temporary = tempfile.TemporaryDirectory(prefix=".t", dir=system_temp)
+    with temporary as directory:
+        yield Path(directory) / "p"
+
+
+def _preflight_commands(basetemp: Path) -> tuple[tuple[str, ...], ...]:
     return (
         ("-m", "pip", "check"),
         ("-c", "import minppi_mofs; print('import OK')"),
@@ -163,7 +179,7 @@ def _preflight_commands() -> tuple[tuple[str, ...], ...]:
             "-p",
             "no:cacheprovider",
             "--basetemp",
-            basetemp,
+            str(basetemp),
         ),
         (
             "-m",
@@ -355,11 +371,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     python_executable = _require_adjacent_project_python(PROJECT_ROOT)
     output_root = _normalize_output_root(PROJECT_ROOT, args.output_root)
     source_revision = _require_clean_source_tree(PROJECT_ROOT)
-    run_checked_command_sequence(
-        _preflight_commands(),
-        python_executable=python_executable,
-        project_root=PROJECT_ROOT,
-    )
+    with _pytest_basetemp(PROJECT_ROOT) as basetemp:
+        run_checked_command_sequence(
+            _preflight_commands(basetemp),
+            python_executable=python_executable,
+            project_root=PROJECT_ROOT,
+        )
     run_checked_command_sequence(
         _acquisition_commands(),
         python_executable=python_executable,

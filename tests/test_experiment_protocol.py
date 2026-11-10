@@ -628,7 +628,7 @@ def test_repository_protocol_configs_are_valid() -> None:
     assert formal.seeds == (42, 123, 456, 789, 1024)
     assert source.backend == "cpu"
     assert formal.backend == "cuda"
-    assert formal.execution.mode == "grouped_nested_v1"
+    assert formal.execution.mode == "grouped_nested_v2"
     assert tuple(dataset.dataset_id for dataset in smoke.datasets) == (
         "spambase",
         "abalone",

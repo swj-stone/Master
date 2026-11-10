@@ -14,6 +14,7 @@ from types import MappingProxyType
 import numpy as np
 import pandas as pd
 
+from minppi_mofs.minimum_sampling import ThresholdMinimumView
 from minppi_mofs.modeling import (
     _empty_subset_predictions,
     _validated_policy,
@@ -751,7 +752,7 @@ class CoalitionUtilityCache:
         return self.record(coalition).utilities[utility]
 
 
-class CoalitionUtilityView:
+class CoalitionUtilityView(ThresholdMinimumView):
     def __init__(
         self, cache: CoalitionUtilityCache, *, utility: str, alpha: float
     ) -> None:
@@ -794,6 +795,11 @@ class CoalitionUtilityView:
         return int(self.is_winning(coalition | {feature})) - int(
             self.is_winning(coalition)
         )
+
+    def update_minimum(self, current: int, coalition: set[str], feature: str) -> int:
+        if feature not in self.feature_order:
+            raise ValueError("feature is outside cache authority")
+        return super().update_minimum(current, coalition, feature)
 
     @property
     def model_fit_count(self) -> int:

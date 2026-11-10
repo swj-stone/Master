@@ -65,6 +65,7 @@ if __name__ == "__main__":
 
 
 from minppi_mofs.experiment_protocol import (  # noqa: E402
+    GROUPED_EXECUTION_MODES,
     AuditLog,
     IncompleteRunError,
     JobSpec,
@@ -94,7 +95,7 @@ else:
 
 
 _PAIR_VALUES = frozenset({"accuracy", "ovr_auc"})
-_SUPPORTED_EXECUTION_MODES = frozenset({"legacy", "grouped_nested_v1"})
+_SUPPORTED_EXECUTION_MODES = {"legacy"} | GROUPED_EXECUTION_MODES
 
 
 def project_isolet_utility_pair_protocol(

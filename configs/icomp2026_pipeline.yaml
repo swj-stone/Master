@@ -12,7 +12,7 @@ seeds: [42, 123, 456, 789, 1024]
 backend: cpu
 
 execution:
-  mode: grouped_nested_v1
+  mode: grouped_nested_v2
   cache_schema: coalition_utility_v1
   checkpoint_every_fits: 50
   progress_every_seconds: 30

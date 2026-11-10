@@ -27,6 +27,7 @@ from experiments.icomp2026_estimator_bundle import (
 )
 from experiments.icomp2026_progress import progress_from_document
 from minppi_mofs.experiment_protocol import (
+    GROUPED_EXECUTION_MODES,
     ManifestStore,
     _DATA_MANIFEST_FIELDS,
     _read_completion_snapshot,
@@ -528,7 +529,7 @@ def read_run_metadata(root: Path) -> RunMetadata:
             "checkpoint_every_fits",
             "progress_every_seconds",
         }
-        and execution["mode"] in {"legacy", "grouped_nested_v1"}
+        and execution["mode"] in {"legacy", *GROUPED_EXECUTION_MODES}
         and execution["cache_schema"] == "coalition_utility_v1"
     ):
         execution_mode = str(execution["mode"])
@@ -834,7 +835,7 @@ def _validate_cross_run_pair(
 ) -> None:
     if (
         legacy.execution_mode != "legacy"
-        or candidate.execution_mode != "grouped_nested_v1"
+        or candidate.execution_mode not in GROUPED_EXECUTION_MODES
     ):
         raise ValueError("legacy/candidate execution modes are invalid")
     _validate_scientific_protocol_equivalence(
@@ -895,7 +896,7 @@ def _group_request_from_metadata(
     methods_value = protocol.get("estimator_methods")
     exact_max_features = protocol.get("exact_max_features")
     if (
-        metadata.execution_mode != "grouped_nested_v1"
+        metadata.execution_mode not in GROUPED_EXECUTION_MODES
         or not isinstance(execution, Mapping)
         or not isinstance(dataset, Mapping)
         or row is None
@@ -923,6 +924,7 @@ def _group_request_from_metadata(
         if method != "exact" or len(features) <= exact_max_features
     )
     return EstimatorGroupRequest(
+        execution_mode=metadata.execution_mode,
         protocol_hash=metadata.protocol_hash,
         dataset_id=dataset_id,
         seed=seed,
