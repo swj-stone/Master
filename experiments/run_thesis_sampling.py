@@ -20,6 +20,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 DATASETS = ("abalone", "spambase", "madelon", "gisette", "credit_card_fraud", "isolet")
 MSK = timezone(timedelta(hours=3))
+REFINEMENTS = ("local_refine", "fold_consensus")
 
 
 def _save(path, data):
@@ -76,6 +77,17 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
                 continue
             p = _read(directory / "progress.json")
             elapsed = time.monotonic() - started
+            if "fit_recipe" in p or p.get("source_partition") == "train":
+                total_fits = 2
+                if "fit_recipe" in p:
+                    full = (1 << len(p["features"])) - 1
+                    fits_per_mask = 2 if p.get("predictor_recipe") == "rounds" else 4
+                    total_fits = fits_per_mask * len({full, int(p["guarded_mask"], 16)})
+                done = p["validation_fits"] + p["test_fits"]
+                eta = f"~{elapsed * (total_fits - done) / done:.0f}s" if done else "pending"
+                log(f"{directory.name} phase={p['phase']} | recipe={p.get('fit_recipe', 'rounds')} | elapsed={elapsed:.0f}s"
+                    f" | fits={done}/{total_fits} | estimated remaining={eta} | deadline in {max(0, seconds-elapsed):.0f}s")
+                continue
             eta = p.get("sampling_eta_s") if p.get("phase") == "sampling" else None
             if p.get("phase") == "sampling" and eta is None and p.get("resolved_trials") and p.get("planned_trials"):
                 done = p["resolved_trials"]
@@ -83,7 +95,7 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
             if eta is not None and sample_seconds is not None:
                 eta = max(0.0, min(eta, sample_seconds - p.get("sample_elapsed_s", 0), seconds - elapsed))
             eta_text = "pending" if eta is None else f"~{max(0, eta):.0f}s"
-            pool = (p.get("proposed_count", 0) if p.get("selection_policy") in ("sign_aware", "confirmed", "guarded", "local_refine")
+            pool = (p.get("proposed_count", 0) if p.get("selection_policy") in ("sign_aware", "confirmed", "guarded", *REFINEMENTS)
                     else p.get("structured_proposed_count", p.get("proposed_count", 0)))
             log(f"{directory.name} phase={p.get('phase', 'starting')} | elapsed={elapsed:.0f}s"
                 f" | coverage={p.get('coverage', 0)}/{p.get('n_features', '?')}"
@@ -187,7 +199,7 @@ def main():
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--dataset-seconds", type=int, default=900)
     parser.add_argument("--sample-seconds", type=int, default=780)
-    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded", "local_refine"),
+    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded", *REFINEMENTS),
                         default="structured")
     parser.add_argument("--reuse-sampling-run", type=Path, help="Reuse verified seed-42 sampling evidence from an earlier run.")
     args = parser.parse_args()
@@ -201,14 +213,16 @@ def main():
     def selection_sources():
         files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",
                  "src/minppi_mofs/minimum_sampling.py", "src/minppi_mofs/baselines/shap_top_k.py")
-        if args.selection_policy in ("sign_aware", "confirmed", "guarded", "local_refine"):
+        if args.selection_policy in ("sign_aware", "confirmed", "guarded", *REFINEMENTS):
             files += ("src/minppi_mofs/sign_aware_removal.py",)
         if args.selection_policy == "confirmed":
             files += ("src/minppi_mofs/removal_confirmation.py",)
-        if args.selection_policy in ("guarded", "local_refine"):
+        if args.selection_policy in ("guarded", *REFINEMENTS):
             files += ("src/minppi_mofs/guarded_update.py",)
         if args.selection_policy == "local_refine":
             files += ("src/minppi_mofs/local_refinement.py", "src/minppi_mofs/residual_ranking.py")
+        if args.selection_policy == "fold_consensus":
+            files += ("src/minppi_mofs/fold_consensus.py",)
         return {f: hashlib.sha256((ROOT / f).read_bytes()).hexdigest() for f in files}
 
     sources = selection_sources()
@@ -225,10 +239,11 @@ def main():
                         confirmation_training_holdout_fraction=0.25, confirmation_split_seed=42)
     elif args.selection_policy == "guarded":
         protocol.update(primary_method="guarded", incumbent="structured", challenger="sign_worst")
-    elif args.selection_policy == "local_refine":
-        protocol.update(primary_method="local_robust", incumbent="guarded_incumbent",
-                        comparators=["local_pooled", "local_drop", "validation_frontier"],
-                        max_local_masks=8, minimum_improved_datasets=2,
+    elif args.selection_policy in REFINEMENTS:
+        local = args.selection_policy == "local_refine"
+        protocol.update(primary_method="local_robust" if local else "fold_consensus", incumbent="guarded_incumbent",
+                        comparators=["local_pooled", "local_drop", "validation_frontier"] if local else [],
+                        max_local_masks=8 if local else 5, minimum_improved_datasets=2,
                         practical_change_fraction_of_margin=0.1, paired_bootstrap_replicates=500,
                         paired_bootstrap_seed=42)
     _save(output / "protocol.json", protocol)
@@ -249,7 +264,7 @@ def main():
         directory = output / dataset
         directory.mkdir()
         reuse, remaining = budgets[dataset]
-        local_deadline = time.monotonic() + remaining if args.selection_policy == "local_refine" else None
+        local_deadline = time.monotonic() + remaining if args.selection_policy in REFINEMENTS else None
         process = multiprocessing.get_context("spawn").Process(
             target=_worker_entry, args=(dataset, directory, args.rounds, args.sample_seconds, args.selection_policy, reuse, local_deadline))
         cutoff = datetime.now(MSK) + timedelta(seconds=remaining)

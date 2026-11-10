@@ -62,17 +62,19 @@ def test_interrupted_replay_reports_time_charged_before_worker_verification():
     assert row["wall_plus_reused_sampling_s"] == pytest.approx(900)
 
 
-@pytest.mark.parametrize("policy", ["sign_aware", "confirmed", "guarded", "local_refine"])
+@pytest.mark.parametrize("policy", ["sign_aware", "confirmed", "guarded", "local_refine", "fold_consensus"])
 def test_experimental_run_records_its_source_and_primary_method_before_start(tmp_path, monkeypatch, policy):
     files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",
              "src/minppi_mofs/minimum_sampling.py", "src/minppi_mofs/baselines/shap_top_k.py",
              "src/minppi_mofs/sign_aware_removal.py")
     if policy == "confirmed":
         files += ("src/minppi_mofs/removal_confirmation.py",)
-    if policy in ("guarded", "local_refine"):
+    if policy in ("guarded", "local_refine", "fold_consensus"):
         files += ("src/minppi_mofs/guarded_update.py",)
     if policy == "local_refine":
         files += ("src/minppi_mofs/local_refinement.py", "src/minppi_mofs/residual_ranking.py")
+    if policy == "fold_consensus":
+        files += ("src/minppi_mofs/fold_consensus.py",)
     for name in files:
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,8 +92,8 @@ def test_experimental_run_records_its_source_and_primary_method_before_start(tmp
             assert protocol["primary_method"] == "guarded"
             assert protocol["incumbent"] == "structured"
             assert protocol["challenger"] == "sign_worst"
-        elif policy == "local_refine":
-            assert protocol["primary_method"] == "local_robust"
+        elif policy in ("local_refine", "fold_consensus"):
+            assert protocol["primary_method"] == ("local_robust" if policy == "local_refine" else "fold_consensus")
             assert protocol["incumbent"] == "guarded_incumbent"
             assert protocol["minimum_improved_datasets"] == 2
             assert protocol["practical_change_fraction_of_margin"] == 0.1

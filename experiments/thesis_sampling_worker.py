@@ -29,7 +29,7 @@ from minppi_mofs.utility import compute_utility
 SOURCE = Path(__file__).resolve().parents[1] / "results/icomp2026_formal/icomp2026-formal-v1-s42-123"
 DATASETS = ("abalone", "madelon", "spambase", "gisette", "isolet", "credit_card_fraud")
 SEED = 42
-SELECTION_POLICIES = ("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded", "local_refine")
+SELECTION_POLICIES = ("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded", "local_refine", "fold_consensus")
 
 
 class SamplingDeadline(Exception):
@@ -127,28 +127,50 @@ def confirm_on_training(train, yt, features, structured, signed, full_scores, ma
     return decision
 
 
-def refine_guarded(train, yt, minima, gain, shap, incumbent, evaluate, full_scores, margin, publish,
-                   completed_trial, gate_fit_seconds, **policy):
-    """Rank recovery on training rows, then select local changes on the frozen validation split."""
-    from minppi_mofs.local_refinement import select_local_refinement
-    from minppi_mofs.residual_ranking import rank_residual_recovery
+def refinement_budget(gate_fit_seconds, max_test_fits, max_candidates):
+    """Reserve the held-out refits using measured official validation-fit durations."""
+    deadline_text = os.environ.get("MINPPI_DATASET_DEADLINE")
+    deadline = float(deadline_text) if deadline_text is not None else None
+    fit_s = max(1.0, float(np.mean(gate_fit_seconds)) if gate_fit_seconds else 1.0)
+    reserve_s = 5.0 + max_test_fits * 1.25 * fit_s
+    def allow_next():
+        return deadline is None or deadline - time.monotonic() >= reserve_s + fit_s
 
+    return allow_next, dict(has_dataset_deadline=deadline is not None, estimated_fit_s=fit_s,
+                            held_out_reserve_s=reserve_s, max_local_masks=max_candidates)
+
+
+def refine_guarded(train, yt, minima, gain, shap, incumbent, evaluate, full_scores, margin, publish,
+                   completed_trial, gate_fit_seconds, method, **policy):
+    """Build training-only rankings, then select changes on the frozen validation split."""
     features = tuple(train.columns)
     mask = incumbent["selected_mask"]
     scores = incumbent["selected_scores"]
     base = incumbent["methods"]["guarded"]
-    deadline_text = os.environ.get("MINPPI_DATASET_DEADLINE")
-    deadline = float(deadline_text) if deadline_text is not None else None
-    # Full, incumbent, robust, pooled, drop, and the validation-frontier control.
-    # Their training partitions are larger than those of the timed validation fits.
-    fit_s = max(1.0, float(np.mean(gate_fit_seconds)) if gate_fit_seconds else 1.0)
-    reserve_s = 5.0 + 6 * 1.25 * fit_s
-    def allow_next():
-        return deadline is None or deadline - time.monotonic() >= reserve_s + fit_s
+    if method == "fold_consensus":
+        from minppi_mofs.fold_consensus import select_fold_consensus
 
-    publish(phase="residual_ranking", local_incumbent_mask=mask, local_incumbent_scores=scores,
-            local_budget=dict(has_dataset_deadline=deadline is not None, estimated_fit_s=fit_s,
-                              held_out_reserve_s=reserve_s, max_local_masks=8))
+        allow_next, budget = refinement_budget(gate_fit_seconds, max_test_fits=3, max_candidates=5)
+        publish(phase="consensus_ranking", local_incumbent_mask=mask, local_incumbent_scores=scores,
+                local_budget=budget, extra_ranking_fits=0)
+        def ranking_progress(completed, planned):
+            phase = "consensus_validation" if completed == planned else "consensus_ranking"
+            publish(phase=phase, extra_ranking_fits=completed, planned_ranking_fits=planned)
+
+        consensus = select_fold_consensus(train, yt, minima, mask, evaluate, scores, full_scores, margin,
+                                          policy=policy, publish=lambda trial: completed_trial(trial, method), allow_next=allow_next,
+                                          publish_ranking=ranking_progress)
+        publish(fold_consensus=consensus, extra_ranking_fits=consensus["ranking_fits"])
+        candidates = set(incumbent["candidate_features"]) | set(consensus["candidate_features"])
+        candidates = [f for f in features if f in candidates]
+        return dict(consensus, candidate_features=candidates, all_candidate_features=candidates,
+                    methods={**consensus["methods"], "guarded_incumbent": base}, trials=incumbent["trials"])
+
+    from minppi_mofs.local_refinement import select_local_refinement
+    from minppi_mofs.residual_ranking import rank_residual_recovery
+
+    allow_next, budget = refinement_budget(gate_fit_seconds, max_test_fits=6, max_candidates=8)
+    publish(phase="residual_ranking", local_incumbent_mask=mask, local_incumbent_scores=scores, local_budget=budget)
     skip_ranking = not allow_next()
     if not skip_ranking:
         publish(fit_started_utc=datetime.now(timezone.utc).isoformat(), fit_mask=hex(mask), fit_is_model=True)
@@ -381,8 +403,8 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
         cache = {}
 
         compare_methods = selection_policy == "wide"
-        local_search = selection_policy == "local_refine"
-        compare_incumbents = selection_policy in {"confirmed", "guarded", "local_refine"}
+        refine_incumbent = selection_policy in {"local_refine", "fold_consensus"}
+        compare_incumbents = refine_incumbent or selection_policy in {"confirmed", "guarded"}
         use_sign_aware = selection_policy == "sign_aware" or compare_incumbents
         use_shap = compare_methods or use_sign_aware
         use_robust_gate = selection_policy != "witness_only"
@@ -400,9 +422,9 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
             if use_robust_gate and not testing:
                 gate_start = time.monotonic()
                 value = subset_validation_scores(*frames, selected, halves, **policy)
-                if local_search and mask and state["phase"] == "validation_gate":
+                if refine_incumbent and mask and state["phase"] == "validation_gate":
                     gate_fit_seconds.append(time.monotonic() - gate_start)
-            elif testing and local_search:
+            elif testing and refine_incumbent:
                 def capture(prediction):
                     held_out_predictions[mask] = np.asarray(prediction)
                 value = (subset_utility(*frames, selected, capture_prediction=capture, **policy),)
@@ -512,15 +534,15 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
                     mask, scores = decision["selected_mask"], decision["selected_scores"]
                     record = dict(mask=mask, removed_count=decision["removed_count"], removed_features=decision["removed_features"],
                                   scores=scores, selected_source=decision["selected_source"])
-                    decision_method = "guarded" if local_search else selection_policy
+                    decision_method = "guarded" if refine_incumbent else selection_policy
                     selection = dict(candidate_features=candidates, all_candidate_features=candidates,
                                      selected_mask=mask, selected_scores=scores, selected_method=decision_method,
                                      removed_features=decision["removed_features"], validation_utility=scores[0],
                                      selected_source=decision["selected_source"], full_scores=full_scores,
                                      trials=partial_trials, methods={decision_method: record})
-                    if local_search:
+                    if refine_incumbent:
                         selection = refine_guarded(train, yt, minima, gain, shap, selection, evaluate, full_scores,
-                                                  margin, publish, completed_trial, gate_fit_seconds, **policy)
+                                                  margin, publish, completed_trial, gate_fit_seconds, selection_policy, **policy)
                 else:
                     selection = structured
                     diagnostic_features = structured_features
@@ -591,7 +613,7 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
         publish(phase="test_retained", full_test_utility=full_test)
         retained_test = evaluate(retained, testing=True)[0]
         method_test = {method: evaluate(mask, testing=True)[0] for method, mask in method_masks.items()}
-        if local_search:
+        if refine_incumbent:
             filename = "paired_test_predictions.npz"
             np.savez_compressed(output / filename, y=ye, full_set=held_out_predictions[full],
                                 **{method: held_out_predictions[mask] for method, mask in method_masks.items()})

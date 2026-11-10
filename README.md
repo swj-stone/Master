@@ -88,6 +88,22 @@ Gain 与 TreeSHAP 平均名次从低到高排列零分列；第二种按 Gain �
 条件的子集中优先选择较差半集改善最多的方案。父进程以 900 秒为硬截止，子进程
 会为最后的重训预留时间。日志记录实际完成和因预算跳过的候选。
 
+`--selection-policy fold_consensus` 使用同一 `guarded` 起点，分别在训练分区的一半
+上拟合模型，在另一半计算 TreeSHAP，结合训练 Gain 生成两份重要性排名。优先提名
+两半排名都低的特征，最多验证五个子集。
+
+固定列后可单独测试预测器。下面的命令复用 seed 42 下冻结的列，在全特征和
+`guarded` 子集上各自比较原预测及增加提升轮数后的预测。将 `rounds` 替换为
+`column_blend` 可比较每个节点随机采样一半特征的第二个模型与原模型的平均预测。
+
+```powershell
+.\thesis-python.ps1 experiments/run_thesis_predictor.py results/thesis_sampling/seed42-confirmed-20261110-191743-946395 --recipe rounds
+```
+
+在 `--recipe rounds` 后附加 `--training-check`，可只在原训练分区内部按 60/20/20
+重新划分，复核固定特征子集上的预测效果。两种预测实验均把已消耗的选列准备时间
+计入每个数据集的 15 分钟硬截止。[稳定性实验结果](docs/thesis/experiments/stability-seed42.md)
+
 每个候选子集重训一次，分别计算整个验证集与两个固定半集的效用。三处都要满足与
 各自全特征基线相比的损失上限，分类为 0.005，回归为 0.01。`structured` 与
 `wide` 的 MinPI 路径优先比较删除的负见证数，再比较总删除数。全部方法的掩码在读取
