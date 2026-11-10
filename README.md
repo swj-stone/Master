@@ -42,13 +42,16 @@ Abalone、Spambase、Madelon、Gisette、Credit Card Fraud 和 ISOLET；seed 为
 本次核验的输入清单指纹为
 `3fb4b9716759de8b3d4ebede5422a41a9a618e9b833f2437fa83bd29d252c0f3`。
 
-30 组共用 CUDA XGBoost（100 轮、深度 4、学习率 0.1、`n_jobs=1`）。正式实验
-对采样和整组任务均不设时长上限。每组在自己的划分上从头执行 MinPI 的 5 轮
-数值采样计划：获得 −1 见证后，该特征的最小值已经确定；其余特征完成全部轮次。
-所有计划项均已完成或由见证确定后，再完成 `guarded` 子集验证。全特征和所选子集分别在
-验证集上决定使用 100 轮预测或 150 与 200 轮预测的平均值，规则相同。回归以 R²
-计分，二分类以 ROC AUC 计分，ISOLET 以宏平均 OvR AUC 计分。Spambase 的
-seed 123 保留了 55 个预处理输入列，其余四个 seed 为 56 列；每组压缩率使用
+30 组共用 CUDA XGBoost（100 轮、深度 4、学习率 0.1、`n_jobs=1`）。每组沿同一条
+MinPI 抽样序列执行到 K=3，采样和整组任务均无时长上限。第 1、2、3 轮结束时分别用
+截至当轮的累计证据进行 `guarded` 选列。得到 −1 见证的特征已经达到 MinPI 下界，
+后续轮次可直接沿用该证据。每轮都从同一份完整特征表重新选列，因此上一轮删掉的列
+可以在下一轮被保留。
+
+每个 K 都在同一验证集上为全特征和所选子集分别决定使用 100 轮预测或 150 与 200 轮
+预测的平均值。三个 K 的选集和预测方案全部确定后，每组读取一次测试集，给每个 K
+独立计分，相同特征集复用模型。回归以 R² 计分，二分类以 ROC AUC 计分，ISOLET 以
+宏平均 OvR AUC 计分。Spambase 的 seed 123 保留了 55 个预处理输入列，其余四个 seed 为 56 列。每组压缩率使用
 本组的输入列数作分母。
 
 每次启动都会打印一个新的 `results/thesis_benchmark/` 运行目录。可从 `Paper`
@@ -58,12 +61,24 @@ seed 123 保留了 55 个预处理输入列，其余四个 seed 为 56 列；每
 Get-Content -LiteralPath '.\MastersThesis\results\thesis_benchmark\<本次运行目录名>\run.log' -Tail 15 -Wait
 ```
 
-`config_audit.json` 保存本轮配置核对结果。每组结束后，`summary.csv` 记录
-数据集、seed、实际耗时、状态、删除数和测试分数。`selection_delta` 比较原 100 轮
-预测器在两套特征上的差异，`predictor_delta` 比较同一选集上轮数选择带来的变化。
-`dataset_summary.csv` 按数据集列出完成组数、均值及 seed 间的样本标准差。
-终端与 `run.log` 每 10 秒更新当前阶段、已用时间，数据足够时显示预计剩余时间。
-整轮成功以 30 组全部完成为准。
+`config_audit.json` 保存本轮配置核对结果。终端与 `run.log` 每 10 秒更新当前阶段、
+已用时间及可估计的剩余时间。每组的 `k-1/`、`k-2/`、`k-3/` 目录先写采样证据
+（`sampling.json`）和验证集决定（`validation.json`），测试评分后再写 `result.json`。
+
+| 运行目录中的文件 | 如何使用 |
+| --- | --- |
+| `jobs.csv` | 每组的运行状态和实际总耗时，完整批次共 30 组。 |
+| `summary.csv` | 每组每个 K 的删列数、验证分数、测试分数和耗时，共 90 条。`selection_delta` 用固定 100 轮预测器比较选列收益，`predictor_delta` 衡量同一选集上调整预测轮数的收益。 |
+| `dataset_summary.csv` | 每个数据集分 K 汇总已完成的 seed，给出均值与样本标准差。 |
+| `marginal.csv` | 同一数据集、同一 seed 下 K=1→2 和 2→3 的差值，共 60 对。可查看多删几列、删除集合变化、新增 −1 见证、分数变化及新增采样耗时。 |
+| `marginal_summary.csv` | 每个数据集分别汇总两次增量。比较五个 seed 上的平均分数增量、离散程度、改善次数及单位采样时间的收益。 |
+
+例如，`guarded_original_test_delta_mean` 衡量在固定预测器下增加一轮带来的平均测试分数变化。
+两段增量都为正且第二段较小时，表示第三轮仍有正收益，但分数增幅减小。
+如果分数相近，还应结合删列数和新增耗时判断。对于验证集选定的预测器，
+2→3 行的 `second_difference_guarded_chosen_test_mean` 给出同一 seed 上两次分数增量之差的均值。
+`additional_sampling_s` 只计新增采样耗时，`checkpoint_selection_s` 与 `checkpoint_test_s`
+分别记录该 K 的选列验证和测试评分耗时。各 K 共用拟合缓存，独立重跑的耗时可能不同。
 
 ## 限时试验（test）
 

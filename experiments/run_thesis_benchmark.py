@@ -20,6 +20,7 @@ from minppi_mofs.experiment_protocol import canonical_hash
 
 
 POLICY = "guarded_rounds"
+CHECKPOINTS = (1, 2, 3)
 FORMAL_OUTPUT = ROOT / "results/thesis_benchmark"
 TEST_OUTPUT = ROOT / "results/test/thesis_benchmark"
 SCIENCE_FILES = (
@@ -32,8 +33,11 @@ SCIENCE_FILES = (
 )
 
 
-def _code_hashes():
-    return {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in SCIENCE_FILES}
+def _code_hashes(nested=False):
+    files = SCIENCE_FILES
+    if nested:
+        files += ("experiments/thesis_nested_k_worker.py", "experiments/thesis_k_summary.py")
+    return {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in files}
 
 
 def _pinned_metadata(root, audit):
@@ -56,15 +60,18 @@ def _changed_file(pins):
     return None
 
 
-def _worker(dataset, seed, source, directory, rounds, sample_seconds):
+def _worker(dataset, seed, source, directory, rounds, sample_seconds, *, nested=False):
     with (directory / "worker.log").open("w", encoding="utf-8", buffering=1) as stream:
         os.dup2(stream.fileno(), 1)
         os.dup2(stream.fileno(), 2)
         with redirect_stdout(stream), redirect_stderr(stream):
             try:
-                from experiments.thesis_sampling_worker import run
-
-                run(dataset, directory, rounds, sample_seconds, selection_policy=POLICY, seed=seed, source=source)
+                if nested:
+                    from experiments.thesis_nested_k_worker import run
+                    run(dataset, directory, seed=seed, source=source)
+                else:
+                    from experiments.thesis_sampling_worker import run
+                    run(dataset, directory, rounds, sample_seconds, selection_policy=POLICY, seed=seed, source=source)
             except Exception:
                 traceback.print_exc(file=stream)
                 raise SystemExit(1)
@@ -98,6 +105,12 @@ def _batch_eta(pending, rows, current_elapsed, limit):
 def _heartbeat(progress, elapsed, remaining, sample_seconds, rounds):
     phase = progress.get("phase", "starting")
     status = [f"phase={phase}", f"elapsed={_clock(elapsed)}"]
+    if "active_k" in progress:
+        status.append(f"K={progress['active_k']} | frozen K={progress.get('frozen_ks', [])}")
+        latest = progress.get("latest_checkpoint")
+        if latest:
+            status.append(f"last frozen K={latest['k']} removed={latest['removed_count']}"
+                          f" validation={latest['selected_validation_utility']:.7f}")
     if remaining is not None:
         status.append(f"deadline in {_clock(remaining)}")
     if phase == "sampling":
@@ -114,7 +127,8 @@ def _heartbeat(progress, elapsed, remaining, sample_seconds, rounds):
         status.append(f"fits={progress.get('predictor_fits_done', 0)}/{progress.get('predictor_fits_planned', '?')}")
         status.append(f"role={progress.get('predictor_role', 'pending')}")
     elif phase == "validation_gate":
-        status.append(f"masks checked={len(progress.get('selection_trials', []))}")
+        checked = progress.get("validation_masks_checked", len(progress.get("selection_trials", [])))
+        status.append(f"masks checked={checked}")
     return " | ".join(status)
 
 
@@ -190,20 +204,52 @@ def _formal_completion_error(result, dataset, seed, rounds):
     return None
 
 
+def _nested_completion_error(result, dataset, seed):
+    checkpoints = result.get("checkpoints", {})
+    if (result.get("phase") != "complete" or result.get("dataset") != dataset or result.get("seed") != seed
+            or set(checkpoints) != {str(k) for k in CHECKPOINTS}):
+        return "The worker did not finish all three checkpoints for this dataset and seed"
+    previous = None
+    for k in CHECKPOINTS:
+        record = checkpoints[str(k)]
+        error = _formal_completion_error(record, dataset, seed, k)
+        if error or record.get("k") != k:
+            return f"K={k}: {error or 'incorrect checkpoint label'}"
+        for field in ("sampled_draws", "sample_fits", "sample_elapsed_s"):
+            value = record.get(field)
+            if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                return f"K={k}: invalid cumulative {field}"
+            if previous is not None and value < previous[field]:
+                return f"K={k}: cumulative {field} fell below the preceding checkpoint"
+        if previous is not None:
+            if record["method_test_utilities"]["full_original"] != previous["method_test_utilities"]["full_original"]:
+                return f"K={k}: full-feature test reference changed between paired checkpoints"
+        previous = record
+    return None
+
+
 def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
-    code = _code_hashes()
+    sampling_checkpoints = config["experiment"].get("sampling_checkpoints")
+    nested = bool(sampling_checkpoints)
+    code = _code_hashes(nested)
     verified_inputs = {**pins, **{ROOT / name: digest for name, digest in code.items()}}
     mode = config["experiment"]["mode"]
     prefix = "test-guarded-rounds" if mode == "test" else "guarded-rounds-formal"
+    if nested:
+        prefix += "-k1-k2-k3"
     run = output_root / datetime.now(MSK).strftime(f"{prefix}-%Y%m%d-%H%M%S-%f")
     run.mkdir(parents=True, exist_ok=False)
     _save(run / "config_audit.json", config)
     _save(run / "protocol.json", dict(mode=mode, selection_policy=POLICY, predictor_recipe="rounds", rounds=rounds,
-          sample_seconds=sample_seconds, dataset_seconds=limit, heartbeat_seconds=10,
+          sample_seconds=sample_seconds, dataset_seconds=limit, heartbeat_seconds=10, sampling_checkpoints=sampling_checkpoints,
           jobs=[dict(dataset=ds, seed=seed, source=str(source)) for (ds, seed), source in jobs.items()],
           catalog_sha256=config["prepared"]["sha256"], config_sha256=config["sha256"], source_sha256=code))
     order = list(jobs)
     rows = []
+    outcomes = {}
+    if nested:
+        from experiments.thesis_k_summary import update_k_reports
+        update_k_reports(run, order, outcomes)
     started = time.monotonic()
 
     def log(message, job_directory=None):
@@ -217,7 +263,8 @@ def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
 
     log(_configuration_line(config))
     timing = "time limits=none" if limit is None else f"sample <= {sample_seconds}s | per-job hard limit={limit}s"
-    log(f"{len(jobs)} jobs | mode={mode} | {POLICY} | rounds={rounds} | {timing} | log={run / 'run.log'}")
+    design = f"single trajectory K={sampling_checkpoints}" if nested else f"rounds={rounds}"
+    log(f"{len(jobs)} jobs | mode={mode} | {POLICY} | {design} | {timing} | log={run / 'run.log'}")
     for index, ((ds, seed), source) in enumerate(jobs.items()):
         changed = _changed_file(verified_inputs)
         if changed:
@@ -234,7 +281,7 @@ def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
 
         job_log("start" if limit is None else f"start | deadline={limit}s")
         process = multiprocessing.get_context("spawn").Process(
-            target=_worker, args=(ds, seed, source, folder, rounds, sample_seconds))
+            target=_worker, args=(ds, seed, source, folder, rounds, sample_seconds), kwargs={"nested": nested})
         try:
             outcome = supervise(process, folder, limit, job_log, sample_seconds,
                                 heartbeat_formatter=lambda p, t, left: _heartbeat(p, t, left, sample_seconds, rounds))
@@ -248,14 +295,30 @@ def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
         finally:
             process.close()
         if mode == "formal" and outcome["status"] == "completed":
-            error = _formal_completion_error(outcome["result"], ds, seed, rounds)
+            error = (_nested_completion_error(outcome["result"], ds, seed) if nested
+                     else _formal_completion_error(outcome["result"], ds, seed, rounds))
             if error:
                 outcome.update(status="error", error=error, result={})
                 _save(folder / "watchdog.json", outcome)
-        row = _summary_row(ds, seed, outcome, mode)
+        job_view = outcome
+        if nested:
+            outcomes[ds, seed] = {key:outcome[key] for key in ("status", "elapsed_s", "result")}
+            if outcome["status"] == "completed":
+                job_view = {**outcome, "result": outcome["result"]["checkpoints"][str(rounds)]}
+        row = _summary_row(ds, seed, job_view, mode)
         rows.append(row)
-        write_summary(run, rows)
-        write_dataset_summary(run, rows, order)
+        if nested:
+            write_summary(run, rows, stem="jobs")
+            update_k_reports(run, order, outcomes)
+            if outcome["status"] == "completed":
+                for k in CHECKPOINTS:
+                    rec = outcome["result"]["checkpoints"][str(k)]
+                    log(f"{prefix} | K={k} | removed={rec['removed_count']}/{rec['n_features']}"
+                        f" | guarded test={rec['method_test_utilities']['guarded_chosen']:.7f}"
+                        f" | cumulative sampling={rec['sample_elapsed_s']:.3f}s", folder)
+        else:
+            write_summary(run, rows)
+            write_dataset_summary(run, rows, order)
         eta = _batch_eta(order[index + 1:], rows, 0., limit)
         log(f"{prefix} | {row['status']} | phase={row['phase']} | wall={row['wall_s']:.3f}s"
             f" | removed={row['removed_count']}/{row['n_features']} | guarded test={row['guarded_chosen_test']}"
@@ -275,7 +338,8 @@ def main(argv=None, *, test_mode=False):
     parser.add_argument("--output-root", type=Path, default=TEST_OUTPUT if test_mode else FORMAL_OUTPUT)
     parser.add_argument("--datasets", nargs="+")
     parser.add_argument("--seeds", nargs="+", type=int)
-    parser.add_argument("--rounds", type=int, default=5)
+    parser.add_argument("--rounds", type=int, default=5 if test_mode else 3,
+                        help="Formal K=3 records the nested K=1,2,3 sweep; other values run a single K.")
     if test_mode:
         parser.add_argument("--sample-seconds", type=int, default=780)
         parser.add_argument("--dataset-seconds", type=int, default=900)
@@ -312,6 +376,10 @@ def main(argv=None, *, test_mode=False):
         balanced_rounds=args.rounds, sampling_seconds=args.sample_seconds, job_limit_seconds=args.dataset_seconds,
         heartbeat_seconds=10, jobs_requested=len(jobs), seeds_requested=sorted({s for _,s in jobs}),
         datasets_requested=sorted({ds for ds,_ in jobs}))}
+    nested = not test_mode and args.rounds == CHECKPOINTS[-1]
+    if nested:
+        config["experiment"].update(sampling_design="nested_prefix", sampling_checkpoints=list(CHECKPOINTS),
+                                    paired_transitions=[[1, 2], [2, 3]], test_access="after_all_validation_decisions")
     config["sha256"] = canonical_hash(config)
     if args.plan:
         print(_configuration_line(config))
@@ -320,6 +388,9 @@ def main(argv=None, *, test_mode=False):
                   if test_mode else "time limits=none")
         print(f"{len(jobs)} jobs | mode={mode} | guarded MinPI + validation-selected rounds | sample rounds={args.rounds}"
               f" | {timing}")
+        if nested:
+            print(f"One sampling trajectory per job, K={list(CHECKPOINTS)} | {len(jobs)*len(CHECKPOINTS)} checkpoint results"
+                  f" | {len(jobs)*(len(CHECKPOINTS)-1)} paired adjacent-K comparisons")
         for i, ((ds, seed), source) in enumerate(jobs.items(), 1):
             print(f"[{i}/{len(jobs)}] dataset={ds} seed={seed} | {source}")
         return 0

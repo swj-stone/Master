@@ -183,9 +183,9 @@ def summary_row(dataset, outcome):
     return row
 
 
-def write_summary(output, rows):
-    _save(output / "summary.json", rows)
-    path = output / "summary.csv"
+def write_summary(output, rows, *, stem="summary"):
+    _save(output / f"{stem}.json", rows)
+    path = output / f"{stem}.csv"
     temp = path.with_suffix(".tmp")
     with temp.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))

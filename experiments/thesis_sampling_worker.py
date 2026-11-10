@@ -334,7 +334,10 @@ def load_sampling(path, dataset, features, row, policy, alpha, full_val, rounds,
     return sampled, hashlib.sha256(raw).hexdigest(), source_fits
 
 
-def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=time.monotonic, seed=SEED):
+def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=time.monotonic, seed=SEED, on_prefix=None):
+    """Sample one trajectory; optionally hand off independent evidence for each complete K."""
+    if on_prefix is not None and seconds is not None:
+        raise ValueError("Sampling prefix checkpoints require an unbounded run")
     n = len(features)
     rng = np.random.default_rng(seed)
     minima = {f: None for f in features}
@@ -346,12 +349,12 @@ def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=tim
     start = clock()
     deadline = None if seconds is None else start + seconds
     deadline_utc = None if seconds is None else (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat()
-    planned = n * rounds
 
-    def snapshot():
+    def snapshot(k=rounds, sampled_at=None):
         draws = sum(counts.values())
-        resolved = draws + sum(rounds - counts[f] for f in witnesses)
-        elapsed = clock() - start
+        planned = n * k
+        resolved = draws + sum(k - counts[f] for f in witnesses)
+        elapsed = (clock() if sampled_at is None else sampled_at) - start
         eta = elapsed * (planned - resolved) / resolved if resolved else None
         if seconds is not None:
             remaining = max(0.0, seconds - elapsed)
@@ -362,6 +365,11 @@ def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=tim
                     witness_count=len(witnesses), proposed_count=len(witnesses), skipped_after=skipped, resolved_trials=resolved,
                     planned_trials=planned, sample_elapsed_s=elapsed, sampling_eta_s=eta,
                     sampling_deadline_utc=deadline_utc)
+
+    def evidence(k, stop, sampled_at=None):
+        return dict(**snapshot(k, sampled_at), stop=stop, sample_minima=minima.copy(),
+                    draws_per_feature=counts.copy(), witnesses={f: w.copy() for f, w in witnesses.items()},
+                    partial_pair=partial.copy() if partial is not None else None)
 
     def check_time():
         if deadline is not None and clock() >= deadline:
@@ -403,11 +411,21 @@ def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=tim
             completed = active_round
             if len(witnesses) == n:
                 stop = "all_witnessed"
+            if on_prefix is not None:
+                sampled_at = clock()
+                # A -1 certificate resolves all future draws for that feature. If
+                # all are certified, emit the remaining logical budgets without fitting.
+                last_k = rounds if stop == "all_witnessed" else completed
+                for k in range(completed, last_k + 1):
+                    on_prefix(k, evidence(k, stop, sampled_at))
+                start += clock() - sampled_at  # exclude downstream checkpoint processing
+            if stop == "all_witnessed":
                 break
     except SamplingDeadline:
+        if seconds is None:
+            raise
         stop = "sample_time_limit"
-    return dict(**snapshot(), stop=stop, sample_minima=minima, draws_per_feature=counts,
-                witnesses=witnesses, partial_pair=partial)
+    return evidence(rounds, stop)
 
 
 def run(dataset, output, rounds, seconds, *, selection_policy="structured", reuse_sampling=None, seed=SEED, source=None):

@@ -30,6 +30,7 @@ def test_plan_validates_inputs_without_creating_a_training_run(tmp_path, monkeyp
     plan = capsys.readouterr().out
     assert "5 jobs" in plan and "seed=1024" in plan and "crimedata" not in plan and "config audit=PASS" in plan
     assert "mode=formal" in plan and "time limits=none" in plan
+    assert "K=[1, 2, 3]" in plan and "15 checkpoint results" in plan
     assert "upper bound" not in plan and "900s" not in plan and "780s" not in plan
     with pytest.raises(SystemExit):
         batch.main(["--plan", "--datasets", "crimedata", "--prepared-root", str(tmp_path), "--output-root", str(output)])
@@ -46,7 +47,8 @@ def test_entries_use_separate_default_output_roots_and_reject_cross_writes(tmp_p
     opposite = batch.FORMAL_OUTPUT if test_mode else batch.TEST_OUTPUT
 
     def check_root(jobs, root, rounds, sample_seconds, limit, config, pins):
-        assert root == output and rounds == 5
+        assert root == output and rounds == (5 if test_mode else 3)
+        assert config["experiment"].get("sampling_checkpoints") == (None if test_mode else [1, 2, 3])
         assert config["experiment"]["mode"] == ("test" if test_mode else "formal")
         assert (sample_seconds, limit) == ((780, 900) if test_mode else (None, None))
         return 0
@@ -122,6 +124,19 @@ def finished_test_stage():
                 predictor_decisions={role: {"adopt_blend": True} for role in ("full", "guarded")})
 
 
+def test_nested_completion_requires_three_complete_paired_prefixes():
+    records = {str(k):dict(**finished_test_stage(), k=k, phase="complete", n_features=4, run_mode="formal",
+                           completed_rounds=k, planned_trials=4*k, resolved_trials=4*k,
+                           sampling_stop="round_limit", sampled_draws=4*k, sample_fits=7*k, sample_elapsed_s=3.*k)
+               for k in (1, 2, 3)}
+    result = dict(dataset="toy", seed=42, phase="complete", checkpoints=records)
+    assert batch._nested_completion_error(result, "toy", 42) is None
+    records["2"]["method_test_utilities"]["full_original"] = .75
+    assert "reference" in batch._nested_completion_error(result, "toy", 42)
+    records.pop("1")
+    assert batch._nested_completion_error(result, "toy", 42)
+
+
 @pytest.mark.parametrize("planned,resolved,stop,finished_rounds,witness_count,sample_limit,expected", [
     (20, 20, "round_limit", 5, 1, None, "completed"),
     (20, 20, "all_witnessed", 2, 4, None, "completed"),
@@ -150,7 +165,7 @@ def test_formal_worker_has_no_deadlines_and_requires_the_entire_plan(
 
     monkeypatch.setattr(batch, "supervise", simulate)
     output = tmp_path / "formal"
-    status = batch.main(["--prepared-root", str(tmp_path), "--output-root", str(output), "--seeds", "42"])
+    status = batch.main(["--prepared-root", str(tmp_path), "--output-root", str(output), "--seeds", "42", "--rounds", "5"])
     assert status == int(expected != "completed")
     run, = output.iterdir()
     protocol = json.loads((run / "protocol.json").read_bytes())
@@ -181,7 +196,7 @@ def test_formal_result_requires_all_frozen_predictor_outcomes(tmp_path, monkeypa
         return dict(status="completed", result=result, elapsed_s=6100., progress={"phase": "predictor_test"})
     monkeypatch.setattr(batch, "supervise", fake_run)
     output = tmp_path / "runs"
-    assert batch.main(["--prepared-root", str(tmp_path), "--output-root", str(output), "--seeds", "42"]) == 1
+    assert batch.main(["--prepared-root", str(tmp_path), "--output-root", str(output), "--seeds", "42", "--rounds", "5"]) == 1
     run, = output.iterdir()
     with (run / "summary.csv").open(encoding="utf-8-sig") as stream:
         row, = csv.DictReader(stream)
