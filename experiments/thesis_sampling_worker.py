@@ -28,6 +28,7 @@ from minppi_mofs.utility import compute_utility
 SOURCE = Path(__file__).resolve().parents[1] / "results/icomp2026_formal/icomp2026-formal-v1-s42-123"
 DATASETS = ("abalone", "madelon", "spambase", "gisette", "isolet", "credit_card_fraud")
 SEED = 42
+SELECTION_POLICIES = ("structured", "wide", "witness_only", "sign_aware")
 
 
 class SamplingDeadline(Exception):
@@ -267,7 +268,7 @@ def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=tim
 
 
 def run(dataset, output, rounds, seconds, *, selection_policy="structured", reuse_sampling=None):
-    if selection_policy not in ("structured", "wide", "witness_only"):
+    if selection_policy not in SELECTION_POLICIES:
         raise ValueError("Unknown selection policy")
     output.mkdir(parents=True, exist_ok=True)
     if (output / "result.json").exists():
@@ -300,6 +301,8 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
         cache = {}
 
         compare_methods = selection_policy == "wide"
+        use_sign_aware = selection_policy == "sign_aware"
+        use_shap = compare_methods or use_sign_aware
         use_robust_gate = selection_policy != "witness_only"
         halves, split = validation_halves(yv, row["task"]) if use_robust_gate else (None, None)
 
@@ -325,11 +328,11 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
         publish(phase="full_validation", features=features, n_features=n, planned_trials=n * rounds)
         if use_robust_gate:
             publish(fit_started_utc=datetime.now(timezone.utc).isoformat(), fit_mask=hex(full), fit_is_model=True)
-            cache[full], gain, shap = full_validation_and_gain(train, yt, val, yv, halves, include_shap=compare_methods, **policy)
+            cache[full], gain, shap = full_validation_and_gain(train, yt, val, yv, halves, include_shap=use_shap, **policy)
             state.update(fit_started_utc=None, ranking_fits=1, validation_fits=1,
                          ranking_source="same full XGBoost fit on training partition",
-                         treeshap_train_rows=min(len(train), 1024) if compare_methods else 0,
-                         treeshap_seed=SEED if compare_methods else None, treeshap_max_rows=1024 if compare_methods else 0)
+                         treeshap_train_rows=min(len(train), 1024) if use_shap else 0,
+                         treeshap_seed=SEED if use_shap else None, treeshap_max_rows=1024 if use_shap else 0)
         full_scores = evaluate(full)
         full_val = full_scores[0]
         threshold = protocol["alpha_default"] * full_val
@@ -355,36 +358,57 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
         margin = regression_margin if row["task"] == "regression" else classification_margin
         fits_pre_gate = state["validation_fits"]
         if use_robust_gate:
-            from minppi_mofs.removal_selection import nominate_removals, select_robust_removals
-
-            nomination = nominate_removals(train, gain, sampled["witnesses"], sample_minima=sampled["sample_minima"])
-            structured = [record["feature"] for record in nomination]
             partial_trials = []
-            publish(structured_proposed_count=len(structured), structured_proposed_features=structured,
-                    validation_halves=split, full_validation_scores=full_scores)
+            state.update(validation_halves=split, full_validation_scores=full_scores)
+            tried_features = set()
 
             def completed_trial(trial):
                 partial_trials.append(trial)
+                if use_sign_aware and trial["is_sign_candidate"]:
+                    tried_features.update(trial["removed_features"])
+                    state.update(proposed_count=len(tried_features),
+                                 proposed_features=[f for f in features if f in tried_features])
                 publish(selection_trials=partial_trials, last_selection_trial=trial)
 
-            selection = select_robust_removals(features, nomination, gain, evaluate, full_scores, margin,
-                                              sample_minima=sampled["sample_minima"], shap_importance=shap,
-                                              structured_only=not compare_methods,
-                                              publish=completed_trial)
+            minima = sampled["sample_minima"]
+            if use_sign_aware:
+                from minppi_mofs.sign_aware_removal import select_sign_aware_removals
+
+                sign_groups = {label: [f for f in features if minima[f] == value] for label, value in
+                               (("negative", -1), ("zero", 0), ("positive", 1), ("unseen", None))}
+                publish(sample_sign_groups=sign_groups, sampled_eligible_count=len(sign_groups["negative"])+len(sign_groups["zero"]),
+                        proposed_count=0, proposed_features=[])
+                selection = select_sign_aware_removals(features, sampled["witnesses"], minima, gain, shap, evaluate,
+                                                      full_scores, margin, publish=completed_trial)
+                # The union of several rankings need not be a tested mask.
+                diagnostic = selection["structured_pool"]
+                diagnostic_features = diagnostic["removed_features"]
+                raw_scores = diagnostic["scores"] if diagnostic_features else None
+                gate_scope = "largest_examined_fused_prefix"
+            else:
+                from minppi_mofs.removal_selection import nominate_removals, select_robust_removals
+
+                nomination = nominate_removals(train, gain, sampled["witnesses"], sample_minima=minima)
+                diagnostic_features = [record["feature"] for record in nomination]
+                publish(structured_proposed_count=len(diagnostic_features), structured_proposed_features=diagnostic_features)
+                selection = select_robust_removals(features, nomination, gain, evaluate, full_scores, margin,
+                                                  sample_minima=minima, shap_importance=shap,
+                                                  structured_only=not compare_methods, publish=completed_trial)
+                raw_mask = full ^ sum(1 << features.index(f) for f in diagnostic_features)
+                raw_scores = evaluate(raw_mask) if raw_mask else None
+                gate_scope = "raw_structured_pool"
             proposed = selection["candidate_features"]
             retained = selection["selected_mask"]
             removed = selection["removed_features"]
             retained_val = selection["validation_utility"]
-            raw_mask = full ^ sum(1 << features.index(f) for f in structured)
-            raw_scores = evaluate(raw_mask) if raw_mask else None
             raw_val = raw_scores[0] if raw_scores else None
             def passes(scores):
                 return all(sub >= ref-margin-1e-12 for sub, ref in zip(scores, full_scores, strict=True))
             gate = dict(accepted=passes(raw_scores) if raw_scores else False,
                         pooled_accepted=bool(raw_scores and raw_val >= full_val-margin-1e-12),
                         full_scores=full_scores, raw_pool_scores=raw_scores, noninferiority_margin=margin,
-                        raw_pool_features=structured, raw_pool_size=len(structured), feasible=bool(raw_mask),
-                        scope="raw_structured_pool", validation_model_fit_count=state["validation_fits"]-fits_pre_gate)
+                        raw_pool_features=diagnostic_features, raw_pool_size=len(diagnostic_features), feasible=raw_scores is not None,
+                        scope=gate_scope, validation_model_fit_count=state["validation_fits"]-fits_pre_gate)
             final_gate = passes(selection["selected_scores"])
             assert final_gate and set(removed).issubset(proposed)
             assert all(sampled["sample_minima"][f] in (-1, 0) for f in proposed)
@@ -396,7 +420,8 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
                 selection["witness_only_pooled_accepted"] = bool(comparison.get("pooled_accepted"))
             selected_method = selection["selected_method"]
         else:
-            structured = proposed = witness_names
+            proposed = witness_names
+            state.update(structured_proposed_count=len(proposed), structured_proposed_features=proposed)
             raw_mask = full ^ sum(1 << features.index(f) for f in proposed)
             raw_val = pooled(raw_mask)
             gate = _removal_safety_gate(task=policy["task"], full_validation_utility=full_val,
@@ -443,12 +468,11 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
         result.update(sampled, phase="complete", elapsed_s=new_wall, new_work_wall_s=new_wall, n_features=n,
                       requested_rounds=rounds, sample_seconds=seconds, features=features, policy=policy,
                       proposed_count=len(proposed), witness_count=len(witness_names), selected_method=selected_method,
-                      structured_proposed_count=len(structured), structured_proposed_features=structured,
-                      raw_structured_pool=gate if use_robust_gate else None,
+                      raw_structured_pool=gate if use_robust_gate and not use_sign_aware else None,
                       external_candidate_features=selection.get("external_candidate_features", []),
                       all_candidate_features=selection.get("all_candidate_features", proposed),
                       removed_witness_count=sum(f in sampled["witnesses"] for f in removed),
-                      training_rankings=({"gain": gain, "mean_abs_treeshap": shap} if compare_methods
+                      training_rankings=({"gain": gain, "mean_abs_treeshap": shap} if use_shap
                                          else {"gain": gain} if use_robust_gate else None),
                       validation_halves=split, selection=selection, selection_trials=selection["trials"],
                       method_results=method_results, method_test_utilities=method_test,
@@ -471,7 +495,7 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument("--sample-seconds", required=True, type=float)
-    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only"), default="structured")
+    parser.add_argument("--selection-policy", choices=SELECTION_POLICIES, default="structured")
     parser.add_argument("--reuse-sampling", type=Path)
     args = parser.parse_args()
     if args.rounds <= 0 or not np.isfinite(args.sample_seconds) or args.sample_seconds <= 0:

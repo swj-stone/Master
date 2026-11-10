@@ -81,14 +81,13 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
             if eta is not None and sample_seconds is not None:
                 eta = max(0.0, min(eta, sample_seconds - p.get("sample_elapsed_s", 0), seconds - elapsed))
             eta_text = "pending" if eta is None else f"~{max(0, eta):.0f}s"
-            # During search only the structured pool has been finalized; the
-            # complete MinPI nomination is the union of its eligible paths.
-            pool = p.get("structured_proposed_count", p.get("proposed_count", 0))
+            pool = (p.get("proposed_count", 0) if p.get("selection_policy") == "sign_aware"
+                    else p.get("structured_proposed_count", p.get("proposed_count", 0)))
             log(f"{directory.name} phase={p.get('phase', 'starting')} | elapsed={elapsed:.0f}s"
                 f" | coverage={p.get('coverage', 0)}/{p.get('n_features', '?')}"
                 f" | sample_fits={p.get('sample_fits', 0)} | skipped={p.get('skipped_after', 0)}"
                 f" | witnesses={p.get('witness_count', len(p.get('witnesses', {})))}"
-                f" | structured nominees={pool} | masks checked={len(p.get('selection_trials', []))}"
+                f" | nominees={pool} | masks checked={len(p.get('selection_trials', []))}"
                 f" | sampling ETA={eta_text}"
                 f" | deadline in {max(0, seconds-elapsed):.0f}s")
     finally:
@@ -186,7 +185,7 @@ def main():
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--dataset-seconds", type=int, default=900)
     parser.add_argument("--sample-seconds", type=int, default=780)
-    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only"), default="structured")
+    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only", "sign_aware"), default="structured")
     parser.add_argument("--reuse-sampling-run", type=Path, help="Reuse verified seed-42 sampling evidence from an earlier run.")
     args = parser.parse_args()
     if (not 1 <= args.dataset_seconds <= 900 or not 0 < args.sample_seconds < args.dataset_seconds
@@ -199,13 +198,20 @@ def main():
     def selection_sources():
         files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",
                  "src/minppi_mofs/minimum_sampling.py", "src/minppi_mofs/baselines/shap_top_k.py")
+        if args.selection_policy == "sign_aware":
+            files += ("src/minppi_mofs/sign_aware_removal.py",)
         return {f: hashlib.sha256((ROOT / f).read_bytes()).hexdigest() for f in files}
 
     sources = selection_sources()
-    _save(output / "protocol.json", {"datasets": list(args.datasets), "seed": 42, "rounds": args.rounds,
-          "selection_policy": args.selection_policy, "sample_seconds": args.sample_seconds,
-          "dataset_seconds": args.dataset_seconds, "reuse_sampling_run": str(args.reuse_sampling_run) if args.reuse_sampling_run else None,
-          "selection_source_sha256": sources})
+    protocol = {"datasets": list(args.datasets), "seed": 42, "rounds": args.rounds,
+                "selection_policy": args.selection_policy, "sample_seconds": args.sample_seconds,
+                "dataset_seconds": args.dataset_seconds,
+                "reuse_sampling_run": str(args.reuse_sampling_run) if args.reuse_sampling_run else None,
+                "selection_source_sha256": sources}
+    if args.selection_policy == "sign_aware":
+        protocol.update(primary_method="sign_worst", sensitivity_method="sign_pooled",
+                        matched_controls=["matched_gain", "matched_treeshap"])
+    _save(output / "protocol.json", protocol)
 
     def log(message):
         line = f"{datetime.now(MSK):%H:%M:%S} MSK | {message}"
@@ -236,7 +242,8 @@ def main():
         row = summary_row(dataset, outcome)
         summary.append(row)
         write_summary(output, summary)
-        log(f"finish {dataset} | status={row['status']} | wall={row['wall_s']}s | removed={row['removed_count']}"
+        log(f"finish {dataset} | status={row['status']} | wall={row['wall_s']}s"
+            f" | charged={row['wall_plus_reused_sampling_s']}s | removed={row['removed_count']}"
             f" | nominees={row['proposed_count']} | policy={row['selected_method']}"
             f" | full test={row['full_test_utility']} | retained test={row['retained_test_utility']}"
             f" | delta={row['test_delta']}")

@@ -173,7 +173,10 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     def score_again(train, y_train, test, y_test, selected, **kwargs):
         if len(train) == 8:
             frozen = json.loads((fresh / "progress.json").read_bytes())
-            assert frozen["phase"].startswith("test_") and frozen["selection_policy"] in {"structured", "wide"}
+            assert frozen["phase"].startswith("test_") and frozen["selection_policy"] in {"structured", "wide", "sign_aware"}
+            if frozen["selection_policy"] == "sign_aware":
+                assert set(frozen["method_masks"]) == {"sign_pooled", "sign_worst", "matched_gain", "matched_treeshap"}
+                assert frozen["selected_method"] == "sign_worst"
             new_tests.append(selected)
             return 0.72 if len(selected) == 3 else 0.71
         return {(): 0.5, ("a",): 0.9, ("a", "b"): 0.4, ("c",): 0.5,
@@ -219,6 +222,34 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     assert structured["external_candidate_features"] == []
     assert len(new_tests) == len({7, expected["mask"]}) == structured["test_fits"]
 
+    fresh = tmp_path / "sign-aware-replay"
+    new_tests.clear()
+    validation_calls.clear()
+    audited_load = worker.AuditedSplitAccess.load_test
+    frozen_at_access = []
+
+    def load_after_freeze(access, **kwargs):
+        snapshot = json.loads((fresh / "progress.json").read_bytes())
+        if snapshot["selection_policy"] == "sign_aware":
+            assert snapshot["phase"] == "test_full"
+            frozen_at_access.append(snapshot["method_masks"])
+        return audited_load(access, **kwargs)
+
+    monkeypatch.setattr(worker.AuditedSplitAccess, "load_test", load_after_freeze)
+    worker.run("madelon", fresh, 1, 20., reuse_sampling=source, selection_policy="sign_aware")
+    signed = json.loads((fresh / "result.json").read_bytes())
+    assert frozen_at_access == [signed["method_masks"]]
+    assert signed["sampling_reused"] and signed["new_sampling_s"] == 0
+    assert signed["treeshap_train_rows"] == 4 and signed["training_rankings"]["mean_abs_treeshap"] == rankings[1]
+    assert signed["sample_sign_groups"] == {"negative": ["b"], "zero": ["c"], "positive": ["a"], "unseen": []}
+    tried = {f for trial in signed["selection_trials"] if trial["is_sign_candidate"] for f in trial["removed_features"]}
+    assert tried == set(signed["proposed_features"]) == {"b", "c"}
+    assert signed["proposed_count"] == len(tried) and signed["sampled_eligible_count"] == 2
+    assert signed["raw_structured_pool"] is None and signed["gate"]["scope"] == "largest_examined_fused_prefix"
+    assert signed["gate"]["raw_pool_scores"] == signed["selection"]["structured_pool"]["scores"]
+    assert signed["test_fits"] == len(new_tests) == len({7, *signed["method_masks"].values()})
+    assert len(validation_calls) == len(set(validation_calls))
+
     for key, field in (("endpoint", "witness"), ("split", "val hash"), ("count", "draw counts"), ("alpha", "alpha")):
         bad = json.loads(json.dumps(result))
         if key == "endpoint":
@@ -247,3 +278,10 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     cold = json.loads((fresh / "result.json").read_bytes())
     assert not cold["sampling_reused"] and cold["inherited_sample_fits"] == 0 and cold["sample_fits"] > 0
     assert cold["sample_minima"] == wide["sample_minima"] and cold["method_masks"] == wide["method_masks"]
+
+    fresh = tmp_path / "cold-sign-aware"
+    worker.run("madelon", fresh, 1, 20., selection_policy="sign_aware")
+    cold_signed = json.loads((fresh / "result.json").read_bytes())
+    assert not cold_signed["sampling_reused"] and cold_signed["sample_fits"] > 0
+    assert cold_signed["method_masks"] == signed["method_masks"] and cold_signed["method_results"] == signed["method_results"]
+    assert frozen_at_access == [signed["method_masks"], cold_signed["method_masks"]]

@@ -2,10 +2,12 @@
 
 import json
 import multiprocessing
+import sys
 import time
 
 import pytest
 
+from experiments import run_thesis_sampling as runner
 from experiments.run_thesis_sampling import reuse_budget, summary_row, supervise
 
 
@@ -58,3 +60,27 @@ def test_interrupted_replay_reports_time_charged_before_worker_verification():
     row = summary_row("isolet", outcome)
     assert row["inherited_sampling_s"] == pytest.approx(780.932)
     assert row["wall_plus_reused_sampling_s"] == pytest.approx(900)
+
+
+def test_sign_aware_run_records_its_source_and_primary_method_before_start(tmp_path, monkeypatch):
+    files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",
+             "src/minppi_mofs/minimum_sampling.py", "src/minppi_mofs/baselines/shap_top_k.py",
+             "src/minppi_mofs/sign_aware_removal.py")
+    for name in files:
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(name, encoding="utf-8")
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["run", "--datasets", "abalone", "--selection-policy", "sign_aware"])
+
+    def check_protocol(process, directory, seconds, log, sample_seconds):
+        protocol = json.loads((directory.parent / "protocol.json").read_bytes())
+        assert protocol["primary_method"] == "sign_worst"
+        assert protocol["sensitivity_method"] == "sign_pooled"
+        assert protocol["matched_controls"] == ["matched_gain", "matched_treeshap"]
+        assert set(protocol["selection_source_sha256"]) == set(files)
+        assert seconds == 900
+        return {"status": "timed_out", "elapsed_s": seconds, "progress": {}, "result": {}}
+
+    monkeypatch.setattr(runner, "supervise", check_protocol)
+    assert runner.main() == 1
