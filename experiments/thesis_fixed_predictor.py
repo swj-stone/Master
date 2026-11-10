@@ -25,6 +25,20 @@ def adopt_blend(original, blend):
     return bool(np.min(deltas) >= -1e-12 and np.mean(deltas[1:]) > 1e-12)
 
 
+def late_rounds(original_rounds):
+    return [(3 * original_rounds + 1) // 2, 2 * original_rounds]
+
+
+def rounds_predictions(train, labels, evaluation, *, task, model_params, backend, seed):
+    """Fit a single 2B booster and return the B and mean(1.5B, 2B) predictions."""
+    original = model_params["n_estimators"]
+    first, second = late_rounds(original)
+    by_round = fit_predict_checkpoints(train, labels, evaluation, task=task,
+                                       model_params=dict(model_params, n_estimators=second), backend=backend,
+                                       seed=seed, checkpoints=sorted({original, first, second}))
+    return {"original": by_round[original], "blend": (by_round[first] + by_round[second]) * .5}
+
+
 def run(dataset, output, mask_manifest, *, recipe="column_blend"):
     if recipe not in {"column_blend", "rounds"}:
         raise ValueError("Invalid predictor recipe")
@@ -50,7 +64,7 @@ def run(dataset, output, mask_manifest, *, recipe="column_blend"):
                   model_params=frozen_protocol["model_params_by_dataset"][dataset])
     if recipe == "rounds":
         original_rounds = policy["model_params"]["n_estimators"]
-        blend_checkpoints = [(3 * original_rounds + 1) // 2, 2 * original_rounds]
+        blend_checkpoints = late_rounds(original_rounds)
     metric = row["utility"]
     features = tuple(train.columns)
     payload = mask_manifest.read_bytes()
@@ -73,12 +87,9 @@ def run(dataset, output, mask_manifest, *, recipe="column_blend"):
         cols = [f for i, f in enumerate(features) if mask & (1 << i)]
         if recipe == "rounds":
             publish(phase=phase, fit_mask=hex(mask), fit_recipe="rounds")
-            checkpoint_policy = dict(policy, model_params=dict(policy["model_params"], n_estimators=2*original_rounds))
-            by_round = fit_predict_checkpoints(fitted_on.loc[:, cols], labels, evaluation.loc[:, cols],
-                                               checkpoints=sorted({original_rounds, *blend_checkpoints}), **checkpoint_policy)
+            by_recipe = rounds_predictions(fitted_on.loc[:, cols], labels, evaluation.loc[:, cols], **policy)
             state[f"{phase}_fits"] += 1
-            first, second = blend_checkpoints
-            return {"original":by_round[original_rounds], "blend":(by_round[first] + by_round[second]) * .5}
+            return by_recipe
         safe = [f"f{i}" for i in range(len(cols))]
         X = fitted_on.loc[:, cols].set_axis(safe, axis=1)
         Z = evaluation.loc[:, cols].set_axis(safe, axis=1)

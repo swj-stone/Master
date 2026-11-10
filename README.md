@@ -25,7 +25,45 @@ Matplotlib / Numba 缓存放在本工作树的 `tmp/` 中；退出后恢复原�
 不要重复执行下方的环境安装步骤，也不要执行 `pip install -e .`，否则会改变
 共享环境的源码指向。共享依赖的升级会同时影响两份项目。
 
-## 硕士实验：限时 MinPI 采样
+## 硕士论文正式实验（六个数据集、五个 seed）
+
+打开 PowerShell，在包含 `Master`、`MastersThesis` 和 `venv` 的 `Paper` 目录
+运行下面这条命令。它使用共享环境，逐组启动 30 个任务，并实时输出进度。
+
+```powershell
+.\MastersThesis\thesis-python.ps1 experiments/run_thesis_benchmark.py
+```
+
+如需只核对数据、配置与任务顺序，在同一条命令末尾加 `--plan`。正式数据集为
+Abalone、Spambase、Madelon、Gisette、Credit Card Fraud 和 ISOLET；seed 为
+42、123、456、789、1024。启动时先检查冻结协议、模型参数和 30 组预处理分区，
+只有三个分片除 seed 列表外的完整协议相符，且六个数据集的模型参数都与公共参数
+相符，配置检查才会通过。每个任务加载相应数据时再校验 CSV 的 SHA-256。
+本次核验的输入清单指纹为
+`3fb4b9716759de8b3d4ebede5422a41a9a618e9b833f2437fa83bd29d252c0f3`。
+
+30 组共用 CUDA XGBoost（100 轮、深度 4、学习率 0.1、`n_jobs=1`）。每组在自己的
+划分上从头运行 MinPI 采样与 `guarded` 选列，最多 5 轮采样、780 秒；整个任务
+含加载、选列、预测器验证与最终测试，硬上限为 900 秒。全特征和所选子集分别在
+验证集上决定使用 100 轮预测或 150 与 200 轮预测的平均值，规则相同。回归以 R²
+计分，二分类以 ROC AUC 计分，ISOLET 以宏平均 OvR AUC 计分。Spambase 的
+seed 123 保留了 55 个预处理输入列，其余四个 seed 为 56 列；每组压缩率使用
+本组的输入列数作分母。
+
+每次启动都会打印一个新的 `results/thesis_benchmark/` 运行目录。可从 `Paper`
+目录在另一个 PowerShell 窗口实时查看本次日志，将下方占位符替换成终端打印的目录名。
+
+```powershell
+Get-Content -LiteralPath '.\MastersThesis\results\thesis_benchmark\<本次运行目录名>\run.log' -Tail 15 -Wait
+```
+
+`config_audit.json` 保存本轮配置核对结果。每组结束后，`summary.csv` 记录
+数据集、seed、实际耗时、状态、删除数和测试分数。`selection_delta` 比较原 100 轮
+预测器在两套特征上的差异，`predictor_delta` 比较同一选集上轮数选择带来的变化。
+`dataset_summary.csv` 按数据集列出完成组数、均值及 seed 间的样本标准差，超时或
+未完成的组单独计数。30 组按顺序执行，各组硬上限合计为 7 小时 30 分钟。
+
+## 硕士实验：限时 MinPI 采样（单 seed 研究入口）
 
 从本目录运行以下命令，在六个正式数据集上各测试 seed 42。输入来自已冻结的预处理
 CSV，加载时校验文件哈希。每轮为每个仍在搜索的特征抽一次联盟，按原配额判定胜负，

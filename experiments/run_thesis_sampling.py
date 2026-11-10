@@ -52,7 +52,7 @@ def _worker_entry(dataset, directory, rounds, sample_seconds, selection_policy, 
         runpy.run_module("experiments.thesis_sampling_worker", run_name="__main__")
 
 
-def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbeat_s=10.0):
+def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbeat_s=10.0, heartbeat_formatter=None):
     started = time.monotonic()
     deadline = started + seconds
     process.start()
@@ -77,6 +77,9 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
                 continue
             p = _read(directory / "progress.json")
             elapsed = time.monotonic() - started
+            if heartbeat_formatter is not None:
+                log(heartbeat_formatter(p, elapsed, max(0.0, seconds - elapsed)))
+                continue
             if "fit_recipe" in p or p.get("source_partition") == "train":
                 total_fits = 2
                 if "fit_recipe" in p:

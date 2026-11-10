@@ -1,4 +1,4 @@
-"""Run one cold, balanced-round MinPI experiment on a frozen seed-42 split."""
+"""Run one balanced-round MinPI experiment on a frozen prepared split."""
 
 import argparse
 import csv
@@ -29,7 +29,7 @@ from minppi_mofs.utility import compute_utility
 SOURCE = Path(__file__).resolve().parents[1] / "results/icomp2026_formal/icomp2026-formal-v1-s42-123"
 DATASETS = ("abalone", "madelon", "spambase", "gisette", "isolet", "credit_card_fraud")
 SEED = 42
-SELECTION_POLICIES = ("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded", "local_refine", "fold_consensus")
+SELECTION_POLICIES = ("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded", "local_refine", "fold_consensus", "guarded_rounds")
 
 
 class SamplingDeadline(Exception):
@@ -48,12 +48,12 @@ def subset_utility(train, yt, eval_frame, ye, selected, *, capture_prediction=No
     return float(compute_utility(ye, prediction, metric=policy["utility"]))
 
 
-def validation_halves(y, task):
+def validation_halves(y, task, *, seed=SEED):
     indices = np.arange(len(y))
-    halves = train_test_split(indices, test_size=0.5, random_state=SEED,
+    halves = train_test_split(indices, test_size=0.5, random_state=seed,
                               stratify=None if task == "regression" else y)
     halves = tuple(np.sort(half) for half in halves)
-    metadata = dict(seed=SEED, index_space="zero-based positions in frozen validation CSV",
+    metadata = dict(seed=seed, index_space="zero-based positions in frozen validation CSV",
                     stratified=task != "regression", sizes=[len(h) for h in halves],
                     index_sha256=[hashlib.sha256(h.astype("<i8").tobytes()).hexdigest() for h in halves])
     return halves, metadata
@@ -79,7 +79,7 @@ def full_validation_and_gain(train, yt, val, yv, halves, *, include_shap, **poli
         return scores, gain, None
     from minppi_mofs.baselines.shap_top_k import fitted_tree_shap_importance
 
-    shap = fitted_tree_shap_importance(model, safe_train, seed=SEED, max_rows=1024)
+    shap = fitted_tree_shap_importance(model, safe_train, seed=policy["seed"], max_rows=1024)
     return scores, gain, {feature: float(v) for feature, v in zip(train.columns, shap, strict=True)}
 
 
@@ -91,6 +91,44 @@ def subset_validation_scores(train, yt, val, yv, selected, halves, **policy):
     else:
         prediction = _empty_subset_predictions(yt, task=policy["task"], row_count=len(val))
     return prediction_scores(yv, prediction, halves, policy["utility"])
+
+
+def fit_rounds_for_masks(train, labels, evaluation, masks, features, policy, phase, state, publish):
+    """Fit each distinct column set once, including the case where guarded retains all columns."""
+    from experiments.thesis_fixed_predictor import rounds_predictions
+
+    predictions = {}
+    unique = list(dict.fromkeys(masks.values()))
+    counter = "validation_fits" if phase == "predictor_validation" else "test_fits"
+    for done, mask in enumerate(unique):
+        roles = "+".join(role for role, value in masks.items() if value == mask)
+        publish(phase=phase, predictor_role=roles, predictor_mask=hex(mask), predictor_fits_done=done,
+                predictor_fits_planned=len(unique), fit_started_utc=datetime.now(timezone.utc).isoformat())
+        cols = [f for i, f in enumerate(features) if mask & (1 << i)]
+        predictions[mask] = rounds_predictions(
+            train.loc[:, cols], labels, evaluation.loc[:, cols], task=policy["task"],
+            model_params=policy["model_params"], backend=policy["backend"], seed=policy["seed"])
+        publish(**{counter: state[counter] + 1}, predictor_fits_done=done + 1, fit_started_utc=None)
+    return predictions
+
+
+def freeze_rounds(masks, validation_predictions, labels, halves, metric, original_scores):
+    from experiments.thesis_fixed_predictor import adopt_blend
+
+    decisions, methods = {}, {}
+    for role, mask in masks.items():
+        scores = {recipe: prediction_scores(labels, prediction, halves, metric)
+                  for recipe, prediction in validation_predictions[mask].items()}
+        if not np.allclose(scores["original"], original_scores[mask], atol=1e-10, rtol=0):
+            raise ValueError(f"{role} B-round validation scores do not reproduce the feature selection baseline")
+        use_blend = adopt_blend(scores["original"], scores["blend"])
+        decisions[role] = dict(mask=hex(mask), original_scores=scores["original"], blend_scores=scores["blend"],
+                               validation_deltas=np.subtract(scores["blend"], scores["original"]).tolist(),
+                               adopt_blend=use_blend)
+        for variant in ("original", "blend", "chosen"):
+            recipe = ("blend" if use_blend else "original") if variant == "chosen" else variant
+            methods[f"{role}_{variant}"] = dict(mask=mask, recipe=recipe, scores=scores[recipe])
+    return decisions, methods
 
 
 def confirm_on_training(train, yt, features, structured, signed, full_scores, margin, publish, **policy):
@@ -296,9 +334,9 @@ def load_sampling(path, dataset, features, row, policy, alpha, full_val, rounds,
     return sampled, hashlib.sha256(raw).hexdigest(), source_fits
 
 
-def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=time.monotonic):
+def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=time.monotonic, seed=SEED):
     n = len(features)
-    rng = np.random.default_rng(SEED)
+    rng = np.random.default_rng(seed)
     minima = {f: None for f in features}
     counts = dict.fromkeys(features, 0)
     witnesses = {}
@@ -369,14 +407,20 @@ def sample(features, rounds, seconds, threshold, evaluate, publish, *, clock=tim
                 witnesses=witnesses, partial_pair=partial)
 
 
-def run(dataset, output, rounds, seconds, *, selection_policy="structured", reuse_sampling=None):
+def run(dataset, output, rounds, seconds, *, selection_policy="structured", reuse_sampling=None, seed=SEED, source=None):
     if selection_policy not in SELECTION_POLICIES:
         raise ValueError("Unknown selection policy")
+    combined = selection_policy == "guarded_rounds"
+    if combined and reuse_sampling is not None:
+        raise ValueError("guarded_rounds requires cold sampling on the run's own prepared partition")
+    if not combined and (seed != SEED or (source is not None and Path(source).resolve() != SOURCE.resolve())):
+        raise ValueError("Custom prepared sources and seeds require guarded_rounds")
+    source = SOURCE if source is None else Path(source)
     output.mkdir(parents=True, exist_ok=True)
     if (output / "result.json").exists():
         raise FileExistsError(f"A completed result already exists in {output}")
     start = time.monotonic()
-    state = dict(dataset=dataset, seed=SEED, selection_policy=selection_policy, phase="loading", round=0, n_features=0, coverage=0,
+    state = dict(dataset=dataset, seed=seed, selection_policy=selection_policy, phase="loading", round=0, n_features=0, coverage=0,
                  marginals=0, sampled_draws=0, observed_marginals=0, sampling_eta_s=None, sampling_deadline_utc=None,
                  proposed_count=0, skipped_after=0, resolved_trials=0, planned_trials=0,
                  validation_fits=0, sample_fits=0, test_fits=0, cache_hits=0, sample_elapsed_s=0.0,
@@ -389,14 +433,14 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
 
     try:
         publish()
-        with (SOURCE / "data_manifest.csv").open(encoding="utf-8-sig", newline="") as file:
-            row, = (r for r in csv.DictReader(file) if r["dataset_id"] == dataset and int(r["seed"]) == SEED)
+        with (source / "data_manifest.csv").open(encoding="utf-8-sig", newline="") as file:
+            row, = (r for r in csv.DictReader(file) if r["dataset_id"] == dataset and int(r["seed"]) == seed)
         for part in ("train", "val", "test"):
             row[f"{part}_row_count"] = int(row[f"{part}_row_count"])
-        train, yt, val, yv = load_prepared_train_validation(SOURCE, row)
-        protocol = yaml.safe_load((SOURCE / "resolved_protocol.yaml").read_text(encoding="utf-8"))
+        train, yt, val, yv = load_prepared_train_validation(source, row)
+        protocol = yaml.safe_load((source / "resolved_protocol.yaml").read_text(encoding="utf-8"))
         policy = dict(task=row["task"], utility=row["utility"], model_params=protocol["model_params_by_dataset"][dataset],
-                      backend=protocol["backend"], seed=SEED)
+                      backend=protocol["backend"], seed=seed)
         features = tuple(train.columns)
         n = len(features)
         full = (1 << n) - 1
@@ -404,11 +448,11 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
 
         compare_methods = selection_policy == "wide"
         refine_incumbent = selection_policy in {"local_refine", "fold_consensus"}
-        compare_incumbents = refine_incumbent or selection_policy in {"confirmed", "guarded"}
+        compare_incumbents = refine_incumbent or combined or selection_policy in {"confirmed", "guarded"}
         use_sign_aware = selection_policy == "sign_aware" or compare_incumbents
         use_shap = compare_methods or use_sign_aware
         use_robust_gate = selection_policy != "witness_only"
-        halves, split = validation_halves(yv, row["task"]) if use_robust_gate else (None, None)
+        halves, split = validation_halves(yv, row["task"], seed=seed) if use_robust_gate else (None, None)
         gate_fit_seconds = []
         held_out_predictions = {}
 
@@ -445,7 +489,7 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
             state.update(fit_started_utc=None, ranking_fits=1, validation_fits=1,
                          ranking_source="same full XGBoost fit on training partition",
                          treeshap_train_rows=min(len(train), 1024) if use_shap else 0,
-                         treeshap_seed=SEED if use_shap else None, treeshap_max_rows=1024 if use_shap else 0)
+                         treeshap_seed=seed if use_shap else None, treeshap_max_rows=1024 if use_shap else 0)
         full_scores = evaluate(full)
         full_val = full_scores[0]
         threshold = protocol["alpha_default"] * full_val
@@ -455,7 +499,7 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
             return evaluate(mask)[0]
 
         if reuse_sampling is None:
-            sampled = sample(features, rounds, seconds, threshold, pooled, publish)
+            sampled = sample(features, rounds, seconds, threshold, pooled, publish, seed=seed)
             state["new_sampling_s"] = sampled["sample_elapsed_s"]
         else:
             sampled, digest, inherited_fits = load_sampling(reuse_sampling, dataset, features, row, policy,
@@ -534,7 +578,7 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
                     mask, scores = decision["selected_mask"], decision["selected_scores"]
                     record = dict(mask=mask, removed_count=decision["removed_count"], removed_features=decision["removed_features"],
                                   scores=scores, selected_source=decision["selected_source"])
-                    decision_method = "guarded" if refine_incumbent else selection_policy
+                    decision_method = "guarded" if refine_incumbent or combined else selection_policy
                     selection = dict(candidate_features=candidates, all_candidate_features=candidates,
                                      selected_mask=mask, selected_scores=scores, selected_method=decision_method,
                                      removed_features=decision["removed_features"], validation_utility=scores[0],
@@ -587,6 +631,22 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
             selected_method = "witness_only"
             method_results = {"witness_only": dict(mask=retained, removed_count=len(removed), scores=[retained_val])}
             selection = dict(nomination=[dict(feature=f, reason="witness") for f in proposed], trials=[gate])
+        predictor_parameters = {}
+        if combined:
+            from experiments.thesis_fixed_predictor import late_rounds
+
+            masks = {"full": full, "guarded": retained}
+            predictions = fit_rounds_for_masks(train, yt, val, masks, features, policy, "predictor_validation", state, publish)
+            decisions, method_results = freeze_rounds(masks, predictions, yv, halves, policy["utility"], cache)
+            for record in method_results.values():
+                record["removed_count"] = n - record["mask"].bit_count()
+            del predictions
+            original_rounds = policy["model_params"]["n_estimators"]
+            predictor_parameters = dict(predictor_recipe="rounds", original_rounds=original_rounds,
+                                        blend_checkpoints=late_rounds(original_rounds), blend_weights=[.5, .5],
+                                        adopt_blend={role: d["adopt_blend"] for role, d in decisions.items()})
+            selected_method = "guarded_chosen"
+            publish(predictor_decisions=decisions, predictor_parameters=predictor_parameters)
         method_masks = {method: int(record["mask"] if "mask" in record else record["selected_mask"])
                         for method, record in method_results.items()}
         # Publish every frozen validation-selected mask before opening the test split.
@@ -594,13 +654,15 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
                 selected_gate_passed=final_gate, removed_count=len(removed), proposed_count=len(proposed),
                 proposed_features=proposed, removed_features=removed, retained_validation_utility=retained_val,
                 witness_count=len(witness_names), selected_method=selected_method, method_masks=method_masks)
-        paths = PreparedSplitPaths(dataset, SEED, row["target"],
-                                   *(SOURCE / row[f"{p}_relpath"] for p in ("train", "val", "test")))
+        paths = PreparedSplitPaths(dataset, seed, row["target"],
+                                   *(source / row[f"{p}_relpath"] for p in ("train", "val", "test")))
         params = dict(rounds=rounds, sample_seconds=seconds, retained_mask=hex(retained),
-                      selection_policy=selection_policy, method_masks=method_masks)
-        job_id = canonical_hash(dict(dataset=dataset, seed=SEED, protocol=row["protocol_hash"], parameters=params))
-        job = JobSpec(job_id, row["protocol_hash"], "removal", dataset, SEED, "balanced_minpi",
+                      selection_policy=selection_policy, method_masks=method_masks, **predictor_parameters)
+        job_id = canonical_hash(dict(dataset=dataset, seed=seed, protocol=row["protocol_hash"], parameters=params))
+        job = JobSpec(job_id, row["protocol_hash"], "removal", dataset, seed, "balanced_minpi",
                       params, (), "result.json")
+        if combined:
+            publish(phase="test_access", parameters=params, job_id=job_id, protocol_hash=row["protocol_hash"])
         audit = AuditLog.from_manifest(output / "test_access.json", [job])
         test, ye = AuditedSplitAccess(paths, stage="removal", job_id=job_id, audit=audit).load_test(
             reason="final_removal_evaluation", expected_sha256=row["test_file_sha256"])
@@ -609,10 +671,24 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
         train_final = pd.concat([train, val], ignore_index=True)
         y_final = np.concatenate([yt, yv])
         cache = {}
-        full_test = evaluate(full, testing=True)[0]
-        publish(phase="test_retained", full_test_utility=full_test)
-        retained_test = evaluate(retained, testing=True)[0]
-        method_test = {method: evaluate(mask, testing=True)[0] for method, mask in method_masks.items()}
+        if combined:
+            predictions = fit_rounds_for_masks(train_final, y_final, test, masks, features, policy, "predictor_test", state, publish)
+            archive = {name: predictions[record["mask"]][record["recipe"]] for name, record in method_results.items()}
+            method_test = {name: compute_utility(ye, pred, metric=policy["utility"]) for name, pred in archive.items()}
+            full_test, retained_test = method_test["full_chosen"], method_test["guarded_chosen"]
+            filename = "paired_test_predictions.npz"
+            np.savez_compressed(output / filename, y=ye, **archive)
+            publish(full_test_utility=full_test, paired_test_predictions=filename,
+                    feature_test_delta=method_test["guarded_original"] - method_test["full_original"],
+                    predictor_test_deltas={role: method_test[f"{role}_chosen"] - method_test[f"{role}_original"]
+                                           for role in masks},
+                    overall_test_delta_vs_original_full=retained_test - method_test["full_original"],
+                    paired_test_predictions_sha256=hashlib.sha256((output / filename).read_bytes()).hexdigest())
+        else:
+            full_test = evaluate(full, testing=True)[0]
+            publish(phase="test_retained", full_test_utility=full_test)
+            retained_test = evaluate(retained, testing=True)[0]
+            method_test = {method: evaluate(mask, testing=True)[0] for method, mask in method_masks.items()}
         if refine_incumbent:
             filename = "paired_test_predictions.npz"
             np.savez_compressed(output / filename, y=ye, full_set=held_out_predictions[full],
@@ -637,7 +713,7 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
                       alpha=protocol["alpha_default"], threshold=threshold, gate=gate, proposed_validation_utility=raw_val,
                       validation_delta=retained_val - full_val, retained_test_utility=retained_test,
                       test_delta=retained_test - full_test, retained_count=retained.bit_count(),
-                      test_training_partitions=["train", "val"], source_run_id=SOURCE.name,
+                      test_training_partitions=["train", "val"], source_run_id=source.name,
                       partition_sha256={p: row[f"{p}_file_sha256"] for p in ("train", "val", "test")},
                       test_fits=state["test_fits"], cache_hits=state["cache_hits"], fit_started_utc=None)
         atomic_write_json(output / "result.json", result)
@@ -649,14 +725,18 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", required=True, choices=DATASETS)
+    parser.add_argument("--dataset", required=True)
+    parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument("--source", type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument("--sample-seconds", required=True, type=float)
     parser.add_argument("--selection-policy", choices=SELECTION_POLICIES, default="structured")
     parser.add_argument("--reuse-sampling", type=Path)
     args = parser.parse_args()
+    if args.dataset not in DATASETS and args.selection_policy != "guarded_rounds":
+        parser.error("Choose a legacy dataset or use guarded_rounds with a prepared source.")
     if args.rounds <= 0 or not np.isfinite(args.sample_seconds) or args.sample_seconds <= 0:
         parser.error("rounds and sample-seconds must be positive and finite")
     run(args.dataset, args.output_dir, args.rounds, args.sample_seconds,
-        selection_policy=args.selection_policy, reuse_sampling=args.reuse_sampling)
+        selection_policy=args.selection_policy, reuse_sampling=args.reuse_sampling, seed=args.seed, source=args.source)
