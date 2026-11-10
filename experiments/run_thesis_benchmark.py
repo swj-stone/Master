@@ -13,7 +13,7 @@ from pathlib import Path
 import time
 import traceback
 
-from experiments.run_thesis_sampling import MSK, ROOT, _read, _save, supervise, write_summary
+from experiments.run_thesis_sampling import MSK, ROOT, _save, read_progress, supervise, write_summary
 from experiments.thesis_benchmark_summary import write_dataset_summary
 from experiments.thesis_prepared_catalog import CAMPAIGN, FORMAL_ROOT, audit_prepared_catalog
 from minppi_mofs.experiment_protocol import canonical_hash
@@ -243,7 +243,7 @@ def _run(jobs, output_root, rounds, sample_seconds, limit, config, pins):
                 process.kill()
                 process.join()
             outcome = dict(status="interrupted", elapsed_s=time.monotonic()-job_start, limit_s=limit,
-                           exit_code=process.exitcode, progress=_read(folder / "progress.json"), result={})
+                           exit_code=process.exitcode, progress=read_progress(folder, log=job_log), result={})
             _save(folder / "watchdog.json", outcome)
         finally:
             process.close()

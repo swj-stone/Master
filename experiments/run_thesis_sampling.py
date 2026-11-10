@@ -30,10 +30,29 @@ def _save(path, data):
 
 
 def _read(path):
+    for attempt in range(3):
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return {}
+        except PermissionError:
+            # A Windows file can be briefly inaccessible during an atomic replacement.
+            if attempt == 2:
+                raise
+            time.sleep(.05 * (attempt + 1))
+
+
+def read_progress(directory, previous=None, log=None):
+    """Live telemetry may lag while a worker is publishing its next snapshot."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
+        snapshot = _read(directory / "progress.json")
+        if snapshot:
+            return snapshot
+    except PermissionError as error:
+        if log is not None:
+            log(f"{directory.name} | progress.json temporarily unreadable; "
+                f"using last available progress ({error.strerror})")
+    return previous if previous is not None else {}
 
 
 def _worker_entry(dataset, directory, rounds, sample_seconds, selection_policy, reuse_sampling, local_deadline=None):
@@ -69,6 +88,7 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
     if deadline is not None:
         timer = threading.Timer(max(0.0, deadline - time.monotonic()), expire)
         timer.start()
+    p = {}
     try:
         while process.is_alive():
             wait = heartbeat_s
@@ -81,7 +101,7 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
             process.join(timeout=wait)
             if not process.is_alive() or (deadline is not None and time.monotonic() >= deadline):
                 continue
-            p = _read(directory / "progress.json")
+            p = read_progress(directory, p, log)
             elapsed = time.monotonic() - started
             left = max(0.0, seconds - elapsed) if seconds is not None else None
             if heartbeat_formatter is not None:
@@ -123,12 +143,19 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
         if process.is_alive():
             process.kill()
         process.join()
-    result = _read(directory / "result.json")
-    progress = _read(directory / "progress.json")
+    result_error = None
+    try:
+        result = _read(directory / "result.json")
+    except PermissionError as error:
+        result = {}
+        result_error = f"Cannot read final result.json: {error}"
+    progress = read_progress(directory, p, log)
     status = "timed_out" if kill_requested else "completed" if result and process.exitcode == 0 else "error"
     outcome = {"status": status, "elapsed_s": time.monotonic() - started, "limit_s": seconds,
                "kill_requested_s": kill_requested[0] if kill_requested else None,
                "exit_code": process.exitcode, "progress": progress, "result": result}
+    if result_error:
+        outcome["error"] = result_error
     _save(directory / "watchdog.json", outcome)
     return outcome
 
