@@ -9,7 +9,7 @@ from minppi_mofs.removal_selection import _feature_order, _gains, _scores, _supp
 
 
 def select_sign_aware_removals(features, witnesses, sample_minima, feature_gain, shap_importance,
-                               evaluate, full_utility, margin, *, publish=None):
+                               evaluate, full_utility, margin, *, publish=None, include_controls=True):
     """Compare sign-aware deletion and matched controls on at most 21 unique masks.
 
     Training-only gain and mean absolute TreeSHAP ranks order sampled zeros.
@@ -23,6 +23,7 @@ def select_sign_aware_removals(features, witnesses, sample_minima, feature_gain,
     and TreeSHAP controls use the same size grid and worst-fold objective on
     their unrestricted feature rankings. Scores are shared across identical
     masks, while each method chooses only from its own admissible proposals.
+    Set include_controls=False to skip the two external comparison paths.
     """
     features = _feature_order(features)
     if not isinstance(sample_minima, Mapping):
@@ -48,8 +49,10 @@ def select_sign_aware_removals(features, witnesses, sample_minima, feature_gain,
     fused_rank = train_scores.rank(method="average").mean(axis=1).to_dict()
     ordered_witnesses = sorted((f for f in features if f in witnessed), key=gain.get)
     fused = ordered_witnesses + sorted(ordered_zeros, key=fused_rank.get)
-    controls = {"matched_gain": sorted(features, key=gain.get),
-                "matched_treeshap": sorted(features, key=shap.get)}
+    controls = {}
+    if include_controls:
+        controls = {"matched_gain": sorted(features, key=gain.get),
+                    "matched_treeshap": sorted(features, key=shap.get)}
     rankings = {"witness_first_fused": fused, "eligible_gain": sorted(eligible, key=gain.get), **controls}
     sizes = (1, math.ceil(n / 4), math.ceil(n / 2), math.ceil(3 * n / 4), 7 * n // 8)
     proposals = {}

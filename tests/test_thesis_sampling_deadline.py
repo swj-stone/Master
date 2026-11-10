@@ -62,22 +62,36 @@ def test_interrupted_replay_reports_time_charged_before_worker_verification():
     assert row["wall_plus_reused_sampling_s"] == pytest.approx(900)
 
 
-def test_sign_aware_run_records_its_source_and_primary_method_before_start(tmp_path, monkeypatch):
+@pytest.mark.parametrize("policy", ["sign_aware", "confirmed", "guarded"])
+def test_experimental_run_records_its_source_and_primary_method_before_start(tmp_path, monkeypatch, policy):
     files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",
              "src/minppi_mofs/minimum_sampling.py", "src/minppi_mofs/baselines/shap_top_k.py",
              "src/minppi_mofs/sign_aware_removal.py")
+    if policy == "confirmed":
+        files += ("src/minppi_mofs/removal_confirmation.py",)
+    if policy == "guarded":
+        files += ("src/minppi_mofs/guarded_update.py",)
     for name in files:
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(name, encoding="utf-8")
     monkeypatch.setattr(runner, "ROOT", tmp_path)
-    monkeypatch.setattr(sys, "argv", ["run", "--datasets", "abalone", "--selection-policy", "sign_aware"])
+    monkeypatch.setattr(sys, "argv", ["run", "--datasets", "abalone", "--selection-policy", policy])
 
     def check_protocol(process, directory, seconds, log, sample_seconds):
         protocol = json.loads((directory.parent / "protocol.json").read_bytes())
-        assert protocol["primary_method"] == "sign_worst"
-        assert protocol["sensitivity_method"] == "sign_pooled"
-        assert protocol["matched_controls"] == ["matched_gain", "matched_treeshap"]
+        if policy == "confirmed":
+            assert protocol["primary_method"] == "confirmed"
+            assert protocol["confirmation_training_holdout_fraction"] == 0.25
+            assert protocol["confirmation_candidates"] == ["structured", "sign_worst", "full_set"]
+        elif policy == "guarded":
+            assert protocol["primary_method"] == "guarded"
+            assert protocol["incumbent"] == "structured"
+            assert protocol["challenger"] == "sign_worst"
+        else:
+            assert protocol["primary_method"] == "sign_worst"
+            assert protocol["sensitivity_method"] == "sign_pooled"
+            assert protocol["matched_controls"] == ["matched_gain", "matched_treeshap"]
         assert set(protocol["selection_source_sha256"]) == set(files)
         assert seconds == 900
         return {"status": "timed_out", "elapsed_s": seconds, "progress": {}, "result": {}}

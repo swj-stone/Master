@@ -28,7 +28,7 @@ from minppi_mofs.utility import compute_utility
 SOURCE = Path(__file__).resolve().parents[1] / "results/icomp2026_formal/icomp2026-formal-v1-s42-123"
 DATASETS = ("abalone", "madelon", "spambase", "gisette", "isolet", "credit_card_fraud")
 SEED = 42
-SELECTION_POLICIES = ("structured", "wide", "witness_only", "sign_aware")
+SELECTION_POLICIES = ("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded")
 
 
 class SamplingDeadline(Exception):
@@ -88,6 +88,40 @@ def subset_validation_scores(train, yt, val, yv, selected, halves, **policy):
     else:
         prediction = _empty_subset_predictions(yt, task=policy["task"], row_count=len(val))
     return prediction_scores(yv, prediction, halves, policy["utility"])
+
+
+def confirm_on_training(train, yt, features, structured, signed, full_scores, margin, publish, **policy):
+    """Verify two frozen candidate masks on a deterministic split of the training partition."""
+    from minppi_mofs.removal_confirmation import select_confirmed_removal
+
+    candidates = {"structured": structured, "sign_worst": signed}
+    masks = {name: result["selected_mask"] for name, result in candidates.items()}
+    official_scores = {result["selected_mask"]: result["selected_scores"] for result in candidates.values()}
+    official_scores[(1 << len(features)) - 1] = full_scores
+    stratified = policy["task"] != "regression"
+    fit_rows, check_rows = (np.sort(rows) for rows in train_test_split(
+        np.arange(len(yt)), test_size=0.25, random_state=SEED, stratify=yt if stratified else None))
+    split = dict(seed=SEED, index_space="zero-based positions in frozen training CSV", stratified=stratified,
+                 sizes=[len(fit_rows), len(check_rows)],
+                 index_sha256=[hashlib.sha256(rows.astype("<i8").tobytes()).hexdigest() for rows in (fit_rows, check_rows)])
+    training, checking = train.iloc[fit_rows], train.iloc[check_rows]
+    labels = np.asarray(yt)
+    training_y, checking_y = labels[fit_rows], labels[check_rows]
+    completed = {}
+    publish(phase="training_confirmation", confirmation_candidate_masks=masks, confirmation_split=split, confirmation_fits=0)
+
+    def evaluate_confirmation(mask):
+        selected = tuple(f for i, f in enumerate(features) if mask & (1 << i))
+        publish(fit_started_utc=datetime.now(timezone.utc).isoformat(), fit_mask=hex(mask), fit_is_model=True)
+        score = subset_utility(training, training_y, checking, checking_y, selected, **policy)
+        completed[hex(mask)] = score
+        publish(confirmation_fits=len(completed), confirmation_scores=completed, fit_started_utc=None)
+        return score
+
+    decision = select_confirmed_removal(features, masks, official_scores, margin, evaluate_confirmation)
+    decision.update(candidate_masks=masks, split=split)
+    publish(confirmation=decision)
+    return decision
 
 
 def load_sampling(path, dataset, features, row, policy, alpha, full_val, rounds, seconds, evaluate):
@@ -301,7 +335,8 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
         cache = {}
 
         compare_methods = selection_policy == "wide"
-        use_sign_aware = selection_policy == "sign_aware"
+        compare_incumbents = selection_policy in {"confirmed", "guarded"}
+        use_sign_aware = selection_policy == "sign_aware" or compare_incumbents
         use_shap = compare_methods or use_sign_aware
         use_robust_gate = selection_policy != "witness_only"
         halves, split = validation_halves(yv, row["task"]) if use_robust_gate else (None, None)
@@ -359,12 +394,21 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
         fits_pre_gate = state["validation_fits"]
         if use_robust_gate:
             partial_trials = []
+            trials_by_mask = {}
             state.update(validation_halves=split, full_validation_scores=full_scores)
             tried_features = set()
 
-            def completed_trial(trial):
-                partial_trials.append(trial)
-                if use_sign_aware and trial["is_sign_candidate"]:
+            def completed_trial(trial, source="sign_worst"):
+                if compare_incumbents:
+                    mask = trial["mask"]
+                    if mask not in trials_by_mask:
+                        record = dict(trial, official_policies=[])
+                        trials_by_mask[mask] = record
+                        partial_trials.append(record)
+                    trials_by_mask[mask]["official_policies"].append(source)
+                else:
+                    partial_trials.append(trial)
+                if compare_incumbents or (use_sign_aware and trial["is_sign_candidate"]):
                     tried_features.update(trial["removed_features"])
                     state.update(proposed_count=len(tried_features),
                                  proposed_features=[f for f in features if f in tried_features])
@@ -379,24 +423,50 @@ def run(dataset, output, rounds, seconds, *, selection_policy="structured", reus
                 publish(sample_sign_groups=sign_groups, sampled_eligible_count=len(sign_groups["negative"])+len(sign_groups["zero"]),
                         proposed_count=0, proposed_features=[])
                 selection = select_sign_aware_removals(features, sampled["witnesses"], minima, gain, shap, evaluate,
-                                                      full_scores, margin, publish=completed_trial)
+                                                      full_scores, margin, publish=completed_trial,
+                                                      include_controls=not compare_incumbents)
                 # The union of several rankings need not be a tested mask.
                 diagnostic = selection["structured_pool"]
                 diagnostic_features = diagnostic["removed_features"]
                 raw_scores = diagnostic["scores"] if diagnostic_features else None
                 gate_scope = "largest_examined_fused_prefix"
-            else:
+            if not use_sign_aware or compare_incumbents:
                 from minppi_mofs.removal_selection import nominate_removals, select_robust_removals
 
                 nomination = nominate_removals(train, gain, sampled["witnesses"], sample_minima=minima)
-                diagnostic_features = [record["feature"] for record in nomination]
-                publish(structured_proposed_count=len(diagnostic_features), structured_proposed_features=diagnostic_features)
-                selection = select_robust_removals(features, nomination, gain, evaluate, full_scores, margin,
-                                                  sample_minima=minima, shap_importance=shap,
-                                                  structured_only=not compare_methods, publish=completed_trial)
-                raw_mask = full ^ sum(1 << features.index(f) for f in diagnostic_features)
-                raw_scores = evaluate(raw_mask) if raw_mask else None
-                gate_scope = "raw_structured_pool"
+                structured_features = [record["feature"] for record in nomination]
+                if not compare_incumbents:
+                    publish(structured_proposed_count=len(structured_features), structured_proposed_features=structured_features)
+                structured = select_robust_removals(features, nomination, gain, evaluate, full_scores, margin,
+                                                    sample_minima=minima, shap_importance=shap,
+                                                    structured_only=not compare_methods,
+                                                    publish=lambda row: completed_trial(row, "structured"))
+                if compare_incumbents:
+                    if selection_policy == "confirmed":
+                        decision = confirm_on_training(train, yt, features, structured, selection, full_scores, margin, publish, **policy)
+                    else:
+                        from minppi_mofs.guarded_update import guarded_update
+
+                        scores_by_mask = {r["selected_mask"]: r["selected_scores"] for r in (structured, selection)}
+                        decision = guarded_update(features, structured["selected_mask"], selection["selected_mask"],
+                                                  scores_by_mask, full_scores, margin)
+                        publish(guarded_update=decision)
+                    candidate_names = set(selection["candidate_features"]) | set(structured["candidate_features"])
+                    candidates = [f for f in features if f in candidate_names]
+                    mask, scores = decision["selected_mask"], decision["selected_scores"]
+                    record = dict(mask=mask, removed_count=decision["removed_count"], removed_features=decision["removed_features"],
+                                  scores=scores, selected_source=decision["selected_source"])
+                    selection = dict(candidate_features=candidates, all_candidate_features=candidates,
+                                     selected_mask=mask, selected_scores=scores, selected_method=selection_policy,
+                                     removed_features=decision["removed_features"], validation_utility=scores[0],
+                                     selected_source=decision["selected_source"], full_scores=full_scores,
+                                     trials=partial_trials, methods={selection_policy: record})
+                else:
+                    selection = structured
+                    diagnostic_features = structured_features
+                    raw_mask = full ^ sum(1 << features.index(f) for f in diagnostic_features)
+                    raw_scores = evaluate(raw_mask) if raw_mask else None
+                    gate_scope = "raw_structured_pool"
             proposed = selection["candidate_features"]
             retained = selection["selected_mask"]
             removed = selection["removed_features"]

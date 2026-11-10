@@ -123,8 +123,9 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     output = tmp_path / "madelon"
     row = dict(dataset_id="madelon", seed=42, task="binary", utility="roc_auc", target="y",
                protocol_hash="a" * 64, selected_features_json=json.dumps(["a", "b", "c"]))
-    for part, size in (("train", 4), ("val", 4), ("test", 2)):
-        frame = pd.DataFrame({"a": range(size), "b": range(size), "c": range(size), "y": [0, 1] * (size // 2)})
+    for part, size, start in (("train", 8, 0), ("val", 4, 100), ("test", 2, 200)):
+        values = range(start, start+size)
+        frame = pd.DataFrame({"a": values, "b": values, "c": values, "y": [0, 1] * (size // 2)})
         path = root / f"{part}.csv"
         frame.to_csv(path, index=False)
         row.update({f"{part}_relpath": path.name, f"{part}_row_count": size,
@@ -140,7 +141,7 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     held_out_calls = []
 
     def score(train, y_train, test, y_test, selected, **kwargs):
-        if len(train) == 8:
+        if len(train) == 12:
             decision = json.loads((output / "progress.json").read_text())
             assert decision["removed_features"] == [] and decision["proposed_features"] == ["b"]
             held_out_calls.append(selected)
@@ -171,14 +172,18 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     new_tests = []
 
     def score_again(train, y_train, test, y_test, selected, **kwargs):
-        if len(train) == 8:
+        if len(train) == 12:
             frozen = json.loads((fresh / "progress.json").read_bytes())
-            assert frozen["phase"].startswith("test_") and frozen["selection_policy"] in {"structured", "wide", "sign_aware"}
+            assert frozen["phase"].startswith("test_")
             if frozen["selection_policy"] == "sign_aware":
                 assert set(frozen["method_masks"]) == {"sign_pooled", "sign_worst", "matched_gain", "matched_treeshap"}
                 assert frozen["selected_method"] == "sign_worst"
             new_tests.append(selected)
             return 0.72 if len(selected) == 3 else 0.71
+        if len(train) == 6:
+            assert len(test) == 2 and set(train.a) | set(test.a) == set(range(8))
+            assert set(train.a).isdisjoint(test.a) and set(y_test) == {0, 1}
+            return 0.8 if len(selected) == 3 else 0.5
         return {(): 0.5, ("a",): 0.9, ("a", "b"): 0.4, ("c",): 0.5,
                 ("a", "c"): 0.6, ("a", "b", "c"): 0.8, ("b",): 0.3,
                 ("b", "c"): 0.81}[selected]
@@ -233,6 +238,12 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
         if snapshot["selection_policy"] == "sign_aware":
             assert snapshot["phase"] == "test_full"
             frozen_at_access.append(snapshot["method_masks"])
+        if snapshot["selection_policy"] == "confirmed":
+            assert snapshot["phase"] == "test_full" and set(snapshot["method_masks"]) == {"confirmed"}
+            assert snapshot["confirmation_fits"] > 0 and snapshot["confirmation"]["selected_source"] == "full_set"
+        if snapshot["selection_policy"] == "guarded":
+            assert snapshot["method_masks"] == {"guarded": snapshot["guarded_update"]["selected_mask"]}
+            assert snapshot["phase"] == "test_full" and "confirmation" not in snapshot
         return audited_load(access, **kwargs)
 
     monkeypatch.setattr(worker.AuditedSplitAccess, "load_test", load_after_freeze)
@@ -240,7 +251,7 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     signed = json.loads((fresh / "result.json").read_bytes())
     assert frozen_at_access == [signed["method_masks"]]
     assert signed["sampling_reused"] and signed["new_sampling_s"] == 0
-    assert signed["treeshap_train_rows"] == 4 and signed["training_rankings"]["mean_abs_treeshap"] == rankings[1]
+    assert signed["treeshap_train_rows"] == 8 and signed["training_rankings"]["mean_abs_treeshap"] == rankings[1]
     assert signed["sample_sign_groups"] == {"negative": ["b"], "zero": ["c"], "positive": ["a"], "unseen": []}
     tried = {f for trial in signed["selection_trials"] if trial["is_sign_candidate"] for f in trial["removed_features"]}
     assert tried == set(signed["proposed_features"]) == {"b", "c"}
@@ -249,6 +260,31 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     assert signed["gate"]["raw_pool_scores"] == signed["selection"]["structured_pool"]["scores"]
     assert signed["test_fits"] == len(new_tests) == len({7, *signed["method_masks"].values()})
     assert len(validation_calls) == len(set(validation_calls))
+
+    fresh = tmp_path / "confirmed-replay"
+    new_tests.clear()
+    validation_calls.clear()
+    worker.run("madelon", fresh, 1, 20., reuse_sampling=source, selection_policy="confirmed")
+    checked = json.loads((fresh / "result.json").read_bytes())
+    assert checked["method_masks"] == {"confirmed": 7} and checked["removed_features"] == []
+    confirmation = checked["confirmation"]
+    masks = {"structured": structured["method_masks"]["witness_proxy_gain"], "sign_worst": signed["method_masks"]["sign_worst"]}
+    assert confirmation["candidate_masks"] == masks
+    assert checked["confirmation_fits"] == len({7, *masks.values()})
+    assert checked["confirmation"]["split"]["sizes"] == [6, 2]
+    assert checked["test_fits"] == 1 and len(new_tests) == 1 and not checked["external_candidate_features"]
+    assert len(validation_calls) == len(set(validation_calls))
+
+    fresh = tmp_path / "guarded-replay"
+    new_tests.clear()
+    validation_calls.clear()
+    monkeypatch.setattr(worker, "confirm_on_training", lambda *_a, **_kw: pytest.fail("unexpected confirmation"))
+    worker.run("madelon", fresh, 1, 20., reuse_sampling=source, selection_policy="guarded")
+    guarded = json.loads((fresh / "result.json").read_bytes())
+    assert guarded["guarded_update"]["candidate_masks"] == masks
+    assert guarded["guarded_update"]["selected_source"] in {"structured", "sign_worst"}
+    assert guarded["test_fits"] == len(new_tests) == len({7, *guarded["method_masks"].values()})
+    assert guarded["external_candidate_features"] == [] and len(validation_calls) == len(set(validation_calls))
 
     for key, field in (("endpoint", "witness"), ("split", "val hash"), ("count", "draw counts"), ("alpha", "alpha")):
         bad = json.loads(json.dumps(result))
@@ -285,3 +321,10 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     assert not cold_signed["sampling_reused"] and cold_signed["sample_fits"] > 0
     assert cold_signed["method_masks"] == signed["method_masks"] and cold_signed["method_results"] == signed["method_results"]
     assert frozen_at_access == [signed["method_masks"], cold_signed["method_masks"]]
+
+    fresh = tmp_path / "cold-guarded"
+    worker.run("madelon", fresh, 1, 20., selection_policy="guarded")
+    cold_guarded = json.loads((fresh / "result.json").read_bytes())
+    assert cold_guarded["sample_fits"] > 0 and not cold_guarded["sampling_reused"]
+    assert cold_guarded["guarded_update"] == guarded["guarded_update"]
+    assert cold_guarded["method_results"] == guarded["method_results"]

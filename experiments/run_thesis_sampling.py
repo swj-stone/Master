@@ -81,7 +81,7 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
             if eta is not None and sample_seconds is not None:
                 eta = max(0.0, min(eta, sample_seconds - p.get("sample_elapsed_s", 0), seconds - elapsed))
             eta_text = "pending" if eta is None else f"~{max(0, eta):.0f}s"
-            pool = (p.get("proposed_count", 0) if p.get("selection_policy") == "sign_aware"
+            pool = (p.get("proposed_count", 0) if p.get("selection_policy") in ("sign_aware", "confirmed", "guarded")
                     else p.get("structured_proposed_count", p.get("proposed_count", 0)))
             log(f"{directory.name} phase={p.get('phase', 'starting')} | elapsed={elapsed:.0f}s"
                 f" | coverage={p.get('coverage', 0)}/{p.get('n_features', '?')}"
@@ -185,7 +185,8 @@ def main():
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--dataset-seconds", type=int, default=900)
     parser.add_argument("--sample-seconds", type=int, default=780)
-    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only", "sign_aware"), default="structured")
+    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded"),
+                        default="structured")
     parser.add_argument("--reuse-sampling-run", type=Path, help="Reuse verified seed-42 sampling evidence from an earlier run.")
     args = parser.parse_args()
     if (not 1 <= args.dataset_seconds <= 900 or not 0 < args.sample_seconds < args.dataset_seconds
@@ -198,8 +199,12 @@ def main():
     def selection_sources():
         files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",
                  "src/minppi_mofs/minimum_sampling.py", "src/minppi_mofs/baselines/shap_top_k.py")
-        if args.selection_policy == "sign_aware":
+        if args.selection_policy in ("sign_aware", "confirmed", "guarded"):
             files += ("src/minppi_mofs/sign_aware_removal.py",)
+        if args.selection_policy == "confirmed":
+            files += ("src/minppi_mofs/removal_confirmation.py",)
+        if args.selection_policy == "guarded":
+            files += ("src/minppi_mofs/guarded_update.py",)
         return {f: hashlib.sha256((ROOT / f).read_bytes()).hexdigest() for f in files}
 
     sources = selection_sources()
@@ -211,6 +216,11 @@ def main():
     if args.selection_policy == "sign_aware":
         protocol.update(primary_method="sign_worst", sensitivity_method="sign_pooled",
                         matched_controls=["matched_gain", "matched_treeshap"])
+    elif args.selection_policy == "confirmed":
+        protocol.update(primary_method="confirmed", confirmation_candidates=["structured", "sign_worst", "full_set"],
+                        confirmation_training_holdout_fraction=0.25, confirmation_split_seed=42)
+    elif args.selection_policy == "guarded":
+        protocol.update(primary_method="guarded", incumbent="structured", challenger="sign_worst")
     _save(output / "protocol.json", protocol)
 
     def log(message):

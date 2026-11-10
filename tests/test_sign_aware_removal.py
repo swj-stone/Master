@@ -99,6 +99,17 @@ def test_external_controls_evaluate_unrestricted_ranks_under_same_loss_rule():
     assert set(result["external_candidate_features"]) == set(features)
     assert set(result["all_candidate_features"]) == set(features)
 
+    evaluations.clear()
+    no_controls = select_sign_aware_removals(features, {}, minima, gain, shap, evaluate, (1., 1., 1.), .01,
+                                             include_controls=False)
+    assert len(evaluations) < len(result["trials"])
+    assert set(no_controls["methods"]) == {"sign_worst", "sign_pooled"}
+    for name, record in no_controls["methods"].items():
+        for field in ("selected_mask", "selected_source", "scores", "objective"):
+            assert record[field] == result["methods"][name][field]
+    assert no_controls["candidate_features"] == result["candidate_features"]
+    assert not no_controls["external_candidate_features"] and all(t["is_sign_candidate"] for t in no_controls["trials"])
+
 
 def test_all_negative_cannot_delete_every_feature_and_zero_margin_rejects_a_bad_fold():
     features = ["a", "b"]
