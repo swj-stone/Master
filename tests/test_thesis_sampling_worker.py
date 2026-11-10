@@ -178,6 +178,8 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
             if frozen["selection_policy"] == "sign_aware":
                 assert set(frozen["method_masks"]) == {"sign_pooled", "sign_worst", "matched_gain", "matched_treeshap"}
                 assert frozen["selected_method"] == "sign_worst"
+            if "capture_prediction" in kwargs:
+                kwargs["capture_prediction"](np.tile([.31, .69], (len(y_test), 1)))
             new_tests.append(selected)
             return 0.72 if len(selected) == 3 else 0.71
         if len(train) == 6:
@@ -244,6 +246,17 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
         if snapshot["selection_policy"] == "guarded":
             assert snapshot["method_masks"] == {"guarded": snapshot["guarded_update"]["selected_mask"]}
             assert snapshot["phase"] == "test_full" and "confirmation" not in snapshot
+        if snapshot["selection_policy"] == "local_refine":
+            assert set(snapshot["method_masks"]) == {"local_robust", "local_pooled", "local_drop", "validation_frontier",
+                                                     "guarded_incumbent"}
+            assert snapshot["guarded_update"]["selected_mask"] == snapshot["method_masks"]["guarded_incumbent"]
+            assert snapshot["phase"] == "test_full" and snapshot["selected_method"] == "local_robust"
+            assert "local_refinement" in snapshot
+        if snapshot["selection_policy"] == "fold_consensus":
+            assert set(snapshot["method_masks"]) == {"fold_consensus", "guarded_incumbent"}
+            assert snapshot["method_masks"]["guarded_incumbent"] == snapshot["guarded_update"]["selected_mask"]
+            assert snapshot["selected_method"] == "fold_consensus" and snapshot["phase"] == "test_full"
+            assert "fold_consensus" in snapshot
         return audited_load(access, **kwargs)
 
     monkeypatch.setattr(worker.AuditedSplitAccess, "load_test", load_after_freeze)
@@ -285,6 +298,55 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     assert guarded["guarded_update"]["selected_source"] in {"structured", "sign_worst"}
     assert guarded["test_fits"] == len(new_tests) == len({7, *guarded["method_masks"].values()})
     assert guarded["external_candidate_features"] == [] and len(validation_calls) == len(set(validation_calls))
+
+    fresh = tmp_path / "local-replay"
+    new_tests.clear()
+    validation_calls.clear()
+    from minppi_mofs import residual_ranking
+
+    def training_rank(train, yt, features, mask, minima, **policy):
+        assert set(train.a) == set(range(8)) and set(yt) == {0, 1}
+        assert mask == guarded["method_masks"]["guarded"] and policy["seed"] == 42
+        assert not (fresh / "test_access.json").exists()
+        kept = {f: 1. for i, f in enumerate(features) if mask & (1 << i)}
+        return {f: 1. for f in features if f not in kept and minima[f] == 0}, kept, {"fit_count": 1}
+
+    monkeypatch.setattr(residual_ranking, "rank_residual_recovery", training_rank)
+    worker.run("madelon", fresh, 1, 20., reuse_sampling=source, selection_policy="local_refine")
+    local = json.loads((fresh / "result.json").read_bytes())
+    assert local["guarded_update"] == guarded["guarded_update"]
+    assert local["sampling_reused"] and local["extra_ranking_fits"] == 1
+    assert set(local["proposed_features"]) <= {"b", "c"}
+    assert local["test_fits"] == len(new_tests) == len(set(new_tests)) == len({7, *local["method_masks"].values()})
+    assert len(validation_calls) == len(set(validation_calls))
+    prediction_file = fresh / local["paired_test_predictions"]
+    assert hashlib.sha256(prediction_file.read_bytes()).hexdigest() == local["paired_test_predictions_sha256"]
+    with np.load(prediction_file) as paired:
+        assert set(paired.files) == {"y", "full_set", *local["method_masks"]}
+        assert paired["y"].tolist() == [0, 1]
+        np.testing.assert_array_equal(paired["local_robust"], np.tile([.31, .69], (2, 1)))
+
+    fresh = tmp_path / "local-short-budget"
+    with monkeypatch.context() as short:
+        short.setenv("MINPPI_DATASET_DEADLINE", "0")
+        worker.run("madelon", fresh, 1, 20., reuse_sampling=source, selection_policy="local_refine")
+    stopped = json.loads((fresh / "result.json").read_bytes())
+    assert stopped["local_refinement"]["budget_stopped"] and stopped["extra_ranking_fits"] == 0
+    assert set(stopped["method_masks"].values()) == {guarded["guarded_update"]["selected_mask"]}
+
+    fresh = tmp_path / "consensus-replay"
+    new_tests.clear()
+    validation_calls.clear()
+    worker.run("madelon", fresh, 1, 20., reuse_sampling=source, selection_policy="fold_consensus")
+    consensus = json.loads((fresh / "result.json").read_bytes())
+    assert consensus["guarded_update"] == guarded["guarded_update"]
+    assert consensus["fold_consensus"]["evaluated_count"] <= 5
+    assert 0 <= consensus["extra_ranking_fits"] == consensus["fold_consensus"]["ranking_fits"] <= 2
+    assert set(consensus["proposed_features"]) <= {"b", "c"}
+    assert consensus["test_fits"] == len(new_tests) == len({7, *consensus["method_masks"].values()})
+    assert len(validation_calls) == len(set(validation_calls))
+    with np.load(fresh / consensus["paired_test_predictions"]) as paired:
+        assert set(paired.files) == {"y", "full_set", "fold_consensus", "guarded_incumbent"}
 
     for key, field in (("endpoint", "witness"), ("split", "val hash"), ("count", "draw counts"), ("alpha", "alpha")):
         bad = json.loads(json.dumps(result))
@@ -328,3 +390,17 @@ def test_gate_veto_freezes_selection_and_refits_once_on_train_plus_validation(tm
     assert cold_guarded["sample_fits"] > 0 and not cold_guarded["sampling_reused"]
     assert cold_guarded["guarded_update"] == guarded["guarded_update"]
     assert cold_guarded["method_results"] == guarded["method_results"]
+
+    fresh = tmp_path / "local-cold"
+    worker.run("madelon", fresh, 1, 20., selection_policy="local_refine")
+    cold_local = json.loads((fresh / "result.json").read_bytes())
+    assert cold_local["sample_fits"] > 0 and not cold_local["sampling_reused"]
+    assert cold_local["method_masks"] == local["method_masks"]
+    assert cold_local["method_results"] == local["method_results"]
+
+    fresh = tmp_path / "consensus-cold"
+    worker.run("madelon", fresh, 1, 20., selection_policy="fold_consensus")
+    cold_consensus = json.loads((fresh / "result.json").read_bytes())
+    assert cold_consensus["sample_fits"] > 0 and not cold_consensus["sampling_reused"]
+    assert cold_consensus["method_masks"] == consensus["method_masks"]
+    assert cold_consensus["method_results"] == consensus["method_results"]

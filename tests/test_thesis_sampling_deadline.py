@@ -62,15 +62,17 @@ def test_interrupted_replay_reports_time_charged_before_worker_verification():
     assert row["wall_plus_reused_sampling_s"] == pytest.approx(900)
 
 
-@pytest.mark.parametrize("policy", ["sign_aware", "confirmed", "guarded"])
+@pytest.mark.parametrize("policy", ["sign_aware", "confirmed", "guarded", "local_refine"])
 def test_experimental_run_records_its_source_and_primary_method_before_start(tmp_path, monkeypatch, policy):
     files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",
              "src/minppi_mofs/minimum_sampling.py", "src/minppi_mofs/baselines/shap_top_k.py",
              "src/minppi_mofs/sign_aware_removal.py")
     if policy == "confirmed":
         files += ("src/minppi_mofs/removal_confirmation.py",)
-    if policy == "guarded":
+    if policy in ("guarded", "local_refine"):
         files += ("src/minppi_mofs/guarded_update.py",)
+    if policy == "local_refine":
+        files += ("src/minppi_mofs/local_refinement.py", "src/minppi_mofs/residual_ranking.py")
     for name in files:
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -88,6 +90,13 @@ def test_experimental_run_records_its_source_and_primary_method_before_start(tmp
             assert protocol["primary_method"] == "guarded"
             assert protocol["incumbent"] == "structured"
             assert protocol["challenger"] == "sign_worst"
+        elif policy == "local_refine":
+            assert protocol["primary_method"] == "local_robust"
+            assert protocol["incumbent"] == "guarded_incumbent"
+            assert protocol["minimum_improved_datasets"] == 2
+            assert protocol["practical_change_fraction_of_margin"] == 0.1
+            assert protocol["paired_bootstrap_replicates"] == 500
+            assert time.monotonic() + 890 < process._args[-1] <= time.monotonic() + 900
         else:
             assert protocol["primary_method"] == "sign_worst"
             assert protocol["sensitivity_method"] == "sign_pooled"

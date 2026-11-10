@@ -35,12 +35,14 @@ def _read(path):
         return {}
 
 
-def _worker_entry(dataset, directory, rounds, sample_seconds, selection_policy, reuse_sampling):
+def _worker_entry(dataset, directory, rounds, sample_seconds, selection_policy, reuse_sampling, local_deadline=None):
     # XGBoost fits in this spawned process using native threads. Killing this
     # process interrupts a native fit without waiting for a Python callback.
     with (directory / "worker.log").open("w", encoding="utf-8", buffering=1) as worker_log:
         os.dup2(worker_log.fileno(), 1)
         os.dup2(worker_log.fileno(), 2)
+        if local_deadline is not None:
+            os.environ["MINPPI_DATASET_DEADLINE"] = str(local_deadline)
         sys.argv = ["thesis_sampling_worker", "--dataset", dataset, "--output-dir", str(directory),
                     "--rounds", str(rounds), "--sample-seconds", str(sample_seconds),
                     "--selection-policy", selection_policy]
@@ -81,7 +83,7 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
             if eta is not None and sample_seconds is not None:
                 eta = max(0.0, min(eta, sample_seconds - p.get("sample_elapsed_s", 0), seconds - elapsed))
             eta_text = "pending" if eta is None else f"~{max(0, eta):.0f}s"
-            pool = (p.get("proposed_count", 0) if p.get("selection_policy") in ("sign_aware", "confirmed", "guarded")
+            pool = (p.get("proposed_count", 0) if p.get("selection_policy") in ("sign_aware", "confirmed", "guarded", "local_refine")
                     else p.get("structured_proposed_count", p.get("proposed_count", 0)))
             log(f"{directory.name} phase={p.get('phase', 'starting')} | elapsed={elapsed:.0f}s"
                 f" | coverage={p.get('coverage', 0)}/{p.get('n_features', '?')}"
@@ -185,7 +187,7 @@ def main():
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--dataset-seconds", type=int, default=900)
     parser.add_argument("--sample-seconds", type=int, default=780)
-    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded"),
+    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only", "sign_aware", "confirmed", "guarded", "local_refine"),
                         default="structured")
     parser.add_argument("--reuse-sampling-run", type=Path, help="Reuse verified seed-42 sampling evidence from an earlier run.")
     args = parser.parse_args()
@@ -199,12 +201,14 @@ def main():
     def selection_sources():
         files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",
                  "src/minppi_mofs/minimum_sampling.py", "src/minppi_mofs/baselines/shap_top_k.py")
-        if args.selection_policy in ("sign_aware", "confirmed", "guarded"):
+        if args.selection_policy in ("sign_aware", "confirmed", "guarded", "local_refine"):
             files += ("src/minppi_mofs/sign_aware_removal.py",)
         if args.selection_policy == "confirmed":
             files += ("src/minppi_mofs/removal_confirmation.py",)
-        if args.selection_policy == "guarded":
+        if args.selection_policy in ("guarded", "local_refine"):
             files += ("src/minppi_mofs/guarded_update.py",)
+        if args.selection_policy == "local_refine":
+            files += ("src/minppi_mofs/local_refinement.py", "src/minppi_mofs/residual_ranking.py")
         return {f: hashlib.sha256((ROOT / f).read_bytes()).hexdigest() for f in files}
 
     sources = selection_sources()
@@ -221,6 +225,12 @@ def main():
                         confirmation_training_holdout_fraction=0.25, confirmation_split_seed=42)
     elif args.selection_policy == "guarded":
         protocol.update(primary_method="guarded", incumbent="structured", challenger="sign_worst")
+    elif args.selection_policy == "local_refine":
+        protocol.update(primary_method="local_robust", incumbent="guarded_incumbent",
+                        comparators=["local_pooled", "local_drop", "validation_frontier"],
+                        max_local_masks=8, minimum_improved_datasets=2,
+                        practical_change_fraction_of_margin=0.1, paired_bootstrap_replicates=500,
+                        paired_bootstrap_seed=42)
     _save(output / "protocol.json", protocol)
 
     def log(message):
@@ -239,8 +249,9 @@ def main():
         directory = output / dataset
         directory.mkdir()
         reuse, remaining = budgets[dataset]
+        local_deadline = time.monotonic() + remaining if args.selection_policy == "local_refine" else None
         process = multiprocessing.get_context("spawn").Process(
-            target=_worker_entry, args=(dataset, directory, args.rounds, args.sample_seconds, args.selection_policy, reuse))
+            target=_worker_entry, args=(dataset, directory, args.rounds, args.sample_seconds, args.selection_policy, reuse, local_deadline))
         cutoff = datetime.now(MSK) + timedelta(seconds=remaining)
         log(f"start {dataset} | inherited sampling={args.dataset_seconds-remaining:.2f}s"
             f" | new work budget={remaining:.2f}s | hard stop by {cutoff:%H:%M:%S} MSK")
