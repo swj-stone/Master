@@ -29,6 +29,27 @@ from minppi_mofs.baselines._coalition_utility import default_utility
 from minppi_mofs.modeling import make_model
 
 
+def fitted_tree_shap_importance(model, X_safe: pd.DataFrame, *, seed=42, max_rows=1024) -> np.ndarray:
+    """Mean |TreeSHAP| from one fitted booster, over training rows and model outputs."""
+    from xgboost import DMatrix
+
+    if max_rows < 1 or X_safe.empty:
+        raise ValueError("TreeSHAP requires a nonempty training sample")
+    sample = X_safe
+    if len(sample) > max_rows:
+        positions = np.random.default_rng(seed).choice(len(sample), max_rows, replace=False)
+        sample = sample.iloc[np.sort(positions)]
+    values = model.get_booster().predict(DMatrix(sample, nthread=1), pred_contribs=True,
+                                         approx_contribs=False, strict_shape=True)
+    if values.ndim != 3 or values.shape[0] != len(sample) or values.shape[2] != sample.shape[1] + 1:
+        raise ValueError("Unexpected TreeSHAP dimensions for training features")
+    # Last output column is the model bias. Strict shape includes the output-group axis for every task.
+    importance = np.abs(values[:, :, :-1]).mean(axis=(0, 1), dtype=np.float64)
+    if not np.isfinite(importance).all():
+        raise ValueError("Non-finite TreeSHAP importance")
+    return importance
+
+
 def compute_shap_topk_importance(
     X: pd.DataFrame,
     y: np.ndarray,
@@ -43,8 +64,8 @@ def compute_shap_topk_importance(
 ) -> dict[str, float]:
     """Compute SHAP-based feature importance.
 
-    Uses XGBoost gain importance (equivalent to mean |SHAP| for tree
-    ensembles) to rank features.  Avoids shap-library numpy 2.x conflicts.
+    Uses mean absolute TreeExplainer contributions on the supplied training
+    rows, averaging across output classes for multiclass tasks.
 
     Args:
         X: Feature DataFrame.

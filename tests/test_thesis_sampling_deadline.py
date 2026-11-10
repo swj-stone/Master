@@ -4,7 +4,9 @@ import json
 import multiprocessing
 import time
 
-from experiments.run_thesis_sampling import supervise
+import pytest
+
+from experiments.run_thesis_sampling import reuse_budget, summary_row, supervise
 
 
 def _stalled_fit(output):
@@ -33,3 +35,26 @@ def test_deadline_still_kills_worker_when_live_log_blocks(tmp_path):
     process = multiprocessing.get_context("spawn").Process(target=_late_write, args=(late, time.monotonic() + 2))
     result = supervise(process, tmp_path, 1.3, lambda *_: time.sleep(2.3), heartbeat_s=0.05)
     assert result["status"] == "timed_out" and not late.exists()
+
+
+def test_matched_replay_charges_sampling_to_the_same_dataset_limit(tmp_path):
+    directory = tmp_path / "isolet"
+    directory.mkdir()
+    record = {"phase": "complete", "dataset": "isolet", "seed": 42, "requested_rounds": 5,
+              "sample_seconds": 780, "sample_elapsed_s": 780.9}
+    path = directory / "result.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    supplied, remaining = reuse_budget(tmp_path, "isolet", 900, 5, 780)
+    assert supplied == path and remaining == pytest.approx(119.1)
+    with pytest.raises(ValueError, match="budget"):
+        reuse_budget(tmp_path, "isolet", 700, 5, 780)
+    with pytest.raises(ValueError, match="Mismatched"):
+        reuse_budget(tmp_path, "isolet", 900, 3, 780)
+
+
+def test_interrupted_replay_reports_time_charged_before_worker_verification():
+    outcome = {"status": "timed_out", "elapsed_s": 119.068, "inherited_sampling_s": 780.932,
+               "progress": {"phase": "verify_sampling", "inherited_sampling_s": 0.0}, "result": {}}
+    row = summary_row("isolet", outcome)
+    assert row["inherited_sampling_s"] == pytest.approx(780.932)
+    assert row["wall_plus_reused_sampling_s"] == pytest.approx(900)

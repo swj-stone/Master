@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import csv
 from datetime import datetime, timedelta, timezone
+import hashlib
 import json
+import math
 import multiprocessing
 import os
 from pathlib import Path
@@ -33,14 +35,17 @@ def _read(path):
         return {}
 
 
-def _worker_entry(dataset, directory, rounds, sample_seconds):
+def _worker_entry(dataset, directory, rounds, sample_seconds, selection_policy, reuse_sampling):
     # XGBoost fits in this spawned process using native threads. Killing this
     # process interrupts a native fit without waiting for a Python callback.
     with (directory / "worker.log").open("w", encoding="utf-8", buffering=1) as worker_log:
         os.dup2(worker_log.fileno(), 1)
         os.dup2(worker_log.fileno(), 2)
         sys.argv = ["thesis_sampling_worker", "--dataset", dataset, "--output-dir", str(directory),
-                    "--rounds", str(rounds), "--sample-seconds", str(sample_seconds)]
+                    "--rounds", str(rounds), "--sample-seconds", str(sample_seconds),
+                    "--selection-policy", selection_policy]
+        if reuse_sampling is not None:
+            sys.argv.extend(("--reuse-sampling", str(reuse_sampling)))
         runpy.run_module("experiments.thesis_sampling_worker", run_name="__main__")
 
 
@@ -76,10 +81,15 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
             if eta is not None and sample_seconds is not None:
                 eta = max(0.0, min(eta, sample_seconds - p.get("sample_elapsed_s", 0), seconds - elapsed))
             eta_text = "pending" if eta is None else f"~{max(0, eta):.0f}s"
+            # During search only the structured pool has been finalized; the
+            # complete MinPI nomination is the union of its eligible paths.
+            pool = p.get("structured_proposed_count", p.get("proposed_count", 0))
             log(f"{directory.name} phase={p.get('phase', 'starting')} | elapsed={elapsed:.0f}s"
                 f" | coverage={p.get('coverage', 0)}/{p.get('n_features', '?')}"
                 f" | sample_fits={p.get('sample_fits', 0)} | skipped={p.get('skipped_after', 0)}"
-                f" | witnesses={p.get('proposed_count', 0)} | sampling ETA={eta_text}"
+                f" | witnesses={p.get('witness_count', len(p.get('witnesses', {})))}"
+                f" | structured nominees={pool} | masks checked={len(p.get('selection_trials', []))}"
+                f" | sampling ETA={eta_text}"
                 f" | deadline in {max(0, seconds-elapsed):.0f}s")
     finally:
         timer.cancel()
@@ -105,8 +115,15 @@ def summary_row(dataset, outcome):
     for key in ("sampling_stop", "sample_fits", "skipped_after", "coverage", "n_features",
                 "proposed_count", "removed_count", "gate_passed", "full_validation_utility",
                 "proposed_validation_utility", "retained_validation_utility", "full_test_utility",
-                "retained_test_utility", "test_delta", "validation_fits", "test_fits", "completed_rounds"):
+                "retained_test_utility", "test_delta", "validation_fits", "test_fits", "completed_rounds",
+                "selection_policy", "selected_method", "ranking_fits", "sampling_reused", "inherited_sample_fits"):
         row[key] = data.get(key)
+    row["witness_count"] = data.get("witness_count", len(data.get("witnesses", {})))
+    row["selection_masks_evaluated"] = len(data.get("selection_trials", []))
+    row["inherited_sampling_s"] = outcome.get("inherited_sampling_s", data.get("inherited_sampling_s", 0.0))
+    row["wall_plus_reused_sampling_s"] = round(outcome["elapsed_s"] + row["inherited_sampling_s"], 3)
+    row["compression_fraction"] = (row["removed_count"] / row["n_features"]
+                                   if row["removed_count"] is not None and row["n_features"] else None)
     draws = data.get("sampled_draws", data.get("marginals"))
     row["sampled_draws"] = draws
     row["observed_marginals"] = None if draws is None else draws - data.get("skipped_after", 0)
@@ -124,18 +141,71 @@ def write_summary(output, rows):
     os.replace(temp, path)
 
 
+def write_method_comparison(output, datasets):
+    """Tabulate comparisons only after the workers have frozen their choices and exited."""
+    rows = []
+    for dataset in datasets:
+        result = _read(output / dataset / "result.json")
+        if not result:
+            continue
+        selection = result.get("selection", {})
+        for method, record in result.get("method_results", {}).items():
+            scores = record.get("scores", ())
+            reference = selection.get("full_scores", [result["full_validation_utility"]])
+            deltas = [s - r for s, r in zip(scores, reference, strict=True)]
+            rows.append(dict(dataset=dataset, metric=result["policy"]["utility"], method=method,
+                             delivered=(method == result["selected_method"]), n=result["n_features"],
+                             removed=record["removed_count"], removed_fraction=record["removed_count"]/result["n_features"],
+                             pooled_validation_delta=deltas[0], worst_validation_half_delta=min(deltas[1:]) if len(deltas)>1 else None,
+                             test_delta=record["test_delta"], test_utility=record["test_utility"]))
+    if rows:
+        with (output / "methods.csv").open("w", encoding="utf-8-sig", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=list(rows[0]))
+            writer.writeheader()
+            writer.writerows(rows)
+
+
+def reuse_budget(source, dataset, seconds, rounds, sample_seconds):
+    """Charge the measured sampling time once when replaying a frozen sampling stage."""
+    if source is None:
+        return None, float(seconds)
+    path = source / dataset / "result.json"
+    result = _read(path)
+    if (result.get("phase") != "complete" or result.get("dataset") != dataset or result.get("seed") != 42
+            or result.get("requested_rounds") != rounds or result.get("sample_seconds") != sample_seconds):
+        raise ValueError(f"Mismatched sampling result for {dataset}: {path}")
+    inherited = result["sample_elapsed_s"]
+    if not math.isfinite(inherited) or not 0 <= inherited < seconds:
+        raise ValueError(f"No valid remaining budget for {dataset}: {inherited!r}s previously sampled")
+    return path, seconds - inherited
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--datasets", nargs="+", choices=DATASETS, default=DATASETS)
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--dataset-seconds", type=int, default=900)
     parser.add_argument("--sample-seconds", type=int, default=780)
+    parser.add_argument("--selection-policy", choices=("structured", "wide", "witness_only"), default="structured")
+    parser.add_argument("--reuse-sampling-run", type=Path, help="Reuse verified seed-42 sampling evidence from an earlier run.")
     args = parser.parse_args()
     if (not 1 <= args.dataset_seconds <= 900 or not 0 < args.sample_seconds < args.dataset_seconds
             or args.rounds < 1 or len(set(args.datasets)) != len(args.datasets)):
         parser.error("Use distinct datasets, positive rounds, and 0 < sample-seconds < dataset-seconds <= 900.")
-    output = ROOT / "results/thesis_sampling" / datetime.now(MSK).strftime("seed42-%Y%m%d-%H%M%S-%f")
+    budgets = {dataset: reuse_budget(args.reuse_sampling_run, dataset, args.dataset_seconds,
+                                     args.rounds, args.sample_seconds) for dataset in args.datasets}
+    output = ROOT / "results/thesis_sampling" / datetime.now(MSK).strftime(f"seed42-{args.selection_policy}-%Y%m%d-%H%M%S-%f")
     output.mkdir(parents=True, exist_ok=False)
+    def selection_sources():
+        files = ("experiments/thesis_sampling_worker.py", "src/minppi_mofs/removal_selection.py",
+                 "src/minppi_mofs/minimum_sampling.py", "src/minppi_mofs/baselines/shap_top_k.py")
+        return {f: hashlib.sha256((ROOT / f).read_bytes()).hexdigest() for f in files}
+
+    sources = selection_sources()
+    _save(output / "protocol.json", {"datasets": list(args.datasets), "seed": 42, "rounds": args.rounds,
+          "selection_policy": args.selection_policy, "sample_seconds": args.sample_seconds,
+          "dataset_seconds": args.dataset_seconds, "reuse_sampling_run": str(args.reuse_sampling_run) if args.reuse_sampling_run else None,
+          "selection_source_sha256": sources})
 
     def log(message):
         line = f"{datetime.now(MSK):%H:%M:%S} MSK | {message}"
@@ -144,23 +214,33 @@ def main():
         print(line, flush=True)
 
     log(f"run={output.name} | seed=42 | rounds={args.rounds} | datasets={','.join(args.datasets)}"
-        f" | sampling allowance={args.sample_seconds}s | per-dataset hard limit={args.dataset_seconds}s")
+        f" | selection={args.selection_policy} | sampling allowance={args.sample_seconds}s"
+        f" | per-dataset hard limit={args.dataset_seconds}s | reuse={args.reuse_sampling_run}")
     summary = []
     for dataset in args.datasets:
+        if sources != selection_sources():
+            raise RuntimeError("Selection code changed during this run; start a new run for the revised policy.")
         directory = output / dataset
         directory.mkdir()
+        reuse, remaining = budgets[dataset]
         process = multiprocessing.get_context("spawn").Process(
-            target=_worker_entry, args=(dataset, directory, args.rounds, args.sample_seconds))
-        cutoff = datetime.now(MSK) + timedelta(seconds=args.dataset_seconds)
-        log(f"start {dataset} | hard stop by {cutoff:%H:%M:%S} MSK")
-        outcome = supervise(process, directory, args.dataset_seconds, log, args.sample_seconds)
+            target=_worker_entry, args=(dataset, directory, args.rounds, args.sample_seconds, args.selection_policy, reuse))
+        cutoff = datetime.now(MSK) + timedelta(seconds=remaining)
+        log(f"start {dataset} | inherited sampling={args.dataset_seconds-remaining:.2f}s"
+            f" | new work budget={remaining:.2f}s | hard stop by {cutoff:%H:%M:%S} MSK")
+        outcome = supervise(process, directory, remaining, log, args.sample_seconds)
         process.close()
+        outcome["inherited_sampling_s"] = args.dataset_seconds - remaining
+        outcome["dataset_limit_s"] = args.dataset_seconds
+        _save(directory / "watchdog.json", outcome)
         row = summary_row(dataset, outcome)
         summary.append(row)
         write_summary(output, summary)
         log(f"finish {dataset} | status={row['status']} | wall={row['wall_s']}s | removed={row['removed_count']}"
+            f" | nominees={row['proposed_count']} | policy={row['selected_method']}"
             f" | full test={row['full_test_utility']} | retained test={row['retained_test_utility']}"
             f" | delta={row['test_delta']}")
+    write_method_comparison(output, args.datasets)
     return int(any(row["status"] != "completed" for row in summary))
 
 
