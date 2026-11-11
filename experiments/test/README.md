@@ -17,6 +17,9 @@
 | 试验入口 | 用途 |
 | --- | --- |
 | `run_thesis_benchmark.py` | 用限时时间预算试跑六数据集、五 seed 的批量配置，支持 `--plan` |
+| `run_madelon_alpha.py` | 比较 Madelon seed 42 的互信息 Top-100 与原始 500 列。每组各运行一次 α=0.99、K=2，900 秒硬截止包含采样、选列、+1 复核和测试。 |
+| `run_relative_voting.py` | 比较同规模相对投票与 Gain，支持 Madelon、Spambase 与五个正式 seed，每个方法和划分独立限时 900 秒。[方案与实测结果](../../docs/thesis/test/budget-relative-voting.md) |
+| `replay_online_relative_voting.py` | 对已保存的验证贡献执行独立校准与单席序贯投票，记录每列失去保护资格、负证据过界与最终锁定的轮次。[规则和复现实例](../../docs/thesis/test/online-voting.md) |
 | `run_thesis_sampling.py` | 比较单 seed 的特征选择策略 |
 | `run_thesis_predictor.py` | 比较固定特征下的轮数或列采样方案，`--training-check` 在原训练分区内复核轮数 |
 | `thesis_sampling_pilot.py` | Madelon 两种采样器的初步比较，每种最多 384 次拟合、约 240 秒，在下一次拟合前检查 |
