@@ -18,6 +18,10 @@
 | --- | --- |
 | `run_thesis_benchmark.py` | 用限时时间预算试跑六数据集、五 seed 的批量配置，支持 `--plan` |
 | `run_madelon_alpha.py` | 比较 Madelon seed 42 的互信息 Top-100 与原始 500 列。每组各运行一次 α=0.99、K=2，900 秒硬截止包含采样、选列、+1 复核和测试。 |
+| `run_madelon_binary_widths.py` | 在相同的 Madelon seed 42 划分上比较 100 列、500 列两种输入，以及负向投票后重新计算 Gain、直接 Gain 两种筛选方式。每组独立启动并限时 900 秒，实时日志和汇总保存在输出目录。 |
+| `run_madelon_fixed13.py --primary <四组试验输出目录>` | 在已冻结的四个 Gain 排序中各取前 13 列，比较相同保留列数下的 AUC，并记录原互信息 Top-100 之外的入选列。 |
+| `run_madelon_all_sizes.py` | 单独测试 Madelon seed 42 的全部保留列数。四组均从头计算 Gain 排序，每种列数验证一个子集。按整体验证 AUC 选列，同分时保留较少列；两个验证半集仅作记录。每组限时 900 秒，逐列验证记录写入 `validation_curve.csv`。 |
+| `run_piv0_seed42.py` | 在六个正式预处理集上比较 PIv0 与直接 Gain。每组按原数据集指标验证全部可用的保留列数，独立冷启动并限时 900 秒。[PIv0 定义与 seed 42 对照结果](../../docs/thesis/test/piv0-seed42.md) |
 | `run_relative_voting.py` | 比较同规模相对投票与 Gain，支持 Madelon、Spambase 与五个正式 seed，每个方法和划分独立限时 900 秒。[方案与实测结果](../../docs/thesis/test/budget-relative-voting.md) |
 | `replay_online_relative_voting.py` | 对已保存的验证贡献执行独立校准与单席序贯投票，记录每列失去保护资格、负证据过界与最终锁定的轮次。[规则和复现实例](../../docs/thesis/test/online-voting.md) |
 | `run_thesis_sampling.py` | 比较单 seed 的特征选择策略 |

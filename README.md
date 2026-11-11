@@ -25,6 +25,20 @@ Matplotlib / Numba 缓存放在本工作树的 `tmp/` 中；退出后恢复原�
 不要重复执行下方的环境安装步骤，也不要执行 `pip install -e .`，否则会改变
 共享环境的源码指向。共享依赖的升级会同时影响两份项目。
 
+## PIv0 与直接 Gain 的五个 seed 对照
+
+在 `Paper` 目录运行下列命令，对六个正式预处理数据集逐一比较 PIv0 和直接 Gain。每个 seed 使用自己冻结的数据分区与预处理列，按整体验证效用选择保留列数。新训练的两种方法按配对顺序串行运行，每个方法独立计时。
+
+```powershell
+.\MastersThesis\thesis-python.ps1 experiments/run_piv0_benchmark.py
+```
+
+程序复用已完成并通过核验的 seed 42 配对结果，保留其原始耗时，再运行 seed 123、456、789 和 1024。进度写入本次运行目录的 `run.log`。重新启动时，可用 `--output <本次运行目录>` 接续已有结果。60 次运行全部完成后，用以下命令生成每数据集汇总、30 组配对明细和总耗时表；将引号内的路径替换为程序打印的实际目录。[五个 seed 的对照表与逐组数据](docs/thesis/experiments/piv0-five-seeds.md)
+
+```powershell
+.\MastersThesis\thesis-python.ps1 experiments/summarize_piv0.py 'results/thesis_benchmark/<本次运行目录名>'
+```
+
 ## 硕士论文正式实验（六个数据集、五个 seed）
 
 打开 PowerShell，在包含 `Master`、`MastersThesis` 和 `venv` 的 `Paper` 目录
