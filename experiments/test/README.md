@@ -22,6 +22,7 @@
 | `run_madelon_fixed13.py --primary <四组试验输出目录>` | 在已冻结的四个 Gain 排序中各取前 13 列，比较相同保留列数下的 AUC，并记录原互信息 Top-100 之外的入选列。 |
 | `run_madelon_all_sizes.py` | 单独测试 Madelon seed 42 的全部保留列数。四组均从头计算 Gain 排序，每种列数验证一个子集。按整体验证 AUC 选列，同分时保留较少列；两个验证半集仅作记录。每组限时 900 秒，逐列验证记录写入 `validation_curve.csv`。 |
 | `run_piv0_seed42.py` | 在六个正式预处理集上比较 PIv0 与直接 Gain。每组按原数据集指标验证全部可用的保留列数，独立冷启动并限时 900 秒。[PIv0 定义与 seed 42 对照结果](../../docs/thesis/test/piv0-seed42.md) |
+| `run_piv1_pilot.py` | PIv1 用三层相对投票、最弱层得分和可回补的子集搜索选列。先运行 `develop`，再用 `final --run <输出目录>` 冻结全局方案，在 seed 42 和 123 上比较投票与等预算无投票对照。[方法、实测对照与复现命令](../../docs/thesis/test/piv1-pilot.md) |
 | `run_relative_voting.py` | 比较同规模相对投票与 Gain，支持 Madelon、Spambase 与五个正式 seed，每个方法和划分独立限时 900 秒。[方案与实测结果](../../docs/thesis/test/budget-relative-voting.md) |
 | `replay_online_relative_voting.py` | 对已保存的验证贡献执行独立校准与单席序贯投票，记录每列失去保护资格、负证据过界与最终锁定的轮次。[规则和复现实例](../../docs/thesis/test/online-voting.md) |
 | `run_thesis_sampling.py` | 比较单 seed 的特征选择策略 |

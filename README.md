@@ -25,6 +25,15 @@ Matplotlib / Numba 缓存放在本工作树的 `tmp/` 中；退出后恢复原�
 不要重复执行下方的环境安装步骤，也不要执行 `pip install -e .`，否则会改变
 共享环境的源码指向。共享依赖的升级会同时影响两份项目。
 
+## PIv1 与直接 Gain 的五个 seed 对照
+
+在 `Paper` 目录运行以下 PowerShell 命令。第一条按冻结的 PIv1 普通投票配方汇集完整历史配对记录并补算缺少的划分，实时打印进度；第二条在全部 60 次运行完成后生成对比表。将第二条命令中的目录名替换为第一条打印的实际结果目录。需要接续中断的批次时，给第一条命令加 `--output <本次运行目录>`。[正式结果和实验口径](docs/thesis/experiments/piv1-five-seeds.md)
+
+```powershell
+.\MastersThesis\thesis-python.ps1 experiments/run_piv1_benchmark.py
+.\MastersThesis\thesis-python.ps1 experiments/summarize_piv1.py 'results/thesis_benchmark/<本次运行目录名>'
+```
+
 ## PIv0 与直接 Gain 的五个 seed 对照
 
 在 `Paper` 目录运行下列命令，对六个正式预处理数据集逐一比较 PIv0 和直接 Gain。每个 seed 使用自己冻结的数据分区与预处理列，按整体验证效用选择保留列数。新训练的两种方法按配对顺序串行运行，每个方法独立计时。
