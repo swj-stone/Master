@@ -1,6 +1,8 @@
 # 限时 test 实验：单 seed 采样与方案比较
 
-从 `MastersThesis` 目录运行以下命令，在六个正式数据集上各测试 seed 42。输入来自已冻结的预处理
+本页记录 PIv0 之前的限时采样方案。原试验入口和对应运行日志已从硕士工作树清理。后续可运行的对照见 [PIv0 单 seed 实验](piv0-seed42.md)。
+
+早期试验在六个正式数据集上各测试 seed 42。输入来自已冻结的预处理
 CSV，加载时校验文件哈希。每轮为每个仍在搜索的特征抽一次联盟，按原配额判定胜负，
 并缓存联盟的验证效用。已有最小值为 0 且基础联盟未达标时，可以跳过新增特征后的
 那次评估。发现负见证时记录两个端点，停止该特征的搜索。
@@ -11,11 +13,7 @@ Python 入口 `estimate_minppi(...)` 默认使用 `method="sampled", K=5`。指�
 `grouped_nested_v1` 执行与计数规则。需要同时计算多个指标的配对实验按完整计划
 读取端点，以便各指标使用相同的模型预测。
 
-```powershell
-.\thesis-python.ps1 experiments/test/run_thesis_sampling.py --rounds 5 --sample-seconds 780 --dataset-seconds 900
-```
-
-每个数据集独立计时。上例最多采样 13 分钟，加载数据、采样、选集和最终测试合计
+每个数据集独立计时，最多采样 13 分钟，加载数据、采样、选集和最终测试合计
 最多 15 分钟，由父进程执行硬截止。提前结束时记录实际覆盖数和完成轮数。
 
 默认的 `--selection-policy structured` 将所有观测到 −1 的特征提名为有害候选，再从
@@ -65,15 +63,10 @@ Gain 与 TreeSHAP 平均名次从低到高排列零分列；第二种按 Gain �
 上拟合模型，在另一半计算 TreeSHAP，结合训练 Gain 生成两份重要性排名。优先提名
 两半排名都低的特征，最多验证五个子集。
 
-固定列后可单独测试预测器。下面的命令复用 seed 42 下冻结的列，在全特征和
-`guarded` 子集上各自比较原预测及增加提升轮数后的预测。将 `rounds` 替换为
-`column_blend` 可比较每个节点随机采样一半特征的第二个模型与原模型的平均预测。
+固定列的预测器试验复用了 seed 42 下冻结的列，在全特征和
+`guarded` 子集上各自比较原预测及增加提升轮数后的预测。`column_blend` 方案比较了每个节点随机采样一半特征的第二个模型与原模型的平均预测。
 
-```powershell
-.\thesis-python.ps1 experiments/test/run_thesis_predictor.py results/test/thesis_sampling/seed42-confirmed-20261110-191743-946395 --recipe rounds
-```
-
-在 `--recipe rounds` 后附加 `--training-check`，可只在原训练分区内部按 60/20/20
+`rounds` 的 `training-check` 复核仅在原训练分区内部按 60/20/20
 重新划分，复核固定特征子集上的预测效果。两种预测实验均把已消耗的选列准备时间
 计入每个数据集的 15 分钟硬截止。[稳定性实验结果](stability-seed42.md)
 
@@ -82,13 +75,7 @@ Gain 与 TreeSHAP 平均名次从低到高排列零分列；第二种按 Gain �
 `wide` 的 MinPI 路径优先比较删除的负见证数，再比较总删除数。全部方法的掩码在读取
 测试集前冻结，随后合并训练集与验证集重训，记录各方法的测试表现。
 
-使用 `--selection-policy witness_only` 可复现原负见证提名和整组验证。
-给 `--reuse-sampling-run` 传入先前运行目录，可核验并复用相同的 MinPI 抽样。
+`witness_only` 策略按负见证提名并整组验证。配对对照通过 `--reuse-sampling-run` 核验并复用了同一批 MinPI 抽样。
 复用模式把原采样耗时计入每个数据集的硬上限，同时单独记录本次新增耗时。
 
-每次运行都会打印新的 `results/test/thesis_sampling/seed42-…/` 目录。终端和
-`run.log` 显示当前阶段、耗时、采样 ETA、硬截止剩余时间、拟合次数和见证数。
-另开 PowerShell 可用 `Get-Content -LiteralPath '<本次运行目录>\run.log' -Tail 10 -Wait` 追踪。
-`summary.csv` 汇总每个数据集的训练效果和墙钟耗时，各数据集子目录保存
-`progress.json`、`watchdog.json` 和成功完成时的 `result.json`。`methods.csv` 列出
-每种策略的删除数量、比例及验证和测试效用变化，具体特征名见数据集结果。
+原试验的 `run.log` 记录阶段、耗时、采样 ETA、硬截止剩余时间、拟合次数和见证数。`summary.csv` 汇总各数据集训练结果和墙钟耗时，`methods.csv` 记录各策略的删列数及验证和测试效用变化。本文保留了这些记录的指标定义。

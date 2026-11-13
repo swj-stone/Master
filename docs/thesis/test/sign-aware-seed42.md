@@ -45,7 +45,4 @@ TreeSHAP 的测试 AUC 分别提高 0.080281、0.076317、0.067855。ISOLET 的�
 Madelon 另以 `guarded` 从头采样、拟合和测试，用时 153.106 秒，复现了相同的
 13 列保留子集及测试 AUC 0.865636。冷启动记录为 `seed42-guarded-20261110-192134-444036`。
 
-这组限时试验已归档于 `results/test/thesis_sampling/`。第一轮的标识为
-`seed42-sign_aware-20261110-191152-485309`，第二轮为
-`seed42-confirmed-20261110-191743-946395`。第二轮目录的 `comparison/`
-保存逐方法结果、回顾比较的六个冻结子集及测试分数。
+2026-11-13 清理了这一轮的原始运行目录，包括分值筛选、训练分区复核和 Madelon 冷启动的逐次日志。上表保留当时的汇总。后续正式 guarded 的 11 组历史对照仍可查阅。[PIv0 与历史版本的比较](../experiments/piv0-method-comparison.md)
