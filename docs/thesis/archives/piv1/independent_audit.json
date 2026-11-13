@@ -1,0 +1,320 @@
+{
+  "catalog_sha256": "3fb4b9716759de8b3d4ebede5422a41a9a618e9b833f2437fa83bd29d252c0f3",
+  "checked_partition_files": 90,
+  "copied_direct_gain": 30,
+  "copied_piv1": 12,
+  "new_piv1": 18,
+  "pair_scores": [
+    {
+      "dataset": "abalone",
+      "gain_seconds": 4.626694799997495,
+      "gain_test": 0.5463475020659226,
+      "metric": "r2",
+      "piv1_seconds": 4.8583420000068145,
+      "piv1_test": 0.5463475020659226,
+      "seed": 42,
+      "width": 8
+    },
+    {
+      "dataset": "spambase",
+      "gain_seconds": 11.873962500001653,
+      "gain_test": 0.9880229469672286,
+      "metric": "roc_auc",
+      "piv1_seconds": 6.487859100001515,
+      "piv1_test": 0.9881587132320271,
+      "seed": 42,
+      "width": 56
+    },
+    {
+      "dataset": "madelon",
+      "gain_seconds": 19.468952600000193,
+      "gain_test": 0.8719674556213018,
+      "metric": "roc_auc",
+      "piv1_seconds": 8.767037400000845,
+      "piv1_test": 0.8719674556213018,
+      "seed": 42,
+      "width": 100
+    },
+    {
+      "dataset": "gisette",
+      "gain_seconds": 21.245399599996745,
+      "gain_test": 0.9874224489795919,
+      "metric": "roc_auc",
+      "piv1_seconds": 8.21245259999705,
+      "piv1_test": 0.9878091836734693,
+      "seed": 42,
+      "width": 100
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "gain_seconds": 20.537316299996746,
+      "gain_test": 0.9789289590343734,
+      "metric": "roc_auc",
+      "piv1_seconds": 13.493335899998783,
+      "piv1_test": 0.9771545858073111,
+      "seed": 42,
+      "width": 29
+    },
+    {
+      "dataset": "isolet",
+      "gain_seconds": 337.06983559999935,
+      "gain_test": 0.993805982905983,
+      "metric": "ovr_auc",
+      "piv1_seconds": 94.98550999999861,
+      "piv1_test": 0.9936666666666667,
+      "seed": 42,
+      "width": 100
+    },
+    {
+      "dataset": "abalone",
+      "gain_seconds": 4.547349200001918,
+      "gain_test": 0.5266222187611287,
+      "metric": "r2",
+      "piv1_seconds": 4.981177499998012,
+      "piv1_test": 0.5266222187611287,
+      "seed": 123,
+      "width": 8
+    },
+    {
+      "dataset": "spambase",
+      "gain_seconds": 11.721817600002396,
+      "gain_test": 0.986917069028506,
+      "metric": "roc_auc",
+      "piv1_seconds": 7.089406199986115,
+      "piv1_test": 0.9868973212081716,
+      "seed": 123,
+      "width": 55
+    },
+    {
+      "dataset": "madelon",
+      "gain_seconds": 21.437332000001334,
+      "gain_test": 0.870784023668639,
+      "metric": "roc_auc",
+      "piv1_seconds": 7.444757799996296,
+      "piv1_test": 0.870784023668639,
+      "seed": 123,
+      "width": 100
+    },
+    {
+      "dataset": "gisette",
+      "gain_seconds": 21.844883099998697,
+      "gain_test": 0.990608163265306,
+      "metric": "roc_auc",
+      "piv1_seconds": 8.492205400005332,
+      "piv1_test": 0.9900612244897959,
+      "seed": 123,
+      "width": 100
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "gain_seconds": 21.13150570000289,
+      "gain_test": 0.9771723510732374,
+      "metric": "roc_auc",
+      "piv1_seconds": 13.225430899998173,
+      "piv1_test": 0.9712380344653336,
+      "seed": 123,
+      "width": 29
+    },
+    {
+      "dataset": "isolet",
+      "gain_seconds": 335.2581743000046,
+      "gain_test": 0.9930542735042737,
+      "metric": "ovr_auc",
+      "piv1_seconds": 95.76287969999248,
+      "piv1_test": 0.9929970085470086,
+      "seed": 123,
+      "width": 100
+    },
+    {
+      "dataset": "abalone",
+      "gain_seconds": 4.536097099990002,
+      "gain_test": 0.5539476992898117,
+      "metric": "r2",
+      "piv1_seconds": 4.885828799990122,
+      "piv1_test": 0.5539476992898117,
+      "seed": 456,
+      "width": 8
+    },
+    {
+      "dataset": "spambase",
+      "gain_seconds": 11.953672600007849,
+      "gain_test": 0.9837376699546787,
+      "metric": "roc_auc",
+      "piv1_seconds": 7.365217600003234,
+      "piv1_test": 0.9827157202523771,
+      "seed": 456,
+      "width": 56
+    },
+    {
+      "dataset": "madelon",
+      "gain_seconds": 19.579748500007554,
+      "gain_test": 0.8534171597633136,
+      "metric": "roc_auc",
+      "piv1_seconds": 10.2664633999957,
+      "piv1_test": 0.8352366863905325,
+      "seed": 456,
+      "width": 100
+    },
+    {
+      "dataset": "gisette",
+      "gain_seconds": 21.931872700006352,
+      "gain_test": 0.9886183673469389,
+      "metric": "roc_auc",
+      "piv1_seconds": 9.322860200001742,
+      "piv1_test": 0.9886928571428572,
+      "seed": 456,
+      "width": 100
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "gain_seconds": 20.375750499995775,
+      "gain_test": 0.9711489389650063,
+      "metric": "roc_auc",
+      "piv1_seconds": 12.207507400002214,
+      "piv1_test": 0.9762573501544681,
+      "seed": 456,
+      "width": 29
+    },
+    {
+      "dataset": "isolet",
+      "gain_seconds": 333.5964559000131,
+      "gain_test": 0.9935799145299143,
+      "metric": "ovr_auc",
+      "piv1_seconds": 94.44790009999997,
+      "piv1_test": 0.9936935897435897,
+      "seed": 456,
+      "width": 100
+    },
+    {
+      "dataset": "abalone",
+      "gain_seconds": 4.555707399995299,
+      "gain_test": 0.513998038508087,
+      "metric": "r2",
+      "piv1_seconds": 4.885494699992705,
+      "piv1_test": 0.513998038508087,
+      "seed": 789,
+      "width": 8
+    },
+    {
+      "dataset": "spambase",
+      "gain_seconds": 11.985869500000263,
+      "gain_test": 0.9863715354917701,
+      "metric": "roc_auc",
+      "piv1_seconds": 7.1424909999914235,
+      "piv1_test": 0.9862579855248477,
+      "seed": 789,
+      "width": 56
+    },
+    {
+      "dataset": "madelon",
+      "gain_seconds": 19.587781099995482,
+      "gain_test": 0.8905843195266272,
+      "metric": "roc_auc",
+      "piv1_seconds": 9.141543799996725,
+      "piv1_test": 0.8976775147928994,
+      "seed": 789,
+      "width": 100
+    },
+    {
+      "dataset": "gisette",
+      "gain_seconds": 21.946662500005914,
+      "gain_test": 0.9892051020408164,
+      "metric": "roc_auc",
+      "piv1_seconds": 8.967244100000244,
+      "piv1_test": 0.9892142857142856,
+      "seed": 789,
+      "width": 100
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "gain_seconds": 21.11569029999373,
+      "gain_test": 0.9614015502796505,
+      "metric": "roc_auc",
+      "piv1_seconds": 15.109273900001426,
+      "piv1_test": 0.9583811859014849,
+      "seed": 789,
+      "width": 29
+    },
+    {
+      "dataset": "isolet",
+      "gain_seconds": 334.7423375000071,
+      "gain_test": 0.9930854700854701,
+      "metric": "ovr_auc",
+      "piv1_seconds": 93.62697499999194,
+      "piv1_test": 0.99296452991453,
+      "seed": 789,
+      "width": 100
+    },
+    {
+      "dataset": "abalone",
+      "gain_seconds": 4.5658377000072505,
+      "gain_test": 0.5487469236671896,
+      "metric": "r2",
+      "piv1_seconds": 5.426294000004418,
+      "piv1_test": 0.5487469236671896,
+      "seed": 1024,
+      "width": 8
+    },
+    {
+      "dataset": "spambase",
+      "gain_seconds": 11.994149100006325,
+      "gain_test": 0.9830563701531445,
+      "metric": "roc_auc",
+      "piv1_seconds": 7.029292400009581,
+      "piv1_test": 0.9830341538552683,
+      "seed": 1024,
+      "width": 56
+    },
+    {
+      "dataset": "madelon",
+      "gain_seconds": 19.58749859999807,
+      "gain_test": 0.7455103550295858,
+      "metric": "roc_auc",
+      "piv1_seconds": 8.526300600002287,
+      "piv1_test": 0.7455103550295858,
+      "seed": 1024,
+      "width": 100
+    },
+    {
+      "dataset": "gisette",
+      "gain_seconds": 21.825249200002872,
+      "gain_test": 0.9881928571428572,
+      "metric": "roc_auc",
+      "piv1_seconds": 9.122817500014207,
+      "piv1_test": 0.9881326530612244,
+      "seed": 1024,
+      "width": 100
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "gain_seconds": 20.953988199995365,
+      "gain_test": 0.9858629756066748,
+      "metric": "roc_auc",
+      "piv1_seconds": 14.691828499999247,
+      "piv1_test": 0.9858629756066748,
+      "seed": 1024,
+      "width": 29
+    },
+    {
+      "dataset": "isolet",
+      "gain_seconds": 334.4240112999978,
+      "gain_test": 0.9935504273504273,
+      "metric": "ovr_auc",
+      "piv1_seconds": 93.49663809999765,
+      "piv1_test": 0.9937884615384613,
+      "seed": 1024,
+      "width": 100
+    }
+  ],
+  "recipe": "vote",
+  "seeds": [
+    42,
+    123,
+    456,
+    789,
+    1024
+  ],
+  "status": "pass",
+  "verified_arms": 60,
+  "verified_pairs": 30
+}

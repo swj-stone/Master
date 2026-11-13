@@ -19,3 +19,12 @@
 - Push only the thesis branch to the existing `origin`, for example
   `git push -u origin thesis/masters`. Never force-push or push to `main` as part
   of thesis work.
+
+## PI versions
+
+- Use the annotated tag `thesis/piv1-frozen` as the PIv1 baseline. Its method,
+  settings, and evidence are indexed in [the archive](docs/thesis/archives/piv1/README.md).
+- Develop subsequent PI variants separately from PIv1. Retain voting and the
+  minimum across coalition-size strata. Prioritize end-to-end efficiency and
+  reuse with different downstream selectors. Measure each backend on its own
+  and with the PI prefilter, including the cost of prefiltering.

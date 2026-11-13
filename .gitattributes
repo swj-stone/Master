@@ -1,2 +1,11 @@
 # Preserve PDF bytes: line-ending conversion can invalidate cross-reference offsets.
 *.pdf binary
+
+# Benchmark protocols identify these files by their literal SHA-256 bytes.
+src/minppi_mofs/piv1.py text eol=lf
+src/minppi_mofs/piv1_search.py text eol=lf
+experiments/run_piv1_benchmark.py text eol=lf
+experiments/test/run_piv1_pilot.py text eol=lf
+experiments/test/run_sampled_permutation_seed42.py text eol=lf
+docs/thesis/archives/piv1/*.json -text
+docs/thesis/archives/piv1/*.csv -text

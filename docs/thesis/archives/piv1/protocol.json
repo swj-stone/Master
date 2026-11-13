@@ -1,0 +1,42 @@
+{
+  "backend": "cuda",
+  "catalog_hash": "3fb4b9716759de8b3d4ebede5422a41a9a618e9b833f2437fa83bd29d252c0f3",
+  "cold_start": true,
+  "datasets": [
+    "madelon",
+    "spambase",
+    "abalone",
+    "gisette",
+    "credit_card_fraud",
+    "isolet"
+  ],
+  "direct_gain_run": "C:\\work\\学校\\A.SPBU\\paper\\ZhaoCHI\\Paper\\MastersThesis\\results\\thesis_benchmark\\PIv0-all-seeds-20261111-213840-398718",
+  "frozen_lock": "a8b0c8463df00d4b41711f1beebb8f17410744c74374160adea4bc47cf278b58",
+  "limit_s_per_new_arm": null,
+  "methods": [
+    "PIv1",
+    "direct_gain"
+  ],
+  "model_params": {
+    "learning_rate": 0.1,
+    "max_depth": 4,
+    "n_estimators": 100,
+    "n_jobs": 1
+  },
+  "pilot_run": "C:\\work\\学校\\A.SPBU\\paper\\ZhaoCHI\\Paper\\MastersThesis\\results\\test\\thesis_sampling\\PIv1-pilot-20261111-234033-780781",
+  "pilot_source_hashes": {
+    "piv1.py": "89a7ea786ea33519c021cbbbd371d3fe751aee3255faa01fd4953813cd63336f",
+    "piv1_search.py": "a138c9e4ad908ea4f60052bce980aa59153850c1a37e4f78734132cdd9d3317a",
+    "run_piv1_pilot.py": "cef2e3a301d8d411e2ec4b4204ab48cdf26883744a330092b909e24d150aafba"
+  },
+  "primary_recipe": "vote",
+  "runner_sha256": "1f98733aed46d85c4b8d86084237e3bd58a78b28395ae8d0169b220d26425038",
+  "seeds": [
+    42,
+    123,
+    456,
+    789,
+    1024
+  ],
+  "version": "PIv1"
+}
