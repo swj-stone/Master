@@ -3557,7 +3557,8 @@ def _run_removal_plan(context: StageContext) -> ResultRecord:
         diagnostics[method] = diag
         baseline_values[method] = scores
 
-    compute_baseline("shap_bottom", compute_shap_topk_importance, {})
+    # The conference protocol aggregated exact contributions over every training row.
+    compute_baseline("shap_bottom", compute_shap_topk_importance, {"max_rows": None})
     shared_diagnostics: dict[str, int] = {}
     with _open_shared_baseline_utility(
         context,

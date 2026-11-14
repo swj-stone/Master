@@ -7,6 +7,8 @@ SELECTOR_MODULES = {
     "gain": "minppi_mofs.baselines.gain",
     "pfi": "minppi_mofs.baselines.pfi",
     "sampling_shap": "minppi_mofs.baselines.sampling_shap",
+    "tree_shap_top_k": "minppi_mofs.baselines.shap_top_k",
+    "nsga2": "minppi_mofs.baselines.nsga2_fs",
     "minshap": "minppi_mofs.baselines.min_shap",
     "banzhaf": "minppi_mofs.baselines.banzhaf_fs",
     "shapg": "minppi_mofs.baselines.shapg",

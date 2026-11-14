@@ -38,7 +38,13 @@ import numpy as np
 import pandas as pd
 from xgboost import XGBClassifier, XGBRegressor
 
-from minppi_mofs.modeling import evaluate_fixed_subset
+from minppi_mofs.modeling import evaluate_fixed_subset, prepare_subset_evaluator
+
+
+# Standalone search budget. The conference protocol passes its own schedule.
+DEFAULT_POP_SIZE = 8
+DEFAULT_MAX_GEN = 2
+DEFAULT_MODEL_PARAMS = dict(n_estimators=100, max_depth=4, learning_rate=.1, n_jobs=1)
 
 
 # ---------------------------------------------------------------------------
@@ -77,81 +83,31 @@ class NSGA2Result:
 # ---------------------------------------------------------------------------
 
 
-def _evaluate_individual(
-    mask: np.ndarray,
-    X_tr: pd.DataFrame,
-    y_tr: np.ndarray,
-    X_val: pd.DataFrame,
-    y_val: np.ndarray,
-    *,
-    task: str = "binary",
-    utility: str | None = None,
-    model_params: Mapping[str, object] | None = None,
-    backend: str = "cpu",
-    seed: int = 42,
-    cardinality_denominator: int | None = None,
-    utility_evaluator: Callable[[tuple[str, ...]], float] | None = None,
-) -> tuple[float, float]:
-    """Evaluate one candidate solution.
+def _denominator(width, override):
+    value = width if override is None else override
+    if isinstance(value, bool) or not isinstance(value, int) or value < max(1, width):
+        raise ValueError("cardinality_denominator must be a positive integer at least as large as the search dimension")
+    return value
 
-    Args:
-        mask: Binary array of shape (n_features,).  1 = selected.
-        X_tr, y_tr: Training data.
-        X_val, y_val: Validation data.
-        task: ``"binary"``, ``"multiclass"``, or ``"regression"``.
-        seed: XGBoost random seed.
 
-    Returns:
-        ``(cardinality_ratio, 1 − utility)`` — both minimised.
-    """
-    n = X_tr.shape[1]
-    denominator = n if cardinality_denominator is None else cardinality_denominator
-    if (
-        isinstance(denominator, bool)
-        or not isinstance(denominator, int)
-        or denominator < max(1, n)
-    ):
-        raise ValueError(
-            "cardinality_denominator must be a positive integer at least as large "
-            "as the search dimension"
+def _utility_metric(task, utility):
+    return utility or {"regression": "r2", "multiclass": "accuracy"}.get(task, "roc_auc")
+
+
+def _evaluate_individual(mask, X_tr, y_tr, X_val, y_val, *, task="binary", utility=None,
+                         model_params=None, backend="cpu", seed=42, cardinality_denominator=None,
+                         utility_evaluator=None):
+    """Standalone single-mask evaluator; a population search prepares its shared data once."""
+    denominator = _denominator(X_tr.shape[1], cardinality_denominator)
+    selected = tuple(X_tr.columns[np.flatnonzero(mask)])
+    if utility_evaluator is not None:
+        value = utility_evaluator(selected)
+    else:
+        value = evaluate_fixed_subset(
+            X_tr, y_tr, X_val, y_val, selected, task=task, utility=_utility_metric(task, utility),
+            model_params=DEFAULT_MODEL_PARAMS if model_params is None else model_params, backend=backend, seed=seed,
         )
-    selected = tuple(X_tr.columns[j] for j in range(n) if mask[j])
-    chosen_utility = utility or (
-        "r2" if task == "regression" else "accuracy" if task == "multiclass" else "roc_auc"
-    )
-    params = (
-        dict(model_params)
-        if model_params is not None
-        else {
-            "n_estimators": 100,
-            "max_depth": 4,
-            "learning_rate": 0.1,
-            "n_jobs": 1,
-        }
-    )
-    value = (
-        utility_evaluator(selected)
-        if utility_evaluator is not None
-        else evaluate_fixed_subset(
-            X_tr,
-            y_tr,
-            X_val,
-            y_val,
-            selected,
-            task=task,
-            utility=chosen_utility,
-            model_params=params,
-            backend=backend,
-            seed=seed,
-        )
-    )
-    clipped = float(np.clip(value, 0.0, 1.0))
-    return len(selected) / denominator, 1.0 - clipped
-
-
-# ---------------------------------------------------------------------------
-# NSGA-II core operators
-# ---------------------------------------------------------------------------
+    return len(selected) / denominator, 1.0 - float(np.clip(value, 0.0, 1.0))
 
 
 def _non_dominated_sort(
@@ -166,19 +122,18 @@ def _non_dominated_sort(
         List of front arrays, each containing indices into *fitness*.
     """
     n = fitness.shape[0]
-    dominated_by: list[set] = [set() for _ in range(n)]
+    dominated_by = []
     dominates_count = [0] * n
     fronts: list[list[int]] = [[]]
 
+    for i, point in enumerate(fitness):
+        # Keep the same set insertion order used by environmental selection when
+        # fronts tie. Only one row of pairwise comparisons is needed at a time.
+        dominates = np.all(point <= fitness, axis=1) & np.any(point < fitness, axis=1)
+        dominated_by.append(set(np.flatnonzero(dominates).tolist()))
+        for j in dominated_by[-1]:
+            dominates_count[j] += 1
     for i in range(n):
-        for j in range(n):
-            if i == j:
-                continue
-            fi, fj = fitness[i], fitness[j]
-            if (fi <= fj).all() and (fi < fj).any():
-                dominated_by[i].add(j)
-            elif (fj <= fi).all() and (fj < fi).any():
-                dominates_count[i] += 1
         if dominates_count[i] == 0:
             fronts[0].append(i)
 
@@ -235,14 +190,9 @@ def _compute_hv(front: np.ndarray, ref: np.ndarray) -> float:
     points = points[np.all(points <= ref, axis=1)]
     if len(points) == 0:
         return 0.0
-    # De-duplicate and keep only non-dominated points
-    points = np.unique(points, axis=0)
-    points = points[_non_dominated_sort(points)[0]]
-    if len(points) == 0:
-        return 0.0
-    # Sort by first objective ascending (second objective will be descending
-    # because the points are mutually non-dominated)
-    points = points[np.argsort(points[:, 0])]
+    # For equal x visit the lowest y first. Dominated or duplicate points
+    # then never improve best_y, so no second non-dominated sort is needed.
+    points = points[np.lexsort((points[:, 1], points[:, 0]))]
     hv = 0.0
     best_y = float(ref[1])
     for x, y in points:
@@ -291,14 +241,15 @@ def nsga2_feature_selection(
     model_params: Mapping[str, object] | None = None,
     backend: str = "cpu",
     seed: int = 42,
-    pop_size: int = 20,
-    max_gen: int = 20,
+    pop_size: int = DEFAULT_POP_SIZE,
+    max_gen: int = DEFAULT_MAX_GEN,
     p_crossover: float = 0.5,
     p_mutation: Optional[float] = None,
     ref_point: tuple[float, float] = (1.0, 1.0),
     verbose: bool = False,
     cardinality_denominator: int | None = None,
     utility_evaluator: Callable[[tuple[str, ...]], float] | None = None,
+    progress: Callable[..., None] | None = None,
 ) -> NSGA2Result:
     """Run NSGA-II for multi-objective feature selection.
 
@@ -307,41 +258,42 @@ def nsga2_feature_selection(
       - ``f₁(m) = |m|₀ / n``  (cardinality ratio)
       - ``f₂(m) = 1 − clipped utility``    (error)
 
-    Operators: tournament selection (rank+CD), uniform crossover,
-    bit-flip mutation.
+    Operators: dominance tournament, uniform crossover, bit-flip mutation and
+    front/crowding-based survivor selection. The evaluation budget is
+    ``pop_size * (1 + max_gen)`` including the initial population.
+    A previously evaluated subset reuses its cached fitness.
 
     Args:
         X_train, y_train: Training data.
         X_val, y_val: Validation data (used for objective evaluation).
         task: ``"binary"``, ``"multiclass"``, or ``"regression"``.
         seed: Random seed.
-        pop_size: Population size (default 20).
-        max_gen: Maximum generations (default 20).
+        pop_size: Population size (default 8).
+        max_gen: Offspring generations (default 2).
         p_crossover: Crossover probability per gene (default 0.5).
         p_mutation: Per-bit mutation probability.  Default: ``1/n``.
         ref_point: Reference point for hypervolume.
         verbose: Print progress every 5 generations.
+        progress: Callback after each logical evaluation with logical_evaluation_count,
+            unique_subset_count, memoization_hit_count, selected_count and cached.
 
     Returns:
         ``NSGA2Result`` dataclass.
     """
     rng = np.random.default_rng(seed)
     n = X_train.shape[1]
-    denominator = n if cardinality_denominator is None else cardinality_denominator
-    if (
-        isinstance(denominator, bool)
-        or not isinstance(denominator, int)
-        or denominator < max(1, n)
-    ):
-        raise ValueError(
-            "cardinality_denominator must be a positive integer at least as large "
-            "as the search dimension"
-        )
+    denominator = _denominator(n, cardinality_denominator)
     if utility_evaluator is not None and not callable(utility_evaluator):
         raise TypeError("utility_evaluator must be callable")
     p_mut = p_mutation if p_mutation is not None else (1.0 / n if n else 0.0)
     reference = np.asarray(ref_point, dtype=float)
     t0 = time.perf_counter()
+    if utility_evaluator is None:
+        utility_evaluator = prepare_subset_evaluator(
+            X_train, y_train, X_val, y_val, task=task, utility=_utility_metric(task, utility),
+            model_params=DEFAULT_MODEL_PARAMS if model_params is None else model_params,
+            backend=backend, seed=seed,
+        )
     utility_by_features: dict[tuple[str, ...], float] = {}
     logical_evaluation_count = 0
     memoization_hit_count = 0
@@ -354,26 +306,16 @@ def nsga2_feature_selection(
             for feature, bit in zip(X_train.columns, mask, strict=True)
             if bit
         )
-        if selected in utility_by_features:
+        cached = selected in utility_by_features
+        if cached:
             memoization_hit_count += 1
             clipped_utility = utility_by_features[selected]
         else:
-            fitness = _evaluate_individual(
-                mask,
-                X_train,
-                y_train,
-                X_val,
-                y_val,
-                task=task,
-                utility=utility,
-                model_params=model_params,
-                backend=backend,
-                seed=seed,
-                cardinality_denominator=denominator,
-                utility_evaluator=utility_evaluator,
-            )
-            clipped_utility = 1.0 - fitness[1]
+            clipped_utility = float(np.clip(utility_evaluator(selected), 0.0, 1.0))
             utility_by_features[selected] = clipped_utility
+        if progress is not None:
+            progress(logical_evaluation_count=logical_evaluation_count, unique_subset_count=len(utility_by_features),
+                     memoization_hit_count=memoization_hit_count, selected_count=len(selected), cached=cached)
         return len(selected) / denominator, 1.0 - clipped_utility
 
     # ── Initialisation ──
@@ -443,7 +385,9 @@ def nsga2_feature_selection(
         pop, fit = new_pop, new_fit
 
         # HV tracking
-        pf_idx = _non_dominated_sort(fit)[0]
+        # Survivors are stored front by front; a truncated first front still
+        # consists entirely of mutually non-dominated individuals.
+        pf_idx = np.arange(min(len(fronts[0]), pop_size))
         hv = _compute_hv(fit[pf_idx], reference)
         hv_history.append(hv)
 
@@ -455,8 +399,11 @@ def nsga2_feature_selection(
 
     runtime = time.perf_counter() - t0
     converged_gen = _converged_gen(hv_history)
-    pf_idx = _non_dominated_sort(fit)[0]
-    hv_final = _compute_hv(fit[pf_idx], reference)
+    if hv_history:
+        hv_final = hv_history[-1]
+    else:
+        pf_idx = _non_dominated_sort(fit)[0]
+        hv_final = _compute_hv(fit[pf_idx], reference)
 
     # Build returnable front
     pf_list: list = []
@@ -482,8 +429,41 @@ def nsga2_feature_selection(
 
 
 # ---------------------------------------------------------------------------
-# Ranking adapter for callers that require one score per feature
+# Formal subset selector and ranking adapter
 # ---------------------------------------------------------------------------
+
+
+def select(context):
+    """Search the complete input schema and deliver one validation-chosen Pareto point."""
+    from minppi_mofs.baselines._selection_context import Selection
+
+    index = {name: i for i, name in enumerate(context.columns)}
+    budget = DEFAULT_POP_SIZE * (1 + DEFAULT_MAX_GEN)
+
+    def evaluate(features):
+        return context.value(tuple(index[name] for name in features))
+
+    def progress(*, logical_evaluation_count, unique_subset_count, **unused):
+        context.progress("nsga2_search", checked=logical_evaluation_count, total=budget,
+                         unique_subsets=unique_subset_count)
+
+    result = nsga2_feature_selection(
+        context.train, context.yt, context.ranking, context.yr, task=context.task,
+        utility=context.utility, seed=context.seed, pop_size=DEFAULT_POP_SIZE,
+        max_gen=DEFAULT_MAX_GEN, utility_evaluator=evaluate, progress=progress,
+    )
+    front = [dict(indices=np.flatnonzero(mask).tolist(), cardinality_ratio=ratio,
+                  validation_utility_loss=loss)
+             for mask, (ratio, loss) in result.pareto_front]
+    best = min(front, key=lambda p: (p["validation_utility_loss"], p["cardinality_ratio"], p["indices"]))
+    return Selection(selected=[context.columns[i] for i in best["indices"]], diagnostics=dict(
+        population=DEFAULT_POP_SIZE, generations=DEFAULT_MAX_GEN,
+        logical_evaluations=result.logical_evaluation_count, unique_subsets=result.unique_subset_count,
+        cache_hits=result.memoization_hit_count, hv=result.hv, hv_history=result.hv_history,
+        pareto_front=front, chosen_point=best,
+        objective_names=["cardinality_fraction", "one_minus_clipped_validation_utility"],
+        representative_rule="highest ranking-split utility, then fewer columns, then original column order",
+    ))
 
 
 def nsga2_ranking(
@@ -492,8 +472,8 @@ def nsga2_ranking(
     *,
     task: str = "binary",
     seed: int = 42,
-    pop_size: int = 20,
-    max_gen: int = 20,
+    pop_size: int = DEFAULT_POP_SIZE,
+    max_gen: int = DEFAULT_MAX_GEN,
     verbose: bool = True,
 ) -> list[tuple[str, float]]:
     """Produce a feature ranking from NSGA-II for the main-table comparison.
@@ -532,17 +512,27 @@ def nsga2_ranking(
         max_gen=max_gen,
         verbose=verbose,
     )
+    return nsga2_ranking_from_result(X, y, result, task=task, seed=seed)
 
+
+def nsga2_ranking_from_result(
+    X: pd.DataFrame,
+    y: np.ndarray,
+    result: NSGA2Result,
+    *,
+    task: str = "binary",
+    seed: int = 42,
+) -> list[tuple[str, float]]:
+    """Rank a completed front using the original search columns in their original order."""
     features = list(X.columns)
-    n = len(features)
 
     if not result.pareto_front:
         # Degenerate: all individuals empty → uniform ranking
         return [(f, 0.0) for f in features]
 
-    # Find the front solution with the best utility (lowest f₂ = 1 − AUC)
+    # Preserve the selected mask's feature order in the ranking-model fit.
     best_mask = min(result.pareto_front, key=lambda x: x[1][1])[0]
-    selected = [features[j] for j in range(n) if best_mask[j]]
+    selected = [name for name, keep in zip(features, best_mask, strict=True) if keep]
 
     if len(selected) < 2:
         # Too few features selected → fall back to SHAP ranking
@@ -576,8 +566,8 @@ def nsga2_ranking(
     imp = dict(zip(selected, model.feature_importances_.astype(float)))
     ranking = sorted(imp.items(), key=lambda kv: kv[1], reverse=True)
 
-    # Append unselected features with zero importance
-    unselected = [f for f in features if f not in selected]
+    # Use the existing importance dictionary for constant-time membership checks.
+    unselected = [f for f in features if f not in imp]
     ranking += [(f, 0.0) for f in unselected]
 
     return ranking
@@ -613,8 +603,6 @@ if __name__ == "__main__":
         y_demo,
         task="binary",
         seed=42,
-        pop_size=10,
-        max_gen=10,
         verbose=True,
     )
     print(f"\nHV: {result.hv:.4f}")
@@ -622,8 +610,8 @@ if __name__ == "__main__":
     print(f"Converged gen: {result.converged_gen}")
     print(f"Pareto front size: {len(result.pareto_front)}")
 
-    ranking = nsga2_ranking(
-        X_demo, y_demo, task="binary", seed=42, pop_size=10, max_gen=10
+    ranking = nsga2_ranking_from_result(
+        X_demo, y_demo, result, task="binary", seed=42
     )
     print("\nNSGA-II feature ranking:")
     for feat, val in ranking[:5]:

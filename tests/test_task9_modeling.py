@@ -1162,19 +1162,18 @@ def test_shap_baseline_uses_canonical_multiclass_model_policy(
         def fit(self, X: pd.DataFrame, y: np.ndarray) -> None:
             seen["fit_columns"] = tuple(X.columns)
 
+        def get_booster(self):
+            return self
+
+        def predict(self, matrix, *, pred_contribs, approx_contribs, strict_shape):
+            assert pred_contribs and not approx_contribs and strict_shape
+            return np.ones((matrix.num_row(), 3, matrix.num_col() + 1))
+
     def fake_make_model(**kwargs):
         seen.update(kwargs)
         return FakeModel()
 
-    class FakeExplainer:
-        def __init__(self, model: object) -> None:
-            pass
-
-        def shap_values(self, X: pd.DataFrame) -> np.ndarray:
-            return np.ones((len(X), X.shape[1], 3))
-
     monkeypatch.setattr(module, "make_model", fake_make_model)
-    monkeypatch.setitem(sys.modules, "shap", type("FakeShap", (), {"TreeExplainer": FakeExplainer}))
     X = pd.DataFrame({"unsafe[0]": np.arange(9), "b": np.arange(9) + 1})
     diagnostics: dict[str, int] = {}
     scores = module.compute_shap_topk_importance(

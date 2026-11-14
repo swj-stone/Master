@@ -4,12 +4,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const [input,out] = process.argv.slice(2);
-const {rows,groups,features} = JSON.parse(await fs.readFile(input,'utf8'));
+const {rows,groups,features,method_labels:methods,mode_labels:modes} = JSON.parse(await fs.readFile(input,'utf8'));
 const book=Workbook.create();
 const order=['abalone','spambase','madelon','credit_card_fraud','gisette','isolet'];
 const datasets={abalone:'Abalone',spambase:'Spambase',madelon:'Madelon',credit_card_fraud:'Credit Card Fraud',gisette:'Gisette',isolet:'ISOLET'};
-const modes={shared:'共享参照',native:'文献估计量',frozen:'统一冻结效用'};
-const methods={full:'全列模型',minpi:'minPI',gain:'紧凑 Gain',pfi:'快速 PFI',minshap:'MinShap',shapley:'排列 Shapley',sampling_shap:'SamplingSHAP',banzhaf:'采样 Banzhaf',shapg:'ShapG'};
 const status={completed:'完成',in_progress:'进行中',not_started:'未启动',failed:'失败',timed_out:'超时',interrupted:'中断'};
 const groupOrder=(a,b)=>order.indexOf(a.dataset)-order.indexOf(b.dataset)
     ||Object.keys(modes).indexOf(a.mode)-Object.keys(modes).indexOf(b.mode)
@@ -55,18 +53,21 @@ function sheet(name,id,title,note,headers,values,accent){
 }
 const integer='#,##0',decimal='0.00',score='0.0000',percent='0.00%';
 const predictions = 'sample_prediction_rows' in rows[0] ? [
-    ['sample_prediction_rows','采样预测行','V',decimal],
-    ['sample_prediction_calls','采样调用','W',decimal],
-    ['selection_prediction_rows','选择总预测行','X',decimal],
-    ['selection_prediction_calls','选择总调用','Y',decimal],
+    ['sample_prediction_rows','采样预测行',decimal],
+    ['sample_prediction_calls','采样调用',decimal],
+    ['selection_prediction_rows','选择总预测行',decimal],
+    ['selection_prediction_calls','选择总调用',decimal],
 ] : [];
+const metrics=[
+    ['auc','AUC',score],['accuracy','准确率',percent],['precision','精确率',percent],
+    ['ap','AP',score],['r2','R²',score],['mae','MAE',score],
+].filter(([field])=>field in rows[0]);
 const summaryMeasures=[
-    ['k','保留列','G',decimal],['deleted','删除列','H',decimal],['fits','拟合次数','I',decimal],
-    ['wall_s','总秒','J',decimal],['auc','AUC','K',score],['accuracy','准确率','L',percent],
-    ['ap','AP','M',score],['r2','R²','N',score],['mae','MAE','O',score], ...predictions,
+    ['k','保留列',decimal],['deleted','删除列',decimal],['fits','拟合次数',decimal],['wall_s','总秒',decimal],...metrics,
+    ...('selector_s_mean' in groups[0]?[['selector_s','选择秒',decimal]]:[]),...predictions,
 ];
 const sumHeaders=[['数据集',153],['求值方式',150],['方法',161],['已完成',105,integer],['计划',94,integer],['输入列范围',125],
-    ...summaryMeasures.flatMap(([,label,,fmt])=>[[label+'均值',124,fmt],[label+'标准差',135,fmt]])];
+    ...summaryMeasures.flatMap(([,label,fmt])=>[[label+'均值',124,fmt],[label+'标准差',135,fmt]])];
 const sumRows=groups.map(g=>[datasets[g.dataset],modes[g.mode],methods[g.method],g.n_completed,g.n_planned,
     g.width_min===g.width_max?g.width_min:g.width_min+'–'+g.width_max,
     ...summaryMeasures.flatMap(([f])=>[g[f+'_mean']??null,g[f+'_sd']??null])]);
@@ -76,17 +77,16 @@ const summary=sheet('跨 seed 汇总','AcrossSeeds','预处理数据 · '+seedLa
     `已完成 ${count} / ${rows.length} 条独立路线。样本标准差使用 n−1。总秒包含冷启动与前置筛选，回归 R² 使用未截断值。`,
     sumHeaders,sumRows,'#26495A');
 const detailHeaders=[['数据集',152],['求值方式',148],['方法',156],['Seed',91,integer],['状态',100],['输入列',110,integer],['保留列',110,integer],
-    ['删除列',110,integer],['拟合次数',124,integer],['冷启动总秒',141,decimal],['测试 AUC',114,score],['测试准确率',130,percent],
-    ['测试 AP',107,score],['测试 R²',105,score],['测试 MAE',120,score],['全列 AUC',117,score],['全列准确率',133,percent],
-    ['全列 AP',110,score],['全列 R²',106,score],['全列 MAE',121,score],['选择用时秒',134,decimal],
+    ['删除列',110,integer],['拟合次数',124,integer],['冷启动总秒',141,decimal],
+    ...['测试','全列'].flatMap(prefix=>metrics.map(([,name,fmt])=>[prefix+' '+name,130,fmt])),['选择用时秒',134,decimal],
     ...predictions.map(([,label])=>[label,140,integer]),...(predictions.length?[['采样配置',460]]:[])];
-const testKeys=['auc','accuracy','ap','r2','mae'];
+const testKeys=metrics.map(([key])=>key);
 const detailKeys=[...testKeys,...testKeys.map(k=>'full_'+k),'selector_s',...predictions.map(p=>p[0])];
 if(predictions.length)detailKeys.push('sampling_policy');
 const details=rows.map(r=>[datasets[r.dataset],modes[r.mode],methods[r.method],r.seed,status[r.status]||r.status,r.width,r.k??null,
     r.deleted??null,r.fits??null,r.wall_s??null,...detailKeys.map(k=>r[k]??null)]);
 const detail=sheet('逐 seed 明细','BySeed','每次独立运行的列数、成本与测试得分',
-    '全列成绩对应同一 seed 和数据集。欺诈检测另列 AP，ISOLET 使用宏平均 OvR AUC。来源为各路线的预测文件、拟合记录和独立冷启动计时。',
+    '全列成绩对应同一 seed 和数据集。精确率在二分类上针对正类，ISOLET 使用宏平均。欺诈检测另列 AP。',
     detailHeaders,details,'#32645C');
 const key=r=>[r.dataset,r.mode,r.method].join('/');
 const extents=new Map();
@@ -97,9 +97,11 @@ for(const [i,r] of rows.entries()){
     if(r.status==='completed')detail.getRange('H'+cell).formulas=[['=F'+cell+'-G'+cell]];
 }
 const tabRef="'逐 seed 明细'!";
+const sourceColumns=new Map(['width','k','deleted','fits','wall_s',...detailKeys].map((field,i)=>[field,column(6+i)]));
 for(const [i,r] of groups.entries()){
     const [first,last]=extents.get(key(r));
-    for(const [j,[measure,,c]] of summaryMeasures.entries()){
+    for(const [j,[measure]] of summaryMeasures.entries()){
+        const c=sourceColumns.get(measure);
         const cells=tabRef+c+first+':'+c+last;
         if(r[measure+'_mean']==null)continue;
         summary.getRange(column(7+j*2)+(i+5)).formulas=[['=AVERAGE('+cells+')']];

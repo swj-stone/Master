@@ -12,7 +12,7 @@ from tempfile import TemporaryDirectory
 from xml.etree import ElementTree as ET
 from zipfile import ZipFile
 
-from experiments.report_formal_literature import DEFAULT, KEYS, PREDICTIONS, PROJECT, SCORES, require
+from experiments.report_formal_literature import DEFAULT, FORMAL_LABEL, KEYS, MODES, PREDICTIONS, PROJECT, SCORES, require
 
 
 def _csv(path):
@@ -41,12 +41,13 @@ def _verify(filename, data):
     # Export order can differ from protocol order; resolve each row by its identity.
     ds={"Abalone":"abalone","Spambase":"spambase","Madelon":"madelon","Credit Card Fraud":"credit_card_fraud",
         "Gisette":"gisette","ISOLET":"isolet"}
-    modes={"共享参照":"shared","文献估计量":"native","统一冻结效用":"frozen"}
-    methods={"全列模型":"full","minPI":"minpi","紧凑 Gain":"gain","快速 PFI":"pfi","MinShap":"minshap",
-             "排列 Shapley":"shapley","SamplingSHAP":"sampling_shap","采样 Banzhaf":"banzhaf","ShapG":"shapg"}
-    fields=("k","deleted","fits","wall_s",*SCORES)
+    modes={label:key for key,label in MODES.items()}
+    methods={label:key for key,label in data["method_labels"].items()}
+    scores=tuple(k for k in SCORES if k in data["rows"][0])
+    fields=("k","deleted","fits","wall_s",*scores)
     predictions = PREDICTIONS if "sample_prediction_rows" in data["rows"][0] else ()
-    details = ("width", *fields, *["full_"+k for k in SCORES], "selector_s", *predictions)
+    details = ("width", *fields, *["full_"+k for k in scores], "selector_s", *predictions)
+    summary = (*fields, *(("selector_s",) if "selector_s_mean" in data["groups"][0] else ()), *predictions)
     if predictions:
         details += ("sampling_policy",)
     rows={_key(r):r for r in data["rows"]}
@@ -91,7 +92,7 @@ def _verify(filename, data):
                     identity=group
                     compare(values["D"],reference["n_completed"])
                     compare(values["E"],reference["n_planned"])
-                    for j,f in enumerate((*fields, *predictions)):
+                    for j,f in enumerate(summary):
                         for delta,suffix in ((0,"mean"),(1,"sd")):
                             compare(values.get(_column(7+2*j+delta)),reference.get(f+"_"+suffix))
                 else:
@@ -114,6 +115,8 @@ def build(root=DEFAULT):
     root=Path(root).resolve()
     data={name:_csv(root/file) for name,file in (("rows","per-seed.csv"),("groups","five-seed-summary.csv"),
                                                  ("features","retained-features.csv"))}
+    data["method_labels"]={**FORMAL_LABEL, "minpi":"minPI"}
+    data["mode_labels"]=MODES
     with (root/"protocol.json").open(encoding="utf-8") as f:
         expected={_key(j) for j in json.load(f)["jobs"]}
     require(expected=={_key(r) for r in data["rows"]} and len(expected)==len(data["rows"]),"Stale run list")

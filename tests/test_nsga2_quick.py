@@ -173,6 +173,35 @@ def test_prefiltered_cardinality_uses_original_feature_denominator(
     assert objective == pytest.approx((0.25, 0.25))
 
 
+def test_completed_front_can_be_ranked_without_restarting_search(monkeypatch):
+    x = pd.DataFrame(np.arange(18).reshape(6, 3), columns=["one", "two", "unused"])
+    y = np.array([0, 1] * 3)
+    front = nsga2_module.NSGA2Result(
+        pareto_front=[(np.array([1, 1, 0]), (2/3, .25))], hv=.3, runtime_s=1,
+        converged_gen=1, hv_history=[.3], logical_evaluation_count=1,
+        unique_subset_count=1, memoization_hit_count=0,
+    )
+    searches = []
+
+    def search(*args, **kwargs):
+        searches.append(1)
+        return front
+
+    class Model:
+        feature_importances_ = np.array([.3, .7])
+
+        def fit(self, frame, labels):
+            np.testing.assert_array_equal(frame, x.iloc[:, :2].values)
+
+    monkeypatch.setattr(nsga2_module, "nsga2_feature_selection", search)
+    monkeypatch.setattr(nsga2_module, "XGBClassifier", lambda **kwargs: Model())
+    expected = [("two", .7), ("one", .3), ("unused", 0.)]
+    assert nsga2_module.nsga2_ranking_from_result(x, y, front) == expected
+    assert len(searches) == 0
+    assert nsga2_module.nsga2_ranking(x, y) == expected
+    assert len(searches) == 1
+
+
 def main() -> None:
     prefix, target, task = DATASET
 

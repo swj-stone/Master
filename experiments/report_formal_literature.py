@@ -11,7 +11,7 @@ from statistics import fmean, stdev
 from tempfile import NamedTemporaryFile
 
 import numpy as np
-from sklearn.metrics import r2_score
+from sklearn.metrics import precision_score, r2_score
 from sklearn.model_selection import train_test_split
 
 from experiments.report_literature_benchmark import LABEL, ledger, match, read
@@ -22,11 +22,11 @@ from minppi_mofs.experiment_protocol import canonical_hash
 
 PROJECT = Path(__file__).resolve().parents[1]
 KEYS = ("seed", "dataset", "mode", "method")
-SCORES = ("auc", "accuracy", "ap", "r2", "mae")
-MEASURES = ("k", "deleted", "fits", "wall_s", *SCORES)
+SCORES = ("auc", "accuracy", "precision", "ap", "r2", "mae")
+MEASURES = ("k", "deleted", "fits", "wall_s", "selector_s", *SCORES)
 PREDICTIONS = ("sample_prediction_rows", "sample_prediction_calls",
                "selection_prediction_rows", "selection_prediction_calls")
-FORMAL_LABEL = {**LABEL, "sampling_shap": "SamplingSHAP"}
+FORMAL_LABEL = {**LABEL, "sampling_shap": "SamplingSHAP", "tree_shap_top_k": "TreeSHAP Top-k", "nsga2": "NSGA-II"}
 MODES = {"shared": "共享参照", "native": "文献估计量", "frozen": "统一冻结效用"}
 
 
@@ -99,6 +99,10 @@ def _route(root, job, pins):
         if meta["task"] == "regression":
             scores["r2_protocol"] = scores["r2"]
             scores["r2"] = float(r2_score(ytest, pred["test_pred"]))
+        else:
+            averaging = "macro" if meta["task"] == "multiclass" else "binary"
+            scores["precision"] = float(precision_score(ytest, pred["test_pred"].argmax(axis=1),
+                                                        average=averaging, zero_division=0))
     row.update(k=len(selected), deleted=len(cols)-len(selected), selector_s=res["selector_s"], **scores)
     for key in PREDICTIONS:
         if key in res:
@@ -128,7 +132,7 @@ def _fmt(row, key):
     avg, sd = row.get(key+"_mean"), row.get(key+"_sd")
     if avg is None:
         return "—"
-    digits = 2 if key in ("wall_s","k","deleted","fits",*PREDICTIONS) else 4
+    digits = 2 if key in ("wall_s","selector_s","k","deleted","fits",*PREDICTIONS) else 4
     value = f"{avg:.{digits}f}"
     return value if sd is None else f"{value} ± {sd:.{digits}f}"
 
@@ -185,31 +189,44 @@ def report(root=DEFAULT, *, partial=False, xlsx=False):
     lines = ["# 正式实验 · 预处理数据集","",
              f"{len(jobs)} 条计划路线，{states['completed']} 条完成。数据集与方法均按 protocol.json 指定的 seed 汇总。",
              "", "表中为已完成 seed 的算术均值 ± 样本标准差。只有一个观测时仅列均值。总秒为从启动独立进程到结束的墙钟时间。"
-             "分类报告测试 AUC 与准确率，欺诈检测另列 AP，ISOLET 使用宏平均 OvR AUC。回归报告未截断的测试 R² 与 MAE。",
+             "选择秒只计特征筛选阶段。分类报告测试 AUC、准确率与精确率。二分类精确率针对正类，多分类取各类的宏平均，"
+             "无预测阳性时该类精确率记 0。欺诈检测另列 AP，ISOLET 使用宏平均 OvR AUC。回归报告未截断的测试 R² 与 MAE。",
              "", "需要把排名转为子集的方法在冻结模型上检查有限前缀，内部代理容差为 8%。最终交付各自选出的子集，"
              "原实验 5% 的独立验证回退已关闭。共享方法的每个数据集与 seed 组合独立计时一次。",
              "", "[逐 seed 明细](per-seed.csv) · [跨 seed 数值](five-seed-summary.csv) · "
              "[实际保留特征](retained-features.csv)"]
+    if references:
+        lines.extend(["", f"全列模型提供同一数据集和 seed 的参照成绩。已完成 {len(references)} 条全列参照，"
+                      f"以及 {sum(r['status']=='completed' and r['method']!='full' for r in rows)} 条选列实验。"])
     if has_sampling:
         lines.extend(["", "采样预测行数按模型实际处理的输入行累加；同一行在不同遮盖下可重复计数。"
                       "多分类一次前向同时返回所有类别。选择总预测量包含采样与选列定宽，逐 seed 表另列实际调用数和采样配置。"])
-    game_modes = [mode for mode in ("native", "frozen") if any(g["mode"] == mode for g in groups)]
-    for mode in game_modes or ["shared"]:
-        label = MODES[mode]
-        subset = [r for r in groups if r["mode"] == mode]
+    if any(g["method"] in ("tree_shap_top_k","nsga2") for g in groups):
+        tables = [
+            ("基线方法", [r for r in groups if r["mode"] in ("shared","native") and r["method"] != "full"]),
+            ("冻结模型补充比较", [r for r in groups if r["mode"] == "frozen"]),
+            ("同一划分的全列模型", [r for r in groups if r["method"] == "full"]),
+        ]
+    else:
+        tables = []
+        game_modes = [mode for mode in ("native", "frozen") if any(g["mode"] == mode for g in groups)]
+        for mode in game_modes or ["shared"]:
+            group = [r for r in groups if r["mode"] == mode]
+            mode_data = {r["dataset"] for r in group}
+            if mode != "shared":
+                group.extend(r for r in groups if r["mode"] == "shared" and r["dataset"] in mode_data)
+            tables.append((MODES[mode],group))
+    for label,subset in tables:
         if not subset:
             continue
-        mode_data = {r["dataset"] for r in subset}
-        if mode != "shared":
-            subset.extend(r for r in groups if r["mode"] == "shared" and r["dataset"] in mode_data)
         labels = tuple(FORMAL_LABEL)
         order = list(dict.fromkeys(r["dataset"] for r in groups))
         subset.sort(key=lambda r:(order.index(r["dataset"]), labels.index(r["method"])))
         prediction_columns = ("sample_prediction_rows", "selection_prediction_rows") if has_sampling else ()
-        displayed = ("k", "fits", *prediction_columns, "wall_s", *SCORES)
+        displayed = ("k", "fits", *prediction_columns, "wall_s", "selector_s", *SCORES)
         heading = "采样预测行 | 选择总预测行 | " if has_sampling else ""
         lines.extend(["", "## "+label, "", "| 数据集 | 方法 | 完成 seed | 原始列 | 保留列 | 拟合次数 | "+heading+
-                      "总秒 | AUC | 准确率 | AP | R² | MAE |", "|---|---|"+"---:|"*(2+len(displayed))])
+                      "总秒 | 选择秒 | AUC | 准确率 | 精确率 | AP | R² | MAE |", "|---|---|"+"---:|"*(2+len(displayed))])
         for r in subset:
             width = str(r["width_min"]) if r["width_min"] == r["width_max"] else f"{r['width_min']}–{r['width_max']}"
             fields = [r["dataset"], FORMAL_LABEL[r["method"]],f"{r['n_completed']}/{r['n_planned']}",width]

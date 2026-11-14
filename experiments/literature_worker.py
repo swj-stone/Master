@@ -27,7 +27,7 @@ from minppi_mofs.utility import compute_utility
 
 FROZEN_ROWS = 256
 METHODS = ("minshap", "shapley", "banzhaf", "shapg")
-CONTROLS = ("minpi", "gain", "pfi", "full", "sampling_shap")
+CONTROLS = ("minpi", "gain", "pfi", "full", "sampling_shap", "tree_shap_top_k", "nsga2")
 
 
 def _constant(y, n, regression):
@@ -388,7 +388,10 @@ def trial(dataset,mode,method,out,*,enforce_guard=True,minshap_support_only=Fals
     progress("selection")
     tick=time.perf_counter()
     selector_begin=tick
-    oracle=_Oracle(train,yt,rank,yr,mode,method,full,policy,utility,ledger)
+    # NSGA-II has one standalone route. Each novel subset uses the native
+    # train-to-ranking refit oracle and is counted in the shared fit ledger.
+    oracle_mode = "native" if method == "nsga2" else mode
+    oracle=_Oracle(train,yt,rank,yr,oracle_mode,method,full,policy,utility,ledger)
     meter = PredictionMeter(full) if method in ("minpi", "sampling_shap") else None
     ctx=SelectionContext(method=method,mode=mode,columns=columns,train=train,yt=yt,ranking=rank,yr=yr,
                          task=task,utility=utility,seed=seed,full_model=meter if meter is not None else full,

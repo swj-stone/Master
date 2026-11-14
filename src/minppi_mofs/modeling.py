@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 import math
 
 import numpy as np
@@ -112,6 +112,11 @@ def fit_predict(
     if not tuple(train.columns) or tuple(evaluation.columns) != tuple(train.columns):
         raise ValueError("non-empty train/evaluation feature columns must match")
     target = _validated_target(y_train, row_count=len(train), task=task)
+    return _fit_predict_validated(model, train, target, evaluation, task)
+
+
+def _fit_predict_validated(model, train, target, evaluation, task):
+    """Fit one fresh model on already aligned and validated numeric frames."""
     safe_columns = [f"f{index}" for index in range(train.shape[1])]
     train = train.set_axis(safe_columns, axis="columns")
     evaluation = evaluation.set_axis(safe_columns, axis="columns")
@@ -237,39 +242,54 @@ def evaluate_fixed_subset(
     seed: int,
 ) -> float:
     """Evaluate an already-frozen ordered subset through ``compute_utility``."""
+    evaluator = prepare_subset_evaluator(
+        X_train_val, y_train_val, X_test, y_test, task=task, utility=utility,
+        model_params=model_params, backend=backend, seed=seed,
+    )
+    return evaluator(features)
+
+
+def prepare_subset_evaluator(
+    X_train_val: pd.DataFrame,
+    y_train_val: np.ndarray,
+    X_test: pd.DataFrame,
+    y_test: np.ndarray,
+    *,
+    task: str,
+    utility: str,
+    model_params: Mapping[str, object],
+    backend: str,
+    seed: int,
+) -> Callable[[Sequence[str]], float]:
+    """Validate one split once, then fit a fresh canonical model per nonempty subset."""
     params = _validated_policy(
         task=task, model_params=model_params, backend=backend, seed=seed
     )
-    del params  # validation must happen even when no model is fitted
-    if isinstance(features, (str, bytes)) or not isinstance(features, Sequence):
-        raise TypeError("features must be an ordered sequence")
-    selected = tuple(features)
-    if len(set(selected)) != len(selected) or not all(
-        isinstance(feature, str) for feature in selected
-    ):
-        raise ValueError("features must contain unique strings")
     train = _validated_frame(X_train_val, name="X_train_val")
     test = _validated_frame(X_test, name="X_test")
-    if not set(selected).issubset(train.columns) or not set(selected).issubset(
-        test.columns
-    ):
-        raise ValueError("features are outside the supplied frames")
     target = _validated_target(y_train_val, row_count=len(train), task=task)
-    if selected:
-        predictions = fit_predict(
-            train.loc[:, list(selected)],
-            target,
-            test.loc[:, list(selected)],
-            task=task,
-            model_params=model_params,
-            backend=backend,
-            seed=seed,
-        )
-    else:
-        predictions = _empty_subset_predictions(
-            target, task=task, row_count=len(test)
-        )
-    value = float(compute_utility(np.asarray(y_test), predictions, metric=utility))
-    if not math.isfinite(value):
-        raise ValueError("utility must be finite")
-    return value
+    labels = np.asarray(y_test)
+    available = set(train.columns).intersection(test.columns)
+    model_type = XGBRegressor if task == "regression" else XGBClassifier
+
+    def evaluate(features: Sequence[str]) -> float:
+        if isinstance(features, (str, bytes)) or not isinstance(features, Sequence):
+            raise TypeError("features must be an ordered sequence")
+        selected = list(features)
+        names = set(selected)
+        if len(names) != len(selected) or not all(isinstance(f, str) for f in selected):
+            raise ValueError("features must contain unique strings")
+        if not names.issubset(available):
+            raise ValueError("features are outside the supplied frames")
+        if selected:
+            predictions = _fit_predict_validated(
+                model_type(**params), train.loc[:, selected], target, test.loc[:, selected], task
+            )
+        else:
+            predictions = _empty_subset_predictions(target, task=task, row_count=len(test))
+        value = float(compute_utility(labels, predictions, metric=utility))
+        if not math.isfinite(value):
+            raise ValueError("utility must be finite")
+        return value
+
+    return evaluate

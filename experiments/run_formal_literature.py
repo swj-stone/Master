@@ -22,14 +22,17 @@ from minppi_mofs.experiment_protocol import atomic_write_json
 
 
 DEFAULT = ROOT / "results/thesis_benchmark/literature-preprocessed-samplingshap-five-seeds"
+BASELINE_ROOT = ROOT / "results/thesis_benchmark/baselines-eight-preprocessed-five-seeds"
 CONTROLS = ("full", "minpi", "gain", "pfi", "sampling_shap")
 ESTIMATORS = ("minshap", "banzhaf", "shapg")
+BASELINE_CONTROLS = ("full", "gain", "pfi", "sampling_shap", "tree_shap_top_k", "nsga2")
 
 
-def protocol(inputs, seeds=FORMAL_SEEDS, datasets=DATASETS, methods=CONTROLS+ESTIMATORS):
+def protocol(inputs, seeds=FORMAL_SEEDS, datasets=DATASETS, methods=CONTROLS+ESTIMATORS, *, eight_baselines=False):
+    controls = BASELINE_CONTROLS if eight_baselines else CONTROLS
     schedule = []
     for mode in ("shared", "frozen", "native"):
-        group = CONTROLS if mode == "shared" else ESTIMATORS
+        group = controls if mode == "shared" else ESTIMATORS
         for seed in seeds:
             for dataset in datasets:
                 offset = DATASETS.index(dataset) % len(group)
@@ -46,7 +49,19 @@ def protocol(inputs, seeds=FORMAL_SEEDS, datasets=DATASETS, methods=CONTROLS+EST
                "src/minppi_mofs/utility.py", "src/minppi_mofs/experiment_protocol.py",
                "src/minppi_mofs/prediction_meter.py"]
     sources.extend(p.relative_to(ROOT).as_posix() for p in sorted((ROOT/"src/minppi_mofs/baselines").glob("*.py")))
-    return dict(seeds=list(seeds), datasets=list(datasets), controls=[m for m in CONTROLS if m in methods],
+    extra = {}
+    if eight_baselines:
+        from minppi_mofs.baselines.nsga2_fs import DEFAULT_MAX_GEN, DEFAULT_POP_SIZE
+        from minppi_mofs.baselines.shap_top_k import DEFAULT_EXPLANATION_ROWS
+        extra.update(
+            main_game="native", auxiliary_game="frozen", reference_method="full",
+            tree_shap_top_k=dict(explanation="exact TreeSHAP, mean absolute margin contribution",
+                                 max_train_rows=DEFAULT_EXPLANATION_ROWS, sizing="common validation prefix"),
+            nsga2=dict(population=DEFAULT_POP_SIZE, offspring_generations=DEFAULT_MAX_GEN,
+                       objectives=["validation prediction utility", "fraction of retained columns"],
+                       representative="highest ranking-validation utility; prefer fewer columns on ties"),
+            execution="Every route is measured in this campaign in its own fresh process. No previous results imported.")
+    return dict(seeds=list(seeds), datasets=list(datasets), controls=[m for m in controls if m in methods],
                 methods=[m for m in ESTIMATORS if m in methods], jobs=schedule, inputs=inputs, limit_s=None,
                 enforce_guard=False, native_workers=1, minshap_support_only=True,
                 timing="Independent, serial cold processes; includes startup, selection, refits and export.",
@@ -59,7 +74,7 @@ def protocol(inputs, seeds=FORMAL_SEEDS, datasets=DATASETS, methods=CONTROLS+EST
                 games="SamplingSHAP estimates local model-output attributions once per seed and dataset. "
                       "The other game estimators have native refit and frozen masked variants.",
                 source={f:_sha(ROOT/f) for f in sources}, python=sys.version.split()[0],
-                dependencies={n:version(n) for n in ("numpy","xgboost","scikit-learn","pandas","scipy","shap")})
+                dependencies={n:version(n) for n in ("numpy","xgboost","scikit-learn","pandas","scipy","shap")}, **extra)
 
 
 def worker(job, out, inputs, contract):
@@ -98,7 +113,7 @@ def heartbeat(label, progress, elapsed, history):
             + f" | elapsed={elapsed:.0f}s | remaining={eta}")
 
 
-def run(root, *, seeds=FORMAL_SEEDS, datasets=DATASETS, methods=CONTROLS+ESTIMATORS):
+def run(root, *, seeds=FORMAL_SEEDS, datasets=DATASETS, methods=CONTROLS+ESTIMATORS, eight_baselines=False):
     from experiments.formal_literature_inputs import prepare_inputs
     root.mkdir(parents=True,exist_ok=True)
     with exclusive_run(root), (root/"run.log").open("a",buffering=1,encoding="utf-8") as stream:
@@ -108,7 +123,7 @@ def run(root, *, seeds=FORMAL_SEEDS, datasets=DATASETS, methods=CONTROLS+ESTIMAT
             print(line,file=stream,flush=True)
         log(f"Checking {len(seeds)*len(datasets)} archived dataset/seed partitions and formal protocol.")
         inputs = prepare_inputs(root, seeds=seeds, datasets=datasets)
-        spec = json.loads(json.dumps(protocol(inputs, seeds, datasets, methods)))
+        spec = json.loads(json.dumps(protocol(inputs, seeds, datasets, methods, eight_baselines=eight_baselines)))
         path = root/"protocol.json"
         if path.exists() and read(path) != spec:
             raise ValueError("Run protocol differs from its saved version; choose a new output directory.")
@@ -160,15 +175,20 @@ def run(root, *, seeds=FORMAL_SEEDS, datasets=DATASETS, methods=CONTROLS+ESTIMAT
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run",type=Path,help="Separate output directory for this protocol or subset")
+    parser.add_argument("--eight-baselines",action="store_true",
+                        help="Run the eight baseline selectors and the full reference, with both games.")
     parser.add_argument("--seeds",type=int,nargs="+",choices=FORMAL_SEEDS)
     parser.add_argument("--datasets",nargs="+",choices=DATASETS)
-    parser.add_argument("--methods",nargs="+",choices=CONTROLS+ESTIMATORS)
+    parser.add_argument("--methods",nargs="+",choices=tuple(dict.fromkeys(CONTROLS+BASELINE_CONTROLS+ESTIMATORS)))
     args = parser.parse_args()
     for key in ("OPENBLAS_NUM_THREADS","OMP_NUM_THREADS","MKL_NUM_THREADS","NUMEXPR_NUM_THREADS"):
         os.environ[key] = "1"
     if not args.run and any((args.seeds, args.datasets, args.methods)):
         parser.error("Pass --run for a subset so its results stay separate from the full experiment.")
-    run((args.run or DEFAULT).resolve(),
+    choices = (BASELINE_CONTROLS if args.eight_baselines else CONTROLS) + ESTIMATORS
+    if args.methods and not set(args.methods).issubset(choices):
+        parser.error("The requested selector is outside this experiment's method list.")
+    run((args.run or (BASELINE_ROOT if args.eight_baselines else DEFAULT)).resolve(),
         seeds=tuple(dict.fromkeys(args.seeds or FORMAL_SEEDS)),
         datasets=tuple(dict.fromkeys(args.datasets or DATASETS)),
-        methods=tuple(dict.fromkeys(args.methods or CONTROLS+ESTIMATORS)))
+        methods=tuple(dict.fromkeys(args.methods or choices)), eight_baselines=args.eight_baselines)
