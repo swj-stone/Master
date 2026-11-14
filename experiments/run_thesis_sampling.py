@@ -71,7 +71,8 @@ def _worker_entry(dataset, directory, rounds, sample_seconds, selection_policy, 
         runpy.run_module("experiments.thesis_sampling_worker", run_name="__main__")
 
 
-def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbeat_s=10.0, heartbeat_formatter=None):
+def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbeat_s=10.0,
+              heartbeat_formatter=None, completion_contract=None):
     """Monitor the worker to completion. A numeric time limit arms the independent kill timer."""
     started = time.monotonic()
     deadline = None if seconds is None else started + seconds
@@ -150,10 +151,20 @@ def supervise(process, directory, seconds, log, sample_seconds=None, *, heartbea
         result = {}
         result_error = f"Cannot read final result.json: {error}"
     progress = read_progress(directory, p, log)
-    status = "timed_out" if kill_requested else "completed" if result and process.exitcode == 0 else "error"
+    public_exit = process.exitcode
+    receipt = {}
+    if completion_contract is not None:
+        from experiments.native_process_guard import decide_public_exit, read_worker_receipt
+        code = read_worker_receipt(completion_contract)
+        public_exit, contained = decide_public_exit(process.exitcode, code)
+        receipt = dict(public_exit_code=public_exit, completion_receipt_code=code,
+                       teardown_fail_fast_contained=contained)
+        if contained:
+            log("Windows XGBoost teardown 0xC0000409 after verified worker completion; raw exit code retained.")
+    status = "timed_out" if kill_requested else "completed" if result and public_exit == 0 else "error"
     outcome = {"status": status, "elapsed_s": time.monotonic() - started, "limit_s": seconds,
                "kill_requested_s": kill_requested[0] if kill_requested else None,
-               "exit_code": process.exitcode, "progress": progress, "result": result}
+               "exit_code": process.exitcode, "progress": progress, "result": result, **receipt}
     if result_error:
         outcome["error"] = result_error
     _save(directory / "watchdog.json", outcome)

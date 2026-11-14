@@ -1,4 +1,4 @@
-"""MinShap feature importance with deterministic shared-coalition sampling."""
+"""Literature MinShap selection and the archived conference marginal-score baseline."""
 
 from __future__ import annotations
 
@@ -119,3 +119,18 @@ def compute_minshap_importance(
 def rank_features(scores: dict[str, float]) -> list[tuple[str, float]]:
     """Rank features by descending score, preserving input order for ties."""
     return sorted(scores.items(), key=lambda item: item[1], reverse=True)
+
+
+def select(context):
+    """Run the sampled MinShap statistical selector or the frozen minimum-score adaptation.
+
+    The legacy compute_minshap_importance entry point implements the conference
+    bottom-ranking experiment. The paper-faithful permutation test uses this
+    select entry point and includes its own significance threshold.
+    """
+    if getattr(context, "minshap_support_only", False):
+        from minppi_mofs.baselines._minshap_support import select_support
+        return select_support(context)
+    from minppi_mofs.baselines._permutation import select_permutation
+
+    return select_permutation(context, "minshap")

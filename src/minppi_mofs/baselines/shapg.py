@@ -437,6 +437,113 @@ def compute_shapg_importance(
     return dict(sorted(shapley.items(), key=lambda kv: kv[1], reverse=True))
 
 
+def _paper_neighbors(frame):
+    """Algorithm 1's sparse Pearson graph, using the first incident edge per vertex.
+
+    The accepted edges equal the union of the strongest incident edges in the
+    descending absolute correlation sort. Ties use original column indices.
+    Algorithm 1's edge-cover stopping condition can leave multiple components.
+    """
+    width = frame.shape[1]
+    edges = [set() for _ in range(width)]
+    if width < 2:
+        return edges
+    x = np.array(frame.to_numpy(), dtype=np.float64, order="F", copy=True)
+    if x.shape[0] < 2 or not np.isfinite(x).all():
+        raise ValueError("ShapG expects at least two finite training rows")
+    x -= x.mean(axis=0)
+    norm = np.sqrt(np.einsum("ij,ij->j", x, x))
+    x /= np.where(norm > 0., norm, 1.)
+    for start in range(0, width, 128):
+        stop = min(start + 128, width)
+        correlations = np.abs(x[:, start:stop].T @ x)
+        correlations[np.arange(stop-start), np.arange(start, stop)] = -1.
+        for node, other in enumerate(correlations.argmax(axis=1), start=start):
+            edges[node].add(int(other))
+            edges[other].add(node)
+    return edges
+
+
+def _paper_draws(neighbors, cap, rng):
+    """Yield local neighbor samples with Algorithm 3's normalization."""
+    degree = len(neighbors)
+    if degree <= cap:
+        yield tuple(neighbors), 2.**(-degree)
+        return
+    draws = int(np.ceil(((degree + .5)/cap - .5) * (np.log(degree) + np.euler_gamma) + .5))
+    # The published pseudocode, line 25, divides by 2^degree. The historical
+    # convenience function in this module instead divides by 2^cap.
+    weight = np.ldexp((degree + 1.)/((cap + 1.)*draws), -degree)
+    for _ in range(draws):
+        yield tuple(sorted(rng.choice(neighbors, cap, replace=False).tolist())), weight
+
+
+def select(context):
+    """Rank features with Algorithms 1 and 3 of Zhao, Liu & Parilina.
+
+    Both modes construct the graph from all training rows. Native mode uses
+    subset refits; frozen mode applies the same graph algorithm to a mask oracle.
+    Source: https://arxiv.org/html/2407.00506v2#S3.SS2.SSS2
+    """
+    from time import perf_counter
+    from minppi_mofs.baselines._selection_context import Selection
+
+    width = len(context.columns)
+    if not width or list(context.train.columns) != list(context.columns):
+        raise ValueError("ShapG input features differ from the original schema")
+    context.progress("shapg_graph", covered=0, total=width)
+    start = perf_counter()
+    graph = _paper_neighbors(context.train)
+    graph_s = perf_counter()-start
+    degrees = [len(neighbors) for neighbors in graph]
+    active = set(context.active) if context.mode == "frozen" else set(range(width))
+    covered = width-len(active)
+    scores = np.zeros(width, dtype=float)
+    neighbor_draws = 0
+    local_marginals = 0
+
+    def evaluate_group(terms):
+        keys = dict.fromkeys(mask for _,before,after,_ in terms for mask in (before,after))
+        utilities = dict(zip(keys,context.values(list(keys)),strict=True))
+        for node,before,after,weight in terms:
+            scores[node] += weight * (utilities[after] - utilities[before])
+
+    terms = []
+    pending_nodes = 0
+    for node in sorted(active):
+        rng = np.random.default_rng(np.random.SeedSequence([context.seed, node]))
+        for sample,weight in _paper_draws(sorted(graph[node]), 3, rng):
+            neighbor_draws += 1
+            for size in range(len(sample)+1):
+                for before in itertools.combinations(sample, size):
+                    after = tuple(sorted((*before, node)))
+                    terms.append((node, before, after, weight))
+                    local_marginals += 1
+                    if len(terms) >= 128:
+                        evaluate_group(terms)
+                        terms.clear()
+                        covered += pending_nodes
+                        pending_nodes = 0
+                        context.progress("shapg_values", covered=covered, total=width, local_marginals=local_marginals)
+        pending_nodes += 1
+        if context.mode == "native" or pending_nodes >= 16:
+            if terms:
+                evaluate_group(terms)
+                terms.clear()
+            covered += pending_nodes
+            pending_nodes = 0
+            context.progress("shapg_values", covered=covered, total=width, local_marginals=local_marginals)
+    if terms:
+        evaluate_group(terms)
+    context.progress("shapg_values", covered=width, total=width, local_marginals=local_marginals)
+    return Selection(scores=scores, diagnostics=dict(
+        method="shapg", source="Zhao et al. arXiv:2407.00506v2, Algorithms 1 and 3",
+        graph="descending absolute Pearson; accept any unseen endpoint", graph_s=graph_s,
+        construction_rows=len(context.train), graph_edges=sum(degrees)//2, graph_degree=degrees,
+        depth=1, max_neighbors=3, neighbor_draws=neighbor_draws, local_marginals=local_marginals,
+        features_covered=width, zero_marginals_known=width-len(active), ratio_normalization=False))
+
+
 def rank_features(scores: dict[str, float]) -> list[tuple[str, float]]:
     """Convert a score dict to a ranked list (highest first).
 

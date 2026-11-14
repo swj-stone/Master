@@ -1,4 +1,4 @@
-"""Banzhaf feature importance with deterministic shared-coalition sampling."""
+"""Sampled Banzhaf baselines. Use select(context) for the literature benchmark."""
 
 from __future__ import annotations
 
@@ -14,6 +14,46 @@ from minppi_mofs.baselines._coalition_utility import (
     update_supplied_diagnostics,
     validated_supplied_coalition_utility,
 )
+
+
+def select(context):
+    """Estimate the signed Banzhaf value using uniform complementary masks.
+
+    For a mask M uniform on {0,1}^p, conditioning on M_i gives the
+    difference between expected utility with and without i. Pairing M with
+    its complement ensures exactly balanced observations for every i.
+    This is the predictive-utility game supplied by the caller. A frozen
+    predictor's split-unused features have identically zero marginal.
+    """
+    from minppi_mofs.baselines._selection_context import Selection
+
+    width = len(context.columns)
+    if not width:
+        raise ValueError("Expected at least one feature")
+    pairs = 32
+    rng = np.random.default_rng(context.seed)
+    masks = rng.integers(0, 2, size=(pairs, width)).astype(bool)
+    total = np.zeros(width)
+    for start in range(0, pairs, 4):
+        chunk = masks[start:start + 4]
+        coalitions = [tuple(np.flatnonzero(m).tolist())
+                      for row in chunk for m in (row, ~row)]
+        values = np.asarray(context.values(coalitions), dtype=float).reshape(-1, 2)
+        signs = 2. * chunk - 1.
+        total += signs.T @ (values[:, 0] - values[:, 1])
+        context.progress("banzhaf_pairs", pairs_completed=start + len(chunk),
+                         pairs_planned=pairs, covered=width, total=width)
+    scores = total / pairs
+    known_nulls = 0
+    if context.mode == "frozen":
+        inactive = np.ones(width, dtype=bool)
+        inactive[list(context.active)] = False
+        scores[inactive] = 0.
+        known_nulls = int(inactive.sum())
+    return Selection(scores=scores, diagnostics=dict(
+        method="banzhaf", distribution="uniform-all-subsets", estimator="paired maximum sample reuse",
+        complementary_pairs=pairs, sampled_masks=2*pairs, zero_marginals_known=known_nulls,
+        features_covered=width))
 
 
 def compute_banzhaf_importance(
