@@ -27,6 +27,27 @@ The outer splits used seed 20261115. For fold $j\in\{0,1,2\}$, the fitting/ranki
 
 All primary arms were run separately on a single logical CPU in rotated order, including imputation, full and reduced fitting, masking, the guard and final prediction. Single runs averaged 0.285, 0.265, 0.283 and 0.262 seconds per fold for Gain, vote, all-context and point respectively. These clocks include initial library and runtime overhead. Distinct nomination mask counts measure evaluations after caching scores. A separate metric implementation checked 760 distinct masks across the 106 candidates and reproduced the scores to within $2.7\times10^{-14}$ with no near-tie decision reversals. Offline exhaustive scoring uses test labels solely to measure attainable compression on the fixed pool.
 
+\paragraph{Exact stopping under a fixed tie order.}
+Let $v_j$ and $m_j$ denote the minimum vote and margin after the first $j$ restorations of a candidate. Every completion satisfies $v_{\rm final}\le v_j$ and $m_{\rm final}\le m_j$. The pair $(v_j,m_j)$ is an upper bound in the lexicographic order for the refined vote. If it cannot strictly beat the current winner and that winner precedes this candidate in the final tie order, processing further restorations cannot select this candidate. For a visit order different from final tie priority, include that priority as the last, fixed comparison key before stopping on equality. The scalar versions follow by applying the same argument to the relevant single minimum. The Lean proof in \texttt{formal/Challenger.lean} uses increasing ranks of the finitely many margin values, with tied values assigned the same rank. The online comparison itself uses the measured values directly.
+
+For the matched timing run we fitted one 100-tree forest per fold with one worker and timed seven independent nominations with fresh caches. They comprise point, exhaustive vote, margin and refined vote, and the three corresponding stopped implementations. Each slate was timed three times per method, permuting method order by a fixed pseudorandom schedule within repetition. The timer includes constructing the ballot, hiding columns, predicting on the proposal rows, computing panel metrics and comparing candidates. Data preparation, feature ranking, the shared forest fit, guard and delivered-model refits are excluded. Reported times sum the within-slate medians across folds on the same machine. Earlier whole-pipeline times refer to the original implementation and include its training and setup costs.
+
+\begin{table}[tb]
+\centering\small
+\caption{Forest nomination time in seconds. Each pair gives the summed within-slate medians from the ten-task and wider panels. The exhaustive column evaluates the full margin without stopping. The three middle columns enable each rule's exact stop. The original Gain and local draws use the same 46 folds.}
+\label{tab:stopping-times}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Slate & Exhaustive margin & Vote & Margin & Refined & Point\\
+\midrule
+Gain & 2.78 / 5.32 & 0.66 / 1.40 & 1.54 / 2.30 & 1.55 / 2.35 & 0.45 / 0.47\\
+Local draw 1 & 3.91 / 7.28 & 1.67 / 2.24 & 2.55 / 4.37 & 2.57 / 4.30 & 0.62 / 0.56\\
+Local draw 2 & 3.92 / 7.25 & 1.68 / 2.32 & 2.71 / 4.40 & 2.73 / 4.40 & 0.61 / 0.55\\
+Local draw 3 & 3.94 / 7.32 & 1.74 / 2.15 & 2.66 / 4.47 & 2.70 / 4.37 & 0.61 / 0.56\\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Sources, wider splits and sensitivity to the outcome definition}
 \label{sec:wide-details}
 All sixteen UCI datasets are available under \href{https://creativecommons.org/licenses/by/4.0/}{CC BY 4.0}. For the first panel, the linked dataset records in Table~\ref{tab:transport-tasks} give the contributors and persistent identifiers. We credit V.~Lohweg (Banknote), I.~Yeh (Blood), M.~K\"okl\"u and \.I.~A.~\"Ozkan (Dry Bean), R.~Lyon (HTRU2), M.~Elter (Mammographic), K.~Mansouri and colleagues (QSAR), \.I.~\c{C}inar and M.~K\"okl\"u (Rice), M.~Charytanowicz and colleagues (Seeds), M.~Buscema, S.~Terzi and W.~Tastle (Steel), and G.~Barreto and A.~Neto (Vertebral). The six wider data sources and split units are listed below. Each DOI links to the upstream archive, and the replication manifest records the exact file and checksum.
