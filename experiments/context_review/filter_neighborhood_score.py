@@ -13,7 +13,6 @@ from experiments.context_review.refit_opportunity import outcome
 from experiments.context_review.receiver_transport import frozen_folds
 
 
-ARMS = ("prefix", "uniform", "vote", "slack", "point")
 PAIRS = (("slack", "vote"), ("slack", "point"), ("slack", "uniform"),
          ("point", "vote"), ("vote", "prefix"), ("point", "prefix"))
 METRICS = ("u", "breach", "saved", "auc", "accuracy", "ap")
@@ -70,8 +69,7 @@ def fold_rows(forecast, truth, key, rec, standalone):
                          for i,row in enumerate(scores,1)]
     tie_row = dict(**ident,**diagnostics(scores),changed=rec["winners"]["vote"]!=rec["winners"]["slack"],
                    joint_possible=bool(np.any(accepted[1:] & passed[1:])),any_outer=bool(np.any(passed[1:])),
-                   anchor=len(supports[0]),retained=len(supports[options[0]]),
-                   parents=rec["timings"]["voter_fit_s"],ranking_s=rec["timings"]["ranking_s"])
+                   anchor=len(supports[0]),retained=len(supports[options[0]]))
     records, bounds, costs = [], [], []
     timings = rec["timings"]
     for delivery in ("guarded","unchecked"):
