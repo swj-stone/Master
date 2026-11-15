@@ -1,14 +1,14 @@
 [
   {
     "path": "thesis-paper/minpi.pdf",
-    "bytes": 505903,
-    "sha256": "d3fdf8942a386110a9f86456fb0c2ab48755fc6130150e55f95817c5d510343f"
+    "bytes": 543371,
+    "sha256": "8f880b7bfc8c1cf543f3b234c4ae93f4772ccc9376476cbfb43474b0a8fcbc3a"
   },
   {
     "path": "thesis-paper/minpi-source.zip",
-    "bytes": 167504,
-    "sha256": "1bf6ba6cdf0eb53799e8db17d3b3aa77a736032a131569e684be60e32c8ad2fe",
-    "members": 26
+    "bytes": 180623,
+    "sha256": "26b25ed38735c4357848a4e08e9114f7db4449bf997faa1014a73bb8e2d7b9f2",
+    "members": 29
   },
   {
     "path": "packages/thesis-pmlb-evidence-r1.zip",

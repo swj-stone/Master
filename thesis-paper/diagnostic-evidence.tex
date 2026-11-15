@@ -18,6 +18,57 @@ For a stump that uses only a subsequently deleted feature, a two-level reduced s
 \paragraph{What the 704 proposals reveal.}
 Fourteen PMLB classification tasks supplied three stratified folds each~\cite{romano2022pmlb}. There were 400 proposals sampled from deletion search paths and 379 drawn at predetermined removal sizes. Their union contained 704 distinct task--fold--support records, including 75 shared records. Within each fold and retained width, all 704 records had distinct vectors of unrounded masked AUC and accuracy on the four proposal panels. After thresholding, 31 ballot groups included opposite refit decisions, covering 136 records on eight tasks. A rule receiving only the entire ballot matrix has to make at least 41 errors on these records, even if it chooses the majority outcome in every group using hindsight. The corresponding minimum was 51 when the target changed from a 100-round XGBoost refit~\cite{chen2016xgboost} to a logistic refit. Uniqueness of a continuous vector across different supports permits lookup in a finite archive. A single previously unseen support presents a different identification problem.
 
-We therefore held each individual proposal, all development data, and both actual boosted-tree fits fixed. We kept the outer labels and multiset of complete outer feature vectors, permitting each vector to be reassigned to another outer position only if all observed predictions at that position remained unchanged. This preserves the joint distribution of the recorded features and permits their pairing with the labels to vary. Given the actual development and proposal observations alone, all 704 proposals admitted an explicit reassignment that reversed the outer tolerance decision against the correspondingly reassigned anchor. After revealing the outer rowwise scores of the frozen model on the empty-restoration anchor and candidate, 17 still admitted opposing decisions. Adding the single unmasked initial predictor to this pair ruled out reversals for every proposal. The full-anchor/full-tail endpoint gave the same partition as the unmasked predictor on all 42 folds. Observing every recorded restoration likewise left all decisions invariant. The interiors contributed no further identification of passage in this comparison. Giving the observer also the final anchor's rowwise scores and the unmasked frozen scores left 93 proposals with an ambiguous individual reduced score but only three whose AUC could vary. None could cross the joint tolerance. A finite observed multiset can be substantially more restrictive than the input space in Eq.~\eqref{eq:main-tree-set}.
+\paragraph{Which outer observations identify the decision?}
+For each of the 704 proposals separately, we fix all development data and the fitted predictors. The observer knows the ordered outer labels and the multiset of complete outer feature vectors, but their row-to-label linkage is hidden. This is an identification calculation after fitting the candidate and its anchor. The proposed selector has neither these two fits nor the outer queries when nominating a support. An assignment $\pi$ places feature vector $\pi(i)$ at position $i$. The observer can rule out an assignment if it changes any supplied frozen-model probability vector at any position, at the implementation's original precision. This finite experiment allows the association between features and labels to change, while preserving every within-row feature relationship. It asks whether the observed decision could reverse. Sampling frequency and the risk on a new draw of test cases require different assumptions.
+
+\begin{table}[tb]
+\centering\small
+\caption{Supports admitting opposite outer refit decisions among permutations of the same feature rows. The final column counts proposals for which exchanging a single pair of opposite-label rows suffices. The two point queries are the frozen model on the anchor and candidate with the restoration tail hidden.}
+\label{tab:observer-controls}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Additional rowwise frozen predictions on the outer sample & Any permutation & One swap\\
+\midrule
+None (development and proposal observations only) & 704/704 & 191/704\\
+Two point queries & 17/704 & 10/704\\
+Unmasked full-model prediction alone & 0/704 & 0/704\\
+Point queries and unmasked prediction & 0/704 & 0/704\\
+All recorded masked restorations & 0/704 & 0/704\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:observer-controls} shows how revealing predictions on the target rows changes the answer. The 17 point-query reversals comprised ten observed passes and seven failures on five folds from four tasks, twelve on SPECTF. Unmasked full-model predictions alone identify the decision for every proposal. Of 38,021 row occurrences over 42 outer folds, 35,619 (93.68\%) had a probability vector unique within their fold. Such an output identifies a particular row of the finite feature dictionary, forcing its assignment. A scalar or short probability vector can thus carry considerable row-identity information when matched at full precision against a known dictionary. The model can achieve this without measuring any candidate mask on the outer rows. The full-anchor/full-tail endpoint gives the same partition on all 42 folds. Interior restorations resolved no additional decisions in this experiment. If we also reveal all masked outer predictions and the refitted anchor's rowwise predictions, individual reduced scores can still vary for 93 proposals and reduced AUC for three. All variations remain on the same side of the joint tolerance.
+
+\paragraph{How a counterexample or invariance certificate is computed.}
+Both the candidate refit $S$ and its anchor refit $A$ follow the same reassignment. As the assignment changes, the candidate score and the floor supplied by the anchor can both change. For class $c$ with $n_c$ positives among $n$ rows, let $R^S_{jc}$ and $R^A_{jc}$ be the ascending midranks of feature row $j$'s predicted probability of $c$ under the two fits. The ranks are fixed under any reassignment. With $\rho=.97$, the one-versus-rest AUC gap is
+\begin{equation}
+ G_c(\pi)=
+ \frac{\sum_{i:y_i=c}\!\big(R^S_{\pi(i)c}-\rho R^A_{\pi(i)c}\big)
+       -(1-\rho)n_c(n_c+1)/2}{n_c(n-n_c)}.
+ \label{eq:assignmentgap}
+\end{equation}
+This follows by subtracting the two rank-sum AUC formulas~\cite{bamber1975area}. Use the positive class for binary AUC and average $G_c$ over classes for multiclass AUC. The accuracy gap is the average over $i$ of $\mathbf 1\{\hat y^S_{\pi(i)}=y_i\}-\rho\mathbf 1\{\hat y^A_{\pi(i)}=y_i\}$. Each gap is therefore an additive assignment objective within equivalence classes of the supplied outputs. A pass requires both gaps to be at least $-\epsilon$. Average precision was inactive on these folds. Two above-floor minima certify invariance of a pass, and a single below-floor maximum certifies invariance of a failure. To establish ambiguity we exhibit an assignment and rescore \emph{both} metrics against their reassigned anchor. Separate maxima may occur at different assignments and need not jointly witness a pass. Restricted searches supplied admissible witnesses. Bounds for invariance use the entire allowed class, including a conservative numerical margin of $10^{-13}$ around the decision tolerance. We revisited 26 initially inconclusive records with unrestricted within-class assignment.
+
+\paragraph{Does the score carry information beyond row identity?}
+We compared the genuine output with an identifier of the same precision and frequency. At $b$ bits each class probability $p$ becomes $\min(2^b-1,\lfloor 2^bp\rfloor)$. For each of five draws, we randomly reassigned the genuine codes among distinct input vectors of the same observed multiplicity. Equal input vectors share a code, and every code has the same occupancy as in the genuine partition. Each observer knows the complete mapping from input vectors in its dictionary to codes and the code at each labelled position. Across resolutions we use the same reassignment within a draw. Matching the marginal occupancy preserves the number and sizes of code groups. It leaves their intersection with the candidate-specific point-query groups unconstrained. The reassignment uses neither labels nor refitted scores. The original full-precision result was known when this control was designed.
+
+\begin{table}[tb]
+\centering\small
+\caption{Numbers of supports with an explicit opposing-decision witness at each precision, among 704. Ranges are the extrema over five randomized code assignments. For the code alone, unresolved counts at 2/4/8/full precision were 11/9/1/0 for genuine codes and 0/0--1/0--6/1--2 across randomized draws. With both point queries every case was resolved.}
+\label{tab:precision}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Observer & 2 bits & 4 bits & 8 bits & Full precision\\
+\midrule
+Unmasked score code alone & 524 & 338 & 65 & 0\\
+Matched random code alone & 698--701 & 648--656 & 454--482 & 9--16\\
+Point pair and unmasked code & 12 & 9 & 3 & 0\\
+Point pair and matched random code & 6--9 & 3--8 & 1--4 & 0\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Singleton rows at 2, 4 and 8 bits numbered 361, 2,760 and 11,109 of 38,021, respectively. These counts apply to the genuine code and every control draw. With the four-bit code alone, genuine predictions left 338 witnessed reversals and nine unresolved cases, while each control left at least 648 witnessed reversals (Table~\ref{tab:precision}). On 12 of the 14 sources, the genuine witness count plus all its unresolved cases was strictly below every control witness count. At full precision even a randomized identifier certified 686--694 proposals invariant. Once the point pair was supplied, the random two-bit code left fewer reversals on every draw than the genuine two-bit prediction. The intersections with the point-pair groups differ, so the joint codes can carry different row-identity information despite their matched marginal frequencies. This measures distinguishability among the known inputs. Forecasting the decision for an unseen support or new cases requires an out-of-sample comparison.
 
 On the historical search paths, adding interior restorations caught eleven more refit failures and vetoed twenty more passing deletions than the two endpoint restorations. On randomly drawn deletions, the extra restorations caught no additional failures and vetoed nine additional passes. The cost crossover, task/fold bootstrap intervals and out-of-task breach prediction results appear in Appendix~\ref{sec:extended-operating}.
