@@ -1,0 +1,29 @@
+\subsection{What can all masks identify about a refit?}
+\label{sec:identification}
+Consider a fixed proposed deletion. Suppose we know the fitting rows, the evaluation labels and even the frozen predictor's score on every evaluation row under every mask. How much can the reduced learner's AUC and accuracy still vary? A depth-one classification tree gives an exact answer for a binary surviving column. We give the observer one additional measurement, the marginal frequency of that column on the evaluation set.
+
+Use binary inputs $D,R$ and train a stump by minimizing weighted Gini impurity, scoring each leaf by its positive-class fraction. On the eight fitting rows, $D=Y$, with four rows in each class. In each class, $R=Y$ on three rows and $R\ne Y$ on one. The split on $D$ has two pure leaves, whereas the split on $R$ has leaf fractions $1/4$ and $3/4$. The full fit therefore uses $D$ alone. Refitting on $R$ alone gives the higher score to $R=1$ and predicts class $R$. Fix the evaluation values of $(D,Y)$ and the mask replacement. Any reassignment of the surviving $R$ values preserves every row's frozen scores, including those on weighted panels.
+
+\begin{proposition}
+\label{prop:refit-identification}
+Write $\pi=\Pr(Y=1)\in(0,1)$ and $q=\Pr(R=1)$. Given only the information above, the sharp population set of reduced $(\mathrm{AUC},\mathrm{accuracy})$ pairs is
+\begin{equation}
+ \left\{\left(\frac12+\frac{u-\pi q}{2\pi(1-\pi)},\
+                  1-\pi-q+2u\right):\
+       L\le u\le H\right\},                                      \label{eq:refit-range}
+\end{equation}
+where $L=\max(0,\pi+q-1)$ and $H=\min(\pi,q)$. On $n$ equally weighted evaluation rows the same formula holds with $nu$ integral. Both metrics attain their minima together at $L$ and their maxima together at $H$.
+\end{proposition}
+
+\begin{proof}
+Let $u=\Pr(Y=1,R=1)$. The true-positive, false-negative, false-positive and true-negative masses are $u,\pi-u,q-u,1-\pi-q+u$. Their nonnegativity gives the two classical Fr\'echet bounds~\cite{frechet1951margins}. Every admissible $u$ assigns mass $u$ of the positive class and $q-u$ of the negative class to $R=1$, preserving all frozen scores. On a finite set this assigns $nu$ positive rows and $n(q-u)$ negative rows to the high-score leaf. Accuracy is the sum of the diagonal masses. For a two-valued score, a positive case with the higher score and a negative case with the lower score receive full pair credit. Equal scores receive half credit. Thus AUC is half the sum of sensitivity $u/\pi$ and specificity $(1-\pi-q+u)/(1-\pi)$. Substitution gives Eq.~\eqref{eq:refit-range}, whose two coordinates are strictly increasing in $u$.
+\end{proof}
+
+Apply the two refitted-anchor floors from Eq.~\eqref{eq:ballot}, including its numerical slack. If both metrics at $L$ meet their floors, every compatible refit passes. If either metric at $H$ misses its floor, every compatible refit fails. In the remaining case the data admit both decisions. For example, if the anchor is perfect, $\pi=0.10$ and $q=0.08$, even the best pairing misses two positives per hundred cases. Its accuracy is $0.98$, but its AUC is $0.90$, so the deletion must breach the $3\%$ tolerance. One further paired measurement, the fraction of evaluation rows with $R=Y=1$, identifies the exact refit outcome for this learner.
+
+At balanced margins $\pi=q=1/2$, the compatible metric pairs are $(s,s)$ for every $0\le s\le1$ in the population. With $D=Y$ on the evaluation rows the anchor is perfect and hiding $D$ gives a constant score. A veto on the balanced population can then reject a passing refit. Conversely, put every evaluation $D$ in the leaf reached by its mask replacement. Deleting $D$ now preserves each row's prediction and every panel approves. Both refit outcomes are still possible relative to this chance-level balanced anchor. The construction conditions on a proposed set and the fitting sample. The original evaluation rows paired with their labels would distinguish these cases.
+
+On an ambiguous observation, let $a>0$ price a false veto and $m>0$ a missed breach. A rule vetoing with probability $z$ has worst-case expected cost $\max\{az,m(1-z)\}$. Equating the terms gives the sharp minimax cost $\tfrac{am}{a+m}$ at $z=\tfrac{m}{a+m}$. The classical two-point argument applies because the passing and failing cases give identical observations.
+
+\paragraph{Which observed refits did the ballots distinguish?}
+For the 704 distinct task--fold--support records in Sect.~\ref{sec:refit}, we grouped proposals by task, fold, retained width and the full matrix of XGBoost approvals on the four panels at every separating restoration. Of 491 groups, 31 contained both passing and failing XGBoost refits. These groups covered 136 proposals across eight tasks. If a group contains $n_0$ passes and $n_1$ failures, the cheapest common decision costs $\min(a n_0,m n_1)$. Summing these minima gives the exact cost attainable with hindsight using the specified inputs. With equal costs, even this rule makes 41 errors. Keeping only the worst approval count raises the minimum to 71, and using width alone within task and fold raises it to 88. For logistic refit outcomes the full ballots force 51 errors. The four-panel AUC and accuracy values underlying those same ballots distinguished all 704 records within task, fold and width. Their distinctness permits memorization on these data. Predictive performance on other tasks requires a held-out comparison.

@@ -1,0 +1,31 @@
+cohort,target,summary,proposals,groups,mixed_groups,mixed_proposals,mixed_tasks,error_floor,cost_floor_miss2
+union,xgb,width,704,223,59,295,11,88,119
+union,xgb,worst approvals,704,310,53,246,11,71,102
+union,xgb,separating ballots,704,491,31,136,8,41,57
+union,xgb,separating metrics,704,704,0,0,0,0,0
+union,xgb,all recorded metrics,704,704,0,0,0,0,0
+union,logistic,width,704,223,73,334,13,113,143
+union,logistic,worst approvals,704,310,62,258,13,91,113
+union,logistic,separating ballots,704,491,38,136,12,51,56
+union,logistic,separating metrics,704,704,0,0,0,0,0
+union,logistic,all recorded metrics,704,704,0,0,0,0,0
+uniform_deletions,xgb,width,379,99,43,169,11,54,73
+uniform_deletions,xgb,worst approvals,379,150,39,143,11,43,62
+uniform_deletions,xgb,separating ballots,379,247,24,77,8,26,37
+uniform_deletions,xgb,separating metrics,379,379,0,0,0,0,0
+uniform_deletions,xgb,all recorded metrics,379,379,0,0,0,0,0
+uniform_deletions,logistic,width,379,99,49,190,13,65,83
+uniform_deletions,logistic,worst approvals,379,150,45,159,13,54,71
+uniform_deletions,logistic,separating ballots,379,247,26,82,11,29,35
+uniform_deletions,logistic,separating metrics,379,379,0,0,0,0,0
+uniform_deletions,logistic,all recorded metrics,379,379,0,0,0,0,0
+path,xgb,width,400,191,34,116,11,40,52
+path,xgb,worst approvals,400,224,26,90,11,30,40
+path,xgb,separating ballots,400,319,14,49,7,15,21
+path,xgb,separating metrics,400,400,0,0,0,0,0
+path,xgb,all recorded metrics,400,400,0,0,0,0,0
+path,logistic,width,400,191,39,133,11,48,61
+path,logistic,worst approvals,400,224,29,99,10,36,45
+path,logistic,separating ballots,400,319,19,54,8,22,24
+path,logistic,separating metrics,400,400,0,0,0,0,0
+path,logistic,all recorded metrics,400,400,0,0,0,0,0
