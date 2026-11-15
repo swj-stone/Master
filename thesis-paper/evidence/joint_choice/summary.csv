@@ -1,0 +1,14 @@
+observer,joint,joint_exact,gap_units,gap_exact,kind,pairs,tasks
+both_points,00,True,0,True,constant,359,13
+both_points,00 01,True,-1 0,True,one_order,7,2
+both_points,00 01 10 11,True,-1 0 1,True,both_orders,4,1
+both_points,00 01 11,True,-1 0,True,one_order,1,1
+both_points,00 10,True,0 1,True,one_order,19,3
+both_points,00 10 11,True,0 1,True,one_order,2,1
+both_points,01,True,-1,True,constant,136,11
+both_points,01 10 11,True,-1 0 1,True,both_orders,2,1
+both_points,01 11,True,-1 0,True,one_order,17,3
+both_points,10,True,1,True,constant,158,11
+both_points,10 11,True,0 1,True,one_order,11,3
+both_points,11,True,0,True,constant,567,11
+development,00 01 10 11,True,-1 0 1,True,both_orders,1283,14

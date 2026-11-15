@@ -1,0 +1,10 @@
+{
+  "pairs": 2566,
+  "verified_common_worlds": 6491,
+  "rescored_model_worlds": 4774,
+  "independent_small_orbits": 8,
+  "four_row_example": {
+    "00": 2,
+    "11": 4
+  }
+}
