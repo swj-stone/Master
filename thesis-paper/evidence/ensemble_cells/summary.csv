@@ -1,0 +1,5 @@
+model,constraint,feasible_worlds,distinct_metric_pairs,min_auc,max_auc,min_accuracy,max_accuracy,both_pass_and_fail
+cart,rows_only,81,11,0.7222222222222222,1.0,0.5,1.0,True
+cart,pooled_histogram,6,3,0.7222222222222222,1.0,0.5,0.8333333333333334,True
+xgboost,rows_only,81,11,0.7222222222222222,1.0,0.5,1.0,True
+xgboost,pooled_histogram,6,3,0.7222222222222222,1.0,0.5,0.8333333333333334,True
