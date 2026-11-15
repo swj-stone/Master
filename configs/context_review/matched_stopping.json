@@ -1,0 +1,10 @@
+{
+  "scope": "Retrospective implementation comparison on all original Gain forest slates and all three ANOVA forest draws. No outcome tuning.",
+  "methods": ["vote", "margin", "vote_margin", "point"],
+  "traversal": "Archived candidate order (earliest wins exact ties) and separating_contexts in original order.",
+  "stopping": "Each coordinate uses the minimum of the restorations seen so far. Stop a candidate when its upper key cannot exceed the completed incumbent. For ordinal-only use the known 0 and 4 endpoints.",
+  "reference": "Exhaust every candidate and context independently for every multicriteria selection key. Point uses the separately computed single-panel empty restoration.",
+  "cost": "Count distinct visible-column masks, pooling anchor and candidate masks within the current policy run; charge each new policy a fresh score cache.",
+  "timing": "Train one frozen 100-tree forest per original fold with the original seed. For each slate time independent nomination, including ballot creation and first mask prediction, excluding shared fit and guard/refits. Three rounds per fold/slate, deterministic permuted method order from SeedSequence([37189, fold index, slate index, repetition]). All 46 original slates and 138 local slates. Use median within fold and slate. Fresh ballot/cache for each run. Run one forest worker at a time.",
+  "excluded": "Portable replay uses stored four-panel tensors to count masks and reproduce choices. It cannot reproduce wall time; archive records measured times separately. Study reuses historical candidates and labels."
+}

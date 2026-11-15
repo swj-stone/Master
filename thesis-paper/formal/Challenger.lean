@@ -19,4 +19,22 @@ theorem pruned_cannot_win (remaining : List Nat) (observed incumbent : Nat)
   omega
 
 #print axioms pruned_cannot_win
+
+/-- The margin of each measured context can be replaced by its rank among the finitely
+many measured margins, assigning equal ranks to ties. Both coordinates prefer larger values. -/
+def better (vote margin refVote refMargin : Nat) : Prop :=
+  refVote < vote ∨ (refVote = vote ∧ refMargin < margin)
+
+/-- Refining the largest vote by a continuous minimum still permits exact early elimination.
+The incumbent wins an equality under the fixed visitation order. -/
+theorem pruned_refinement_cannot_win
+    (votes margins : List Nat) (vote margin refVote refMargin : Nat)
+    (stop : ¬ better vote margin refVote refMargin) :
+    ¬ better (votes.foldl Nat.min vote) (margins.foldl Nat.min margin) refVote refMargin := by
+  have hv := remaining_cannot_raise votes vote
+  have hm := remaining_cannot_raise margins margin
+  unfold better at stop ⊢
+  omega
+
+#print axioms pruned_refinement_cannot_win
 end MinPI.Challenger
