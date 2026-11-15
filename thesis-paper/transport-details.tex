@@ -81,7 +81,33 @@ Attainable $U$ with guard &10.59 &&27.37&\\
 \end{tabular}
 \end{table}
 
-Among top-vote candidates, breaking ties by point margin rather than uniformly changed $U$ by $-0.60$ points ($[-2.92,1.11]$) on the ten tasks and $-3.48$ points ($[-12.50,2.76]$) on the wider panel with logistic refits. For random nominations the return-bound calculation also admits a direct extension of Eq.~\eqref{eq:opportunity-bound}. Let $p_{LfS},p_{RfS}$ be the probabilities that the respective policies return support $S$ after the guard. Its coefficient in the expected difference is $c_{fS}=w_f s_{fS}(p_{LfS}-p_{RfS})$. Summing $\min(0,c_{fS})$ and $\max(0,c_{fS})$ over supports and folds bounds that difference before outer scoring, since the same returned fit has the same passage bit for both policies. The archive verifies the deterministic bound in Lean for nonnegative rational weights and savings.
+Among top-vote candidates, breaking ties by point margin rather than uniformly changed $U$ by $-0.60$ points ($[-2.92,1.11]$) on the ten tasks and $-3.48$ points ($[-12.50,2.76]$) on the wider panel with logistic refits. For random nominations the return-bound calculation also admits a direct extension of Eq.~\eqref{eq:opportunity-bound}. Let $p_{LfS},p_{RfS}$ be the probabilities that the respective policies return support $S$ after the guard. Its coefficient in the expected difference is $c_{fS}=w_f s_{fS}(p_{LfS}-p_{RfS})$. Summing $\min(0,c_{fS})$ and $\max(0,c_{fS})$ over supports and folds bounds that difference before outer scoring, since the same returned fit has the same passage bit for both policies. Lean verifies the deterministic and randomized bounds for rational coefficients, using nonnegative weights and savings in the deterministic case.
+
+\subsection{Ranking all candidates within a fold}
+\label{sec:slate-concordance}
+The guarded decision uses a single nominee. To examine the scores on the rest of the slate, we retrospectively compared each passing candidate with each failing one on the same fold. A higher score for the passing candidate receives one, an exact score tie one half. We averaged the pairs on each mixed fold, averaged these folds within each source, then weighted the contributing sources equally. A slate on which all candidates share the same outcome has no comparable pair. Table~\ref{tab:slate-concordance} gives coverage for both target definitions. The Gain order uses summed within-anchor feature ranks, breaking ties by column indices as in the original policy.
+
+\begin{table}[htb]
+\centering\small
+\caption{Within-fold concordance among the 216 external candidates. Each target is either outer passage alone or passage at both the guard and outer test. Folds and sources count those with a passing and a failing candidate. The ten-task panel has 30 folds and the wide panel has 16.}
+\label{tab:slate-concordance}
+\begin{tabular}{@{}lllrrrrrrr@{}}
+\toprule
+Panel & Refit & Pass & Sources & Folds & Pairs & Gain & Vote & Full & Point\\
+\midrule
+Ten & Tree & Outer & 5 & 10 & 118 & .491 & .540 & .717 & .752\\
+Ten & Tree & Both & 5 & 9 & 100 & .404 & .550 & .634 & .674\\
+Wide & Tree & Outer & 5 & 12 & 128 & .630 & .500 & .621 & .630\\
+Wide & Tree & Both & 4 & 8 & 93 & .612 & .521 & .598 & .604\\
+Ten & Logistic & Outer & 5 & 9 & 69 & .616 & .514 & .614 & .607\\
+Ten & Logistic & Both & 4 & 7 & 75 & .415 & .542 & .534 & .566\\
+Wide & Logistic & Outer & 5 & 9 & 106 & .571 & .562 & .636 & .643\\
+Wide & Logistic & Both & 5 & 8 & 102 & .590 & .546 & .498 & .500\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On wider tree refits the point score's concordance for outer passage ranged from .458 on SECOM to .896 on Ozone. Its mean excess over the vote was .130 (paired source-bootstrap 95\% interval $[.105,.155]$ over five contributing sources). For joint passage under wider logistic refits the corresponding difference was $-.046$ ($[-.235,.093]$). Candidates share test observations and occur in multiple pairs. The intervals resample contributing sources with their fold results intact. The outcome and receiver change which folds contribute.
 
 \subsection{Averaging predictions over training backgrounds}
 \label{sec:masking-background}

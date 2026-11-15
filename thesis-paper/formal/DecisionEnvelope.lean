@@ -60,4 +60,21 @@ theorem study_bounds [DecidableEq α] (folds : List (Fold α)) :
 
 #print axioms study_bounds
 
+/-- One coefficient for each fold and distinct returned support:
+weight times savings times the difference in return probabilities. -/
+def lotteryDiff (atoms : List (Rat × Bool)) : Rat :=
+  (atoms.map fun (c, passed) ↦ if passed then c else 0).sum
+
+theorem lottery_bounds (atoms : List (Rat × Bool)) :
+    (atoms.map fun x ↦ min 0 x.1).sum ≤ lotteryDiff atoms ∧
+    lotteryDiff atoms ≤ (atoms.map fun x ↦ max 0 x.1).sum := by
+  induction atoms with
+  | nil => simp [lotteryDiff]
+  | cons head tail ih =>
+    rcases head with ⟨c, b⟩
+    simp only [lotteryDiff, List.map_cons, List.sum_cons] at *
+    cases b <;> simp <;> grind
+
+#print axioms lottery_bounds
+
 end MinPI.DecisionEnvelope
