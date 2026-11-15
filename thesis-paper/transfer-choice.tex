@@ -1,0 +1,31 @@
+\subsection{Choosing a nomination policy on other sources}
+\label{sec:transfer-choice}
+Suppose prior sources have outcomes for all candidates but a new source has none. We selected a rule using only the other sources in the same panel and candidate construction. Holding out Dry Bean, for example, removed all its folds and all its exchange draws. The decision criterion was mean $U-\lambda B$, where $B$ indicates a delivered breach. An anchor fallback has $U=B=0$. A penalty $\lambda=0.5$ charges one breach the value of half an anchor's width saved within tolerance. We fixed penalties 0, 0.5 and 1 before running this retrospective analysis. Time is reported separately from this criterion.
+
+The four-rule library kept the highest-vote tier and used original order, uniform sampling, point margin or full margin within that tier. Equal training averages to $10^{-12}$ retained the first rule in that order. An expanded library also included an unrestricted single-point nomination, giving it first preference on a tie. Each training source had equal weight. Within-source averages gave equal weight to folds after averaging local draws. A selected rule then nominated one candidate per held-out slate for the usual guard.
+
+\begin{table}[htb]
+\centering\small
+\caption{Held-source net return above the fixed unrestricted single point, in percentage points. Full always maximizes the full margin among highest-vote candidates. Tier chooses its tie rule on the other sources. Expanded also permits the unrestricted point rule. The original and local designs reuse the same sources.}
+\label{tab:transfer-choice}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+Construction & Panel & $\lambda$ & Full & Tier & Expanded\\
+\midrule
+Gain & Ten & 0 & 0.00 & $-5.00$ & $-5.00$\\
+     &     & 0.5 & 0.00 & $-4.17$ & $-5.83$\\
+     &     & 1 & 0.00 & $-4.17$ & $-4.17$\\
+Gain & Wide & 0 & 0.00 & 0.00 & 0.00\\
+     &      & 0.5 & 0.00 & $-6.18$ & $-6.18$\\
+     &      & 1 & 0.00 & $-7.57$ & $-7.57$\\
+Local & Ten & 0 & $-1.08$ & $+1.14$ & $+1.14$\\
+      &     & 0.5 & $-1.64$ & $+1.69$ & $+1.69$\\
+      &     & 1 & $-2.20$ & $+2.25$ & $+2.25$\\
+Local & Wide & 0 & $+0.89$ & $-1.81$ & $-1.81$\\
+      &      & 0.5 & $+0.89$ & $-1.35$ & $-3.67$\\
+      &      & 1 & $+0.89$ & $-1.35$ & $-5.52$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On the ten Gain sources at $\lambda=0$, omitting Dry Bean selected the original tie order, which lost 50 points of $U$ to the single point on Dry Bean. The other nine held sources gave equal returns. On the ten local sources each omission and penalty selected the original tie order. It gained a mean 1.14 points of $U$ with 1.11 points fewer breaches than the unrestricted point. These were the only three positive entries for the transferred tier rule in Table~\ref{tab:transfer-choice}. On the wide Gain sources at $\lambda=1$, the held-source uniform choices lost net return on Ozone, Parkinson and Semeion. The table measures transfer of a source-average preference conditional on these ten and six sources. The training sets overlap across omissions, so we report realized paired differences and make the individual choices available. This experiment uses no descriptors of a new task and supplies little evidence for deciding that the additional voting computation will pay off there.
