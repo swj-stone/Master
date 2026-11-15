@@ -1,0 +1,94 @@
+[
+  {
+    "dataset": "cnae",
+    "url": "https://archive.ics.uci.edu/static/public/233/cnae+9.zip",
+    "id": 233,
+    "doi": "10.24432/C51G7P",
+    "creator": "P. Ciarelli and E. Oliveira (2009)",
+    "license": "CC BY 4.0",
+    "bytes": 1853578,
+    "sha256": "458957518ec4339e0fc456837a96d44419ef81ae61425a6cdf2451112f18fbaa",
+    "members": [
+      "CNAE-9.names",
+      "CNAE-9.data"
+    ]
+  },
+  {
+    "dataset": "ozone",
+    "url": "https://archive.ics.uci.edu/static/public/172/ozone+level+detection.zip",
+    "id": 172,
+    "doi": "10.24432/C5NG6W",
+    "creator": "K. Zhang, W. Fan and X. Yuan (2008)",
+    "license": "CC BY 4.0",
+    "bytes": 503814,
+    "sha256": "b0ff07fc723325743441dac8239ed1de6c9e1410afc40cb50cc273bd4b359325",
+    "members": [
+      "eighthr.data",
+      "eighthr.names",
+      "onehr.data",
+      "onehr.names"
+    ]
+  },
+  {
+    "dataset": "parkinson",
+    "url": "https://archive.ics.uci.edu/static/public/470/parkinson+s+disease+classification.zip",
+    "id": 470,
+    "doi": "10.24432/C5MS4X",
+    "creator": "C. Sakar, G. Serbes, A. Gunduz, H. Nizam and B. Sakar (2018)",
+    "license": "CC BY 4.0",
+    "bytes": 2140135,
+    "sha256": "f161da296e4d6adbf8cc2f5d78c9b9c924f7dcd290b6f4c27424841df644e991",
+    "members": [
+      "pd_speech_features.rar"
+    ]
+  },
+  {
+    "dataset": "secom",
+    "url": "https://archive.ics.uci.edu/static/public/179/secom.zip",
+    "id": 179,
+    "doi": "10.24432/C54305",
+    "creator": "M. McCann and A. Johnston (2008)",
+    "license": "CC BY 4.0",
+    "bytes": 1964989,
+    "sha256": "eea568baf3c2229096d7d294cf0b096b5502bd96d92c0b80a65b84714059be8e",
+    "members": [
+      "secom.data",
+      "secom.names",
+      "secom_labels.data"
+    ]
+  },
+  {
+    "dataset": "semeion",
+    "url": "https://archive.ics.uci.edu/static/public/178/semeion+handwritten+digit.zip",
+    "id": 178,
+    "doi": "10.24432/C5SC8V",
+    "creator": "Semeion Handwritten Digit (1998)",
+    "license": "CC BY 4.0",
+    "bytes": 49996,
+    "sha256": "6fb091394714cddda5751d4e1c2781ab094e7cf15de07917fb40e581f19efc75",
+    "members": [
+      "semeion.data",
+      "semeion.names"
+    ]
+  },
+  {
+    "dataset": "urban",
+    "url": "https://archive.ics.uci.edu/static/public/295/urban+land+cover.zip",
+    "id": 295,
+    "doi": "10.24432/C53S48",
+    "creator": "B. Johnson (2013)",
+    "license": "CC BY 4.0",
+    "bytes": 144090,
+    "sha256": "277a27000a4a4b593f655595b92904ccb30ece48b8bb2a35cf5d3854d7204f79",
+    "members": [
+      "urban+land+cover/",
+      "__MACOSX/._urban+land+cover",
+      "urban+land+cover/training.csv",
+      "__MACOSX/urban+land+cover/._training.csv",
+      "urban+land+cover/.DS_Store",
+      "__MACOSX/urban+land+cover/._.DS_Store",
+      "urban+land+cover/testing.csv",
+      "__MACOSX/urban+land+cover/._testing.csv"
+    ]
+  }
+]
