@@ -18,6 +18,7 @@ PACKAGES = ROOT / "packages"
 ARTIFACTS = PAPER / "evidence/revision/artifacts.json"
 REASSESSMENT = PACKAGES/"thesis-refit-reassessment-evidence.zip"
 OPERATING = PACKAGES / "thesis-operating-evidence.zip"
+TRANSPORT = PACKAGES / "thesis-transport-evidence.zip"
 
 
 def digest(path):
@@ -45,6 +46,13 @@ def paper_source():
                     if path.suffix == ".tex":
                         pending.append(path)
     result = {p.relative_to(PAPER).as_posix():p for p in inputs}
+    for tex in inputs:
+        if tex.suffix == ".tex":
+            for packages in re.findall(r"\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}", tex.read_text(encoding="utf8")):
+                for name in packages.split(","):
+                    local = PAPER / (name.strip() + ".sty")
+                    if local.is_file():
+                        result[local.name] = local
     result["main.bbl"] = PAPER / "build/main.bbl"
     return result
 

@@ -1,0 +1,37 @@
+\section{Where is information lost?}
+\label{sec:evidence}
+\paragraph{Even all frozen predictions can leave the refit unidentified.}
+Consider binary features $D,R$ and a depth-one tree trained by Gini impurity. On eight fitting cases, four per class, $D$ always equals the label $Y$, and $R$ agrees with $Y$ in three of four cases in each class. The full fit splits on $D$ and ignores $R$. The reduced fit after deleting $D$ predicts class $R$, scoring $R=1$ above $R=0$. Fix the fitting sample, replacement values, and the evaluation rows' $(D,Y)$. Reassigning the evaluation values of $R$ leaves every row's frozen score under every mask unchanged. Only the reduced fit sees the new pairing of $R$ with $Y$.
+
+Even if the observer also knows the evaluation prevalence $\pi=\Pr(Y=1)\in(0,1)$ and retained-feature frequency $q=\Pr(R=1)$, the unknown overlap $u=\Pr(R=Y=1)$ can range from $\max(0,\pi+q-1)$ to $\min(\pi,q)$~\cite{frechet1951margins}. The refit's AUC is $1/2+(u-\pi q)/(2\pi(1-\pi))$ and its accuracy is $1-\pi-q+2u$. Every feasible overlap is attainable. On a finite sample it is a multiple of the reciprocal sample size. At $\pi=q=1/2$, both metrics equal $2u$ and span the entire unit interval in the population. Paired raw evaluation inputs and labels would identify $u$. Appendix~\ref{sec:identification} proves the sharp set, gives the conditions under which the margins alone decide a tolerance breach, and derives the minimax cost of an ambiguous decision. This construction establishes nonidentification for an observer restricted to the specified measurements. It gives no frequency estimate for ambiguity in boosted trees.
+
+\paragraph{Observed collisions after thresholding.}
+We evaluated 14 previously studied PMLB classification tasks~\cite{romano2022pmlb}, using three stratified outer folds per task. Within a fold we sampled up to 12 proposals from three adaptive deletion paths. Independently of those paths we drew up to four supports at each of three deletion sizes (one, one quarter and one half of the anchor, with rounding and duplicate sizes removed). The two collections contain 400 and 379 observations, with 75 identical task--fold--support records. We used the 704 distinct records to assess what the recorded observations can distinguish. The reference and primary refit learner was XGBoost with 100 boosting rounds, depth four and learning rate 0.1~\cite{chen2016xgboost}.
+
+Within each task, fold and retained width we grouped records with identical observations. If $n_0$ members of such a group pass after refitting and $n_1$ breach, every common binary decision makes at least $\min(n_0,n_1)$ mistakes. A rule with access to the observed outcomes attains this count by choosing the majority outcome. The 491 groups defined by the entire four-panel ballot matrix included 31 mixed groups covering 136 proposals from eight tasks. At equal error costs the hindsight error floor was 41 for this matrix, 71 for its worst approval count and 88 for width alone. Continuous four-panel AUC and accuracy values distinguished all 704 records at their stored precision. That allows exact lookup on these data. It says nothing about prediction error on another task. Holding the XGBoost ballots fixed and changing the refit to L2 logistic regression raised the full-ballot error floor to 51.
+
+\paragraph{Operating the veto.}
+On search paths, the minimum vote vetoed 184 of 189 breaches (97.4\%) and 194 of 211 passes (91.9\%). Compared with voting only on the empty and full restorations, the interiors caught 11 additional breaches and vetoed 20 additional passes. The paired changes in true- and false-positive rates were $+5.82$ percentage points (95\% interval $[0,13.56]$) and $+9.48$ ($[4.57,15.14]$). On drawn deletions, the minimum vote caught 161 of 163 breaches and vetoed 178 of 216 passes. The interiors added zero detections ($[0,0]$ points) and nine false alarms ($+4.17$ points, $[0.46,9.14]$). The intervals resample tasks and folds, retaining proposals, outcomes and decisions together (30,000 paired draws). They condition on the fitted models and test folds. Seven of the eleven additional detections came from Sonar. With unit false-alarm cost, the interiors repay their 20 extra path false alarms only when a missed breach costs more than $20/11$. On the pooled paths a cutoff at one quarter of the anchor or a constant veto had lower cost than the separating vote at every miss price. Appendix~\ref{sec:refit} gives the full rates, cost curves and learner sensitivities.
+
+\paragraph{What transfers to another task?}
+A deletion fraction alone ties all proposals at a given width. We therefore fitted ridge logistic models predicting a refit breach from (i) the deletion fraction with fixed spline terms, (ii) those terms plus the removed share of split gain and rank mass, and (iii) these features plus continuous losses on the empty and full restorations. We compared (iii) with an otherwise identical model adding the largest dissent fraction in any restoration. Each model was trained without any observations from the task where it was evaluated. Scaling and the ridge penalty were identical across models. Tasks received equal weight, as did folds within a task and proposals within a fold. These analyses are retrospective because the collection's outcomes were already known when the comparisons were specified.
+
+\begin{table}[tb]
+\centering
+\caption{Adding the worst dissent fraction to a predictor using width, Gain and continuous endpoint losses. Lower binary log loss indicates better breach probabilities. Paired 95\% intervals resample the 14 tasks with their out-of-task predictions fixed. The collections share 75 proposals.}
+\label{tab:strong-risk}
+\small
+\begin{tabular}{llrrr}
+\toprule
+Train on other tasks & Test proposals & Endpoints & With dissent & Paired difference [95\% interval]\\
+\midrule
+Path & Path & .5742 & .5798 & $+.0056\ [-.0120,.0321]$\\
+Path & Drawn & .5758 & .5585 & $-.0173\ [-.0284,-.0056]$\\
+Drawn & Path & .5808 & .5793 & $-.0016\ [-.0199,.0191]$\\
+Drawn & Drawn & .5407 & .5228 & $-.0179\ [-.0373,.0020]$\\
+Unique union & Unique union & .5471 & .5391 & $-.0079\ [-.0216,.0073]$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The clearest change occurred when a model trained on paths scored drawn proposals on the omitted task (Table~\ref{tab:strong-risk}). Restricting the target to the same retained width and the observed range of deleted gain mass on the source fold retained 116 of 379 drawn proposals. The paired change was $-.0232$ there ($[-.0422,-.0051]$), and $-.0137$ ($[-.0399,.0138]$) on the 41 remaining after excluding shared supports. The restriction changes the population, and its interval widens as coverage decreases. For the unique union, adding Gain to width alone reduced log loss by .0276 ($[.0088,.0436]$ improvement). Adding dissent to the richer endpoint baseline yielded a smaller, less precise gain. These are conditional prediction comparisons under different proposal distributions. They do not isolate a causal effect of the search path.

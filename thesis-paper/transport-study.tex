@@ -1,0 +1,49 @@
+\section{Choosing the subset that receives one refit}
+\label{sec:transport}
+The decision experiment restricts all nominees to the same width. If $k=|A|>1$, the candidate pool consists of the top $\lceil k/2\rceil$ columns by Gain and up to seven other distinct, uniformly drawn subsets of the same width. If $k=1$, all policies retain $A$. An eligible policy nominates one candidate. Candidate and anchor are each refitted on the fitting and proposal rows and evaluated on separate guard rows. When the nominee breaches any guard allowance, the policy falls back to the anchor. The final support $S_f$ is retrained on all development rows and scored on the outer test. The primary outcome is the fraction of anchor columns saved within the measured tolerance,
+\begin{equation}
+ U=(1-|S_f|/|A|)\,\mathbf 1\{\text{final fit meets every outer tolerance}\}\,.
+ \label{eq:utility}
+\end{equation}
+Both a fallback and a harmful deletion receive zero. We report breaches separately to distinguish those outcomes.
+
+\paragraph{Historical opportunity.}
+On the 14 PMLB tasks, 41 folds could support a separate guard, including one with a singleton anchor. The minimum vote tied at zero on all candidates in 32 of 40 actionable folds. Against a Gain prefix, it increased mean $U$ from 9.33\% to 10.12\%, entirely on one New Thyroid fold. Breaches rose from one to three. Subsequent refits of every candidate showed that on 18 of 40 folds no candidate met the outer tolerance. On two more the guard excluded every outer pass. On the remaining 20 at least one candidate passed both checks. The corresponding task-weighted ceilings were 24.90\% for outer passage alone and 22.57\% for joint passage, compared with 45.91\% nominal savings if every proposed width were acceptable. This retrospectively scored pool motivated a test that retains the magnitude of the masked losses.
+
+\paragraph{Contrasting the loss with its vote.}
+For each higher-is-better classification metric, set $h_{bi}=\tau_i|R_{bi}|$. Its normalized margin is $(V_{bi}-R_{bi}+h_{bi}+\epsilon)/\max(h_{bi},\epsilon)$. The panel margin is the minimum over metrics. Define four nomination rules on the same candidates.
+\begin{itemize}
+\item \textbf{Gain} chooses the prefix of the original feature ranking.
+\item \textbf{Vote} maximizes $v(S)$, the smallest approval count over restorations.
+\item \textbf{All-context margin} maximizes the smallest, across restorations, of the third-largest of the four panel margins. Its nonnegative set is exactly the three-of-four voting acceptance set, but it orders candidates on either side.
+\item \textbf{Point margin} maximizes the margin on just the original panel with no tail restored. Each candidate requires one masked prediction, and the shared anchor is scored once.
+\end{itemize}
+Score ties favor the smallest sum of within-anchor Gain ranks and then sorted feature indices. As a limited-training control, we also nominated the candidate with the largest worst-metric margin from fresh eight-round XGBoost models for the candidates and the anchor. These models train on fitting rows and score the full proposal sample. Only the nominee receives the 100-round candidate guard fit. The extra small fits are charged separately.
+
+\paragraph{Ten tasks fixed before scoring.}
+We selected ten previously unused UCI classification tasks with numeric or ordinal inputs, 4--41 predictors and 210--17,898 records. The list, policies, contrasts and primary tolerance were specified locally before evaluating the tasks. We used all three stratified outer folds per task. Within each development split we assigned 75\% of records to fitting, and split the remainder equally into proposal and guard samples. Imputation used only the corresponding training partition. We recorded selections and outer predictions for all 30 folds before running the outer scorer. The low-fidelity rule and the plan to refit every candidate were separately fixed before inspecting the predictive results. Table~\ref{tab:transport-tasks} identifies each source and gives its paired outcomes.
+
+\begin{table}[tb]
+\centering
+\caption{One half-width nomination on the ten UCI tasks. Headers give units or denominators. $U$, AUC and accuracy average folds within each task and weight tasks equally. Counts include all ten singleton-anchor folds. Nomination masks exclude shared anchor construction.}
+\label{tab:transport}
+\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Nomination & $U$ (\%) & Guard accepts /30 & Breaches /30 & AUC & Acc.\ (\%) & Masks/fold\\
+\midrule
+Gain & 0.00 & 4 & 4 & .9207 & 86.46 & 0.0\\
+Minimum vote & 1.33 & 5 & 4 & .9202 & 86.41 & 5.9\\
+All-context margin & 7.29 & 9 & 4 & .9183 & 85.98 & 25.3\\
+Point margin & 7.29 & 7 & 2 & .9201 & 86.43 & 4.2\\
+Eight-round refits & 6.33 & 8 & 4 & .9194 & 85.87 & ---\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The primary vote-minus-Gain difference in $U$ was $+1.33$ percentage points (paired task bootstrap 95\% interval $[0,4.00]$). The minimum vote changed two nominees and one final support. Its sole gain came from Seeds. On 16 of 20 actionable folds every nominee had zero worst-context approvals. The primary all-context-margin contrast against Gain was $+7.29$ points ($[1.52,14.45]$), with gains on five folds across four tasks. The all-context margin changed 12 nominations and eight final supports relative to Gain. Omitting the two related crop datasets, Dry Bean and Rice, reduced this gain to 4.95 points. Intervals describe 30,000 paired resamples of these ten tasks, separately for each contrast.
+
+The point margin obtained the same $U$ as the full margin on every fold. Their nominees differed six times. In two instances, on Seeds and Steel, the full margin admitted a deletion the point rule avoided, and both breached the outer tolerance. The full margin averaged 25.3 distinct nomination masks per fold versus 4.2 for the point margin. The eight-round control used 4.2 extra fits per fold, taking an average of 0.051 seconds for that screening stage. Its $U$ difference from the point rule was $-0.96$ points ($[-5.66,3.89]$). All policies used the same full-fidelity budget of one initial and one final fit on every fold plus an anchor and candidate guard fit on each actionable fold. Whole-pipeline timing and nomination counts answer different cost questions.
+
+\paragraph{Which deletions could have worked?}
+We recorded genuine guard and outer fits for all 106 non-anchor candidates on the 20 actionable folds. Of 34 candidates meeting outer tolerance, 27 also passed the guard. Fifteen other candidates passed the guard and breached outside it. On ten of the actionable folds there was no outer pass, on one the guard excluded every outer pass, and on nine a candidate passed both checks. Accounting for the ten singleton anchors gives 29.07\% nominal savings, 15.18\% attainable using the outer results alone and 13.51\% when the guard also has to accept. These are hindsight ceilings on the sampled candidates. The point rule realized five of the nine available fold opportunities.

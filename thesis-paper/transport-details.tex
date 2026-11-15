@@ -1,0 +1,34 @@
+\section{Task-level results and replication details}
+\label{sec:transport-details}
+\begin{table}[htb]
+\centering
+\caption{UCI data sources and results on all planned folds. UCI numbers link to the original records. Each method cell reports mean $U$ as a percentage of anchor width followed by the count of breaches in three outer folds. All uses all restoration margins and Eight uses eight-round refits.}
+\label{tab:transport-tasks}
+\small\setlength{\tabcolsep}{3.4pt}
+\begin{tabular}{@{}lrrr rrrrr@{}}
+\toprule
+Task (UCI ID) & Rows & Cols. & Classes & Gain & Vote & Point & All & Eight\\
+\midrule
+Banknote (\href{https://archive.ics.uci.edu/dataset/267}{267})&1,372&4&2&0/0&0/0&0/0&0/0&0/0\\
+Blood transfusion (\href{https://archive.ics.uci.edu/dataset/176}{176})&748&4&2&0/0&0/0&0/0&0/0&0/0\\
+Dry Bean (\href{https://archive.ics.uci.edu/dataset/602}{602})&13,611&16&7&0/1&0/1&33.3/0&33.3/0&50.0/0\\
+HTRU2 (\href{https://archive.ics.uci.edu/dataset/372}{372})&17,898&8&2&0/0&0/0&0/0&0/0&0/0\\
+Mammographic Mass (\href{https://archive.ics.uci.edu/dataset/161}{161})&961&5&2&0/0&0/0&11.1/0&11.1/0&0/0\\
+QSAR biodegradation (\href{https://archive.ics.uci.edu/dataset/254}{254})&1,055&41&2&0/0&0/0&0/0&0/0&0/1\\
+Rice (\href{https://archive.ics.uci.edu/dataset/545}{545})&3,810&7&2&0/0&0/0&0/0&0/0&0/0\\
+Seeds (\href{https://archive.ics.uci.edu/dataset/236}{236})&210&7&3&0/0&13.3/0&13.3/0&13.3/1&13.3/1\\
+Steel plates (\href{https://archive.ics.uci.edu/dataset/198}{198})&1,941&27&7&0/2&0/2&15.2/1&15.2/2&0/1\\
+Vertebral Column (\href{https://archive.ics.uci.edu/dataset/212}{212})&310&6&3&0/1&0/1&0/1&0/1&0/1\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The outer splits used seed 20261115. For fold $j\in\{0,1,2\}$, the fitting/ranking and proposal/guard splits used $20421+j$ and $39823+j$. Sampling used at most 256 proposal rows and 512 fitting rows for the masking background. We used the minority fitting class as positive for binary AUC. Rice and Dry Bean share investigators. Matching a test record's complete predictor vector against development records found 29 such rows on Banknote, 283 on Blood, 86 on Dry Bean, 438 on Mammographic Mass and four on QSAR. The other five tasks had no exact matches. Row-stratified estimates concern records from these datasets. Mammographic Mass includes the radiologist's BI-RADS assessment in the locked five-input protocol. The repository's detailed description designates it a comparison assessment. In a post hoc sensitivity analysis we repeated selection and training with only age, shape, margin and density on the original three splits. Replacing these folds changed the ten-task mean $U$ to 6.18\% for both continuous rules, 1.33\% for the vote and zero for Gain.
+
+All primary arms were run separately on a single logical CPU in rotated order, including imputation, full and reduced fitting, masking, the guard and final prediction. Single runs averaged 0.285, 0.265, 0.283 and 0.262 seconds per fold for Gain, vote, all-context and point respectively. These clocks include initial library and runtime overhead. Distinct nomination mask counts measure evaluations after caching scores. A separate metric implementation checked 760 distinct masks across the 106 candidates and reproduced the scores to within $2.7\times10^{-14}$ with no near-tie decision reversals. Offline exhaustive scoring uses test labels solely to measure attainable compression on the fixed pool.
+
+\paragraph{Predicting a breach on an omitted PMLB task.}
+For deletion fraction $x$, the width model used $x$ and positive parts of $x-c$ for $c=1/4,1/2,3/4$. The identity-aware model added the fraction of the anchor's total split gain removed and the fraction of linear rank points removed, assigning $k,\ldots,1$ points in descending order of mean split gain. The endpoint model added three continuous features. For each panel and restoration it used the largest $(R_{bi}-V_{bi}-\tau_i|R_{bi}|)/\tau_i$ over metrics. It retained the original-panel empty-restoration value and the mean and maximum over all four panels at the distinct empty/full endpoints. An alternative included the mean and maximum over all separating restorations. These historical risk predictors measure excess in nominal metric-tolerance units. The decision rules in Sect.~\ref{sec:transport} normalize by the metric-specific absolute allowance. All predictors use the same fold- and task-weighted standardization, unpenalized intercept and ridge penalty of .01 on the slopes. Probability-score intervals use 50,000 whole-task paired bootstrap draws, conditional on cross-validated fits. An exact-width, in-range comparison uses the source collection only to define the range of removed total-gain mass at that width in the same fold. Reported intervals are pointwise and comparisons share training data and test records.
+
+\paragraph{Supplementary studies.}
+The following appendices describe the earlier context and panel tests, decision costs, different learners, feature widths and deployment settings. They retain the experiments' original sampling units and metrics. Methods used as precursors to the present tests include group votes, worst-case selection over contexts and a deletion search with block subdivision~\cite{shi2026minpi,zeller2002ddmin}. Other coalition methods characterize redundancy or sample graph-dependent feature contributions~\cite{zheng2026minshap,zhao2025shapg}. Their observational unit differs from a tolerance decision on a reduced fit. The archive contains protocols, fold and support manifests, predictions or reconstruction scripts, checksums and a record of AI assistance with implementation, writing and internal review.
