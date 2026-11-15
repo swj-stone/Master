@@ -1,0 +1,743 @@
+{
+  "design": "fd37cd135a3d6493e054055af31f76dcdd9d712b977bfed25b5ff552a9c14e0c",
+  "code": "e32dfc8c1f87e212420579980a526923e9af9d95793c75f5f96ed4cedc9474fc",
+  "original": "d9e6476007f5a05cf81826aec0072843e2ea075acfa24c191695d20ee85f568c",
+  "folds": [
+    {
+      "key": "banknote/fold-0",
+      "selection_hash": "6f73eb445adc2242cc591d42ca56a1ddd2ec665b194e398191350905f960500a",
+      "winners": {
+        "empty1": [
+          0,
+          1
+        ],
+        "empty4": [
+          0,
+          1
+        ],
+        "family1": [
+          0,
+          1
+        ],
+        "family4": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "key": "banknote/fold-1",
+      "selection_hash": "aa0e325721d719c4ae9452404d53ddcf0a88ee9c2e42d03cba1c9be69ecdf365",
+      "winners": {
+        "empty1": [
+          0,
+          1
+        ],
+        "empty4": [
+          0,
+          1
+        ],
+        "family1": [
+          0,
+          1
+        ],
+        "family4": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "key": "banknote/fold-2",
+      "selection_hash": "4614d7a7516179080cc39374460424582402b339c3f18af643e2090623b2919b",
+      "winners": {
+        "empty1": [
+          0,
+          2
+        ],
+        "empty4": [
+          0,
+          2
+        ],
+        "family1": [
+          0,
+          2
+        ],
+        "family4": [
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "key": "blood/fold-0",
+      "selection_hash": "94d29c7314a55f97ddf7f35a438028f339b02184d47e2f78e73b420f116a22d3",
+      "winners": {
+        "empty1": [
+          0
+        ],
+        "empty4": [
+          0
+        ],
+        "family1": [
+          0
+        ],
+        "family4": [
+          0
+        ]
+      }
+    },
+    {
+      "key": "blood/fold-1",
+      "selection_hash": "e009499799e2289884b1ca1250bde12d7fe830a865e5b56f745401fabc839d2e",
+      "winners": {
+        "empty1": [
+          0
+        ],
+        "empty4": [
+          0
+        ],
+        "family1": [
+          0
+        ],
+        "family4": [
+          0
+        ]
+      }
+    },
+    {
+      "key": "blood/fold-2",
+      "selection_hash": "e2ed0e15f3a4d11c52d3c8d30096eb6de30556ccb8b7b8240d7c17a3e7d2bcc3",
+      "winners": {
+        "empty1": [
+          0,
+          1
+        ],
+        "empty4": [
+          0,
+          1
+        ],
+        "family1": [
+          0,
+          1
+        ],
+        "family4": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "key": "dry_bean/fold-0",
+      "selection_hash": "7ba405c39d9ba489f0ca083698231e8e7ac355dbb036e1ee209495d290362686",
+      "winners": {
+        "empty1": [
+          0,
+          6,
+          10,
+          11,
+          12
+        ],
+        "empty4": [
+          0,
+          6,
+          10,
+          11,
+          12
+        ],
+        "family1": [
+          0,
+          6,
+          10,
+          11,
+          12
+        ],
+        "family4": [
+          0,
+          6,
+          10,
+          11,
+          12
+        ]
+      }
+    },
+    {
+      "key": "dry_bean/fold-1",
+      "selection_hash": "e879835e7e29aaaf2fa8d831266538106c8d534fc9a3d1abb48d327acf389e84",
+      "winners": {
+        "empty1": [
+          3,
+          10,
+          11,
+          12
+        ],
+        "empty4": [
+          3,
+          10,
+          11,
+          12
+        ],
+        "family1": [
+          3,
+          10,
+          11,
+          12
+        ],
+        "family4": [
+          3,
+          10,
+          11,
+          12
+        ]
+      }
+    },
+    {
+      "key": "dry_bean/fold-2",
+      "selection_hash": "a82c699c53fdb73b399061aa29d7266707732875621df665f3933db631963c5f",
+      "winners": {
+        "empty1": [
+          0,
+          2,
+          6,
+          11,
+          12
+        ],
+        "empty4": [
+          0,
+          2,
+          6,
+          11,
+          12
+        ],
+        "family1": [
+          0,
+          2,
+          6,
+          11,
+          12
+        ],
+        "family4": [
+          0,
+          2,
+          6,
+          11,
+          12
+        ]
+      }
+    },
+    {
+      "key": "htru2/fold-0",
+      "selection_hash": "e0cf421d4e956255295073b4db233172195da9c4df5078a7fdc40804b9f1efeb",
+      "winners": {
+        "empty1": [
+          2
+        ],
+        "empty4": [
+          2
+        ],
+        "family1": [
+          2
+        ],
+        "family4": [
+          2
+        ]
+      }
+    },
+    {
+      "key": "htru2/fold-1",
+      "selection_hash": "34d0aadfeb2e0cb1f0a3a3903603e4f17462a3ab654b3334214f92a3cbced52f",
+      "winners": {
+        "empty1": [
+          2
+        ],
+        "empty4": [
+          2
+        ],
+        "family1": [
+          2
+        ],
+        "family4": [
+          2
+        ]
+      }
+    },
+    {
+      "key": "htru2/fold-2",
+      "selection_hash": "22656114de63e56184b463d209a4eaa7afb91eeeaa7a373cfc7c8b36a4bfa8db",
+      "winners": {
+        "empty1": [
+          2
+        ],
+        "empty4": [
+          2
+        ],
+        "family1": [
+          2
+        ],
+        "family4": [
+          2
+        ]
+      }
+    },
+    {
+      "key": "mammographic/fold-0",
+      "selection_hash": "34f5fad758253265751da3bc132f56baf36719253a4d3445c2d7ca050c812794",
+      "winners": {
+        "empty1": [
+          2
+        ],
+        "empty4": [
+          0
+        ],
+        "family1": [
+          0
+        ],
+        "family4": [
+          0
+        ]
+      }
+    },
+    {
+      "key": "mammographic/fold-1",
+      "selection_hash": "c692bdec186b4e244366400f4414930f48dad55ae91d2792acf7eb668f939c03",
+      "winners": {
+        "empty1": [
+          0,
+          1
+        ],
+        "empty4": [
+          0,
+          1
+        ],
+        "family1": [
+          0,
+          1
+        ],
+        "family4": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "key": "mammographic/fold-2",
+      "selection_hash": "d5596d624771cc55f98019d55a74c61be7f80728a43d7b76803a7bda2c5a85c4",
+      "winners": {
+        "empty1": [
+          0
+        ],
+        "empty4": [
+          0
+        ],
+        "family1": [
+          0
+        ],
+        "family4": [
+          0
+        ]
+      }
+    },
+    {
+      "key": "qsar/fold-0",
+      "selection_hash": "ced345f337192503959abb4fed882bf26b00f4aa296b65896bcbd9206709f77a",
+      "winners": {
+        "empty1": [
+          8,
+          10,
+          33,
+          35,
+          39,
+          40
+        ],
+        "empty4": [
+          8,
+          10,
+          33,
+          35,
+          39,
+          40
+        ],
+        "family1": [
+          0,
+          5,
+          8,
+          11,
+          37,
+          39
+        ],
+        "family4": [
+          0,
+          5,
+          8,
+          11,
+          37,
+          39
+        ]
+      }
+    },
+    {
+      "key": "qsar/fold-1",
+      "selection_hash": "d7fdea6614464621d9c8e86dd3cc414e5c3331579ef5e11669edd9fc5c0d6014",
+      "winners": {
+        "empty1": [
+          0,
+          9,
+          29,
+          35,
+          39
+        ],
+        "empty4": [
+          14,
+          29,
+          33,
+          35,
+          39
+        ],
+        "family1": [
+          14,
+          29,
+          33,
+          35,
+          39
+        ],
+        "family4": [
+          14,
+          29,
+          33,
+          35,
+          39
+        ]
+      }
+    },
+    {
+      "key": "qsar/fold-2",
+      "selection_hash": "6609dff25e6b3a2d0814004f1cfc5bd72a8c3a2d652bfd3da72a5948baa2b08a",
+      "winners": {
+        "empty1": [
+          8,
+          26,
+          33,
+          35,
+          39
+        ],
+        "empty4": [
+          8,
+          26,
+          33,
+          35,
+          39
+        ],
+        "family1": [
+          26,
+          35,
+          37,
+          39,
+          40
+        ],
+        "family4": [
+          26,
+          35,
+          37,
+          39,
+          40
+        ]
+      }
+    },
+    {
+      "key": "rice/fold-0",
+      "selection_hash": "84d106def3557de7e466735534b00c30bddbdc17f86eb448e31934ac1b29a5cc",
+      "winners": {
+        "empty1": [
+          2
+        ],
+        "empty4": [
+          2
+        ],
+        "family1": [
+          2
+        ],
+        "family4": [
+          2
+        ]
+      }
+    },
+    {
+      "key": "rice/fold-1",
+      "selection_hash": "655f9a35f45402e20665bce3f223e650dd72b93439bc8a75060c5104f9c8860f",
+      "winners": {
+        "empty1": [
+          2
+        ],
+        "empty4": [
+          2
+        ],
+        "family1": [
+          2
+        ],
+        "family4": [
+          2
+        ]
+      }
+    },
+    {
+      "key": "rice/fold-2",
+      "selection_hash": "5c55ad76c0633ab4d218af5961fccb8d97f75f40777e42c0493ada2d4251ff55",
+      "winners": {
+        "empty1": [
+          2
+        ],
+        "empty4": [
+          2
+        ],
+        "family1": [
+          2
+        ],
+        "family4": [
+          2
+        ]
+      }
+    },
+    {
+      "key": "seeds/fold-0",
+      "selection_hash": "ab95d10980d9d7429c115c7f20bc6966658fb88afe1752fb0480a32fe5ecc141",
+      "winners": {
+        "empty1": [
+          0,
+          1,
+          6
+        ],
+        "empty4": [
+          0,
+          1,
+          6
+        ],
+        "family1": [
+          0,
+          1,
+          6
+        ],
+        "family4": [
+          0,
+          1,
+          6
+        ]
+      }
+    },
+    {
+      "key": "seeds/fold-1",
+      "selection_hash": "c8e89bede019d2f1706eb1744a3ce343072874a217f75a24d6dff9eb11a5af78",
+      "winners": {
+        "empty1": [
+          6
+        ],
+        "empty4": [
+          6
+        ],
+        "family1": [
+          0
+        ],
+        "family4": [
+          0
+        ]
+      }
+    },
+    {
+      "key": "seeds/fold-2",
+      "selection_hash": "beec8b7ca8004c1285868b0583a645518de2f397f61ebc035eae152a7a529847",
+      "winners": {
+        "empty1": [
+          0
+        ],
+        "empty4": [
+          0
+        ],
+        "family1": [
+          0
+        ],
+        "family4": [
+          0
+        ]
+      }
+    },
+    {
+      "key": "steel/fold-0",
+      "selection_hash": "404eef5789959c15925f8593f272945d8d4a91cb5150c7d96fa057673e91b946",
+      "winners": {
+        "empty1": [
+          4,
+          10,
+          11,
+          13,
+          16,
+          17,
+          23,
+          24
+        ],
+        "empty4": [
+          4,
+          10,
+          11,
+          13,
+          16,
+          17,
+          23,
+          24
+        ],
+        "family1": [
+          4,
+          10,
+          11,
+          13,
+          16,
+          17,
+          23,
+          24
+        ],
+        "family4": [
+          4,
+          10,
+          11,
+          13,
+          16,
+          17,
+          23,
+          24
+        ]
+      }
+    },
+    {
+      "key": "steel/fold-1",
+      "selection_hash": "19eac25afb31613dbbd1854140196d2a2d0e6f9cc193ce6310e2b2fb694d36bb",
+      "winners": {
+        "empty1": [
+          10,
+          11,
+          13,
+          16,
+          19,
+          25
+        ],
+        "empty4": [
+          10,
+          11,
+          13,
+          16,
+          19,
+          25
+        ],
+        "family1": [
+          10,
+          11,
+          13,
+          16,
+          19,
+          25
+        ],
+        "family4": [
+          10,
+          11,
+          13,
+          16,
+          19,
+          25
+        ]
+      }
+    },
+    {
+      "key": "steel/fold-2",
+      "selection_hash": "3d54f2331feb7f4124a9e2b65939666f46bd3827077416fcd63b96144ea05c59",
+      "winners": {
+        "empty1": [
+          0,
+          4,
+          10,
+          11,
+          16,
+          24
+        ],
+        "empty4": [
+          0,
+          4,
+          10,
+          11,
+          16,
+          24
+        ],
+        "family1": [
+          0,
+          4,
+          10,
+          11,
+          16,
+          24
+        ],
+        "family4": [
+          4,
+          7,
+          10,
+          13,
+          16,
+          24
+        ]
+      }
+    },
+    {
+      "key": "vertebral/fold-0",
+      "selection_hash": "4bd47cfbc1cc6a80e741a05728484cd12baa7f4f039729c162e9d3b27a89abba",
+      "winners": {
+        "empty1": [
+          5
+        ],
+        "empty4": [
+          5
+        ],
+        "family1": [
+          5
+        ],
+        "family4": [
+          5
+        ]
+      }
+    },
+    {
+      "key": "vertebral/fold-1",
+      "selection_hash": "fe8e81a675b339d4575006560b7e354132fc43af26f7e4ef4927ab6eb6573a75",
+      "winners": {
+        "empty1": [
+          5
+        ],
+        "empty4": [
+          5
+        ],
+        "family1": [
+          5
+        ],
+        "family4": [
+          5
+        ]
+      }
+    },
+    {
+      "key": "vertebral/fold-2",
+      "selection_hash": "bbfcc7b454d7361f6421fa3454af25fade08fe5adeb3a73a4b060c59cd9ed684",
+      "winners": {
+        "empty1": [
+          4,
+          5
+        ],
+        "empty4": [
+          4,
+          5
+        ],
+        "family1": [
+          4,
+          5
+        ],
+        "family4": [
+          4,
+          5
+        ]
+      }
+    }
+  ]
+}
