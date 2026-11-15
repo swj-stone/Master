@@ -25,7 +25,7 @@ We selected ten previously unused UCI classification tasks with numeric or ordin
 
 \begin{table}[tb]
 \centering
-\caption{Outcome of nominating one candidate for a full refit. $U$ is the percentage of anchor columns saved when the final fit meets every tolerance. Breach rates and distinct nomination masks are means over tasks, weighting folds within task equally. Uniform is the exact expectation of a random nomination followed by the same guard. Small refits are additional training runs.}
+\caption{Outcome of nominating one candidate for a full XGBoost refit. $U$ is the percentage of anchor columns saved when the final fit meets every tolerance. Breach rates and distinct nomination masks are means over tasks, weighting folds within task equally. Uniform is the exact expectation of a random nomination followed by the same guard. Small refits are additional training runs.}
 \label{tab:transport}
 \small\setlength{\tabcolsep}{5.0pt}
 \begin{tabular}{@{}lrrr@{\quad}rrr@{}}
@@ -68,3 +68,12 @@ Because every candidate was refitted, the expected $U$ of a uniform nomination f
 \input{transport-opportunity-plot}
 
 A user may also charge for a breach separately from receiving zero savings. For a charge $h$ in units of a full anchor's value, net return is $U-h\,\mathbf 1\{\mathrm{breach}\}$. At the illustrative price $h=1$, the point rule and the uniform lottery returned $+0.63$ and $-3.40$ points on the first panel (paired difference $+4.03$, $[-1.65,10.72]$). On the wider panel they returned $-9.32$ and $-5.89$ points ($-3.43$, $[-17.26,11.17]$). These pointwise intervals resample whole tasks and condition on the measured candidate outcomes. The five-point primary decision criterion concerned $U$ itself.
+
+
+
+\paragraph{Keeping the nominees and changing the learner.}
+The preceding comparisons use boosted trees for nomination, guard and final fit. After inspecting their outcomes, we fixed a second learner and all analysis settings before scoring its results. Each original tree-derived candidate and anchor was refitted by standardized L2 logistic regression. Each guard decision and outer evaluation used the logistic anchor trained on the same rows as the candidate. On the ten-task panel the point and all-context rules again gave equal mean $U$ (5.78\%), with one and two breaches, respectively. The guarded uniform choice gave 6.05\%.
+
+The six wider tasks reversed the ordering of vote and point. The vote gave 19.16\% mean $U$, point gave 8.21\%, and the Gain prefix gave 16.55\%. The vote--point difference of 10.95 points came from Parkinson and Urban (exploratory paired task interval $[0,27.61]$). Urban contributes one entire source weight through a single official split. Relative to Gain, the vote gained 2.61 points ($[0,7.84]$), entirely on Parkinson, and incurred two breaches across 16 folds versus three for Gain and point. The all-context margin reached 10.83\%, gaining 2.61 points over point on Parkinson alone, with unchanged breach rate. Relative to uniform nomination, the full margin changed $U$ by $-0.27$ points ($[-2.58,1.44]$) on the first panel and $-0.16$ ($[-11.14,10.26]$) on the wider panel. Table~\ref{tab:receiver} gives the other comparisons. Comparisons within a learner use its own refitted anchor. The absolute values of $U$ for the two learners can therefore differ even for the same nominee.
+
+The expected uniform return averages over nominations. For a single run, independently drawing one nominee per fold can match a deterministic policy by chance. We computed the exact distribution of the task-weighted mean by convolving the fold-specific probabilities of joint guard and outer passage at the observed widths. With the XGBoost fits, the probability of matching or exceeding the point rule's $U$ was 22.06\% on the ten-task panel and 50.18\% on the wider panel. With logistic refits on the wider panel, the corresponding probability for the minimum vote was 8.34\%. These probabilities condition on these precise pools, fitted models, outcomes and fold weights. Only the random nominations vary.

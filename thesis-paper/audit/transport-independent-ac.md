@@ -1,0 +1,37 @@
+# Independent area-chair review of reading 2
+
+**Vote: weak reject, with high confidence in the evaluation diagnosis.** I regard this as a credible empirical study. Its strongest contribution is the ability to reconstruct a budgeted decision under every candidate nomination, including its failures. I would consider a revised evaluation paper built around what these counterfactuals establish. The main-track case in this version is weaker. One headline test could no longer attain its registered effect before the outer labels were scored, and the gain attributed to resolving ties is measured against a particularly unsuccessful way to break them.
+
+I reviewed the frozen manuscript with SHA-256 `4A75D270778964D171421D3ACFAAF5DE65B8093A733A0F1661BE4AEE69A889AB`. I compared the saved policy choices and reconstructed the guarded returns from the candidate predictions and outer labels. The choices, lottery expectation and attainable returns agree with Table 2. I found no evidence that the authors used outer labels to choose a nominee.
+
+## 1. The wide panel had insufficient disagreement to attain its primary target
+
+Lines 232–249 compare the all-context and point margins against a five-percentage-point target. The two policies produced different final supports on exactly one fold, SECOM fold 0. Both retained 69 of 138 anchor columns there. On each other fold the same support and fit give identical utility for any assignment of outer labels. Under the prescribed equal-source mean, that sole fold has weight 1/18. The largest possible absolute difference in mean utility after these choices was therefore **0.5/18 = 2.78 percentage points**, even if one support passed every tolerance and the other failed badly. The 95% bootstrap lower endpoint could never exceed zero for a positive contrast confined to SECOM, since (5/6)^6, roughly one third, of resamples omit that source.
+
+This is more informative than the observed [0, 0] interval. The nomination and guard already ruled out a material benefit for the actual pipeline on these splits. The labels add the finding that both SECOM candidates breached despite appreciably different AUC and AP. The experiment had little opportunity to tell us which scorer orders viable alternatives better when it changes the deployed support.
+
+**Requested change.** Report the bound calculated from sealed final supports and the weighting rule. Give the corresponding first-panel result: differing final supports on Seeds fold 1 and Steel fold 2 allowed an all-context-minus-point utility difference between 0 and +3.33 points before outer scoring. Both extra admissions ultimately breached. Preserve the unconditional result, since the scarcity of disagreements is itself an operational finding. A future attempt to resolve a five-point difference should count the decision opportunities before estimating its attainable precision. Selecting folds on favorable outer results would change the question.
+
+## 2. Value of a tie-break needs a lottery within the top vote group
+
+Table 2's uniform policy draws from the whole slate. The original vote uses the Gain ordering within the top vote group. The comparison in lines 250–256 shows what happens when that particular ordering is replaced. A reader also needs to know whether the point margin helps compared with an arbitrary resolution of **the same tied vote**. The general lottery mixes in a second effect whenever the vote excludes candidates. The random tie order mentioned in the historical appendix concerns different tasks and a single realized order.
+
+I retained every strict vote ordering, averaged the saved fraction and breach indicator uniformly over the candidates tied for the maximum integer vote on each fold, and applied the original guard, outer criteria and task weights. Singleton anchors contribute zero. The exact within-tie lottery gives the following percentages. Intervals are my retrospective 30,000-draw paired task bootstrap using seed 33119 and the paper's fixed-outcome convention.
+
+| Panel | Within-tie lottery U | Point tie-break U | Point minus lottery, percentage points | Within-tie lottery breaches | Point tie-break breaches |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Ten tasks | 6.16 | 7.29 | +1.14 [−1.05, +3.39] | 8.47 | 6.67 |
+| Six wider tasks | 9.49 | 7.34 | −2.15 [−6.45, +1.85] | 13.89 | 16.67 |
+
+Only eight of the 20 actionable first-panel folds and four of the 15 actionable wider folds had both a jointly passing candidate and a zero-utility candidate inside the top vote group. Thus the first-panel 5.96-point gain over voting with Gain tie-breaking decomposes into roughly 4.82 points from replacing Gain by random choice inside the tie and 1.14 further points from selecting by margin. The point rule really did rescue particular deletions, including the example in lines 211–215. The evidence for learning to resolve ties across tasks is modest.
+
+**Requested change.** Add the exact matched comparator to the decision results and identify it as retrospective. A positive revised paper need not demonstrate that the margin wins. A defensible practical conclusion is that ballots can collapse the decision to the tie convention, and a single mask resolves those ties cheaply with uncertain average benefit over a lottery within them.
+
+## Theory, novelty and scope
+
+Proposition 1 gives a correct sharp set for the stated restricted observer. The Gini construction makes the surviving column invisible to the fitted stump. The refit's two-valued score reduces the problem to the Fréchet bounds for a two-by-two table. The boosting witness improves relevance by getting both columns into the real anchor and passing the real guard. Its outer observations all have D = 0 and the R assignments are deliberately rearranged across labels. Neither construction quantifies how often natural datasets expose this ambiguity or provides a rate for a selector with access to the paired proposal observations. The manuscript states these conditions carefully. I see little independent theorem-level novelty beyond this application of a classical bound.
+
+The historical 136 collisions and 41 forced empirical errors substantiate a finite-data distinction; unique continuous values permit lookup even for a poor ranking score. The prospective all-candidate comparisons carry the scientific argument. Holding the restoration family, supplied pool, trained learner, width, guard and threshold fixed makes their comparisons interpretable. It also limits actionability beyond this protocol. A practitioner choosing among the tested policies can see why the extra masks rarely changed the deployed decision. Someone choosing a method on a new source still lacks a demonstrated gain over simple alternatives. Evidence for a general masking theorem or cross-learner recommendation would require a different study. The two corrections above are possible using the present records and would materially sharpen this one.
+
+**Evidence locations.** The first bound uses `thesis-paper/evidence/{transport,wide}/fold-results.csv`. The tie calculation uses each panel's `candidate-scores.csv`, `results/context_review/{low-fidelity,wide-slate}/<task>/fold-*/{sealed.json,predictions.npz}`, and `targets.npz` under the matching `transport-uci` or `wide-uci` fold. I joined by task, fold and sorted support, calculated AUC, accuracy and applicable AP against the matching anchor, and recovered Table 2's unconstrained lottery and hindsight ceiling as cross-checks.
+
