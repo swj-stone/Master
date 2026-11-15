@@ -12,9 +12,9 @@
     "scipy": "1.18.0",
     "sklearn": "1.9.0",
     "xgboost": "3.3.0",
-    "forest_n_jobs": 1,
+    "xgboost_n_jobs": 1,
     "threadpoolctl_limit": 1,
-    "cpu_affinity": "not pinned"
+    "cpu_affinity": "logical CPU 2"
   },
   "pinned_logical_cpu": 2,
   "timings_sha256": "8e7d6d796f7297bb1d38717290a5c6086f20f160ba432cbb670bee00bce382f6"

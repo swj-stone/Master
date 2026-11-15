@@ -117,7 +117,7 @@ def timing():
         for number, (panel, key, src, folder, sealed) in enumerate(jobs(), 1):
             layout = bg.read(src / "layout.json")
             selection = bg.read(src / "selection.json")
-            checkpoint = RUNS / "budget-comparison" / panel / key / "timing.json"
+            checkpoint = RUNS / "budget-comparison" / stamp["source"][:12] / panel / key / "timing.json"
             if checkpoint.exists():
                 saved = bg.read(checkpoint)
                 assert saved["stamp"] == stamp and len(saved["rows"]) == 9
@@ -146,13 +146,18 @@ def timing():
             elapsed = perf_counter() - begun
             print(f"[{number}/46] {panel}/{key} elapsed {elapsed:.1f}s ETA {elapsed*(46-number)/number:.1f}s", flush=True)
     pd.DataFrame(records).to_csv(DEST / "timings.csv", index=False)
-    bg.store(DEST / "receipt.json", dict(**stamp, environment=environment(), pinned_logical_cpu=cpu,
+    machine = environment()
+    machine.pop("forest_n_jobs")
+    machine.update(xgboost_n_jobs=1, cpu_affinity=f"logical CPU {cpu}" if cpu is not None else "not pinned")
+    (DEST / "timed-source.py").write_bytes(Path(__file__).read_bytes())
+    bg.store(DEST / "receipt.json", dict(**stamp, environment=machine, pinned_logical_cpu=cpu,
                                          timings_sha256=bg.digest(DEST / "timings.csv")))
     replay()
 
 
 def replay():
     receipt = bg.read(DEST / "receipt.json")
+    assert bg.digest(DEST / "timed-source.py") == receipt["source"]
     assert bg.digest(DEST / "timings.csv") == receipt["timings_sha256"]
     data = pd.read_csv(DEST / "timings.csv", float_precision="round_trip")
     assert len(data) == 46 * 3 * 3 and not data.duplicated(KEY + ["repeat"]).any()

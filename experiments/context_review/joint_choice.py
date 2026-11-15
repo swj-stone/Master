@@ -349,6 +349,51 @@ def compare_fold(archive, key, rec, point_invariant, witnesses, sealed=None):
     return results, examples, np.stack(distinct) if distinct else None
 
 
+def marginal_attribution(pairs, marginal):
+    """Separate the gain from more queries from that of imposing one shared world."""
+    point = pairs[pairs.observer == "both_points"]
+    singles = marginal.set_index(["dataset", "fold", "proposal"])
+    assert singles.index.is_unique
+    records = []
+    for pair in point.itertuples():
+        joint = set(pair.joint.split())
+        separate = []
+        for idx in (pair.a, pair.b):
+            entry = singles.loc[pair.dataset, pair.fold, idx]
+            separate.append((str(int(entry.original_pass)),) if entry.disposition == "invariant" else ("0", "1"))
+        # Endpoint P gives a candidate only its own pair of outer point queries.
+        # C gives both candidates the full joint observation, then discards their dependence.
+        initial = {"".join(s) for s in product(*separate)}
+        a_values = {bits[0] for bits in joint}
+        b_values = {bits[1] for bits in joint}
+        projected = {a+b for a, b in product(a_values, b_values)}
+        assert joint <= projected <= initial
+        gaps = [{int(s[0])-int(s[1]) for s in states} for states in (initial, projected, joint)]
+        assert set(map(int, str(pair.gap_units).split())) == gaps[-1]
+        records.append(dict(dataset=pair.dataset, fold=pair.fold, a=pair.a, b=pair.b,
+                            individual_cartesian=" ".join(sorted(initial)),
+                            shared_query_cartesian=" ".join(sorted(projected)), joint=" ".join(sorted(joint)),
+                            individual_gap=" ".join(map(str, sorted(gaps[0]))),
+                            shared_query_cartesian_gap=" ".join(map(str, sorted(gaps[1]))),
+                            shared_gap=" ".join(map(str, sorted(gaps[2]))),
+                            own_queries_both_fixed=(len(initial) == 1),
+                            both_vary_after_query_union=(len(a_values) == 2 and len(b_values) == 2),
+                            query_union_narrows_states=(projected != initial),
+                            coupling_narrows_states=(joint != projected),
+                            query_union_narrows_gap=(gaps[1] != gaps[0]),
+                            coupling_narrows_gap=(gaps[2] != gaps[1]),
+                            new_fixed_gap_after_query_union=(len(gaps[0]) > 1 and len(gaps[1]) == 1),
+                            new_fixed_gap_after_coupling=(len(gaps[1]) > 1 and len(gaps[2]) == 1)))
+    attribution = pd.DataFrame(records)
+    assert len(attribution) == 1283 and attribution.own_queries_both_fixed.sum() == 1218
+    assert attribution.new_fixed_gap_after_query_union.sum() == 2 and not attribution.new_fixed_gap_after_coupling.any()
+    noncartesian = attribution[attribution.coupling_narrows_states]
+    assert set(noncartesian.dataset) == {"spectf"} and set(noncartesian.fold) == {2}
+    assert len(noncartesian) == 5 and noncartesian.coupling_narrows_gap.sum() == 3
+    attribution.to_csv(DEST / "attribution.csv", index=False)
+    return attribution
+
+
 def replay(record_worlds=False):
     path = tp.DEST / "row-partitions.zip"
     manifest = tp.rules.read(tp.DEST / "manifest.json")
@@ -391,6 +436,8 @@ def replay(record_worlds=False):
                 exemplars.setdefault(tag, value)
             print(f"{key}: {len(rows)//2} pairs", flush=True)
     if record_worlds:
+        if any(not row["joint_exact"] for row in tables):
+            raise RuntimeError("Witness discovery did not recover all certified joint states")
         saved_worlds["world-index.json"] = json.dumps(manifest_ids, separators=(",", ":")).encode("utf8")
         pending = witness_path.with_suffix(".tmp")
         with ZipFile(pending, "w") as out:
@@ -401,6 +448,7 @@ def replay(record_worlds=False):
                                                     indent=2)+"\n", encoding="utf8")
     pairs = pd.DataFrame(tables)
     pairs.to_csv(DEST / "pairs.csv", index=False)
+    marginal_attribution(pairs, marginal)
     summary = pairs.groupby(["observer", "joint", "joint_exact", "gap_units", "gap_exact", "kind"]).agg(
         pairs=("a", "size"), tasks=("dataset", "nunique")).reset_index()
     summary.to_csv(DEST / "summary.csv", index=False)

@@ -9,3 +9,5 @@ experiments/test/run_piv1_pilot.py text eol=lf
 experiments/test/run_sampled_permutation_seed42.py text eol=lf
 docs/thesis/archives/piv1/*.json -text
 docs/thesis/archives/piv1/*.csv -text
+thesis-paper/evidence/budget_comparison/timings.csv text eol=crlf
+thesis-paper/evidence/budget_comparison/timed-source.py text eol=lf
