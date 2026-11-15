@@ -1,4 +1,14 @@
-# Can Masked-Model Votes Predict Which Feature Deletions Exceed a Refit Loss Tolerance?
+# Feature deletion after retraining
+
+The two external panels ask which candidate should receive a single refit check. Their probability archives support rescoring at the fold and task levels, including the expected outcome of uniform nomination over all measured candidates. The ten-task study used 30 record-level folds. The six wider sources contributed 16 splits, including chronological, participant-aggregated and official holdouts. [Ten-task design](transport_external.md) · [Wide-panel design](wide_panel.md) · [Exact lottery contrasts](../../thesis-paper/evidence/chance/)
+
+To replay the collected outcomes without training a model, use the command below from the thesis checkout. The release guide indexes every campaign, its source, its locks, and the additional inputs used for fresh fits. [Archive and replay guide](../../thesis-paper/evidence/transport-release.md) · [Historical matched-risk study](matched_signal.md)
+
+```powershell
+.\thesis-python.ps1 thesis-paper/package_revision.py --verify-transport packages/thesis-transport-evidence.zip
+```
+
+## Historical proposal and refit studies
 
 The unit of the primary comparison is a proposed retained set within a fold. The outcome compares two fresh models trained on the same development rows, one on the proposed set and one on its reference anchor. The rules being compared all vote on the same proposals. [Loss definition and sampling](../../configs/context_review/refit_target.json) · [Eight-rule comparison](../../results/context_review/refit-target/counts.csv)
 

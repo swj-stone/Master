@@ -1,10 +1,14 @@
-# Can Masked-Model Votes Predict Which Feature Deletions Exceed a Refit Loss Tolerance?
+# What Do Masked Losses Reveal About Feature Deletion After Retraining?
 
-[Manuscript PDF](minpi.pdf) · [LaTeX sources](minpi-source.zip) · [Study protocols and rerun commands](../experiments/context_review/README.md) · [Current review and revisions](audit/operating-revision-history.md) · [Earlier review](audit/critique-cycle.md)
+[Manuscript PDF](minpi.pdf) · [LaTeX sources](minpi-source.zip) · [Transport evidence and replay](evidence/transport-release.md) · [Study protocols](../experiments/context_review/README.md) · [Independent review](audit/transport-area-chair.md) · [Computational audit](audit/transport-forensic.md)
 
-For a proposed feature deletion, four validation panels compare the performance of a fitted predictor with and without the deleted columns. The search accepts only if a majority approves in every tested restoration of background columns. Its intended use is to train a new predictor on the surviving features. The paper measures how well the masking votes anticipate the loss after that refit. The vote is defined for a set of features proposed for deletion. The original MinPI assigns a worst marginal power index to each feature.
+The paper asks how much a fitted classifier's response to masked columns can tell us about training a new classifier on the surviving columns. A finite tree construction characterizes the possible refit AUC and accuracy under a common mask transcript. Of 704 historical feature subsets, 136 shared a binary vote pattern with an equally wide subset on the same fold that had the opposite refit outcome. [Identification argument](identification-bounds.tex) · [Collision counts](audit/refit-observation-collisions.csv) · [Held-task prediction of refit failure](../experiments/context_review/matched_signal.md)
 
-## What the masking evidence buys
+The two new UCI panels compare policies that nominate one candidate from a fixed half-width slate. Across the first ten tasks, a single continuous mask margin saved 7.29% of anchor columns within tolerance, compared with 1.33% for the minimum vote. Choosing uniformly from the same candidates gave 5.49% in expectation. On the six wider tasks all four primary policies attained 7.34%, with three outer breaches each. A full-slate evaluation quantifies the opportunity each policy had under the common refit guard. [Ten-task protocol](../experiments/context_review/transport_external.md) · [Wide-panel protocol](../experiments/context_review/wide_panel.md) · [Random-nomination comparison](evidence/chance/)
+
+The logistic-regression replication kept the tree-selected nominees and changed the learner used for the guard and final refits. On the wide panel, the full continuous margin saved 10.83% against 8.21% for the single margin, with a paired task-bootstrap interval of 0.00 to 7.84 percentage points for their difference. Uniform nomination averaged 10.99%. [Receiver design](../configs/context_review/receiver_transport.json) · [Receiver results](evidence/receiver/means.csv)
+
+## Earlier operating analyses
 
 The operating analyses estimate the cost of a veto on an individual, previously measured proposal. At a unit cost for rejecting a passing deletion and a cost of `r` for missing a failing refit, the separating minimum beats the endpoints on the search paths when `r > 20/11`. A 30,000-draw task/fold resampling range for the crossover extended from 0.46 to infinity. On drawn proposals both policies missed the same two failures and the separating minimum gave nine extra false alarms. Against a wider library including a deletion-size threshold and the constant decisions, the primary rule never minimized observed path cost. Choosing rules on 13 tasks and scoring the fourteenth favored the size library on drawn proposals at all four miss costs studied. [Clustered rates and frontier](../experiments/context_review/cluster_cost.md) · [Transferred policies](../experiments/context_review/cluster_cost_transfer.md)
 
@@ -29,7 +33,7 @@ The refit experiments count a deletion as harmful when the outer-fold comparison
 
 ## Reproduce the paper, figures and formal checks
 
-Run the following commands in the `MastersThesis` checkout. The three generators read portable [benchmark evidence](evidence/revision/), [refit evidence](evidence/reassessment/) and [operating evidence](evidence/operating/README.md). They rebuild tables and figures without fitting new predictors. Lean 4.35 is pinned under `formal/`. The paper build uses TeX Live's LNCS class, BibTeX style and `latexmk`.
+Run the following commands in the `MastersThesis` checkout. The three historical generators read portable [benchmark evidence](evidence/revision/), [refit evidence](evidence/reassessment/) and [operating evidence](evidence/operating/README.md). The current manuscript uses the bundled NeurIPS style, BibTeX and `latexmk`. The formal directory pins the Lean version. The [transport release guide](evidence/transport-release.md) covers the new data and scoring commands.
 
 ```powershell
 .\thesis-python.ps1 thesis-paper/revision_results.py
@@ -43,6 +47,7 @@ lean EqualFrequency.lean
 lean RefitTarget.lean
 lean Challenger.lean
 lean ProposalCost.lean
+lean IdentificationBounds.lean
 Pop-Location
 Push-Location thesis-paper
 latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=build main.tex
@@ -52,17 +57,18 @@ Pop-Location
 
 The refit counterexample constructs two populations with the same mask scores. The best score available from the surviving variable has AUC 0.99 in one and 0.50 in the other. Lean verifies the finite arithmetic, and a separate Wolfram Language program enumerates all four masks. A second Lean file proves that a running minimum bounds a candidate's final score, which justifies stopping evaluations once the candidate cannot beat the incumbent. Neither proof estimates the error of a fitted model. [Refit arithmetic](formal/RefitTarget.lean) · [Wolfram enumeration](formal/RefitTarget.wl) · [Pruning lemma](formal/Challenger.lean)
 
-The [proposal-cost theorems](formal/ProposalCost.lean) check the integer break-even arithmetic and the finite-sample alternatives to the primary rule. An independent [Wolfram calculation](formal/ProposalCost.wl) solves the corresponding inequalities over real nonnegative cost ratios. Run the two Wolfram checks from the thesis checkout with a configured Wolfram Engine.
+The [proposal-cost theorems](formal/ProposalCost.lean) check the integer break-even arithmetic and the finite-sample alternatives to the primary rule. An independent [Wolfram calculation](formal/ProposalCost.wl) solves the corresponding inequalities over real nonnegative cost ratios. A further [symbolic check](formal/IdentificationBounds.wl) covers the attainable-set result. Run the Wolfram checks from the thesis checkout with a configured Wolfram Engine.
 
 ```powershell
 wolframscript -file thesis-paper/formal/RefitTarget.wl
 wolframscript -file thesis-paper/formal/ProposalCost.wl
+wolframscript -file thesis-paper/formal/IdentificationBounds.wl
 ```
 
-The packaging command assembles the current PDF and source ZIP. Add `--evidence` to create the [operating evidence archive](../packages/thesis-operating-evidence.zip) from the seven campaigns and their supporting files. Earlier companion packages retain the [original PMLB runs](../packages/thesis-pmlb-evidence-r1.zip), [context revision](../packages/thesis-context-revision-evidence.zip), and [refit reassessment](../packages/thesis-refit-reassessment-evidence.zip). The prior reassessment manuscript and source are also archived. Source datasets follow their original access terms. [Pre-operating manuscript](../packages/refit-review-before-operating/minpi.pdf) · [Archive checksums](evidence/revision/artifacts.json)
+The packaging command assembles the current PDF and source ZIP. Add `--transport-evidence` (also accepted as `--evidence`) to assemble and replay the new predictive evidence archive. The earlier operating archive remains a companion to the original PMLB, context revision and refit reassessment packages. [Transport archive](../packages/thesis-transport-evidence.zip) · [Operating archive](../packages/thesis-operating-evidence.zip) · [Archive checksums](evidence/revision/artifacts.json)
 
 ```powershell
-.\thesis-python.ps1 thesis-paper/package_revision.py --evidence --verify-source
+.\thesis-python.ps1 thesis-paper/package_revision.py --transport-evidence --verify-source
 ```
 
 For a fresh collection from the completed runs, see the [campaign commands](../experiments/context_review/README.md). `operating_results.py --collect` refreshes the [portable tables](evidence/operating/README.md) and rebuilds the manuscript tables.

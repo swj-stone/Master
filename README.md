@@ -2,7 +2,11 @@
 
 硕士研究在 `MastersThesis/` 的 `thesis/masters` 分支进行，与 `../Master/` 共享 Git 仓库及 Python 环境。会议最终版在 `../Master/` 的 `main` 分支，供只读参考。工作树中的 `data/`、`results/` 和 `packages/` 是独立的本地文件，受 Git 忽略规则管理。
 
-## 遮蔽模型的投票能否预测哪些删列方案会在重训后超过损失容差？
+## 遮蔽损失能揭示多少删列重训后的信息？
+
+在 704 个历史候选列集中，有 136 个在同一折与另一个同宽候选得到完全相同的二元选票，但重训后的损失一个超限、一个未超限。新实验让各策略从同一组半宽候选中提名一个列集，再用独立重训检查决定是否接受。首批 10 个 UCI 任务上，单次连续遮蔽评分、最差背景票数、均匀随机提名的容差内平均压缩分别为 7.29%、1.33%、5.49%。在另外 6 个较高维任务的 16 个划分上，四种主策略的压缩均为 7.34%，各有 3 次外测超限。[论文 PDF](thesis-paper/minpi.pdf) · [当前证据包与复现说明](thesis-paper/evidence/transport-release.md) · [逐任务结果](thesis-paper/evidence/chance/)
+
+### 早期投票与重训对照
 
 算法先用 Compact Gain 选出初始列集，再提议删除其中若干列。每次恢复一组背景列，在同一个已训练模型上比较候选与初始列集。四个验证面板投票，所有恢复情形都要有至少三票同意。这里的 min 作用于一项删列提案，会议版 MinPI 衡量的是单个特征的最差边际投票。两者的定义和输出不同。[英文论文](thesis-paper/minpi.pdf) · [论文与复现说明](thesis-paper/README.md)
 
@@ -23,8 +27,8 @@
 
 | 查找内容 | 入口 |
 | --- | --- |
-| 复现实验或查看逐项结果 | [本轮协议、数据与执行命令](experiments/context_review/README.md) · [本轮表图源数据](thesis-paper/evidence/operating/README.md) · [早期重训对照汇总](thesis-paper/evidence/reassessment/) · [本轮证据包](packages/thesis-operating-evidence.zip) |
-| 稿件、复审和可验证的数学命题 | [论文 PDF](thesis-paper/minpi.pdf) · [论文源文件包](thesis-paper/minpi-source.zip) · [逐稿审读记录](thesis-paper/audit/operating-revision-history.md) · [遮蔽与重训反例](thesis-paper/formal/RefitTarget.lean) |
+| 复现实验或查看逐项结果 | [实验协议与执行命令](experiments/context_review/README.md) · [本轮证据包](packages/thesis-transport-evidence.zip) · [早期操作策略证据](thesis-paper/evidence/operating/README.md) · [早期重训对照汇总](thesis-paper/evidence/reassessment/) |
+| 稿件、复审和可验证的数学命题 | [论文 PDF](thesis-paper/minpi.pdf) · [论文源文件包](thesis-paper/minpi-source.zip) · [复审意见](thesis-paper/audit/transport-area-chair.md) · [独立复算记录](thesis-paper/audit/transport-forensic.md) · [可识别范围证明](thesis-paper/formal/IdentificationBounds.lean) |
 | 投票、min 与提案搜索 | [搜索实现](src/minppi_mofs/context_vote.py) · [恢复列设计](src/minppi_mofs/context_design.py) · [历史六集的机制检验](experiments/context_diagnostics/README.md) |
 | 已用于开发或对照的基准 | [14 个 PMLB 任务与高维挑战](experiments/context_study/README.md) · [早期基线核查](thesis-paper/audit/rounds/README.md) |
 
