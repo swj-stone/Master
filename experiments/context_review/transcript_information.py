@@ -85,9 +85,12 @@ def replay():
                     base, factual = paired_gap(y, candidate, anchor)
                     cc = tp.score_columns(y, candidate)
                     contributions = tuple(c - .97*a for c, a in zip(cc, base_cols))
-                    for observer in ("proposal_only", "outer_point", "outer_point_unmasked", "outer_family"):
+                    for observer in ("proposal_only", "outer_point", "outer_unmasked",
+                                     "outer_point_unmasked", "outer_family"):
                         if observer == "proposal_only":
                             observed = np.zeros((len(y), 1), dtype=np.uint8)
+                        elif observer == "outer_unmasked":
+                            observed = initial[:, None]
                         elif observer == "outer_family":
                             observed = masks[:, s["recorded"]]
                         else:
@@ -105,7 +108,7 @@ def replay():
                         if example is not None:
                             witnesses.append(dict(**ident, factual=factual, alternative=example))
     df = pd.DataFrame(results)
-    assert len(df) == 4*704
+    assert len(df) == 5*704
     DEST.mkdir(parents=True, exist_ok=True)
     df.to_csv(DEST / "proposals.csv", index=False)
     counts = df.groupby(["observer", "disposition"]).agg(
