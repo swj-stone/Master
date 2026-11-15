@@ -1,0 +1,21 @@
+{
+  "source": "0c402282166d511eec8b544852f7d7612772822011191355233fbd4c3d5b92cd",
+  "protocol": "65f944b98c1a0e624377da75d453c987e5ca471cc8b1de60d60a831af8838cb8",
+  "cpu": 2,
+  "environment": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "operating_system": "Windows-11-10.0.26200-SP0",
+    "architecture": "AMD64",
+    "python": "3.13.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scipy": "1.18.0",
+    "sklearn": "1.9.0",
+    "xgboost": "3.3.0",
+    "forest_n_jobs": 1,
+    "threadpoolctl_limit": 1,
+    "cpu_affinity": "not pinned"
+  },
+  "pinned_logical_cpu": 2,
+  "timings_sha256": "8e7d6d796f7297bb1d38717290a5c6086f20f160ba432cbb670bee00bce382f6"
+}
