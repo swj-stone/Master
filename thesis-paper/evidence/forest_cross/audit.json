@@ -1,0 +1,8 @@
+{
+  "folds": 46,
+  "independently_rebuilt_support_fits": 524,
+  "max_probability_error": 0.0,
+  "candidate_guard_outer_pass_decisions": 432,
+  "independently_scored_forest_masks": 2094,
+  "max_weighted_metric_error": 2.1094237467877974e-15
+}
