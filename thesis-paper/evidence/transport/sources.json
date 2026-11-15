@@ -1,0 +1,114 @@
+[
+  {
+    "dataset": "banknote",
+    "uci_id": 267,
+    "url": "https://archive.ics.uci.edu/static/public/267/banknote+authentication.zip",
+    "sha256": "1e2acd9a2085fadf3d8145c12d3d22af853320d52294a6590c2eaf75fdc05227",
+    "bytes": 46562,
+    "members": [
+      "data_banknote_authentication.txt"
+    ]
+  },
+  {
+    "dataset": "blood",
+    "uci_id": 176,
+    "url": "https://archive.ics.uci.edu/static/public/176/blood+transfusion+service+center.zip",
+    "sha256": "95c39e2e05972bdc8a9c6fe521184cc8284578885d5b3e0c553d3f7dd9543221",
+    "bytes": 3938,
+    "members": [
+      "transfusion.data",
+      "transfusion.names"
+    ]
+  },
+  {
+    "dataset": "dry_bean",
+    "uci_id": 602,
+    "url": "https://archive.ics.uci.edu/static/public/602/dry+bean+dataset.zip",
+    "sha256": "0a64eff5be87f48c3dbbfc0a12a56c5d5b5167ef8e61cd45d69b3e7c7130c06f",
+    "bytes": 4738776,
+    "members": [
+      "DryBeanDataset/",
+      "DryBeanDataset/Dry_Bean_Dataset.arff",
+      "DryBeanDataset/Dry_Bean_Dataset.txt",
+      "DryBeanDataset/Dry_Bean_Dataset.xlsx"
+    ]
+  },
+  {
+    "dataset": "htru2",
+    "uci_id": 372,
+    "url": "https://archive.ics.uci.edu/static/public/372/htru2.zip",
+    "sha256": "ba442c076dd22a8952700f26e38499fc1806037dcf7bea0e125e6bfba393f379",
+    "bytes": 1563015,
+    "members": [
+      "HTRU_2.csv",
+      "HTRU_2.arff",
+      "Readme.txt"
+    ]
+  },
+  {
+    "dataset": "mammographic",
+    "uci_id": 161,
+    "url": "https://archive.ics.uci.edu/static/public/161/mammographic+mass.zip",
+    "sha256": "4c5158166aa7f1503e14d95be4c95fe66a734474f614441ede226314b93db6e7",
+    "bytes": 4745,
+    "members": [
+      "mammographic_masses.data",
+      "mammographic_masses.names"
+    ]
+  },
+  {
+    "dataset": "qsar",
+    "uci_id": 254,
+    "url": "https://archive.ics.uci.edu/static/public/254/qsar+biodegradation.zip",
+    "sha256": "b5f7cf1b05564d94d65265a9a4aeae5fffcd15b8d3bcafe4225a8827d7ae08ac",
+    "bytes": 156105,
+    "members": [
+      "biodeg.csv"
+    ]
+  },
+  {
+    "dataset": "rice",
+    "uci_id": 545,
+    "url": "https://archive.ics.uci.edu/static/public/545/rice+cammeo+and+osmancik.zip",
+    "sha256": "fe94e42046b829de21b92b0ffb6a22774fde021328cae799faa802a14e8dbed9",
+    "bytes": 171738,
+    "members": [
+      "Citation_Request.txt",
+      "Rice_Cammeo_Osmancik.arff"
+    ]
+  },
+  {
+    "dataset": "seeds",
+    "uci_id": 236,
+    "url": "https://archive.ics.uci.edu/static/public/236/seeds.zip",
+    "sha256": "5033bd71b24592fa70d9b3cc5be02332dc6d03d0b27e6655e6d553f39afab323",
+    "bytes": 9432,
+    "members": [
+      "seeds_dataset.txt"
+    ]
+  },
+  {
+    "dataset": "steel",
+    "uci_id": 198,
+    "url": "https://archive.ics.uci.edu/static/public/198/steel+plates+faults.zip",
+    "sha256": "cb8eb9859198b63f053e443513036b401746fa517ef58bd17c846c6741c93919",
+    "bytes": 100890,
+    "members": [
+      "Faults.NNA",
+      "Faults27x7_var"
+    ]
+  },
+  {
+    "dataset": "vertebral",
+    "uci_id": 212,
+    "url": "https://archive.ics.uci.edu/static/public/212/vertebral+column.zip",
+    "sha256": "899ed1d137ceb4c36d59fa35f3cbab39ec3b78fd3ca1fdaf2fae155459c1372f",
+    "bytes": 33251,
+    "members": [
+      "column_2C.dat",
+      "column_2C_weka.arff",
+      "column_3C.dat",
+      "column_3C_weka.arff"
+    ]
+  }
+]
