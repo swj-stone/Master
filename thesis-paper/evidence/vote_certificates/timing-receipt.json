@@ -1,0 +1,37 @@
+{
+  "protocol": "51873, fold and slate index select the first order; rotate by one for each repetition",
+  "slates": 184,
+  "folds": 46,
+  "repetitions": 3,
+  "live_nominations": 1656,
+  "environment": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "operating_system": "Windows-11-10.0.26200-SP0",
+    "architecture": "AMD64",
+    "python": "3.13.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scipy": "1.18.0",
+    "sklearn": "1.9.0",
+    "xgboost": "3.3.0",
+    "forest_n_jobs": 1,
+    "threadpoolctl_limit": 1,
+    "cpu_affinity": "logical CPU 2"
+  },
+  "source_and_inputs_utf8_lf_sha256": {
+    "experiments/context_review/vote_certificate_timing.py": "b369dbe6d28773c7120932e8fb1d7055ef8124550d5a33e16da8220bb183d616",
+    "src/minppi_mofs/minimum_vote.py": "56337b52da4115969b7550ff4322f7e03aa0a4726e140fc1d5cce81e5b19c60a",
+    "experiments/context_review/matched_stopping.py": "66ce1e40c26264273f2d8d67cf999a4558b0021ba979884723493906b33d47ab",
+    "experiments/context_review/transport_predict.py": "383c03e451d08f8de056ae8de4ffa6cc4730b698d61b2e359b7f70534dc84b00",
+    "experiments/context_review/forest_predict.py": "3c4fc246093ea4f567745c211ca972d20349644b420ada7b9134c1efa58b181e",
+    "experiments/context_review/timing_process.py": "7918c5e667da84bfa08c7b9e3ba887cb625358d0a05cc9d133de029d95f1487d",
+    "experiments/test/minpi_convergence_metrics.py": "0b1f25966c66c5a9f0b3e8fb16f836a5a05cbb1d85ae2e1c62a116a359417075",
+    "src/minppi_mofs/piv3_compact_witness.py": "32bbc81ea2d4486c160816f3feea88112bc6a622517d55133a39111ac69fda88",
+    "src/minppi_mofs/context_design.py": "52d293aab4a2126e4329579e225ff3707ae374c241f00a9806b4d634d394ce49",
+    "thesis-paper/evidence/matched_stopping/folds.csv": "4de1d8acfcda5d6aeec38121f2b37680bcbcbc2c9e0de9c6da15785e8d51c1d9",
+    "thesis-paper/evidence/forest_cross/prediction-lock.json": "34dfa862bd60fc19e79e66d5fbf3662699b13095406c88823aa298a932f5f1ba",
+    "thesis-paper/evidence/filter_neighborhood/prediction-lock.json": "d4ccfe56423c526dd48d57da4927d1b7abb1659ebe9ebc851f22ab85ada53c10",
+    "thesis-paper/evidence/neighborhood_replicates/prediction-lock.json": "bf9b6fe6c7a5c9241ae731c2a4f9ce523dfff1a828ed2d47a556be6350eeaff7"
+  },
+  "timings_utf8_lf_sha256": "b0a3925df9ee0c4faa564e04d4bc9c58b0ac4f2ca853e846cda0bfb54fbb2a07"
+}
