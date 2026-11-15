@@ -153,7 +153,7 @@ def guard_targets(folder):
 def transport():
     files = {ROOT / name for name in ("README.md", "AGENTS.md", "thesis-python.ps1", "pyproject.toml",
                                        "requirements.txt", "src/minppi_mofs/__init__.py",
-                                       "experiments/test/run_piv0_seed42.py")}
+                                       "experiments/test/run_piv0_seed42.py", "tests/test_matched_stopping.py")}
     files.update({PAPER / "README.md", PAPER / "minpi.pdf", PAPER / "minpi-source.zip",
                   Path(__file__).resolve(), EVIDENCE / "transport-release.md", EVIDENCE / "robustness-release.md",
                   PAPER / "identification-bounds.tex", PAPER / "audit/rounds/pmlb_baselines.py"})
@@ -311,6 +311,7 @@ def replay_archived_tables():
         transport_score, ensemble_identification, filter_neighborhood_score, forest_replay, gain_increment_score,
         transcript_information, transcript_permutations, transcript_swaps, neighborhood_replicates_score,
         score_resolution_replay, score_resolution_check, ordinal_decomposition, matched_stopping,
+        matched_stopping_audit,
     )
 
     def compare(path, frame):
@@ -384,6 +385,7 @@ def replay_archived_tables():
     score_resolution_check.check()
     if read(resolution_audit) != expected_checks:
         raise ValueError("The independent finite-orbit verification changed")
+    matched_stopping_audit.audit()
     collisions = PAPER / "audit/refit-observation-collisions.csv"
     reference = pd.read_csv(collisions)
     collisions.unlink()

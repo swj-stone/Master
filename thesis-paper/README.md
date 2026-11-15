@@ -54,6 +54,8 @@ lean RefitTarget.lean
 lean Challenger.lean
 lean ProposalCost.lean
 lean IdentificationBounds.lean
+lean TranscriptCells.lean
+lean DecisionEnvelope.lean
 Pop-Location
 Push-Location thesis-paper
 latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=build main.tex
@@ -69,12 +71,13 @@ The [proposal-cost theorems](formal/ProposalCost.lean) check the integer break-e
 wolframscript -file thesis-paper/formal/RefitTarget.wl
 wolframscript -file thesis-paper/formal/ProposalCost.wl
 wolframscript -file thesis-paper/formal/IdentificationBounds.wl
+wolframscript -file thesis-paper/formal/TranscriptCells.wl
 ```
 
-The packaging command assembles the current PDF and source ZIP. Add `--transport-evidence` (also accepted as `--evidence`) to assemble and replay the new predictive evidence archive. The earlier operating archive remains a companion to the original PMLB, context revision and refit reassessment packages. [Transport archive](../packages/thesis-transport-evidence.zip) · [Operating archive](../packages/thesis-operating-evidence.zip) · [Archive checksums](evidence/revision/artifacts.json)
+The packaging command assembles the current PDF and source ZIP. Add `--robustness-evidence` to build and replay the current research supplement. The earlier transport and operating archives retain their original names and digests. [Current supplement](../packages/thesis-robustness-evidence.zip) · [Earlier transport archive](../packages/thesis-transport-evidence.zip) · [Archive checksums](evidence/revision/artifacts.json)
 
 ```powershell
-.\thesis-python.ps1 thesis-paper/package_revision.py --transport-evidence --verify-source
+.\thesis-python.ps1 thesis-paper/package_revision.py --robustness-evidence --verify-source
 ```
 
 For a fresh collection from the completed runs, see the [campaign commands](../experiments/context_review/README.md). `operating_results.py --collect` refreshes the [portable tables](evidence/operating/README.md) and rebuilds the manuscript tables.
