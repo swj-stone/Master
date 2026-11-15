@@ -1,0 +1,22 @@
+\paragraph{What does a cheaper refit buy?}
+One baseline used the original proposal panel and empty restoration. A second used the full continuous margin with exact early stopping. A third trained a small eight-round booster on the anchor and every candidate, ranked their proposal scores by the minimum normalized slack, and sent one nominee to the same full-size guard. This third rule spends several small fits before its single candidate guard. All three rules used identical candidate sets and the same fallback.
+
+\begin{table}[tb]
+\centering\small
+\caption{XGBoost policies with one full-size candidate guard. Effective compression ($U$) and breaches are percentages, averaged within source and equally over sources. Seconds sum within-fold medians over the 30 or 16 folds. Complete time includes preprocessing, the Gain anchor, nomination, guard and final fit and prediction.}
+\label{tab:practical-budget}
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+Panel & Nomination rule & $U$ & Breach & Small fits & Nomination (s) & Complete (s)\\
+\midrule
+Ten  & Single point & 7.29 & 6.67 & 0 & 0.13 & 7.87\\
+     & Full margin  & 7.29 & 13.33 & 0 & 0.43 & 8.11\\
+     & Eight rounds & 6.33 & 13.33 & 126 & 1.76 & 9.53\\
+Wide & Single point & 7.34 & 16.67 & 0 & 0.17 & 11.29\\
+     & Full margin  & 7.34 & 16.67 & 0 & 0.89 & 12.11\\
+     & Eight rounds & 10.13 & 16.67 & 125 & 1.68 & 12.78\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On the wider tasks the eight-round rule gained 2.79 points over point masking (paired 95\% interval $[-5.43,11.06]$). Both delivered an outer breach on precisely the same folds. On the ten tasks the change in $U$ was $-0.96$ points ($[-5.66,3.89]$) and breaches rose by 6.67 points. We timed three balanced repetitions of each complete policy on one logical CPU. All 414 freshly computed nominees, guard returns and final prediction vectors matched the archived results. The slates with singleton anchors and no deletion remain in these estimates.
