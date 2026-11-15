@@ -25,25 +25,46 @@ We selected ten previously unused UCI classification tasks with numeric or ordin
 
 \begin{table}[tb]
 \centering
-\caption{One half-width nomination on the ten UCI tasks. Headers give units or denominators. $U$, AUC and accuracy average folds within each task and weight tasks equally. Counts include all ten singleton-anchor folds. Nomination masks exclude shared anchor construction.}
+\caption{Outcome of nominating one candidate for a full refit. $U$ is the percentage of anchor columns saved when the final fit meets every tolerance. Breach rates and distinct nomination masks are means over tasks, weighting folds within task equally. Uniform is the exact expectation of a random nomination followed by the same guard. Small refits are additional training runs.}
 \label{tab:transport}
-\small
-\begin{tabular}{@{}lrrrrrr@{}}
+\small\setlength{\tabcolsep}{5.0pt}
+\begin{tabular}{@{}lrrr@{\quad}rrr@{}}
 \toprule
-Nomination & $U$ (\%) & Guard accepts /30 & Breaches /30 & AUC & Acc.\ (\%) & Masks/fold\\
+ & \multicolumn{3}{c}{10 tasks, 30 folds} & \multicolumn{3}{c}{6 wider tasks, 16 folds}\\
+Nomination & $U$ (\%) & Breach (\%) & Masks & $U$ (\%) & Breach (\%) & Masks\\
 \midrule
-Gain & 0.00 & 4 & 4 & .9207 & 86.46 & 0.0\\
-Minimum vote & 1.33 & 5 & 4 & .9202 & 86.41 & 5.9\\
-All-context margin & 7.29 & 9 & 4 & .9183 & 85.98 & 25.3\\
-Point margin & 7.29 & 7 & 2 & .9201 & 86.43 & 4.2\\
-Eight-round refits & 6.33 & 8 & 4 & .9194 & 85.87 & ---\\
+Uniform & 5.49 & 8.89 & 0 & 7.07 & 12.96 & 0\\
+Gain prefix & 0.00 & 13.33 & 0 & 7.34 & 16.67 & 0\\
+Minimum vote & 1.33 & 13.33 & 5.90 & 7.34 & 16.67 & 14.89\\
+Vote with point tie-break & 7.29 & 6.67 & 5.80 & 7.34 & 16.67 & 14.78\\
+All-context margin & 7.29 & 13.33 & 25.33 & 7.34 & 16.67 & 85.11\\
+Point margin & 7.29 & 6.67 & 4.20 & 7.34 & 16.67 & 7.94\\
+Eight-round refits & 6.33 & 13.33 & 0 & 10.13 & 16.67 & 0\\
+\midrule
+Attainable $U$ with guard & 13.51 & & & 21.05 & & \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The primary vote-minus-Gain difference in $U$ was $+1.33$ percentage points (paired task bootstrap 95\% interval $[0,4.00]$). The minimum vote changed two nominees and one final support. Its sole gain came from Seeds. On 16 of 20 actionable folds every nominee had zero worst-context approvals. The primary all-context-margin contrast against Gain was $+7.29$ points ($[1.52,14.45]$), with gains on five folds across four tasks. The all-context margin changed 12 nominations and eight final supports relative to Gain. Omitting the two related crop datasets, Dry Bean and Rice, reduced this gain to 4.95 points. Intervals describe 30,000 paired resamples of these ten tasks, separately for each contrast.
+The primary vote-minus-Gain difference in $U$ was $+1.33$ percentage points (paired task bootstrap 95\% interval $[0,4.00]$). The minimum vote changed two nominees and one final support. Its sole gain came from Seeds. On 16 of 20 actionable folds every nominee had zero worst-context approvals. The primary all-context-margin contrast against Gain was $+7.29$ points ($[1.52,14.45]$), with gains on five folds across four tasks. The all-context margin changed 12 nominations and eight final supports relative to Gain. Omitting the two related crop datasets, Dry Bean and Rice, reduced this gain to 4.95 points. Intervals describe 30,000 paired resamples of these ten tasks, separately for each contrast. All ten nominations on which the all-context margin and vote differed had tied at zero under the vote. For example, on the first Dry Bean fold both five-column nominees passed the guard. The Gain prefix, also chosen by the vote, gave 88.34\% outer accuracy against 91.34\% for the anchor. Changing one column, as both margin rules did, gave 91.27\%. The continuous score broke a tie that changed whether the deletion met tolerance.
 
 The point margin obtained the same $U$ as the full margin on every fold. Their nominees differed six times. In two instances, on Seeds and Steel, the full margin admitted a deletion the point rule avoided, and both breached the outer tolerance. The full margin averaged 25.3 distinct nomination masks per fold versus 4.2 for the point margin. The eight-round control used 4.2 extra fits per fold, taking an average of 0.051 seconds for that screening stage. Its $U$ difference from the point rule was $-0.96$ points ($[-5.66,3.89]$). All policies used the same full-fidelity budget of one initial and one final fit on every fold plus an anchor and candidate guard fit on each actionable fold. Whole-pipeline timing and nomination counts answer different cost questions.
 
 \paragraph{Which deletions could have worked?}
 We recorded genuine guard and outer fits for all 106 non-anchor candidates on the 20 actionable folds. Of 34 candidates meeting outer tolerance, 27 also passed the guard. Fifteen other candidates passed the guard and breached outside it. On ten of the actionable folds there was no outer pass, on one the guard excluded every outer pass, and on nine a candidate passed both checks. Accounting for the ten singleton anchors gives 29.07\% nominal savings, 15.18\% attainable using the outer results alone and 13.51\% when the guard also has to accept. These are hindsight ceilings on the sampled candidates. The point rule realized five of the nine available fold opportunities.
+
+
+\paragraph{A second panel with wider inputs.}
+We next froze an independent six-source comparison before scoring its 16 planned splits. The sources contain 72--856 features. CNAE-9 and Semeion use row-level folds, Parkinson uses participant-level averages of three recordings, Ozone and SECOM use expanding chronological windows, and Urban Land Cover uses the released train/test split from one aerial image (Appendix~\ref{sec:wide-details}). We specified the all-context margin versus point as primary. A practically material benefit required a lower 95\% paired task-bootstrap endpoint above five percentage points of $U$ and no increase in mean breach rate. Five points correspond roughly to one additional successful half-width deletion per ten decisions.
+
+Fifteen folds offered a deletion, yielding 110 distinct candidates. Gain, vote, point and all-context margins achieved identical $U$ on all 16 folds, with six admissions and three breaches per policy. Their equal-source mean was 7.34\%. All six task differences were zero, so both the observed bootstrap interval and the leave-one-source-out range for the primary contrast were $[0,0]$. The prespecified advantage was absent on this panel. Resampling six ties cannot determine equivalence on future sources. The full margin used 1,334 nomination masks across the folds, versus 125 for point, while each arm used 62 full-fidelity fits. Full and point disagreed on two nominees and one final support. On one SECOM fold the full margin improved outer AUC from .6078 to .7706 with unchanged accuracy (.9649). Average precision was .0792 and .1517, respectively, against .1711 for the anchor. Both missed its 5\% allowance. That fold accounts for their entire mean AUC difference of .00905.
+
+\paragraph{Does breaking an integer tie recover the gain?}
+After the ten-task results and before scoring the wider panel, we specified a rule that maximizes the original integer vote, using the point margin only to break ties. This preserves every strict ordering by vote. Evaluating candidates in descending point-margin order permits exact pruning as soon as the current worst count cannot beat the incumbent. On the first panel this refinement increased $U$ by 5.96 points over the original vote ($[0,13.33]$) and gave the same predictions as point alone. On the wider panel it again gave the same final outcomes as point. It used 5.80 and 14.78 masks per fold on the respective panels. The clocks for the refinement and original policies came from different runs. A crossed comparison of one or four panels with empty or all restorations also gave identical $U$ across all four continuous policies on both panels at the primary tolerance. In the first panel, adding the three reweightings at the empty restoration kept two outer breaches. Adding interior restorations on one panel gave three, and combining interiors with four panels gave four. Their equal $U$ masks these differences.
+
+\paragraph{What does the score buy over a lottery?}
+Because every candidate was refitted, the expected $U$ of a uniform nomination followed by the same guard can be computed without simulation. On a fold with $M$ candidates of common width, it equals the removal fraction times the number passing both tests divided by $M$. It is zero at a singleton anchor. On the first panel the point rule gained 1.80 points of $U$ over this baseline ($[-0.70,4.31]$), with a breach-rate difference of $-2.22$ points ($[-8.06,3.06]$). On the wider panel the corresponding differences were $+0.27$ points ($[-6.45,8.89]$) and $+3.70$ breach points ($[-4.63,14.58]$). Figure~\ref{fig:opportunity} shows the task-level opportunities. The eight-round control achieved $U=10.13\%$ on the wider panel, 3.06 points above the lottery ($[0.56,5.89]$), with the same mean breach rate as the point rule and an additional small fit for the anchor and each eligible candidate.
+
+\input{transport-opportunity-plot}
+
+A user may also charge for a breach separately from receiving zero savings. For a charge $h$ in units of a full anchor's value, net return is $U-h\,\mathbf 1\{\mathrm{breach}\}$. At the illustrative price $h=1$, the point rule and the uniform lottery returned $+0.63$ and $-3.40$ points on the first panel (paired difference $+4.03$, $[-1.65,10.72]$). On the wider panel they returned $-9.32$ and $-5.89$ points ($-3.43$, $[-17.26,11.17]$). These pointwise intervals resample whole tasks and condition on the measured candidate outcomes. The five-point primary decision criterion concerned $U$ itself.
