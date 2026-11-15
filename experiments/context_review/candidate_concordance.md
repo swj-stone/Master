@@ -7,10 +7,10 @@ Within each fold, compare every positive candidate with every negative candidate
 | Panel and receiver | Passing target | Source count | Mixed folds | Candidate pairs | Point | Full margin | Vote | Gain order |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | Ten, XGBoost | Outer | 5 | 10 | 118 | .752 | .717 | .540 | .491 |
-| Ten, XGBoost | Joint | 5 | 9 | 100 | .674 | .634 | .550 | .405 |
+| Ten, XGBoost | Joint | 5 | 9 | 100 | .674 | .634 | .550 | .404 |
 | Wide, XGBoost | Outer | 5 | 12 | 128 | .630 | .621 | .500 | .630 |
 | Wide, XGBoost | Joint | 4 | 8 | 93 | .604 | .598 | .521 | .612 |
-| Ten, logistic | Outer | 5 | 9 | 69 | .607 | .614 | .514 | .617 |
+| Ten, logistic | Outer | 5 | 9 | 69 | .607 | .614 | .514 | .616 |
 | Ten, logistic | Joint | 4 | 7 | 75 | .566 | .534 | .542 | .415 |
 | Wide, logistic | Outer | 5 | 9 | 106 | .643 | .636 | .562 | .571 |
 | Wide, logistic | Joint | 5 | 8 | 102 | .500 | .498 | .546 | .590 |

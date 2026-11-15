@@ -1,6 +1,6 @@
 # What Do Masked Losses Reveal About Feature Deletion After Retraining?
 
-[Manuscript PDF](minpi.pdf) · [LaTeX sources](minpi-source.zip) · [Transport evidence and replay](evidence/transport-release.md) · [Study protocols](../experiments/context_review/README.md) · [Independent review](audit/transport-area-chair.md) · [Computational audit](audit/transport-forensic.md)
+[Manuscript PDF](minpi.pdf) · [LaTeX sources](minpi-source.zip) · [Transport evidence and replay](evidence/transport-release.md) · [Study protocols](../experiments/context_review/README.md) · [Review history and decisions](audit/transport-revision-history.md) · [Computational audit](audit/transport-forensic.md)
 
 The paper asks how much a fitted classifier's response to masked columns can tell us about training a new classifier on the surviving columns. A finite tree construction characterizes the possible refit AUC and accuracy under a common mask transcript. Of 704 historical feature subsets, 136 shared a binary vote pattern with an equally wide subset on the same fold that had the opposite refit outcome. [Identification argument](identification-bounds.tex) · [Collision counts](audit/refit-observation-collisions.csv) · [Held-task prediction of refit failure](../experiments/context_review/matched_signal.md)
 
