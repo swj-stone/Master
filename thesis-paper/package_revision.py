@@ -169,7 +169,7 @@ def transport():
         raise FileNotFoundError("Missing reviewed transport manuscripts")
     files.update(reviews)
     for name in ("transport", "wide", "low_fidelity", "refinement", "matched_signal", "opportunity",
-                 "wide_slate", "chance", "margin_factorial", "receiver"):
+                 "wide_slate", "chance", "margin_factorial", "receiver", "opportunities", "marginal"):
         files.update(p for p in (EVIDENCE / name).glob("*") if p.suffix in {".csv", ".json", ".md", ".zip", ".npz"})
     campaigns = ["transport-uci", "transport-mammographic-four", "wide-uci", "matched-signal-r2",
                  "refit-opportunity", "low-fidelity", "wide-slate", "ballot-refinement-first", "ballot-refinement-wide"]
@@ -302,8 +302,9 @@ def replay_archived_tables():
     from functools import partial
     import pandas as pd
     from experiments.context_review import (
-        ballot_refinement, chance_nomination, lottery_reference, low_fidelity_score, matched_signal, receiver_transport,
-        transport_mammographic, transport_score,
+        ballot_refinement, chance_nomination, decision_opportunities, lottery_reference,
+        low_fidelity_score, marginal_replay, matched_signal, receiver_transport, transport_mammographic,
+        transport_score,
     )
 
     def compare(path, frame):
@@ -336,6 +337,10 @@ def replay_archived_tables():
         producers.append((partial(ballot_refinement.score, panel), "refinement",
                           [f"{panel}-{key}" for key in ("folds", "means", "contrasts")]))
     producers.append((lottery_reference.main, "chance", ("finite-lottery",)))
+    producers.append((decision_opportunities.main, "opportunities",
+                      ("folds", "tasks", "means", "contrasts", "fold-envelopes", "envelopes")))
+    producers.append((marginal_replay.replay, "marginal",
+                      ("costs", "agreement", "folds", "tasks", "means", "contrasts")))
 
     # Remove the reference copies in the temporary extraction so each scorer must create its outputs.
     table_count = len(summary)
