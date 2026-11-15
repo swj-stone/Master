@@ -1,0 +1,10 @@
+{
+  "folds": 46,
+  "independent_support_refits": 524,
+  "policies": 230,
+  "largest_absolute_probability_difference": 0.0010820534590709752,
+  "largest_absolute_metric_difference": 2.406623026562915e-05,
+  "independent_pipeline_changed_candidate_decisions": [],
+  "candidate_metrics": "rank-sum AUC; tie-aware AP; direct accuracy",
+  "passing_rule": "Independent joint guard and outer comparisons"
+}
