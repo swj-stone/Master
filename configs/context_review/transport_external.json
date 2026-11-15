@@ -1,0 +1,99 @@
+{
+  "design": "Prospective transport test on previously unused public classification datasets. The final comparison is fixed before fitting or inspecting any predictive outcomes. This is a purposive panel of real tabular tasks spanning medical, industrial, chemical, astronomical and agricultural measurements, with tractable numeric/ordinal inputs. All listed tasks and feasible folds enter, including one-column anchors and null changes. No replacement based on outcomes.",
+  "sources": [
+    [
+      "banknote",
+      267,
+      "banknote+authentication",
+      1372,
+      4
+    ],
+    [
+      "blood",
+      176,
+      "blood+transfusion+service+center",
+      748,
+      4
+    ],
+    [
+      "dry_bean",
+      602,
+      "dry+bean+dataset",
+      13611,
+      16
+    ],
+    [
+      "htru2",
+      372,
+      "htru2",
+      17898,
+      8
+    ],
+    [
+      "mammographic",
+      161,
+      "mammographic+mass",
+      961,
+      5
+    ],
+    [
+      "qsar",
+      254,
+      "qsar+biodegradation",
+      1055,
+      41
+    ],
+    [
+      "rice",
+      545,
+      "rice+cammeo+and+osmancik",
+      3810,
+      7
+    ],
+    [
+      "seeds",
+      236,
+      "seeds",
+      210,
+      7
+    ],
+    [
+      "steel",
+      198,
+      "steel+plates+faults",
+      1941,
+      27
+    ],
+    [
+      "vertebral",
+      212,
+      "vertebral+column",
+      310,
+      6
+    ]
+  ],
+  "source_fields": [
+    "short_name",
+    "uci_id",
+    "archive_slug",
+    "published_rows",
+    "predictors"
+  ],
+  "overlap": "Prior benchmark tables and thesis transfer scripts were searched by aliases, source domains and inventories. Breast Cancer Wisconsin Diagnostic and Wine were both previously used in the linear-transfer experiment and are expressly excluded. No prior sources/studies found for the ten included tasks. Rice and Dry Bean are different crops and samples studied by overlapping investigators, so report omission of both as a sensitivity check.",
+  "rows": "Use each original released row once and class target only; discard no hard cases. Vertebral uses the three-class version; Steel combines its seven one-hot targets into one categorical label. Mammographic includes all five documented predictors, including the radiologist's BI-RADS assessment. Numeric missing predictors are median-imputed only within the corresponding fitting partition. Row-level repeated feature vectors may represent different people or specimens. Report overlap frequency; interpretation concerns random records, not unseen hospitals, donors, instruments or molecules.",
+  "splits": "Archived learner, recipe and seeds: three shuffled row-stratified outer folds seed 20261115. Split each development portion stratified into 75% fitting and 25% ranking seed 20421+fold. Split ranking stratified into proposal and guard halves seed 39823+fold. Binary positive class is the minority in fitting, breaking ties by original class sort (larger label positive). Encode multiclass in sorted order. Use outer labels to create folds only. Freeze predictions and support manifests for all tasks before running the separate outer scorer. Report infeasible folds and explanation without replacement.",
+  "anchor": "Fit the archived 100-tree single-thread CPU XGBoost (depth 4, eta .1), use Compact Gain with its 8% masking allowance on proposal rows. Feature ranking, median background and four panel weights follow the archive. Use the anchor, tail and complete separating restoration family from that fit.",
+  "pool": "Anchor A; if w=ceil(|A|/2)<|A|, archive candidate_pool at index=1000+UCI ID, fold 0..2, width w. Include Gain prefix and at most seven unique uniformly drawn alternatives. Each policy has one candidate guard refit, plus the common anchor refit and final production refit. At |A|=1 keep the anchor and charge no candidate or guard fit.",
+  "policies": {
+    "gain": "Choose first w Gain-ranked columns.",
+    "vote": "Maximize the smallest count of passing panels across separating restorations. A panel passes all archived metrics (3% relative AUC and accuracy, plus 5% AP if fitting-proposal family's binary minority fraction on proposal rows is at most 5%).",
+    "slack": "For candidate S, restoration e, panel b and metric m with reference R=metric(A union e) and candidate value V=metric(S union e), define q=(V-R+tau_m*abs(R)+1e-12)/max(tau_m*abs(R),1e-12). Take min across metrics, third-largest across the four panels (three votes are needed), then min across restorations. Choose the largest resulting score. Its nonnegative level set is the archived predicate. It ranks candidates even when all fail.",
+    "point": "Cheap identity-aware control: maximize min_m q on the empty restoration and original proposal panel alone, on exactly the same candidates."
+  },
+  "ties": "All score ties use smallest sum of within-anchor Gain ranks, then sorted feature indices. Never use outer outcomes to choose a method or tune the comparison.",
+  "guard": "Refit nominee and anchor on fitting plus proposal rows and accept the nominee only if its guard metrics meet the anchor's same 3%/5% joint tolerance. Fit final support on all development rows. Store all supports and test probabilities without outer outcomes before scoring. Store reference anchor probabilities for U. Outer comparison uses identical tolerance against the refitted anchor.",
+  "primary": "Two named paired contrasts on safe fraction U=(1-|S|/|A|)*I(no outer breach): archived vote minus Gain (replication) and continuous slack minus Gain (method test). Fold-average within each task and equally weight all ten tasks. Give task-level paired 95% percentile bootstrap intervals, 30000 draws seed 33119, separately for each contrast (descriptive intervals, no multiplicity-adjusted significance claim).",
+  "secondary": "Compare slack against vote and point, point against Gain. Report guard acceptances, outer breaches, raw AUC, accuracy, retained widths/fractions, U, ties, disagreement in nominations and final supports, all per-task effects and leave-one-task-out U ranges. Report sensitivity omitting both rice and dry bean. No pooling with historical task outcomes.",
+  "cost": "Each policy executes cold standalone components from initial fit and imputation to final prediction (one thread, preloaded data, method order rotated per dataset/fold). Count genuine fits and distinct nomination masks per policy. Report sample wall time with no precise superiority claim; full exhaustive scoring for point and slack; integer vote may stop after a zero or when the current minimum cannot beat the incumbent. Offline candidate-resolution diagnostics may evaluate further masks but are excluded from policy times.",
+  "decision": "A future advantage requires meaningful safe compression without a commensurate increase in breach burden. Report positive, adverse and null outcomes without declaring equivalence from overlapping intervals. Any protocol deviation must be labeled."
+}
