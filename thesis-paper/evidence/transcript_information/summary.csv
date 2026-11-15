@@ -1,7 +1,6 @@
 observer,disposition,proposals,tasks,original_pass
 outer_family,invariant,704,14,402
-outer_point,invariant,683,14,392
-outer_point,unresolved,4,1,0
+outer_point,invariant,687,14,392
 outer_point,witness,17,4,10
-proposal_only,unresolved,22,3,16
-proposal_only,witness,682,14,386
+outer_point_unmasked,invariant,704,14,402
+proposal_only,witness,704,14,402

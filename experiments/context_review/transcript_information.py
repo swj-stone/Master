@@ -20,7 +20,7 @@ def paired_gap(y, candidate, anchor):
             dict(candidate=cm, anchor=am))
 
 
-def exchange_classes(y, contributions, codes):
+def exchange_classes(y, contributions, codes, block_limit):
     groups, restricted = [], False
     order = np.argsort(codes, kind="stable")
     for group in np.split(order, np.cumsum(np.bincount(codes))[:-1]):
@@ -30,17 +30,18 @@ def exchange_classes(y, contributions, codes):
         # this class changes either objective even if the underlying scores vary.
         if all(np.all(a[group] == a[group[0]]) for a in contributions):
             continue
-        restricted |= len(group) > MAX_BLOCK
-        for start in range(0, len(group), MAX_BLOCK):
-            b = group[start:start+MAX_BLOCK]
+        step = block_limit or len(group)
+        restricted |= len(group) > step
+        for start in range(0, len(group), step):
+            b = group[start:start+step]
             if len(b) > 1 and np.any(y[b] != y[b[0]]):
                 groups.append(b)
     return groups, restricted
 
 
-def audit(y, candidate, anchor, observed, base, contributions):
+def audit(y, candidate, anchor, observed, base, contributions, block_limit=MAX_BLOCK):
     codes = tp.partition(observed)
-    groups, restricted = exchange_classes(y, contributions, codes)
+    groups, restricted = exchange_classes(y, contributions, codes, block_limit)
     passed = bool(np.all(base >= 0))
     low, high = base.copy(), base.copy()
     witness = None
@@ -78,23 +79,33 @@ def replay():
             with np.load(BytesIO(archive.read(key+".npz"))) as data:
                 y, anchor, masks = data["y"], data["anchor"], data["codes"].T
                 base_cols = tp.score_columns(y, anchor)
+                initial = data["initial"]
                 for i, s in enumerate(meta["proposals"]):
                     candidate = data[f"s{i}"]
                     base, factual = paired_gap(y, candidate, anchor)
                     cc = tp.score_columns(y, candidate)
                     contributions = tuple(c - .97*a for c, a in zip(cc, base_cols))
-                    for observer in ("proposal_only", "outer_point", "outer_family"):
+                    for observer in ("proposal_only", "outer_point", "outer_point_unmasked", "outer_family"):
                         if observer == "proposal_only":
                             observed = np.zeros((len(y), 1), dtype=np.uint8)
+                        elif observer == "outer_family":
+                            observed = masks[:, s["recorded"]]
                         else:
-                            observed = masks[:, s["point" if observer == "outer_point" else "recorded"]]
+                            observed = masks[:, s["point"]]
+                            if observer == "outer_point_unmasked":
+                                observed = np.column_stack((observed, initial))
                         ident = dict(dataset=meta["dataset"], fold=meta["fold"], proposal=i, observer=observer)
                         record, example = audit(y, candidate, anchor, observed, base, contributions)
+                        first_pass = record["disposition"]
+                        if first_pass == "unresolved" and record["restricted_blocks"]:
+                            record, example = audit(y, candidate, anchor, observed, base, contributions,
+                                                    block_limit=None)
+                        record["first_pass"] = first_pass
                         results.append(dict(**ident, **record))
                         if example is not None:
                             witnesses.append(dict(**ident, factual=factual, alternative=example))
     df = pd.DataFrame(results)
-    assert len(df) == 3*704
+    assert len(df) == 4*704
     DEST.mkdir(parents=True, exist_ok=True)
     df.to_csv(DEST / "proposals.csv", index=False)
     counts = df.groupby(["observer", "disposition"]).agg(
