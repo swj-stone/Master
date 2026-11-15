@@ -1,0 +1,9 @@
+{
+  "question": "With the same XGBoost Gain slate and one nominated candidate for the guard, what do a single masking point, an exactly stopped full margin, and eight boosting rounds per candidate buy in utility, risk and elapsed time?",
+  "scope": "Both published panels, including no-action folds. Previously exposed outcomes. No tuning.",
+  "methods": ["point", "slack", "small"],
+  "repetitions": 3,
+  "order_seed": 77631,
+  "timing": "One worker on one available logical CPU. Each arm in each repetition fits its own 100-tree reference, rebuilds the Gain anchor and slate, nominates, runs the same independent guard if actionable and fits and predicts with the delivered support. Three cyclic rotations of a fold-specific shuffled method order balance positions. Exclude disk I/O, golden checks, external test-label scoring and independent research refits. Record nomination and complete wall time; summarize as sums of within-fold medians.",
+  "scoring": "Check every freshly produced guarded support and final probability vector against the archived fold and support. Use exact archived guarded U and breach, average within source and then equally over sources. Bootstrap paired source differences on fixed folds with 30000 draws and seed 33119."
+}
