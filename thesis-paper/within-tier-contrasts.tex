@@ -1,0 +1,31 @@
+\paragraph{Uncertainty for choice within a tied group.}
+An analyst who nominates uniformly draws once among the maximum-vote candidates before the guard. We computed the expected guarded return by averaging each nominee's own outcome, including its possible fallback. Every rule used that same eligible group. The point and full rules give any remaining exact tie to the first candidate in frozen slate order. A nonactionable fold returns the anchor under every rule.
+
+\begin{table}[ht]
+\centering\small
+\caption{Paired differences in effective compression and outer breach rate for three choices within the highest-vote group. Entries are percentage points with 95\% paired source bootstrap intervals. Draws and folds stay within their original sources. Positive breach differences mean more violations.}
+\label{tab:within-tier-forest-contrasts}
+\begin{tabular}{@{}ll l rr@{}}
+\toprule
+Slate & Panel & Difference & $\Delta U$ & $\Delta$breach\\
+\midrule
+Gain & Ten & Point $-$ uniform & $+0.91\;[-2.89,5.63]$ & $+0.69\;[-5.42,7.50]$\\
+ & & Full $-$ uniform  & $+0.91\;[-2.89,5.63]$ & $+4.03\;[-1.67,10.56]$\\
+ & & Full $-$ point    & $0.00\;[0.00,0.00]$ & $+3.33\;[0.00,10.00]$\\
+ & Wide & Point $-$ uniform & $+2.71\;[-4.22,8.83]$ & $+2.78\;[-8.33,15.97]$\\
+ & & Full $-$ uniform  & $+2.71\;[-4.22,8.83]$ & $+2.78\;[-8.33,15.97]$\\
+ & & Full $-$ point    & $0.00\;[0.00,0.00]$ & $0.00\;[0.00,0.00]$\\
+\midrule
+Local & Ten & Point $-$ uniform & $+0.84\;[-0.74,2.85]$ & $+0.14\;[-1.67,2.08]$\\
+ & & Full $-$ uniform  & $-0.25\;[-2.38,2.19]$ & $+1.25\;[-1.25,5.00]$\\
+ & & Full $-$ point    & $-1.08\;[-2.70,0.00]$ & $+1.11\;[-3.33,6.67]$\\
+ & Wide & Point $-$ uniform & $+0.84\;[-1.48,3.40]$ & $-2.89\;[-6.75,0.89]$\\
+ & & Full $-$ uniform  & $+1.26\;[-2.15,5.51]$ & $-1.04\;[-4.89,2.40]$\\
+ & & Full $-$ point    & $+0.43\;[-1.85,3.59]$ & $+1.85\;[0.00,5.56]$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The four panel--design combinations in Table~\ref{tab:within-tier-forest} had multiple highest-vote nominees on 14/30, 10/16, 60/90 and 42/48 fold--draw records. After the guard, at least two distinct supports could still be returned on 9, 7, 43 and 37 records, respectively. The guarded $U$ varied across these supports on 5, 5, 17 and 25 records, and breach status varied on 6, 5, 4 and 13. Over the remaining records even an oracle choosing within the highest-vote group could not improve that particular endpoint. The oracle counts use the realized outer outcomes.
+
+Conditioning only on a visible tie gives a different decision population. Retaining folds with at least one tied draw, we averaged the eligible draws within each fold, then folds within each contributing source. For full minus uniform $U$, the Gain estimates were $+1.30$ points ($[-4.12,8.04]$, seven sources) and $+9.50$ ($[-2.77,23.17]$, six sources). The local estimates were $+0.31$ ($[-2.82,3.93]$, ten sources) and $+0.70$ ($[-3.30,5.40]$, six sources).
