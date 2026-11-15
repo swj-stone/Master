@@ -1,0 +1,60 @@
+{
+  "independently_rebuilt_codebooks": 210,
+  "class_matched_proposal_conditions": 7040,
+  "exhaustive_cases": [
+    {
+      "dataset": "new_thyroid",
+      "fold": 0,
+      "draw": 1,
+      "proposal": 0,
+      "observer": "point_plus_code",
+      "disposition": "invariant",
+      "allocations": 2
+    },
+    {
+      "dataset": "new_thyroid",
+      "fold": 0,
+      "draw": 1,
+      "proposal": 1,
+      "observer": "point_plus_code",
+      "disposition": "invariant",
+      "allocations": 2
+    },
+    {
+      "dataset": "new_thyroid",
+      "fold": 0,
+      "draw": 1,
+      "proposal": 2,
+      "observer": "point_plus_code",
+      "disposition": "invariant",
+      "allocations": 2
+    },
+    {
+      "dataset": "segmentation",
+      "fold": 1,
+      "draw": 1,
+      "proposal": 4,
+      "observer": "point_plus_code",
+      "disposition": "witness",
+      "allocations": 2
+    },
+    {
+      "dataset": "spectf",
+      "fold": 2,
+      "draw": 1,
+      "proposal": 0,
+      "observer": "point_plus_code",
+      "disposition": "witness",
+      "allocations": 12
+    },
+    {
+      "dataset": "spectf",
+      "fold": 2,
+      "draw": 1,
+      "proposal": 3,
+      "observer": "point_plus_code",
+      "disposition": "witness",
+      "allocations": 4
+    }
+  ]
+}
