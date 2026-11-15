@@ -1,0 +1,8411 @@
+{
+  "design_sha": "7d8193831bfdad8b70f17339e57654c00b4e5c0e8e5ff37d5acadf4e0d771e01",
+  "sklearn": "1.9.0",
+  "forecast_archive_sha": "4c382a9874182e50fec20b9115c34e5e7d35358219acbdd81d64913a883d98bf",
+  "folds": {
+    "first/banknote/fold-0": {
+      "panel": "first",
+      "dataset": "banknote",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "f87127927f1258f0fc52d2044bf6251396baa736b5b9722313105ea56f0a4638",
+      "layout_sha": "75f3d1b3845cb1496acd1ffb8f9ab1bf0ea4867d00ed8ba3d91e8a17dd1701d2",
+      "selection_sha": "6f73eb445adc2242cc591d42ca56a1ddd2ec665b194e398191350905f960500a",
+      "targets_sha": "5b29aaedf831bc7e62d59a022e73b1214af5b85ab5d62d015d30979bedeaad77",
+      "predictions_sha": "52b0039df9c55a0f952528e90aa03b3673e637e6442c90b223ac767fb238af19",
+      "guard_runs": [
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/banknote/fold-1": {
+      "panel": "first",
+      "dataset": "banknote",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "e0528e9df4c18a1ea8584d766e664d06e5113202472f9ddc52c1a72562ec6dfe",
+      "layout_sha": "0ef16abcbed5e86aab99cf96f150f4ec851998f7c1aec543952068317294045f",
+      "selection_sha": "aa0e325721d719c4ae9452404d53ddcf0a88ee9c2e42d03cba1c9be69ecdf365",
+      "targets_sha": "0ad9bd173e4696ab6dab79139760fecc37a6bae15384907e04c7f622e15e3f08",
+      "predictions_sha": "defbe3dcde4b4276cc406450103861bcfb9c28ba67f403ee81dbf322c20195f2",
+      "guard_runs": [
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/banknote/fold-2": {
+      "panel": "first",
+      "dataset": "banknote",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 2,
+        "point": 2,
+        "slack": 2
+      },
+      "input_sha": "93c741d567e30e7d058de58272febcbd9a5d269ce79612f5ee1f19e5d02a5321",
+      "layout_sha": "c40f0218ddb91b3525cc7eacd86f8d761529238bb0de5b976dc440ae4669f042",
+      "selection_sha": "4614d7a7516179080cc39374460424582402b339c3f18af643e2090623b2919b",
+      "targets_sha": "fb1312e22a667e411b4789e5b9b415499faa6846bfb1da30984ab95cefe16201",
+      "predictions_sha": "14cf2d36e7dd3a3549aca222804a2806e20392887780732b40b66b1c9f1dd681",
+      "guard_runs": [
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/blood/fold-0": {
+      "panel": "first",
+      "dataset": "blood",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          0
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "d4e378a9ec775adf7b46c5828dabe1b46006ca87530e2d953b2dd77a686dd495",
+      "layout_sha": "75073e5537f63df45f1ab89f2e5863f3ba22a8386c79114628dfa8fd0595022f",
+      "selection_sha": "94d29c7314a55f97ddf7f35a438028f339b02184d47e2f78e73b420f116a22d3",
+      "targets_sha": "b4def2b7dfe6b22695035b8d00ce0fc7223bd4657c0b2d85023acb347e057a70",
+      "predictions_sha": "00359be9ace018f9c33998fc256c672308b6f3434d4474d3f694a85ba7a5b10a",
+      "guard_runs": [
+        {
+          "iterations": 7,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 7,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/blood/fold-1": {
+      "panel": "first",
+      "dataset": "blood",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          0
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "a0348bf607f53f235c29f5c844920a0019bed7c340fbb337acfc86090f3a15e4",
+      "layout_sha": "a854fd88106da0e5fc2dfe34b0625a0ff0841019cfc914cddd7751dde5c28bda",
+      "selection_sha": "e009499799e2289884b1ca1250bde12d7fe830a865e5b56f745401fabc839d2e",
+      "targets_sha": "87a5367824218e503e047ff2de80592a4a2f8b318c5e9e904d656d8532f18e35",
+      "predictions_sha": "42e8675da967218afb1f6a7587817c184707b21c76cf575aa64ca1b4871b0e48",
+      "guard_runs": [
+        {
+          "iterations": 7,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 7,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/blood/fold-2": {
+      "panel": "first",
+      "dataset": "blood",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          3
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          3
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "f02e7dccfa18d333596ef781e13ae294f72f51f0ace6b6be4b5687c04cccb5eb",
+      "layout_sha": "5dcf96b63b232e6da14dd3cc2316a1708b1c955921c46756eab500e8316dbdc7",
+      "selection_sha": "e2ed0e15f3a4d11c52d3c8d30096eb6de30556ccb8b7b8240d7c17a3e7d2bcc3",
+      "targets_sha": "a7f3dd9ecfe9ebcf6cd43ec2a80d0c484f29b5bfc588ea7b4aec1e430b6996cb",
+      "predictions_sha": "3bb73f692465d0db486027e2c994a672f4c3a23c15c26bb63e7286d375c8adc0",
+      "guard_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/dry_bean/fold-0": {
+      "panel": "first",
+      "dataset": "dry_bean",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          6,
+          10,
+          11,
+          12,
+          13
+        ],
+        [
+          0,
+          2,
+          6,
+          11,
+          12
+        ],
+        [
+          0,
+          6,
+          10,
+          11,
+          12
+        ],
+        [
+          0,
+          2,
+          3,
+          6,
+          12
+        ],
+        [
+          0,
+          1,
+          6,
+          10,
+          12
+        ],
+        [
+          0,
+          2,
+          4,
+          6,
+          10
+        ],
+        [
+          1,
+          2,
+          3,
+          4,
+          11
+        ],
+        [
+          1,
+          2,
+          4,
+          6,
+          10
+        ],
+        [
+          0,
+          2,
+          3,
+          4,
+          10
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 2,
+        "slack": 2
+      },
+      "input_sha": "794b677b9a269bb00eb80ac005172b66d349bbe5b7a07af23da8282f2e16a30b",
+      "layout_sha": "5cc250134707f2525c880c06eb54774f8ddaa31ca04505931f4cb8effdb525b5",
+      "selection_sha": "7ba405c39d9ba489f0ca083698231e8e7ac355dbb036e1ee209495d290362686",
+      "targets_sha": "059a1ab5058db3b3b5911a2514a74ebed2dc486031b75577f0ce66a082d7b886",
+      "predictions_sha": "0c55255d1aa06f6a2e774436ee1348e0b29153b5d866744f1c76b21db44d78cb",
+      "guard_runs": [
+        {
+          "iterations": 214,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 161,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 129,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 173,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 186,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 119,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 128,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 121,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 123,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 233,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 146,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 125,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 167,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 198,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 122,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 129,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 125,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 135,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/dry_bean/fold-1": {
+      "panel": "first",
+      "dataset": "dry_bean",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          2,
+          3,
+          6,
+          10,
+          11,
+          12,
+          13
+        ],
+        [
+          0,
+          2,
+          6,
+          11
+        ],
+        [
+          0,
+          2,
+          11,
+          13
+        ],
+        [
+          3,
+          6,
+          10,
+          11
+        ],
+        [
+          0,
+          3,
+          6,
+          13
+        ],
+        [
+          0,
+          2,
+          12,
+          13
+        ],
+        [
+          3,
+          10,
+          11,
+          12
+        ],
+        [
+          0,
+          3,
+          12,
+          13
+        ],
+        [
+          0,
+          3,
+          10,
+          13
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 6,
+        "slack": 6
+      },
+      "input_sha": "a2c49cdfdd24b420355571e21902eca28dfcb793e8cf3742a699fd5dd0da0fd4",
+      "layout_sha": "6118387349f98945b940356acc89e246ccc6045ecd63bfdc49ef941c7f55957b",
+      "selection_sha": "e879835e7e29aaaf2fa8d831266538106c8d534fc9a3d1abb48d327acf389e84",
+      "targets_sha": "da79be8924495320bc504427173ca72b0f2c2e2070d930fb9a541afb0095dc4e",
+      "predictions_sha": "23116fb769a94299fe01e0489533620742173e7dbf5594c55617b981c1c99df6",
+      "guard_runs": [
+        {
+          "iterations": 160,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 115,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 138,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 120,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 139,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 137,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 124,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 145,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 130,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 176,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 117,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 136,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 122,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 139,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 150,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 129,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 151,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 145,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/dry_bean/fold-2": {
+      "panel": "first",
+      "dataset": "dry_bean",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          6,
+          10,
+          11,
+          12,
+          13
+        ],
+        [
+          0,
+          2,
+          6,
+          11,
+          12
+        ],
+        [
+          0,
+          3,
+          6,
+          10,
+          11
+        ],
+        [
+          0,
+          4,
+          6,
+          10,
+          11
+        ],
+        [
+          0,
+          1,
+          10,
+          11,
+          13
+        ],
+        [
+          2,
+          6,
+          10,
+          12,
+          13
+        ],
+        [
+          3,
+          4,
+          11,
+          12,
+          13
+        ],
+        [
+          4,
+          10,
+          11,
+          12,
+          13
+        ],
+        [
+          2,
+          3,
+          4,
+          10,
+          12
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "4f833e6404715877a4597bcd6cee09213ba47b5b4c77b2a3790cbf6d3f64f69c",
+      "layout_sha": "88949a58d771de06dd11d833296ab9c344d1dd91d57c4da4eae7037241b80780",
+      "selection_sha": "a82c699c53fdb73b399061aa29d7266707732875621df665f3933db631963c5f",
+      "targets_sha": "0ee9bc0362bb341250b7edb778050a641d639aff2464048851371efd1bab34d9",
+      "predictions_sha": "d24894cf08e66d98c2716c0ce038b09eef1ecf1654f106889156f6ddf1aa6584",
+      "guard_runs": [
+        {
+          "iterations": 173,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 127,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 125,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 108,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 143,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 132,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 130,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 131,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 145,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 208,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 174,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 123,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 114,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 146,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 146,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 177,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 140,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 156,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/htru2/fold-0": {
+      "panel": "first",
+      "dataset": "htru2",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "04953e24a020ad79fff18ca9d102e1a71a56a9dc344740b34ff297515bc17ea4",
+      "layout_sha": "d9b540e78b3d01acd8e8435047ee71cd1f421a8f402162c78d0bfbec41abdb45",
+      "selection_sha": "e0cf421d4e956255295073b4db233172195da9c4df5078a7fdc40804b9f1efeb",
+      "targets_sha": "a4a7fa7aea3ac54121660a10413a52eebe4c312fe9d6622d3eee912ff37bbe69",
+      "predictions_sha": "1e5875434cb7ba1ff666891b47d4c60010b60842795176ed3c3615610d533a87",
+      "guard_runs": [
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/htru2/fold-1": {
+      "panel": "first",
+      "dataset": "htru2",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "36a18dffa4408a882bd5bb11b0d2b24ef474bc7dfba0cea9c1fdb79e84385506",
+      "layout_sha": "7b8c793be46f6417686141602f558a71e450e356f62471357f3478498d3e2802",
+      "selection_sha": "34d0aadfeb2e0cb1f0a3a3903603e4f17462a3ab654b3334214f92a3cbced52f",
+      "targets_sha": "ee2d2a2dceba5f10c64c531685c26bf6229615bb7dc5301be7f50ca3600b2152",
+      "predictions_sha": "4bba08b271012f527f2569096b7fa1575ccf48490ca347153cc61d7cfda976aa",
+      "guard_runs": [
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/htru2/fold-2": {
+      "panel": "first",
+      "dataset": "htru2",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "85bf4ec2bd097b1422aec66f2aad404f592295492d48dc0d62e08ba2c0fb78dd",
+      "layout_sha": "723d77871717e3fdb253b25b7145208eb19805d6576afe07b265d878921b090d",
+      "selection_sha": "22656114de63e56184b463d209a4eaa7afb91eeeaa7a373cfc7c8b36a4bfa8db",
+      "targets_sha": "4add99ffce2e6cd557fe5b204534a06f10c7935bd1b8566778bb386660a94c52",
+      "predictions_sha": "2b3176e466ed5821c9c5597fb5150a2f57668455f75ec54fdc7ca212ec393511",
+      "guard_runs": [
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/mammographic/fold-0": {
+      "panel": "first",
+      "dataset": "mammographic",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          2
+        ],
+        [
+          0
+        ],
+        [
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 2,
+        "slack": 1
+      },
+      "input_sha": "681906ab0eb92a6048654b6e9d30c56f1775fc06e4376d9535ebf35eb73c35bd",
+      "layout_sha": "555eb9bbd20026e15bf787a50010685ac61ae073073e6de3f395ed60d8cfbf8c",
+      "selection_sha": "34f5fad758253265751da3bc132f56baf36719253a4d3445c2d7ca050c812794",
+      "targets_sha": "3b1b4b242c11a68f5c10f505422634672492b22560c9ee0886a8165994d8c282",
+      "predictions_sha": "557b49e59c02756899e7ed70973534ded947eb4d997fd01ae0c692903ab62e2f",
+      "guard_runs": [
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 6,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 6,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/mammographic/fold-1": {
+      "panel": "first",
+      "dataset": "mammographic",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 2,
+        "slack": 2
+      },
+      "input_sha": "1fea7b4801159aa4c0b0643b7f1163ebe3c4f1bf40a8eb9c5b678f5693ec8435",
+      "layout_sha": "21f2d3aa6b29797189283cdfb8624b14883ce9282ed0b689da956148af527032",
+      "selection_sha": "c692bdec186b4e244366400f4414930f48dad55ae91d2792acf7eb668f939c03",
+      "targets_sha": "3e2fb9326dfbbe742e2836cb7e8dca188a962c84b986425403df45ff587e386d",
+      "predictions_sha": "481a4b8680068270e0fdabdf859bdcdd6dc0ce0e8e124c96b5c5f60a9bdb85cb",
+      "guard_runs": [
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 7,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 7,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/mammographic/fold-2": {
+      "panel": "first",
+      "dataset": "mammographic",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          2
+        ],
+        [
+          0
+        ],
+        [
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "7bbe2c3f4673b34b3c83f5d0a129995d61545f94691e68b7d3bafd86837ba26d",
+      "layout_sha": "0870b4cde9d46dcdccae3a5349cec0ea2b4d2ef4e222ec3fb60e09939d5a3ff4",
+      "selection_sha": "d5596d624771cc55f98019d55a74c61be7f80728a43d7b76803a7bda2c5a85c4",
+      "targets_sha": "079c0317d042791366aabfe6f873cecddb0b4d02aaeb5b77ced4048f821d1e86",
+      "predictions_sha": "5aadac6b4a89c65f884058027c3f747346eb774a7bc7314ceefe0e15ddb10d21",
+      "guard_runs": [
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 7,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 6,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 6,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 6,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/qsar/fold-0": {
+      "panel": "first",
+      "dataset": "qsar",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          5,
+          8,
+          10,
+          11,
+          26,
+          33,
+          35,
+          37,
+          39,
+          40
+        ],
+        [
+          8,
+          10,
+          33,
+          35,
+          39,
+          40
+        ],
+        [
+          8,
+          11,
+          33,
+          35,
+          39,
+          40
+        ],
+        [
+          0,
+          8,
+          10,
+          26,
+          35,
+          39
+        ],
+        [
+          0,
+          8,
+          10,
+          11,
+          37,
+          39
+        ],
+        [
+          5,
+          8,
+          10,
+          37,
+          39,
+          40
+        ],
+        [
+          0,
+          5,
+          8,
+          11,
+          37,
+          39
+        ],
+        [
+          5,
+          11,
+          26,
+          35,
+          37,
+          39
+        ],
+        [
+          8,
+          11,
+          26,
+          37,
+          39,
+          40
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 6
+      },
+      "input_sha": "cefd7d7b27e8ba9f2c5eb7fba63c30867980b4ae2478d70d37981488c1f14fc8",
+      "layout_sha": "7d60207bdfc43219fb5f30fe42886b965612a3f9580b6f14fb72312a0ea9ca51",
+      "selection_sha": "ced345f337192503959abb4fed882bf26b00f4aa296b65896bcbd9206709f77a",
+      "targets_sha": "ef3fd6f7c7cc8fe4b5b4a592712bc617b6e742f79f317547fe5b70400aa7e470",
+      "predictions_sha": "299d5c8a40129215b62a297ff8f80ecb6a30325c4aae18ac6671dc9e47c59303",
+      "guard_runs": [
+        {
+          "iterations": 26,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 16,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 25,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 16,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 17,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/qsar/fold-1": {
+      "panel": "first",
+      "dataset": "qsar",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          5,
+          9,
+          14,
+          29,
+          33,
+          35,
+          37,
+          39
+        ],
+        [
+          0,
+          5,
+          33,
+          35,
+          39
+        ],
+        [
+          0,
+          5,
+          33,
+          35,
+          37
+        ],
+        [
+          0,
+          9,
+          29,
+          35,
+          39
+        ],
+        [
+          0,
+          14,
+          35,
+          37,
+          39
+        ],
+        [
+          14,
+          29,
+          33,
+          35,
+          39
+        ],
+        [
+          0,
+          14,
+          33,
+          35,
+          37
+        ],
+        [
+          5,
+          9,
+          14,
+          35,
+          37
+        ],
+        [
+          0,
+          9,
+          29,
+          33,
+          39
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 3,
+        "slack": 5
+      },
+      "input_sha": "3446f81de1b4ca18d1f2922ca420ad086a60b2bc5d21b1cce5e1088bfe990151",
+      "layout_sha": "702bc02b4d4abbf06f53708626e2eb7b46e74199ca75644a7598d1deb1812044",
+      "selection_sha": "d7fdea6614464621d9c8e86dd3cc414e5c3331579ef5e11669edd9fc5c0d6014",
+      "targets_sha": "af8f69dac54861b9982e6fdaee3318c98719e568f965fa8d80527a2d7e42d6e6",
+      "predictions_sha": "be345c4e49e47ce40da08bd4b144afc6f8546d34020f8247f50c2b993872223b",
+      "guard_runs": [
+        {
+          "iterations": 25,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 17,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 24,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 16,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/qsar/fold-2": {
+      "panel": "first",
+      "dataset": "qsar",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          2,
+          8,
+          15,
+          26,
+          33,
+          35,
+          37,
+          39,
+          40
+        ],
+        [
+          2,
+          15,
+          33,
+          35,
+          39
+        ],
+        [
+          0,
+          2,
+          15,
+          33,
+          39
+        ],
+        [
+          8,
+          26,
+          33,
+          35,
+          39
+        ],
+        [
+          2,
+          8,
+          26,
+          33,
+          39
+        ],
+        [
+          26,
+          35,
+          37,
+          39,
+          40
+        ],
+        [
+          0,
+          2,
+          8,
+          35,
+          40
+        ],
+        [
+          8,
+          15,
+          26,
+          35,
+          40
+        ],
+        [
+          0,
+          2,
+          26,
+          39,
+          40
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 3,
+        "slack": 5
+      },
+      "input_sha": "d0df49ddf622ed811f17f61b0b26901cbcd1b18c395969270abb5977f9c6b8a2",
+      "layout_sha": "19cb01813a769bad2093826b73c7a17f5ed47d04f6ea47e996d95c0068884bf3",
+      "selection_sha": "6609dff25e6b3a2d0814004f1cfc5bd72a8c3a2d652bfd3da72a5948baa2b08a",
+      "targets_sha": "e95f2f569cb401f3d84df529687676e75abb86d1cc91a8aa248b86d771fcb226",
+      "predictions_sha": "4526866066a207d1fb4361ec0d479d2d2f4a09401d33172746ed14deb9420062",
+      "guard_runs": [
+        {
+          "iterations": 25,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 17,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 24,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 22,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/rice/fold-0": {
+      "panel": "first",
+      "dataset": "rice",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "ca4a786be79424cfb3a745bc1ff5bdfd1e41f846f88ef3a7f17e0cee20970f6e",
+      "layout_sha": "4a7b32fad2f79da1fb68a4cbb9112e3cbb56cdc58c9653f8f8acf4da0d04a909",
+      "selection_sha": "84d106def3557de7e466735534b00c30bddbdc17f86eb448e31934ac1b29a5cc",
+      "targets_sha": "58a18636392b5565f1c0436eeb4b1083e0353ddceb22bb3c9e35bd40b6bbec9e",
+      "predictions_sha": "dbc86366021a3978d05fc381d93abc4c14211dac801fdcce3dc0565a1adfc68e",
+      "guard_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/rice/fold-1": {
+      "panel": "first",
+      "dataset": "rice",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "910c4df544b4f99b391350da77b694f4298be51b3fed8f74989d5feb38f6f50f",
+      "layout_sha": "13729cd49f8331fa80632e94cb21a765d1eeaf7e505f538bd03f9b99af98d61e",
+      "selection_sha": "655f9a35f45402e20665bce3f223e650dd72b93439bc8a75060c5104f9c8860f",
+      "targets_sha": "f4a7bce5cd4ed173d6d79c16f991dd10b067d580fe91337ee569bc7dec5dbf70",
+      "predictions_sha": "68e22342df19f8e05fd6fbc8565b18d73032289429f64bfde20dd54a0c4e9c3a",
+      "guard_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/rice/fold-2": {
+      "panel": "first",
+      "dataset": "rice",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          2
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "5591fbf6762a057f42585cc617d9d4bf31c1feea33f842ebedc9f1c4bd69ad78",
+      "layout_sha": "84376cfa717c609def15ebe9d0d28de2f79f011c5be1e35eed8e465f0e2f1763",
+      "selection_sha": "5c55ad76c0633ab4d218af5961fccb8d97f75f40777e42c0493ada2d4251ff55",
+      "targets_sha": "e41a1536cd6f6e45c766430b54faa8a393bfad3d2a11575bdb8a71a1929550c2",
+      "predictions_sha": "422539b079fbf478f0bbb7bb757ffa5213c5a3ca6cae373f702f2f3d1861013b",
+      "guard_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/seeds/fold-0": {
+      "panel": "first",
+      "dataset": "seeds",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          3,
+          5,
+          6
+        ],
+        [
+          0,
+          1,
+          3
+        ],
+        [
+          0,
+          3,
+          5
+        ],
+        [
+          0,
+          3,
+          6
+        ],
+        [
+          0,
+          1,
+          5
+        ],
+        [
+          1,
+          3,
+          6
+        ],
+        [
+          0,
+          1,
+          6
+        ],
+        [
+          3,
+          5,
+          6
+        ],
+        [
+          0,
+          5,
+          6
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 6,
+        "point": 6,
+        "slack": 6
+      },
+      "input_sha": "a69ca0e68a4abc3d9685335d61b37fb82427ce04a37fca6a1115f1527ca1cf82",
+      "layout_sha": "a8566e12ada1b789807ccc807d8764509763df040f218a864a60c46f532eb37c",
+      "selection_sha": "ab95d10980d9d7429c115c7f20bc6966658fb88afe1752fb0480a32fe5ecc141",
+      "targets_sha": "1fe3b8ecb0fb59c5e76fcf9a3dac6134f506b8aebc28e1f2adbe68fe78759de6",
+      "predictions_sha": "2277b64602adf74a387251b6c7851eddc75e30e96ab33cd94c5a07e8079c3632",
+      "guard_runs": [
+        {
+          "iterations": 25,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 24,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 21,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 21,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 22,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 25,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 17,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 17,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 25,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 24,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 21,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 23,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 24,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 24,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 21,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/seeds/fold-1": {
+      "panel": "first",
+      "dataset": "seeds",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          6
+        ],
+        [
+          6
+        ],
+        [
+          0
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 2
+      },
+      "input_sha": "11525c241c99d4196faeb57fe8348a531d40bf5ddf532a3cd0ddacfe56d9374c",
+      "layout_sha": "e7bcd5ac505d4340e8cd83c7c620a0169314104bf2e04e7abba1b3f3e5e282a6",
+      "selection_sha": "c8e89bede019d2f1706eb1744a3ce343072874a217f75a24d6dff9eb11a5af78",
+      "targets_sha": "a416b3ff41d7bfa4777992cdd770890c24ac9f05c1186f792555cddb0e1788bc",
+      "predictions_sha": "942b5f2f56844f67a3a0a816338528437e5b9761130669a38a09c0a5bc44404c",
+      "guard_runs": [
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/seeds/fold-2": {
+      "panel": "first",
+      "dataset": "seeds",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          6
+        ],
+        [
+          0
+        ],
+        [
+          6
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "0dcabb4d052cd85439b127dde0d40a1374afc0667d0332c4679ae552fa7987e6",
+      "layout_sha": "f1ee6d51e5aefa0f71a6466a49e0e5a689b72b5aa19df3e10883369b3b52bafc",
+      "selection_sha": "beec8b7ca8004c1285868b0583a645518de2f397f61ebc035eae152a7a529847",
+      "targets_sha": "8fd8085f051463b090e507ed60828f1984ba073bd6c39bd9cc2ae51ad921bcd5",
+      "predictions_sha": "844d2af0a8bca494232cf684c70c392ee878fc5b8e1fbe5e1dbe13a2868f972b",
+      "guard_runs": [
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/steel/fold-0": {
+      "panel": "first",
+      "dataset": "steel",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          2,
+          4,
+          6,
+          7,
+          8,
+          10,
+          11,
+          13,
+          14,
+          16,
+          17,
+          19,
+          23,
+          24,
+          25
+        ],
+        [
+          4,
+          10,
+          11,
+          13,
+          16,
+          17,
+          23,
+          24
+        ],
+        [
+          6,
+          10,
+          11,
+          13,
+          16,
+          19,
+          23,
+          24
+        ],
+        [
+          2,
+          4,
+          7,
+          10,
+          17,
+          23,
+          24,
+          25
+        ],
+        [
+          6,
+          8,
+          10,
+          11,
+          13,
+          14,
+          23,
+          24
+        ],
+        [
+          2,
+          4,
+          6,
+          7,
+          8,
+          17,
+          19,
+          23
+        ],
+        [
+          2,
+          7,
+          8,
+          10,
+          13,
+          14,
+          16,
+          24
+        ],
+        [
+          2,
+          6,
+          7,
+          8,
+          10,
+          17,
+          24,
+          25
+        ],
+        [
+          2,
+          7,
+          8,
+          10,
+          14,
+          16,
+          19,
+          23
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "1e0a292f12bcecf9c7079397dd95245b143aa80d4c8d8ee09aba62b29663c06a",
+      "layout_sha": "f4e7390071195350de60c292b692b118fd1bd82037f1bf608f02845928b97b2d",
+      "selection_sha": "404eef5789959c15925f8593f272945d8d4a91cb5150c7d96fa057673e91b946",
+      "targets_sha": "51bdbc76fbc635a72b880df8f40470f8ee5b3478a5100a186ceaceb36f0d1df4",
+      "predictions_sha": "652face85c59e57c3bc5afb2379e4bfe2b4030fd0043564321ee0b41e3d05d1f",
+      "guard_runs": [
+        {
+          "iterations": 137,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 109,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 101,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 112,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 98,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 109,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 89,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 108,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 105,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 145,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 112,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 109,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 127,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 101,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 115,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 98,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 114,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 109,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/steel/fold-1": {
+      "panel": "first",
+      "dataset": "steel",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          4,
+          6,
+          7,
+          10,
+          11,
+          13,
+          16,
+          17,
+          19,
+          24,
+          25
+        ],
+        [
+          4,
+          7,
+          10,
+          11,
+          17,
+          24
+        ],
+        [
+          4,
+          7,
+          10,
+          11,
+          19,
+          24
+        ],
+        [
+          7,
+          10,
+          11,
+          16,
+          17,
+          24
+        ],
+        [
+          7,
+          10,
+          11,
+          13,
+          16,
+          24
+        ],
+        [
+          4,
+          6,
+          10,
+          17,
+          24,
+          25
+        ],
+        [
+          4,
+          7,
+          13,
+          16,
+          17,
+          25
+        ],
+        [
+          10,
+          11,
+          13,
+          16,
+          19,
+          25
+        ],
+        [
+          4,
+          6,
+          13,
+          16,
+          17,
+          19
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 7,
+        "slack": 7
+      },
+      "input_sha": "f4ccd8fe0ae3314dada7c0d7ed7c795510c5760a1c01887f46af26ffc9e54b84",
+      "layout_sha": "b71c2ff13911accd6de356f94c2b1ab4df75ba16656a19fd89cd5db14b0cd411",
+      "selection_sha": "19eac25afb31613dbbd1854140196d2a2d0e6f9cc193ce6310e2b2fb694d36bb",
+      "targets_sha": "da154f25d9b8b5887c7bec6151be2ae55c819c90356aa30d50b484f49a2cf8fd",
+      "predictions_sha": "e9c740ec1596cc450450bec8870951803ce02b86534ce38250d13aaa92748e1d",
+      "guard_runs": [
+        {
+          "iterations": 118,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 110,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 93,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 103,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 88,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 102,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 92,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 90,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 90,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 127,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 113,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 94,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 106,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 97,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 104,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 99,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 90,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 93,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/steel/fold-2": {
+      "panel": "first",
+      "dataset": "steel",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          4,
+          7,
+          10,
+          11,
+          13,
+          16,
+          17,
+          19,
+          22,
+          24,
+          25
+        ],
+        [
+          4,
+          11,
+          13,
+          17,
+          22,
+          24
+        ],
+        [
+          4,
+          11,
+          13,
+          17,
+          22,
+          25
+        ],
+        [
+          7,
+          11,
+          17,
+          19,
+          22,
+          24
+        ],
+        [
+          0,
+          4,
+          10,
+          11,
+          16,
+          24
+        ],
+        [
+          4,
+          7,
+          13,
+          17,
+          19,
+          25
+        ],
+        [
+          4,
+          10,
+          16,
+          22,
+          24,
+          25
+        ],
+        [
+          4,
+          7,
+          10,
+          13,
+          16,
+          24
+        ],
+        [
+          0,
+          13,
+          16,
+          17,
+          19,
+          24
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 4,
+        "slack": 7
+      },
+      "input_sha": "00563956e846e8126e02602682f84011901e9b3c517afa41a80033fb74910358",
+      "layout_sha": "b7289b0d08bea36bfd7da6b68fbb736af20d8f3aca96f50b5629078e83c2ae3f",
+      "selection_sha": "3d54f2331feb7f4124a9e2b65939666f46bd3827077416fcd63b96144ea05c59",
+      "targets_sha": "3363398cf556df9162fba5fc4b9ca655d7409a1e19a39f1772b3fda8b8b87314",
+      "predictions_sha": "a28f20bc677fa41ade510f37963e2477e3e50e6701fa4a4d1ca63857dfcf87b0",
+      "guard_runs": [
+        {
+          "iterations": 135,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 112,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 104,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 116,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 88,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 101,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 101,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 92,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 98,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 143,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 112,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 114,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 117,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 96,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 99,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 103,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 100,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 105,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/vertebral/fold-0": {
+      "panel": "first",
+      "dataset": "vertebral",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          5
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "6c1b61f9306decb5b858280f39e64d0e94006498659da63f2f62e62b51598d74",
+      "layout_sha": "ecb02b0a97f0bddd1401eec886c8756439b857acc7862209f416c75abecd95ff",
+      "selection_sha": "4bd47cfbc1cc6a80e741a05728484cd12baa7f4f039729c162e9d3b27a89abba",
+      "targets_sha": "6def142da9d619b83aaefa5a7be2386a1c001e52bdf27266ccb10b1c13a2eebd",
+      "predictions_sha": "051585196b6929166e5ff6eee5fe01033851ebeff30075471b47d336e318bd5b",
+      "guard_runs": [
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/vertebral/fold-1": {
+      "panel": "first",
+      "dataset": "vertebral",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          5
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "a7b1026674f90fb03b9e1377acdecc273c528cfd96c7acd532bca039d9854763",
+      "layout_sha": "1ba82a94ba232a4a72cc4767627f3c50c4dc9d5ce3d965c7ad75ee4ee4b5ce5e",
+      "selection_sha": "fe8e81a675b339d4575006560b7e354132fc43af26f7e4ef4927ab6eb6573a75",
+      "targets_sha": "fa29e5d18085ae4138dfd0eb73fc0f277ea15d2da08729a169915ec6fc6d0c59",
+      "predictions_sha": "607e717c99db31a4eb0465b8efd801fd05b51c438fd4b17da1e1603af9ae3e82",
+      "guard_runs": [
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "first/vertebral/fold-2": {
+      "panel": "first",
+      "dataset": "vertebral",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          3,
+          4,
+          5
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 2,
+        "slack": 2
+      },
+      "input_sha": "217fb6fc8f299b9858fc9bee704693961d2ae11f0e53c1d90dc86d25c4227f62",
+      "layout_sha": "2f32edb3ee9d31328798422f74c000db84aba51c07fe3a34c67729d7780068ab",
+      "selection_sha": "bbfcc7b454d7361f6421fa3454af25fade08fe5adeb3a73a4b060c59cd9ed684",
+      "targets_sha": "ea18acdd87b320ff583d81ee2126ab86ecd09b553ec1b59055df0c27de124f09",
+      "predictions_sha": "d3ec22e1ef6b2061619a5e2dbd39a0b32937cadb9be372993aee1cf61d8fc27e",
+      "guard_runs": [
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 14,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/cnae/fold-0": {
+      "panel": "wide",
+      "dataset": "cnae",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          6,
+          74,
+          104,
+          190,
+          206,
+          210,
+          271,
+          333,
+          337,
+          344,
+          349,
+          358,
+          372,
+          378,
+          386,
+          398,
+          402,
+          403,
+          420,
+          446,
+          462,
+          482,
+          483,
+          517,
+          518,
+          543,
+          545,
+          560,
+          594,
+          606,
+          607,
+          609,
+          610,
+          614,
+          618,
+          630,
+          672,
+          683,
+          686,
+          704,
+          725,
+          730,
+          750,
+          829,
+          831
+        ],
+        [
+          190,
+          206,
+          210,
+          337,
+          344,
+          378,
+          386,
+          402,
+          403,
+          420,
+          446,
+          482,
+          517,
+          518,
+          545,
+          594,
+          606,
+          614,
+          618,
+          672,
+          704,
+          725,
+          750
+        ],
+        [
+          74,
+          206,
+          210,
+          271,
+          337,
+          378,
+          386,
+          402,
+          420,
+          446,
+          462,
+          482,
+          483,
+          518,
+          543,
+          545,
+          560,
+          594,
+          630,
+          683,
+          704,
+          725,
+          750
+        ],
+        [
+          74,
+          206,
+          210,
+          271,
+          344,
+          372,
+          378,
+          386,
+          402,
+          446,
+          482,
+          483,
+          517,
+          518,
+          594,
+          606,
+          630,
+          672,
+          683,
+          686,
+          725,
+          750,
+          831
+        ],
+        [
+          6,
+          210,
+          333,
+          337,
+          344,
+          349,
+          358,
+          372,
+          378,
+          386,
+          446,
+          483,
+          517,
+          518,
+          545,
+          606,
+          610,
+          618,
+          686,
+          704,
+          730,
+          829,
+          831
+        ],
+        [
+          74,
+          206,
+          210,
+          333,
+          337,
+          344,
+          349,
+          358,
+          378,
+          398,
+          402,
+          420,
+          446,
+          482,
+          545,
+          560,
+          606,
+          607,
+          614,
+          630,
+          686,
+          730,
+          750
+        ],
+        [
+          6,
+          74,
+          190,
+          206,
+          349,
+          372,
+          378,
+          386,
+          398,
+          403,
+          462,
+          482,
+          483,
+          517,
+          545,
+          607,
+          614,
+          618,
+          630,
+          686,
+          725,
+          750,
+          831
+        ],
+        [
+          6,
+          74,
+          190,
+          271,
+          337,
+          344,
+          358,
+          398,
+          402,
+          403,
+          482,
+          483,
+          517,
+          560,
+          606,
+          607,
+          609,
+          630,
+          686,
+          704,
+          725,
+          750,
+          829
+        ],
+        [
+          6,
+          74,
+          190,
+          210,
+          271,
+          344,
+          349,
+          358,
+          372,
+          398,
+          420,
+          446,
+          483,
+          517,
+          543,
+          560,
+          607,
+          610,
+          672,
+          683,
+          686,
+          725,
+          750
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "d03032e66188417d0a551af32a5ba6365bf42743e85b4391c58a148b15431b5b",
+      "layout_sha": "bbfc5497e50daa6b7b06a5247fa5af796bfa8bba057f8d0b715e52c293b231ed",
+      "selection_sha": "22a8ba4afb074df137a14effac68b4d3b5fb9ffd62c52e8910465b354e5ed0c9",
+      "targets_sha": "65a149ebd4cf35acfb2add6f11eeac59727e5172c2b64454503efca7123045b9",
+      "predictions_sha": "675d0df6685418b209dcd524a9e279ac5104cdc86b5d2c5fb3b27378577502c3",
+      "guard_runs": [
+        {
+          "iterations": 52,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 59,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 56,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 51,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 55,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 45,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 71,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 60,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 46,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 61,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 58,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 61,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 67,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 56,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 52,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 74,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 70,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 49,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/cnae/fold-1": {
+      "panel": "wide",
+      "dataset": "cnae",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          76,
+          91,
+          95,
+          104,
+          150,
+          190,
+          206,
+          210,
+          257,
+          271,
+          337,
+          344,
+          346,
+          347,
+          349,
+          358,
+          386,
+          402,
+          420,
+          446,
+          482,
+          483,
+          486,
+          498,
+          517,
+          518,
+          545,
+          594,
+          606,
+          607,
+          609,
+          614,
+          618,
+          655,
+          672,
+          683,
+          704,
+          725,
+          730,
+          831,
+          838
+        ],
+        [
+          95,
+          104,
+          190,
+          206,
+          210,
+          271,
+          344,
+          358,
+          386,
+          402,
+          420,
+          517,
+          518,
+          545,
+          606,
+          607,
+          618,
+          655,
+          672,
+          704,
+          725
+        ],
+        [
+          91,
+          95,
+          104,
+          190,
+          206,
+          257,
+          271,
+          349,
+          358,
+          386,
+          402,
+          420,
+          483,
+          498,
+          518,
+          545,
+          594,
+          606,
+          609,
+          683,
+          838
+        ],
+        [
+          104,
+          206,
+          210,
+          257,
+          271,
+          337,
+          344,
+          347,
+          349,
+          386,
+          420,
+          446,
+          482,
+          483,
+          517,
+          606,
+          609,
+          672,
+          704,
+          831,
+          838
+        ],
+        [
+          95,
+          104,
+          190,
+          206,
+          210,
+          257,
+          271,
+          344,
+          346,
+          347,
+          349,
+          358,
+          483,
+          498,
+          545,
+          594,
+          606,
+          609,
+          618,
+          672,
+          704
+        ],
+        [
+          76,
+          91,
+          190,
+          206,
+          210,
+          257,
+          347,
+          358,
+          386,
+          420,
+          446,
+          483,
+          486,
+          518,
+          545,
+          594,
+          606,
+          609,
+          614,
+          618,
+          655
+        ],
+        [
+          76,
+          150,
+          190,
+          210,
+          257,
+          271,
+          337,
+          344,
+          346,
+          347,
+          402,
+          482,
+          483,
+          486,
+          517,
+          606,
+          607,
+          618,
+          683,
+          704,
+          725
+        ],
+        [
+          95,
+          104,
+          257,
+          347,
+          358,
+          386,
+          402,
+          420,
+          446,
+          486,
+          498,
+          545,
+          606,
+          607,
+          614,
+          618,
+          655,
+          725,
+          730,
+          831,
+          838
+        ],
+        [
+          76,
+          91,
+          190,
+          206,
+          210,
+          257,
+          271,
+          344,
+          346,
+          347,
+          386,
+          482,
+          483,
+          486,
+          498,
+          545,
+          606,
+          614,
+          655,
+          725,
+          730
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "aa99be6784497831af60e6c57c8fa06999b081f520587964989a1de8725c1318",
+      "layout_sha": "2850a3d939574c8fbc1dbd7ede6e420293f2b26790971c0c135557b6d9a99d59",
+      "selection_sha": "62a6a26bdc0ea2f6112b213cf70c49f58d5923a79d06d1da602aa1dcae29ff17",
+      "targets_sha": "8e7d58eee1d2f53309ebdab0bcac1360235a8b2e2eb37790a6ae8876dc7b67c0",
+      "predictions_sha": "f1f5dcf3df3388dc1e0e78b7f0d078c72ac7e8cbce2dcf3d35a2bf6f1fafb745",
+      "guard_runs": [
+        {
+          "iterations": 49,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 39,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 51,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 47,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 45,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 60,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 58,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 53,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 70,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 50,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 45,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 53,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 50,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 45,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 59,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 61,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 57,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 68,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/cnae/fold-2": {
+      "panel": "wide",
+      "dataset": "cnae",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          6,
+          104,
+          110,
+          190,
+          206,
+          210,
+          215,
+          271,
+          297,
+          332,
+          333,
+          337,
+          386,
+          402,
+          420,
+          462,
+          501,
+          517,
+          518,
+          545,
+          580,
+          606,
+          607,
+          614,
+          618,
+          672,
+          686,
+          704,
+          725,
+          750,
+          829
+        ],
+        [
+          190,
+          206,
+          210,
+          386,
+          420,
+          517,
+          518,
+          545,
+          606,
+          607,
+          614,
+          618,
+          686,
+          704,
+          725,
+          750
+        ],
+        [
+          6,
+          104,
+          190,
+          206,
+          210,
+          332,
+          337,
+          386,
+          545,
+          580,
+          607,
+          614,
+          686,
+          704,
+          725,
+          829
+        ],
+        [
+          6,
+          206,
+          210,
+          215,
+          271,
+          297,
+          337,
+          386,
+          462,
+          501,
+          545,
+          607,
+          672,
+          686,
+          725,
+          829
+        ],
+        [
+          110,
+          210,
+          215,
+          332,
+          337,
+          386,
+          518,
+          580,
+          606,
+          607,
+          614,
+          618,
+          704,
+          725,
+          750,
+          829
+        ],
+        [
+          104,
+          110,
+          210,
+          215,
+          271,
+          386,
+          462,
+          518,
+          580,
+          607,
+          614,
+          618,
+          686,
+          704,
+          750,
+          829
+        ],
+        [
+          6,
+          104,
+          110,
+          190,
+          210,
+          215,
+          333,
+          386,
+          462,
+          517,
+          518,
+          580,
+          618,
+          672,
+          725,
+          829
+        ],
+        [
+          104,
+          110,
+          271,
+          332,
+          402,
+          462,
+          501,
+          517,
+          518,
+          545,
+          580,
+          606,
+          607,
+          672,
+          750,
+          829
+        ],
+        [
+          6,
+          110,
+          215,
+          297,
+          333,
+          402,
+          420,
+          462,
+          501,
+          518,
+          545,
+          607,
+          672,
+          704,
+          725,
+          829
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "f9e9073c0eb77bc7ce2e4c140deede7d5e5be0d8b86b8ed4f234c4b04447adf7",
+      "layout_sha": "0dbc6ee46149e7046ffca5424699f7a4429f4e11ad062c22763845b601cb0c34",
+      "selection_sha": "8a98fd506adeef78c01a22971ce317d3cb503f228e7570e61229d6ece5503e7d",
+      "targets_sha": "7b4890bbf180ba8f4f8fe05305079812d1dd1ff3e5a2f51063f3a989ae3d5ee7",
+      "predictions_sha": "5eda67bd54f45af8846aadc5c34d1593184b2af87da8b77a3107ea1fe05b2ac4",
+      "guard_runs": [
+        {
+          "iterations": 52,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 52,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 54,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 57,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 45,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 45,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 51,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 53,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 67,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 62,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 54,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 55,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 66,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 47,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 51,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 56,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 54,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 65,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/ozone/fold-0": {
+      "panel": "wide",
+      "dataset": "ozone",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          25,
+          32,
+          40
+        ],
+        [
+          25,
+          40
+        ],
+        [
+          25,
+          32
+        ],
+        [
+          32,
+          40
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 3,
+        "point": 3,
+        "slack": 3
+      },
+      "input_sha": "29af26cb0dbbb4fdcf899b89f75fdfad5eb12867335d5098b29fe077d17cb597",
+      "layout_sha": "3c4e6b9ac23837439a7dc0e5de148f4ca16cff0155c10c2d84206a668fea2439",
+      "selection_sha": "0a75035000146ac8616e6bf91ebe232d42cc5d58fa44489aade37a7f8b740244",
+      "targets_sha": "74b59d90669f85129d2451f9e09c6efa9e7bf783d451515e2f134c27f0f67fcd",
+      "predictions_sha": "55c31371cbb04787dfafc09c32fb59a3bb3b3f449407c8bd5645024f1fc2b4d6",
+      "guard_runs": [
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 12,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 13,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 11,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/ozone/fold-1": {
+      "panel": "wide",
+      "dataset": "ozone",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          11,
+          13,
+          19,
+          20,
+          25,
+          30,
+          31,
+          32,
+          36,
+          37,
+          38,
+          40,
+          41,
+          53,
+          55,
+          71
+        ],
+        [
+          20,
+          25,
+          36,
+          37,
+          40,
+          41,
+          53,
+          55,
+          71
+        ],
+        [
+          0,
+          11,
+          20,
+          31,
+          36,
+          37,
+          40,
+          41,
+          71
+        ],
+        [
+          1,
+          11,
+          30,
+          31,
+          36,
+          37,
+          40,
+          53,
+          55
+        ],
+        [
+          1,
+          19,
+          20,
+          25,
+          30,
+          31,
+          36,
+          37,
+          53
+        ],
+        [
+          0,
+          1,
+          20,
+          30,
+          32,
+          38,
+          53,
+          55,
+          71
+        ],
+        [
+          1,
+          11,
+          13,
+          19,
+          31,
+          32,
+          36,
+          40,
+          55
+        ],
+        [
+          0,
+          13,
+          20,
+          30,
+          31,
+          36,
+          38,
+          40,
+          71
+        ],
+        [
+          1,
+          13,
+          25,
+          30,
+          31,
+          37,
+          38,
+          55,
+          71
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 2,
+        "point": 2,
+        "slack": 2
+      },
+      "input_sha": "c14da25876a08865c1ba60eee97983e8f83677f4687d88f66adbc38fbd30685e",
+      "layout_sha": "6b4ae7ebb7c7cf818268320e05cc88a0299fe44ca22e1261781a70e9578722c1",
+      "selection_sha": "e1ff56f4c663928867e73c56bdf35e8b77a371aabb14eebd6c3ae8ccd3d9f2e7",
+      "targets_sha": "ed42ea4b0d7016a16e224b198a8d6bb41c2c08c3ff50a0bc8078c1d39895b19e",
+      "predictions_sha": "7dde5b949f0ab0403231c644e01f843c476771aa8cd882c85077a0a5a0242bde",
+      "guard_runs": [
+        {
+          "iterations": 55,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 36,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 35,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 39,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 35,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 27,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 31,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 36,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 38,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 63,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 33,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 43,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 40,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 46,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 27,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 38,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 35,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 39,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/ozone/fold-2": {
+      "panel": "wide",
+      "dataset": "ozone",
+      "fold": 2,
+      "rare": true,
+      "supports": [
+        [
+          0,
+          1,
+          3,
+          4,
+          5,
+          6,
+          9,
+          11,
+          12,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          25,
+          28,
+          30,
+          31,
+          32,
+          33,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          43,
+          47,
+          48,
+          51,
+          52,
+          53,
+          54,
+          55,
+          59,
+          60,
+          63,
+          64,
+          67,
+          68,
+          71
+        ],
+        [
+          0,
+          3,
+          9,
+          11,
+          12,
+          20,
+          25,
+          30,
+          32,
+          33,
+          35,
+          37,
+          39,
+          40,
+          41,
+          43,
+          47,
+          51,
+          53,
+          55,
+          59,
+          71
+        ],
+        [
+          4,
+          6,
+          17,
+          18,
+          20,
+          25,
+          28,
+          30,
+          32,
+          35,
+          37,
+          38,
+          40,
+          41,
+          47,
+          48,
+          51,
+          52,
+          53,
+          60,
+          64,
+          71
+        ],
+        [
+          0,
+          1,
+          5,
+          6,
+          12,
+          21,
+          25,
+          28,
+          32,
+          39,
+          40,
+          41,
+          47,
+          48,
+          51,
+          53,
+          59,
+          60,
+          64,
+          67,
+          68,
+          71
+        ],
+        [
+          0,
+          4,
+          5,
+          6,
+          9,
+          11,
+          18,
+          19,
+          25,
+          30,
+          31,
+          33,
+          36,
+          37,
+          39,
+          40,
+          43,
+          48,
+          54,
+          55,
+          60,
+          63
+        ],
+        [
+          0,
+          1,
+          3,
+          4,
+          5,
+          17,
+          19,
+          21,
+          22,
+          28,
+          30,
+          32,
+          38,
+          40,
+          41,
+          43,
+          47,
+          54,
+          55,
+          63,
+          64,
+          71
+        ],
+        [
+          1,
+          4,
+          5,
+          11,
+          12,
+          17,
+          18,
+          21,
+          22,
+          31,
+          32,
+          33,
+          36,
+          37,
+          38,
+          40,
+          48,
+          52,
+          53,
+          54,
+          63,
+          68
+        ],
+        [
+          3,
+          4,
+          5,
+          17,
+          18,
+          19,
+          20,
+          21,
+          35,
+          36,
+          37,
+          48,
+          51,
+          52,
+          53,
+          54,
+          55,
+          59,
+          60,
+          67,
+          68,
+          71
+        ],
+        [
+          0,
+          1,
+          4,
+          5,
+          12,
+          17,
+          19,
+          20,
+          25,
+          28,
+          35,
+          36,
+          37,
+          43,
+          48,
+          52,
+          53,
+          55,
+          59,
+          60,
+          63,
+          64
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "bf0443190d5b743c10266663bddaa1562e4ff082392cabdb2019a87523f19a2c",
+      "layout_sha": "5d74d3780ab03c69a27b82e4d159a66597969ec8a94c9013498bdaa9d140c842",
+      "selection_sha": "2cb6a6da3471d9c39a6525e21264cbe89c1e0cd58fd8cb90276aeae4e2a42a73",
+      "targets_sha": "d6830f55d2a58a1350e9a65f987877d4ca8122de6e7ec9967fab78ae1a79251c",
+      "predictions_sha": "33b783af4b4adbc19c4f8dcda42eb160ec0279d3d1b82072a3d7f1d3234c82bf",
+      "guard_runs": [
+        {
+          "iterations": 86,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 77,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 80,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 77,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 77,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 61,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 61,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 59,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 73,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 94,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 69,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 70,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 71,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 72,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 66,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 64,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 75,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 71,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/parkinson/fold-0": {
+      "panel": "wide",
+      "dataset": "parkinson",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          25,
+          49,
+          62,
+          68,
+          70,
+          79,
+          91,
+          102,
+          110,
+          113,
+          117,
+          118,
+          124,
+          133,
+          134,
+          166,
+          249,
+          257,
+          279,
+          330,
+          344,
+          373,
+          390,
+          404,
+          420,
+          452,
+          474,
+          482,
+          488,
+          493,
+          505,
+          506,
+          507,
+          515,
+          517,
+          520,
+          523,
+          540,
+          551,
+          562,
+          563,
+          570,
+          637,
+          679,
+          689,
+          693,
+          703,
+          727,
+          732,
+          748,
+          749
+        ],
+        [
+          49,
+          70,
+          102,
+          117,
+          118,
+          124,
+          133,
+          134,
+          166,
+          257,
+          279,
+          330,
+          344,
+          373,
+          390,
+          404,
+          474,
+          482,
+          488,
+          493,
+          507,
+          540,
+          637,
+          727,
+          732,
+          748
+        ],
+        [
+          25,
+          49,
+          70,
+          91,
+          110,
+          133,
+          134,
+          166,
+          249,
+          330,
+          344,
+          373,
+          390,
+          404,
+          420,
+          452,
+          474,
+          488,
+          506,
+          520,
+          540,
+          551,
+          689,
+          703,
+          732,
+          748
+        ],
+        [
+          62,
+          68,
+          70,
+          79,
+          91,
+          102,
+          110,
+          124,
+          133,
+          134,
+          279,
+          330,
+          373,
+          404,
+          420,
+          452,
+          482,
+          488,
+          493,
+          505,
+          520,
+          562,
+          637,
+          693,
+          748,
+          749
+        ],
+        [
+          49,
+          70,
+          91,
+          102,
+          110,
+          113,
+          118,
+          134,
+          257,
+          279,
+          330,
+          373,
+          404,
+          420,
+          452,
+          488,
+          505,
+          515,
+          517,
+          551,
+          563,
+          570,
+          689,
+          693,
+          727,
+          732
+        ],
+        [
+          25,
+          62,
+          70,
+          79,
+          113,
+          118,
+          133,
+          166,
+          249,
+          390,
+          420,
+          474,
+          488,
+          493,
+          505,
+          506,
+          507,
+          523,
+          562,
+          563,
+          570,
+          637,
+          689,
+          703,
+          732,
+          748
+        ],
+        [
+          49,
+          62,
+          68,
+          102,
+          113,
+          117,
+          124,
+          133,
+          134,
+          249,
+          344,
+          373,
+          493,
+          505,
+          506,
+          515,
+          540,
+          562,
+          563,
+          570,
+          637,
+          679,
+          689,
+          703,
+          727,
+          732
+        ],
+        [
+          62,
+          70,
+          79,
+          91,
+          102,
+          134,
+          166,
+          249,
+          279,
+          330,
+          344,
+          404,
+          420,
+          482,
+          493,
+          505,
+          506,
+          507,
+          515,
+          517,
+          520,
+          523,
+          563,
+          570,
+          703,
+          732
+        ],
+        [
+          25,
+          49,
+          68,
+          91,
+          113,
+          133,
+          134,
+          166,
+          344,
+          390,
+          404,
+          452,
+          482,
+          505,
+          506,
+          515,
+          523,
+          540,
+          562,
+          563,
+          570,
+          637,
+          679,
+          689,
+          693,
+          749
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "5bf52e028ce0fa8cb05d1ab2d5e2ade917c8a03c46c5af9d49a846d6138ea626",
+      "layout_sha": "3d99c2823887dcb71435ba60c3df9b4e0b2b6ef60b92d9df4db00b6823d5b024",
+      "selection_sha": "431290de1f08353a98561090de1b5c1828d060a7c43dcf6b6a32f32840f28a0b",
+      "targets_sha": "a627d73f1c4e4907a2f9d4807676bc56f59b43e2bb3016b24a7d9d3d8be08794",
+      "predictions_sha": "7e7973668d6bdf9b8026aaeaba5072b47f6f86663c2966c670460f0b2eeade58",
+      "guard_runs": [
+        {
+          "iterations": 38,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 34,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 30,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 30,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 29,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 29,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 29,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 33,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 31,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 40,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 35,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 29,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 30,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 29,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 30,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 30,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 34,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 28,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/parkinson/fold-1": {
+      "panel": "wide",
+      "dataset": "parkinson",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          28,
+          29,
+          32,
+          115,
+          121,
+          123,
+          124,
+          133,
+          330,
+          346,
+          367,
+          403,
+          424,
+          481,
+          511,
+          528,
+          540,
+          654,
+          663,
+          698,
+          709,
+          726,
+          735,
+          741,
+          747
+        ],
+        [
+          32,
+          115,
+          123,
+          330,
+          346,
+          367,
+          403,
+          481,
+          511,
+          540,
+          663,
+          698,
+          747
+        ],
+        [
+          123,
+          124,
+          330,
+          346,
+          403,
+          424,
+          511,
+          654,
+          663,
+          698,
+          735,
+          741,
+          747
+        ],
+        [
+          29,
+          32,
+          124,
+          330,
+          367,
+          403,
+          481,
+          511,
+          540,
+          654,
+          663,
+          709,
+          741
+        ],
+        [
+          29,
+          115,
+          330,
+          346,
+          424,
+          481,
+          511,
+          528,
+          540,
+          709,
+          735,
+          741,
+          747
+        ],
+        [
+          29,
+          133,
+          330,
+          346,
+          367,
+          403,
+          424,
+          540,
+          663,
+          709,
+          726,
+          735,
+          741
+        ],
+        [
+          28,
+          29,
+          32,
+          115,
+          133,
+          346,
+          367,
+          403,
+          424,
+          481,
+          528,
+          726,
+          735
+        ],
+        [
+          28,
+          32,
+          121,
+          123,
+          367,
+          403,
+          481,
+          511,
+          528,
+          698,
+          709,
+          726,
+          741
+        ],
+        [
+          28,
+          32,
+          121,
+          123,
+          133,
+          346,
+          424,
+          511,
+          540,
+          654,
+          698,
+          735,
+          741
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 2,
+        "slack": 2
+      },
+      "input_sha": "017d7c4013a0947289a91a4b7724b5166fcfb3d62069f6d5b05617881ca2a316",
+      "layout_sha": "d751e53a150a5f6eb22e8be5ba8fa5ffd4e3a7c4b491a8fc4b2caf3ea2926ce9",
+      "selection_sha": "7d3ee91f57aaa1e0379ebabb7ab9f127eca75889d699a6ee9afcd6bc9b340b2f",
+      "targets_sha": "5bce3d7f54d9e0f9dbf3b0dff71c1cd1cc5baee51d15b5e6dcb77ba5f72e5c5a",
+      "predictions_sha": "3f63b17286c2b27b565b23a93efc16a9514e6d830a23c7d37ae0dc86ef56d3b4",
+      "guard_runs": [
+        {
+          "iterations": 27,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 21,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 16,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 17,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 28,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 16,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/parkinson/fold-2": {
+      "panel": "wide",
+      "dataset": "parkinson",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          61,
+          76,
+          82,
+          103,
+          110,
+          117,
+          133,
+          372,
+          417,
+          439,
+          475,
+          482,
+          591,
+          613,
+          655,
+          660,
+          742
+        ],
+        [
+          76,
+          82,
+          372,
+          439,
+          475,
+          482,
+          591,
+          660,
+          742
+        ],
+        [
+          76,
+          82,
+          103,
+          117,
+          372,
+          439,
+          475,
+          482,
+          742
+        ],
+        [
+          76,
+          110,
+          133,
+          439,
+          475,
+          591,
+          613,
+          660,
+          742
+        ],
+        [
+          61,
+          76,
+          117,
+          133,
+          372,
+          482,
+          591,
+          655,
+          742
+        ],
+        [
+          61,
+          133,
+          372,
+          482,
+          591,
+          613,
+          655,
+          660,
+          742
+        ],
+        [
+          61,
+          76,
+          110,
+          117,
+          133,
+          482,
+          591,
+          655,
+          660
+        ],
+        [
+          61,
+          76,
+          82,
+          110,
+          133,
+          475,
+          591,
+          655,
+          742
+        ],
+        [
+          76,
+          82,
+          103,
+          110,
+          117,
+          417,
+          475,
+          655,
+          660
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 5,
+        "point": 4,
+        "slack": 5
+      },
+      "input_sha": "318f29c1582c30a6da20348127a9ddd3251fa82dba5ee2bc0400f95046d62598",
+      "layout_sha": "ce1873971f262a101508d45d6b41e0f7ee1358e99cb0ac767efaaa1dac2a0421",
+      "selection_sha": "bb4bf77bc5d22a85299908de76f93075411ee778cd31d6f917a1f5a63babe1b9",
+      "targets_sha": "1a9583a3b212dbef1da0bbf78f5e51baaf340d21780ed276c858e665ecf35b3d",
+      "predictions_sha": "f879a50ff2d53712a9660b9b429fa7d4dcd3ea34129c7c8ee9d9df02868da3bb",
+      "guard_runs": [
+        {
+          "iterations": 26,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 16,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 15,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 29,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 25,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 18,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 19,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 16,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 20,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/secom/fold-0": {
+      "panel": "wide",
+      "dataset": "secom",
+      "fold": 0,
+      "rare": true,
+      "supports": [
+        [
+          0,
+          10,
+          12,
+          17,
+          18,
+          19,
+          20,
+          21,
+          28,
+          29,
+          31,
+          37,
+          39,
+          40,
+          45,
+          48,
+          54,
+          59,
+          62,
+          63,
+          64,
+          65,
+          66,
+          72,
+          75,
+          76,
+          78,
+          81,
+          82,
+          83,
+          86,
+          90,
+          92,
+          102,
+          103,
+          106,
+          107,
+          112,
+          113,
+          115,
+          117,
+          122,
+          128,
+          131,
+          133,
+          151,
+          152,
+          155,
+          156,
+          166,
+          176,
+          177,
+          184,
+          200,
+          202,
+          210,
+          211,
+          212,
+          214,
+          216,
+          222,
+          224,
+          225,
+          247,
+          248,
+          250,
+          252,
+          253,
+          269,
+          270,
+          277,
+          278,
+          281,
+          287,
+          290,
+          291,
+          299,
+          305,
+          311,
+          316,
+          317,
+          323,
+          324,
+          333,
+          335,
+          345,
+          357,
+          362,
+          363,
+          365,
+          366,
+          377,
+          386,
+          390,
+          391,
+          405,
+          407,
+          408,
+          412,
+          416,
+          417,
+          423,
+          424,
+          425,
+          433,
+          434,
+          437,
+          439,
+          440,
+          445,
+          457,
+          459,
+          460,
+          469,
+          472,
+          477,
+          479,
+          480,
+          482,
+          484,
+          491,
+          496,
+          511,
+          519,
+          523,
+          525,
+          541,
+          547,
+          552,
+          561,
+          565,
+          570,
+          574,
+          575,
+          580,
+          583,
+          587,
+          588
+        ],
+        [
+          0,
+          12,
+          20,
+          21,
+          37,
+          39,
+          45,
+          62,
+          64,
+          66,
+          72,
+          76,
+          81,
+          82,
+          102,
+          103,
+          106,
+          107,
+          112,
+          115,
+          122,
+          128,
+          156,
+          166,
+          176,
+          200,
+          202,
+          211,
+          214,
+          222,
+          247,
+          250,
+          253,
+          269,
+          277,
+          278,
+          287,
+          299,
+          305,
+          311,
+          316,
+          317,
+          324,
+          335,
+          345,
+          363,
+          366,
+          377,
+          386,
+          391,
+          405,
+          407,
+          416,
+          423,
+          437,
+          439,
+          440,
+          445,
+          457,
+          469,
+          472,
+          477,
+          479,
+          491,
+          496,
+          519,
+          565,
+          580,
+          587
+        ],
+        [
+          0,
+          10,
+          21,
+          28,
+          29,
+          31,
+          39,
+          40,
+          48,
+          65,
+          66,
+          72,
+          76,
+          78,
+          106,
+          112,
+          113,
+          117,
+          122,
+          151,
+          155,
+          166,
+          176,
+          184,
+          202,
+          210,
+          212,
+          222,
+          225,
+          248,
+          253,
+          269,
+          277,
+          278,
+          287,
+          291,
+          317,
+          324,
+          335,
+          345,
+          357,
+          362,
+          363,
+          365,
+          377,
+          390,
+          405,
+          407,
+          416,
+          417,
+          423,
+          433,
+          459,
+          460,
+          469,
+          472,
+          477,
+          479,
+          482,
+          491,
+          511,
+          519,
+          552,
+          561,
+          570,
+          580,
+          583,
+          587,
+          588
+        ],
+        [
+          0,
+          12,
+          17,
+          18,
+          19,
+          21,
+          39,
+          40,
+          48,
+          63,
+          66,
+          72,
+          78,
+          81,
+          82,
+          83,
+          90,
+          102,
+          103,
+          107,
+          115,
+          122,
+          131,
+          133,
+          151,
+          166,
+          176,
+          211,
+          225,
+          247,
+          248,
+          253,
+          269,
+          277,
+          278,
+          281,
+          287,
+          299,
+          311,
+          317,
+          323,
+          324,
+          335,
+          345,
+          357,
+          362,
+          365,
+          386,
+          405,
+          407,
+          408,
+          412,
+          416,
+          423,
+          425,
+          433,
+          434,
+          439,
+          479,
+          480,
+          496,
+          511,
+          523,
+          525,
+          541,
+          547,
+          561,
+          574,
+          575
+        ],
+        [
+          12,
+          17,
+          20,
+          28,
+          29,
+          31,
+          40,
+          59,
+          63,
+          66,
+          72,
+          75,
+          78,
+          81,
+          82,
+          86,
+          92,
+          102,
+          131,
+          155,
+          156,
+          166,
+          200,
+          210,
+          212,
+          214,
+          222,
+          247,
+          252,
+          253,
+          269,
+          277,
+          278,
+          291,
+          299,
+          316,
+          324,
+          357,
+          362,
+          365,
+          377,
+          386,
+          391,
+          405,
+          412,
+          417,
+          423,
+          433,
+          434,
+          439,
+          440,
+          445,
+          457,
+          459,
+          460,
+          472,
+          477,
+          479,
+          480,
+          484,
+          511,
+          519,
+          523,
+          565,
+          570,
+          575,
+          580,
+          583,
+          588
+        ],
+        [
+          10,
+          28,
+          45,
+          59,
+          62,
+          63,
+          65,
+          66,
+          75,
+          78,
+          81,
+          83,
+          102,
+          103,
+          107,
+          112,
+          113,
+          117,
+          131,
+          151,
+          152,
+          184,
+          212,
+          214,
+          216,
+          247,
+          248,
+          250,
+          253,
+          269,
+          277,
+          281,
+          290,
+          299,
+          305,
+          311,
+          323,
+          324,
+          333,
+          335,
+          345,
+          357,
+          362,
+          363,
+          377,
+          390,
+          391,
+          407,
+          412,
+          417,
+          423,
+          424,
+          425,
+          437,
+          445,
+          457,
+          460,
+          469,
+          472,
+          479,
+          496,
+          541,
+          547,
+          552,
+          565,
+          570,
+          575,
+          583,
+          588
+        ],
+        [
+          0,
+          10,
+          18,
+          19,
+          21,
+          28,
+          31,
+          37,
+          48,
+          59,
+          64,
+          75,
+          76,
+          78,
+          86,
+          102,
+          106,
+          107,
+          117,
+          133,
+          156,
+          176,
+          177,
+          184,
+          200,
+          202,
+          211,
+          212,
+          214,
+          216,
+          222,
+          225,
+          270,
+          278,
+          287,
+          290,
+          299,
+          316,
+          324,
+          335,
+          357,
+          362,
+          363,
+          365,
+          366,
+          386,
+          390,
+          391,
+          407,
+          412,
+          417,
+          423,
+          424,
+          425,
+          433,
+          457,
+          459,
+          469,
+          472,
+          477,
+          479,
+          482,
+          523,
+          525,
+          547,
+          575,
+          583,
+          587,
+          588
+        ],
+        [
+          17,
+          20,
+          29,
+          37,
+          39,
+          48,
+          54,
+          59,
+          62,
+          64,
+          66,
+          75,
+          82,
+          83,
+          86,
+          90,
+          92,
+          103,
+          106,
+          112,
+          115,
+          122,
+          128,
+          133,
+          155,
+          166,
+          177,
+          210,
+          247,
+          248,
+          250,
+          270,
+          278,
+          281,
+          290,
+          291,
+          305,
+          311,
+          316,
+          335,
+          345,
+          357,
+          365,
+          366,
+          391,
+          407,
+          433,
+          434,
+          437,
+          439,
+          440,
+          445,
+          457,
+          459,
+          460,
+          479,
+          480,
+          482,
+          484,
+          491,
+          511,
+          519,
+          525,
+          541,
+          547,
+          565,
+          570,
+          583,
+          587
+        ],
+        [
+          0,
+          10,
+          17,
+          19,
+          20,
+          29,
+          31,
+          37,
+          48,
+          54,
+          59,
+          63,
+          65,
+          66,
+          75,
+          78,
+          82,
+          90,
+          102,
+          103,
+          107,
+          117,
+          128,
+          133,
+          155,
+          156,
+          177,
+          184,
+          200,
+          202,
+          210,
+          212,
+          225,
+          248,
+          269,
+          270,
+          278,
+          287,
+          290,
+          305,
+          316,
+          317,
+          333,
+          335,
+          345,
+          357,
+          366,
+          405,
+          408,
+          416,
+          417,
+          425,
+          433,
+          434,
+          445,
+          459,
+          469,
+          472,
+          477,
+          482,
+          484,
+          496,
+          523,
+          525,
+          541,
+          570,
+          575,
+          587,
+          588
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 3,
+        "point": 3,
+        "slack": 6
+      },
+      "input_sha": "4072b839b65fe2feab0b723de06ff44f5dd96656464f18d91c61ae04fe15989d",
+      "layout_sha": "de8e7d95e8490614c63959e98cc77de1940fa058a0bc69f3689eb48bf1b02805",
+      "selection_sha": "219de8b986d28a28119d76a3f0cd5ca5a58ce8746ab2a9d9adec7e59a5b5f9c7",
+      "targets_sha": "38534a7a23cacdfe8c853f86dc254d8ac1dae59f57ea18f9d16111e367510cea",
+      "predictions_sha": "a3627ff87cd1b54916e73c3472a388c1c7ce263fc789665090108341989d6f1b",
+      "guard_runs": [
+        {
+          "iterations": 76,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 61,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 53,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 58,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 60,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 67,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 58,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 60,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 65,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 78,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 67,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 53,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 61,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 63,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 65,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 56,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 63,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 67,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/secom/fold-1": {
+      "panel": "wide",
+      "dataset": "secom",
+      "fold": 1,
+      "rare": true,
+      "supports": [
+        [
+          127
+        ]
+      ],
+      "nominees": {
+        "gain": 0,
+        "vote": 0,
+        "point": 0,
+        "slack": 0
+      },
+      "input_sha": "add080fc3030f1d3eecca02d0e19cf92381b438f097f74098505ffbdfdb94c81",
+      "layout_sha": "28923b7e25cf3139bfafea4ada892e26b3124e696b36e6db580192a3840dfaf6",
+      "selection_sha": "7f34113fa09d06ac51112cf87e2121bf9439e31050f1d993cc9053333b12176d",
+      "targets_sha": "fc25bddfce8060feef7cd9049393ff72a14123dc88235a3b6f8e61973a5484b0",
+      "predictions_sha": "a40990b40a006d9d30223a66b85199f5bdc6a09163c9f92f8a02370fa625655d",
+      "guard_runs": [
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/secom/fold-2": {
+      "panel": "wide",
+      "dataset": "secom",
+      "fold": 2,
+      "rare": true,
+      "supports": [
+        [
+          166,
+          216,
+          279
+        ],
+        [
+          216,
+          279
+        ],
+        [
+          166,
+          279
+        ],
+        [
+          166,
+          216
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 2,
+        "point": 2,
+        "slack": 2
+      },
+      "input_sha": "4c79ae06fcfd04b5378ff2e714f716ce945798bdf58ec5f8de4289a2645fbfc7",
+      "layout_sha": "d924fbf9f913ba2e573b69bfbedb9d34e696c029b5569fa1f75c65b4dab13c90",
+      "selection_sha": "e6ad78726cd0f3647426c7dc93b0ab12c95d199cb5ae28bbc60d7d7dd06f0974",
+      "targets_sha": "a67e2f7c515f7d67610a86da57920569f46532ed649a4e377fa3ada727599349",
+      "predictions_sha": "aecdc4d859ca6df8f8d13015f8d9dcf8b5d93319bd589c9f2df052e230c15372",
+      "guard_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 9,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 8,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 10,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/semeion/fold-0": {
+      "panel": "wide",
+      "dataset": "semeion",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          9,
+          10,
+          11,
+          15,
+          16,
+          18,
+          19,
+          23,
+          24,
+          25,
+          26,
+          30,
+          32,
+          34,
+          35,
+          36,
+          37,
+          41,
+          43,
+          45,
+          47,
+          49,
+          51,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          70,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          81,
+          82,
+          84,
+          88,
+          89,
+          91,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          101,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          113,
+          116,
+          118,
+          119,
+          126,
+          128,
+          129,
+          131,
+          132,
+          134,
+          135,
+          136,
+          137,
+          138,
+          141,
+          142,
+          143,
+          144,
+          145,
+          151,
+          152,
+          153,
+          154,
+          156,
+          157,
+          158,
+          161,
+          163,
+          164,
+          169,
+          170,
+          171,
+          174,
+          176,
+          177,
+          178,
+          179,
+          182,
+          183,
+          185,
+          186,
+          187,
+          190,
+          191,
+          192,
+          193,
+          194,
+          198,
+          199,
+          200,
+          205,
+          209,
+          211,
+          212,
+          218,
+          219,
+          220,
+          221,
+          222,
+          225,
+          227,
+          228,
+          229,
+          230,
+          231,
+          233,
+          234,
+          235,
+          237,
+          238,
+          244,
+          246,
+          252,
+          253
+        ],
+        [
+          0,
+          4,
+          7,
+          8,
+          10,
+          11,
+          16,
+          24,
+          25,
+          26,
+          30,
+          34,
+          45,
+          47,
+          49,
+          51,
+          56,
+          57,
+          58,
+          59,
+          60,
+          62,
+          74,
+          75,
+          76,
+          77,
+          78,
+          82,
+          91,
+          93,
+          95,
+          98,
+          99,
+          101,
+          106,
+          108,
+          109,
+          110,
+          111,
+          116,
+          118,
+          126,
+          128,
+          129,
+          134,
+          137,
+          142,
+          143,
+          144,
+          145,
+          151,
+          152,
+          156,
+          158,
+          161,
+          170,
+          171,
+          177,
+          186,
+          190,
+          191,
+          192,
+          193,
+          198,
+          199,
+          220,
+          222,
+          225,
+          227,
+          228,
+          230,
+          231,
+          235,
+          237,
+          244
+        ],
+        [
+          1,
+          3,
+          7,
+          8,
+          10,
+          11,
+          18,
+          19,
+          24,
+          25,
+          26,
+          32,
+          34,
+          41,
+          45,
+          51,
+          55,
+          56,
+          57,
+          59,
+          60,
+          61,
+          63,
+          64,
+          66,
+          72,
+          73,
+          75,
+          76,
+          81,
+          84,
+          93,
+          94,
+          95,
+          96,
+          98,
+          101,
+          104,
+          106,
+          108,
+          109,
+          111,
+          116,
+          126,
+          131,
+          132,
+          134,
+          137,
+          141,
+          142,
+          143,
+          151,
+          154,
+          156,
+          157,
+          158,
+          163,
+          171,
+          174,
+          176,
+          177,
+          178,
+          179,
+          183,
+          185,
+          186,
+          191,
+          192,
+          198,
+          220,
+          228,
+          230,
+          234,
+          235,
+          253
+        ],
+        [
+          1,
+          2,
+          7,
+          8,
+          9,
+          10,
+          16,
+          25,
+          26,
+          32,
+          34,
+          36,
+          45,
+          47,
+          49,
+          51,
+          53,
+          56,
+          60,
+          61,
+          63,
+          64,
+          70,
+          74,
+          76,
+          77,
+          82,
+          95,
+          96,
+          97,
+          98,
+          103,
+          104,
+          105,
+          106,
+          108,
+          110,
+          111,
+          118,
+          119,
+          126,
+          128,
+          131,
+          132,
+          134,
+          137,
+          138,
+          143,
+          154,
+          156,
+          158,
+          169,
+          174,
+          176,
+          179,
+          183,
+          185,
+          186,
+          187,
+          190,
+          191,
+          193,
+          194,
+          199,
+          200,
+          211,
+          212,
+          219,
+          220,
+          225,
+          227,
+          229,
+          231,
+          233,
+          244
+        ],
+        [
+          1,
+          2,
+          9,
+          10,
+          11,
+          30,
+          32,
+          34,
+          36,
+          37,
+          49,
+          53,
+          54,
+          58,
+          61,
+          62,
+          64,
+          65,
+          66,
+          70,
+          73,
+          75,
+          88,
+          91,
+          93,
+          94,
+          95,
+          96,
+          98,
+          99,
+          107,
+          108,
+          113,
+          118,
+          119,
+          128,
+          138,
+          141,
+          142,
+          143,
+          144,
+          145,
+          151,
+          152,
+          153,
+          156,
+          157,
+          158,
+          161,
+          169,
+          171,
+          176,
+          178,
+          179,
+          182,
+          183,
+          186,
+          198,
+          200,
+          209,
+          212,
+          218,
+          219,
+          220,
+          221,
+          225,
+          227,
+          228,
+          230,
+          231,
+          235,
+          237,
+          238,
+          244,
+          253
+        ],
+        [
+          2,
+          7,
+          8,
+          9,
+          16,
+          18,
+          19,
+          23,
+          25,
+          26,
+          30,
+          35,
+          36,
+          45,
+          51,
+          54,
+          55,
+          56,
+          57,
+          60,
+          63,
+          70,
+          72,
+          75,
+          76,
+          77,
+          82,
+          84,
+          88,
+          89,
+          91,
+          93,
+          95,
+          97,
+          98,
+          105,
+          106,
+          108,
+          110,
+          111,
+          113,
+          118,
+          128,
+          129,
+          134,
+          136,
+          137,
+          141,
+          143,
+          151,
+          154,
+          157,
+          164,
+          170,
+          176,
+          182,
+          185,
+          186,
+          187,
+          190,
+          191,
+          193,
+          198,
+          199,
+          205,
+          218,
+          219,
+          221,
+          228,
+          229,
+          233,
+          235,
+          237,
+          238,
+          246
+        ],
+        [
+          3,
+          7,
+          9,
+          11,
+          15,
+          24,
+          25,
+          26,
+          32,
+          34,
+          36,
+          41,
+          43,
+          53,
+          57,
+          58,
+          59,
+          61,
+          64,
+          66,
+          73,
+          74,
+          75,
+          76,
+          78,
+          82,
+          89,
+          93,
+          96,
+          97,
+          98,
+          99,
+          103,
+          105,
+          106,
+          107,
+          108,
+          116,
+          119,
+          128,
+          136,
+          137,
+          138,
+          144,
+          151,
+          153,
+          154,
+          163,
+          164,
+          170,
+          171,
+          174,
+          176,
+          177,
+          183,
+          186,
+          187,
+          190,
+          194,
+          198,
+          199,
+          205,
+          209,
+          219,
+          220,
+          221,
+          222,
+          227,
+          231,
+          233,
+          234,
+          237,
+          238,
+          244,
+          253
+        ],
+        [
+          2,
+          3,
+          7,
+          8,
+          9,
+          18,
+          23,
+          24,
+          25,
+          30,
+          32,
+          35,
+          37,
+          45,
+          47,
+          49,
+          54,
+          55,
+          56,
+          61,
+          62,
+          65,
+          66,
+          70,
+          72,
+          75,
+          76,
+          78,
+          81,
+          88,
+          89,
+          91,
+          96,
+          97,
+          98,
+          99,
+          101,
+          103,
+          105,
+          106,
+          108,
+          110,
+          119,
+          126,
+          129,
+          132,
+          135,
+          141,
+          143,
+          145,
+          153,
+          154,
+          161,
+          163,
+          174,
+          176,
+          178,
+          182,
+          190,
+          194,
+          200,
+          205,
+          209,
+          212,
+          218,
+          228,
+          229,
+          230,
+          231,
+          233,
+          235,
+          237,
+          238,
+          252,
+          253
+        ],
+        [
+          2,
+          8,
+          9,
+          10,
+          11,
+          15,
+          30,
+          34,
+          35,
+          36,
+          37,
+          41,
+          43,
+          51,
+          53,
+          54,
+          55,
+          59,
+          61,
+          62,
+          64,
+          65,
+          66,
+          70,
+          72,
+          73,
+          74,
+          75,
+          76,
+          78,
+          82,
+          91,
+          93,
+          94,
+          95,
+          101,
+          105,
+          107,
+          108,
+          110,
+          113,
+          116,
+          119,
+          126,
+          131,
+          134,
+          135,
+          136,
+          137,
+          145,
+          151,
+          154,
+          156,
+          157,
+          161,
+          163,
+          164,
+          170,
+          171,
+          177,
+          182,
+          183,
+          185,
+          186,
+          187,
+          209,
+          218,
+          219,
+          221,
+          222,
+          225,
+          229,
+          246,
+          252,
+          253
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "5e27cf197f39c4310d007728795ddf2212d9aec93adb36d39e7ec0b2a9e153a1",
+      "layout_sha": "cc766e52777ad20a634eda2f1f8c6123d832f21a479c5c84a7708d5b1b7784e2",
+      "selection_sha": "8931bc6f91702da27b306b3d366d488f73cef3f1bdb6999dc9f11239c99718e0",
+      "targets_sha": "1c9ffdeb5523489274aeeb3655d9ff89b514323af0607181ef4373bc8296bfbd",
+      "predictions_sha": "1a22e9cfc6dbd07ff0ca3e35ed29386c58123394c27eb567bfadbd48436bd1e6",
+      "guard_runs": [
+        {
+          "iterations": 86,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 94,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 85,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 92,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 95,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 95,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 96,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 95,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 91,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 89,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 100,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 90,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 90,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 91,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 102,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 96,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 99,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 99,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/semeion/fold-1": {
+      "panel": "wide",
+      "dataset": "semeion",
+      "fold": 1,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          15,
+          24,
+          25,
+          28,
+          30,
+          32,
+          33,
+          35,
+          38,
+          46,
+          47,
+          49,
+          51,
+          52,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          64,
+          65,
+          66,
+          67,
+          74,
+          75,
+          76,
+          77,
+          78,
+          81,
+          84,
+          89,
+          91,
+          94,
+          95,
+          99,
+          100,
+          103,
+          108,
+          110,
+          111,
+          114,
+          117,
+          118,
+          120,
+          128,
+          129,
+          132,
+          133,
+          134,
+          135,
+          142,
+          144,
+          145,
+          150,
+          151,
+          155,
+          156,
+          157,
+          158,
+          161,
+          168,
+          170,
+          173,
+          177,
+          179,
+          181,
+          187,
+          188,
+          189,
+          190,
+          191,
+          192,
+          193,
+          201,
+          204,
+          205,
+          206,
+          218,
+          220,
+          222,
+          223,
+          226,
+          227,
+          228,
+          230,
+          233,
+          234,
+          235,
+          237,
+          239,
+          246,
+          247,
+          248,
+          249,
+          252,
+          254
+        ],
+        [
+          0,
+          2,
+          8,
+          24,
+          25,
+          30,
+          33,
+          38,
+          46,
+          47,
+          59,
+          62,
+          64,
+          65,
+          66,
+          74,
+          76,
+          77,
+          78,
+          81,
+          84,
+          89,
+          95,
+          99,
+          108,
+          110,
+          111,
+          114,
+          118,
+          120,
+          128,
+          134,
+          144,
+          145,
+          151,
+          156,
+          161,
+          168,
+          170,
+          173,
+          177,
+          188,
+          189,
+          190,
+          191,
+          193,
+          220,
+          222,
+          227,
+          228,
+          230,
+          233,
+          234,
+          239,
+          247
+        ],
+        [
+          4,
+          7,
+          8,
+          10,
+          11,
+          13,
+          24,
+          25,
+          30,
+          38,
+          47,
+          49,
+          51,
+          52,
+          56,
+          58,
+          59,
+          60,
+          61,
+          62,
+          65,
+          74,
+          76,
+          78,
+          84,
+          89,
+          99,
+          111,
+          117,
+          128,
+          133,
+          134,
+          135,
+          142,
+          150,
+          151,
+          155,
+          156,
+          161,
+          170,
+          177,
+          189,
+          190,
+          191,
+          192,
+          205,
+          206,
+          218,
+          222,
+          223,
+          228,
+          230,
+          233,
+          234,
+          248
+        ],
+        [
+          2,
+          3,
+          4,
+          7,
+          24,
+          25,
+          28,
+          30,
+          32,
+          38,
+          47,
+          49,
+          51,
+          56,
+          57,
+          59,
+          61,
+          62,
+          65,
+          76,
+          77,
+          81,
+          91,
+          99,
+          103,
+          108,
+          118,
+          120,
+          133,
+          144,
+          145,
+          156,
+          161,
+          168,
+          170,
+          179,
+          181,
+          188,
+          190,
+          191,
+          192,
+          193,
+          201,
+          205,
+          206,
+          220,
+          222,
+          227,
+          228,
+          230,
+          233,
+          234,
+          237,
+          247,
+          254
+        ],
+        [
+          2,
+          4,
+          6,
+          10,
+          11,
+          12,
+          13,
+          24,
+          28,
+          33,
+          60,
+          65,
+          66,
+          67,
+          74,
+          75,
+          76,
+          84,
+          89,
+          95,
+          100,
+          103,
+          108,
+          111,
+          114,
+          118,
+          129,
+          132,
+          142,
+          144,
+          150,
+          151,
+          155,
+          156,
+          157,
+          168,
+          170,
+          173,
+          187,
+          191,
+          192,
+          206,
+          222,
+          223,
+          227,
+          228,
+          233,
+          234,
+          235,
+          239,
+          246,
+          247,
+          248,
+          249,
+          252
+        ],
+        [
+          2,
+          4,
+          6,
+          7,
+          10,
+          12,
+          24,
+          28,
+          30,
+          47,
+          49,
+          51,
+          56,
+          57,
+          58,
+          62,
+          65,
+          67,
+          74,
+          78,
+          84,
+          94,
+          95,
+          99,
+          108,
+          110,
+          111,
+          117,
+          118,
+          120,
+          129,
+          132,
+          134,
+          150,
+          151,
+          157,
+          158,
+          168,
+          170,
+          177,
+          179,
+          181,
+          187,
+          188,
+          192,
+          193,
+          205,
+          206,
+          218,
+          222,
+          226,
+          227,
+          228,
+          233,
+          235
+        ],
+        [
+          2,
+          3,
+          4,
+          9,
+          10,
+          11,
+          12,
+          15,
+          24,
+          35,
+          46,
+          47,
+          49,
+          52,
+          58,
+          60,
+          61,
+          64,
+          66,
+          74,
+          78,
+          84,
+          94,
+          100,
+          108,
+          110,
+          114,
+          118,
+          120,
+          129,
+          132,
+          133,
+          142,
+          156,
+          158,
+          168,
+          177,
+          181,
+          187,
+          191,
+          201,
+          204,
+          205,
+          222,
+          227,
+          228,
+          230,
+          233,
+          234,
+          237,
+          239,
+          246,
+          247,
+          249,
+          254
+        ],
+        [
+          2,
+          4,
+          8,
+          10,
+          11,
+          12,
+          13,
+          15,
+          32,
+          35,
+          38,
+          47,
+          51,
+          52,
+          57,
+          60,
+          64,
+          65,
+          74,
+          75,
+          78,
+          81,
+          89,
+          91,
+          94,
+          95,
+          99,
+          103,
+          108,
+          110,
+          111,
+          114,
+          128,
+          129,
+          132,
+          133,
+          134,
+          157,
+          158,
+          168,
+          173,
+          177,
+          179,
+          188,
+          192,
+          201,
+          205,
+          206,
+          220,
+          234,
+          235,
+          237,
+          239,
+          248,
+          252
+        ],
+        [
+          2,
+          4,
+          7,
+          8,
+          11,
+          13,
+          24,
+          28,
+          30,
+          32,
+          33,
+          35,
+          47,
+          51,
+          56,
+          59,
+          61,
+          65,
+          66,
+          67,
+          74,
+          75,
+          77,
+          89,
+          91,
+          94,
+          99,
+          100,
+          110,
+          111,
+          117,
+          128,
+          129,
+          132,
+          135,
+          145,
+          157,
+          168,
+          177,
+          179,
+          181,
+          187,
+          189,
+          191,
+          206,
+          218,
+          223,
+          226,
+          227,
+          228,
+          230,
+          246,
+          248,
+          252,
+          254
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "456be40921294a7adf08823f78c5f5c6f36def2a68e646ab62c0df9d86138477",
+      "layout_sha": "d158c9cdf1d8ee0265b13afc540a04ddbd45b05e0da04bc8d00f3e09c1d6e6e6",
+      "selection_sha": "466924e75b24b24f314b30886b841db690a6b0748f7f82d38ff09622300912dc",
+      "targets_sha": "954015524857f38761d88968f28cfd0158b72308210e69aee750c1d94d30af9f",
+      "predictions_sha": "9be2fddce0a4a95b07ce693b5129584a644444f25bb965719efd769a8b3486ad",
+      "guard_runs": [
+        {
+          "iterations": 90,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 97,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 101,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 85,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 99,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 80,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 89,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 92,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 84,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 93,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 98,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 95,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 90,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 106,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 84,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 94,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 91,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 88,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/semeion/fold-2": {
+      "panel": "wide",
+      "dataset": "semeion",
+      "fold": 2,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          18,
+          19,
+          24,
+          25,
+          26,
+          28,
+          29,
+          32,
+          33,
+          35,
+          39,
+          46,
+          47,
+          49,
+          53,
+          56,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          70,
+          74,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          84,
+          88,
+          89,
+          91,
+          97,
+          98,
+          100,
+          101,
+          102,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          115,
+          117,
+          118,
+          119,
+          120,
+          124,
+          128,
+          129,
+          132,
+          134,
+          135,
+          142,
+          145,
+          149,
+          150,
+          152,
+          156,
+          158,
+          160,
+          161,
+          165,
+          166,
+          167,
+          168,
+          171,
+          173,
+          177,
+          185,
+          186,
+          187,
+          188,
+          190,
+          192,
+          193,
+          196,
+          203,
+          205,
+          206,
+          208,
+          211,
+          217,
+          219,
+          220,
+          221,
+          225,
+          226,
+          228,
+          229,
+          230,
+          233,
+          235,
+          236,
+          237,
+          239,
+          244,
+          246,
+          255
+        ],
+        [
+          0,
+          3,
+          8,
+          13,
+          14,
+          16,
+          26,
+          29,
+          39,
+          46,
+          47,
+          49,
+          58,
+          59,
+          61,
+          62,
+          64,
+          65,
+          66,
+          67,
+          74,
+          77,
+          78,
+          79,
+          81,
+          91,
+          98,
+          107,
+          108,
+          111,
+          118,
+          119,
+          120,
+          124,
+          129,
+          145,
+          156,
+          161,
+          166,
+          173,
+          177,
+          186,
+          187,
+          190,
+          193,
+          206,
+          208,
+          217,
+          220,
+          221,
+          225,
+          226,
+          228,
+          229,
+          230,
+          235,
+          236,
+          237,
+          239,
+          255
+        ],
+        [
+          3,
+          4,
+          5,
+          7,
+          8,
+          14,
+          15,
+          25,
+          32,
+          33,
+          35,
+          46,
+          47,
+          49,
+          53,
+          56,
+          59,
+          61,
+          65,
+          66,
+          74,
+          76,
+          81,
+          82,
+          84,
+          88,
+          97,
+          101,
+          107,
+          117,
+          118,
+          120,
+          124,
+          128,
+          129,
+          134,
+          142,
+          145,
+          156,
+          160,
+          165,
+          168,
+          177,
+          190,
+          192,
+          193,
+          205,
+          206,
+          211,
+          219,
+          220,
+          221,
+          229,
+          230,
+          235,
+          236,
+          237,
+          239,
+          244,
+          255
+        ],
+        [
+          3,
+          7,
+          8,
+          14,
+          16,
+          18,
+          19,
+          24,
+          28,
+          32,
+          33,
+          39,
+          46,
+          47,
+          60,
+          66,
+          79,
+          89,
+          91,
+          98,
+          101,
+          102,
+          107,
+          109,
+          110,
+          115,
+          117,
+          118,
+          124,
+          128,
+          134,
+          135,
+          142,
+          145,
+          149,
+          152,
+          158,
+          161,
+          167,
+          168,
+          171,
+          173,
+          177,
+          186,
+          187,
+          190,
+          193,
+          203,
+          206,
+          208,
+          211,
+          217,
+          220,
+          225,
+          226,
+          228,
+          229,
+          230,
+          237,
+          244
+        ],
+        [
+          3,
+          4,
+          5,
+          6,
+          8,
+          11,
+          12,
+          13,
+          15,
+          18,
+          19,
+          28,
+          29,
+          32,
+          35,
+          39,
+          47,
+          53,
+          59,
+          63,
+          64,
+          65,
+          70,
+          74,
+          78,
+          82,
+          91,
+          97,
+          100,
+          102,
+          106,
+          107,
+          109,
+          111,
+          115,
+          117,
+          118,
+          124,
+          129,
+          132,
+          134,
+          142,
+          145,
+          149,
+          161,
+          168,
+          173,
+          177,
+          185,
+          187,
+          188,
+          190,
+          192,
+          193,
+          217,
+          228,
+          233,
+          235,
+          239,
+          255
+        ],
+        [
+          0,
+          5,
+          7,
+          14,
+          15,
+          16,
+          18,
+          24,
+          26,
+          29,
+          35,
+          49,
+          53,
+          56,
+          58,
+          59,
+          60,
+          61,
+          63,
+          64,
+          67,
+          84,
+          88,
+          100,
+          106,
+          107,
+          108,
+          109,
+          117,
+          119,
+          120,
+          128,
+          129,
+          132,
+          134,
+          135,
+          142,
+          150,
+          156,
+          158,
+          160,
+          166,
+          185,
+          190,
+          192,
+          193,
+          203,
+          206,
+          208,
+          211,
+          217,
+          225,
+          226,
+          228,
+          230,
+          233,
+          235,
+          237,
+          239,
+          255
+        ],
+        [
+          0,
+          5,
+          7,
+          14,
+          15,
+          18,
+          24,
+          25,
+          26,
+          32,
+          33,
+          49,
+          53,
+          56,
+          58,
+          60,
+          63,
+          64,
+          66,
+          74,
+          81,
+          82,
+          88,
+          89,
+          91,
+          97,
+          98,
+          101,
+          106,
+          107,
+          109,
+          110,
+          111,
+          117,
+          119,
+          124,
+          132,
+          142,
+          149,
+          150,
+          152,
+          156,
+          167,
+          177,
+          186,
+          188,
+          190,
+          193,
+          203,
+          206,
+          211,
+          219,
+          228,
+          230,
+          235,
+          237,
+          239,
+          244,
+          246,
+          255
+        ],
+        [
+          0,
+          4,
+          5,
+          11,
+          12,
+          13,
+          14,
+          15,
+          24,
+          25,
+          29,
+          32,
+          46,
+          47,
+          56,
+          59,
+          60,
+          62,
+          63,
+          64,
+          65,
+          74,
+          77,
+          78,
+          80,
+          81,
+          84,
+          88,
+          100,
+          101,
+          106,
+          107,
+          109,
+          117,
+          128,
+          129,
+          132,
+          134,
+          142,
+          150,
+          156,
+          160,
+          166,
+          167,
+          171,
+          177,
+          185,
+          186,
+          187,
+          203,
+          206,
+          208,
+          211,
+          217,
+          221,
+          230,
+          235,
+          236,
+          237,
+          244
+        ],
+        [
+          0,
+          3,
+          4,
+          5,
+          13,
+          15,
+          19,
+          25,
+          32,
+          33,
+          35,
+          46,
+          49,
+          53,
+          56,
+          58,
+          59,
+          60,
+          65,
+          74,
+          84,
+          88,
+          100,
+          101,
+          102,
+          108,
+          110,
+          128,
+          132,
+          134,
+          135,
+          142,
+          145,
+          149,
+          150,
+          156,
+          158,
+          161,
+          165,
+          167,
+          173,
+          177,
+          186,
+          188,
+          192,
+          193,
+          196,
+          217,
+          219,
+          220,
+          221,
+          225,
+          233,
+          235,
+          236,
+          237,
+          239,
+          244,
+          246,
+          255
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 1,
+        "slack": 1
+      },
+      "input_sha": "9783f0aa3fa6f052a3f4f5c80470d8fd540cdc0292f645bc916444f1af4c4895",
+      "layout_sha": "594fdb138ef9e5f4517d20ef675b47817fe8e8ef9aefc8b8462e635054be80a2",
+      "selection_sha": "1394c2a01ab9d999db7f0834c8292cda3db2a40d9b77aa9475571fe64e946d59",
+      "targets_sha": "706623f08d483c3b0f59058c65111308ee190292478aab5ee7fd0a0bb0ca5f9f",
+      "predictions_sha": "60e30592e28e066a339109f9db5b905c6bef32202bf4f3e7b3f960d6ceebb889",
+      "guard_runs": [
+        {
+          "iterations": 95,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 95,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 96,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 95,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 95,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 92,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 99,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 95,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 94,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 97,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 105,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 103,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 104,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 99,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 99,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 101,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 93,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 98,
+          "convergence_warning": false
+        }
+      ]
+    },
+    "wide/urban/fold-0": {
+      "panel": "wide",
+      "dataset": "urban",
+      "fold": 0,
+      "rare": false,
+      "supports": [
+        [
+          0,
+          1,
+          3,
+          5,
+          6,
+          7,
+          18,
+          22,
+          29,
+          40,
+          41,
+          43,
+          44,
+          61,
+          64,
+          65,
+          66,
+          69,
+          78,
+          83,
+          88,
+          103,
+          108,
+          110,
+          113,
+          121
+        ],
+        [
+          1,
+          5,
+          6,
+          18,
+          22,
+          29,
+          43,
+          61,
+          64,
+          66,
+          69,
+          88,
+          113
+        ],
+        [
+          0,
+          1,
+          6,
+          18,
+          29,
+          41,
+          43,
+          44,
+          103,
+          108,
+          110,
+          113,
+          121
+        ],
+        [
+          1,
+          3,
+          5,
+          6,
+          18,
+          40,
+          41,
+          44,
+          64,
+          69,
+          83,
+          88,
+          108
+        ],
+        [
+          1,
+          3,
+          7,
+          18,
+          22,
+          61,
+          65,
+          66,
+          69,
+          78,
+          88,
+          103,
+          121
+        ],
+        [
+          3,
+          6,
+          7,
+          29,
+          43,
+          44,
+          64,
+          65,
+          66,
+          83,
+          103,
+          113,
+          121
+        ],
+        [
+          1,
+          29,
+          41,
+          44,
+          64,
+          66,
+          83,
+          88,
+          103,
+          108,
+          110,
+          113,
+          121
+        ],
+        [
+          0,
+          1,
+          5,
+          6,
+          7,
+          40,
+          43,
+          61,
+          64,
+          65,
+          69,
+          78,
+          103
+        ],
+        [
+          1,
+          3,
+          5,
+          22,
+          40,
+          61,
+          69,
+          78,
+          83,
+          88,
+          103,
+          110,
+          121
+        ]
+      ],
+      "nominees": {
+        "gain": 1,
+        "vote": 1,
+        "point": 4,
+        "slack": 4
+      },
+      "input_sha": "e5e381bd2edd1a318708f647983540957aab50e5cc5ffc6e7c3cab7c3b3e2921",
+      "layout_sha": "fbcdcb128be07a060bcd02be6a25596d5c935abd91d343cacc0fa5c7eca4775a",
+      "selection_sha": "c7bc2cdf0190657f6b2f4c0affeb54caa3f8d599b2dee33b0fb9d7b4380d5bb8",
+      "targets_sha": "e024029f8c6dccd4731395beeefc22e8d6522bcea8b091f559ba4fd817e316e2",
+      "predictions_sha": "168c6c3e6e1298e048a5b3e944e7af715d75ec6be35ac7d561d609807bb87872",
+      "guard_runs": [
+        {
+          "iterations": 103,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 78,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 64,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 68,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 68,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 74,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 68,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 68,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 54,
+          "convergence_warning": false
+        }
+      ],
+      "outer_runs": [
+        {
+          "iterations": 108,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 77,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 69,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 75,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 75,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 90,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 75,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 68,
+          "convergence_warning": false
+        },
+        {
+          "iterations": 65,
+          "convergence_warning": false
+        }
+      ]
+    }
+  }
+}
