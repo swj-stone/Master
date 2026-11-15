@@ -16,7 +16,7 @@ from experiments.run_thesis_sampling import ROOT, supervise
 from minppi_mofs.experiment_protocol import atomic_write_json
 
 
-REFERENCE = ROOT / "results/test/thesis_sampling/formal-samplingshap-isolet100-seed42"
+REFERENCE = ROOT / "results/thesis_benchmark/baselines-eight-preprocessed-five-seeds"
 MODES = ("five_blocks", "legacy", "full")
 SEEDS = (42, 123, 456)
 

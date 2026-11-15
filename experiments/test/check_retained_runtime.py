@@ -19,7 +19,7 @@ from minppi_mofs.experiment_protocol import atomic_write_json
 
 METHODS = ("tree_shap_top_k", "nsga2")
 EQUAL_WORK = ("tree_before", "tree_after", "nsga_before", "nsga_after")
-INPUTS = ROOT / "results/thesis_benchmark/literature-preprocessed-formal-five-seeds"
+INPUTS = ROOT / "results/thesis_benchmark/baselines-eight-preprocessed-five-seeds"
 TESTS = ROOT / "results/test/thesis_sampling"
 LIMIT_S = 300
 
