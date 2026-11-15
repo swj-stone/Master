@@ -1,14 +1,14 @@
 [
   {
     "path": "thesis-paper/minpi.pdf",
-    "bytes": 459413,
-    "sha256": "1cb50a76630ac5a6884f658454a157bcf84b5f01d4d6e142a354dbd4b927173c"
+    "bytes": 505903,
+    "sha256": "d3fdf8942a386110a9f86456fb0c2ab48755fc6130150e55f95817c5d510343f"
   },
   {
     "path": "thesis-paper/minpi-source.zip",
-    "bytes": 155250,
-    "sha256": "a4c1b179b81ef6a37b2778105e5809d6823d55def8f9217c2750e91f217236b3",
-    "members": 25
+    "bytes": 167504,
+    "sha256": "1bf6ba6cdf0eb53799e8db17d3b3aa77a736032a131569e684be60e32c8ad2fe",
+    "members": 26
   },
   {
     "path": "packages/thesis-pmlb-evidence-r1.zip",
@@ -33,5 +33,11 @@
     "bytes": 52448489,
     "sha256": "b1e967c21cdd27db214002bc6cbf0cc9979f0d29bad1fc5e6390dd7fc135efb6",
     "members": 897
+  },
+  {
+    "path": "packages/thesis-transport-evidence.zip",
+    "bytes": 39555766,
+    "sha256": "ab11768a7b8c46f46a191c798a0318147b5299abdceaa5f794b814f622927b1a",
+    "members": 1247
   }
 ]
