@@ -30,5 +30,8 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff.lint.per-file-ignores]
 "src/minppi_mofs/__init__.py" = ["E402"]  # xgboost monkey-patch before subpackage imports
