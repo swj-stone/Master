@@ -4,9 +4,11 @@
 
 ## 遮蔽损失能揭示多少删列重训后的信息？
 
-论文当前区分了两个问题。在已知的有限样本中，单靠原模型的连续输出就能锁定全部 704 个提案的容差判定，精度降低后会出现与同一记录相容的相反判定。在实际选列时，给相同 Gain 候选和单点平票规则再加投票，只改变了常规组的一个提名，宽数据组为零。换用随机森林和 ANOVA 的局部候选后，两类评分的相对表现随数据来源与候选抽样变化。[当前论文](thesis-paper/minpi.pdf) · [新证据和复现命令](thesis-paper/evidence/robustness-release.md) · [实验协议](experiments/context_review/README.md)
+论文从两个层面研究删列。在已知的有限样本中，单靠原模型的连续输出就能锁定全部 704 个提案的容差判定，精度降低后会出现与同一记录相容的相反判定。在实际选列时，给相同 Gain 候选和单点平票规则再加投票，只改变了常规组的一个提名，宽数据组为零。换用随机森林和 ANOVA 的局部候选后，两类评分的相对表现随数据来源与候选抽样变化。[当前论文](thesis-paper/minpi.pdf) · [完整证据、复现命令与新研究设计检查](thesis-paper/evidence/decision-release.md) · [终审意见逐项回应](thesis-paper/final-review/response.md) · [实验协议](experiments/context_review/README.md)
 
-在 704 个历史候选列集中，有 136 个在同一折与另一个同宽候选得到完全相同的二元选票，但重训后的损失一个超限、一个未超限。新实验让各策略从同一组半宽候选中提名一个列集，再用独立重训检查决定是否接受。首批 10 个 UCI 任务上，单次连续遮蔽评分、最差背景票数、均匀随机提名的容差内平均压缩分别为 7.29%、1.33%、5.49%。在另外 6 个较高维任务的 16 个划分上，四种主策略的压缩均为 7.34%，各有 3 次外测超限。[论文 PDF](thesis-paper/minpi.pdf) · [当前证据包与复现说明](thesis-paper/evidence/transport-release.md) · [逐任务结果](thesis-paper/evidence/chance/)
+本次根据终审意见增加了同一批测试行上的成对比较、最高票组内的均匀抽选、预测类内重编码、八轮法的完整计时和留一来源选择。实验目录按问题索引，会议版本保存在另一工作树。[实验索引](thesis-paper/evidence/decision-release.md)
+
+在 704 个历史候选列集中，有 136 个在同一折与另一个同宽候选得到完全相同的二元选票，但重训后的损失一个超限、一个未超限。新实验让各策略从同一组半宽候选中提名一个列集，再用独立重训检查决定是否接受。首批 10 个 UCI 任务上，单次连续遮蔽评分、最差背景票数、均匀随机提名的容差内平均压缩分别为 7.29%、1.33%、5.49%。在另外 6 个较高维任务的 16 个划分上，四种主策略的压缩均为 7.34%，各有 3 次外测超限。[论文 PDF](thesis-paper/minpi.pdf) · [原始两组实验的证据](thesis-paper/evidence/transport-release.md) · [逐任务结果](thesis-paper/evidence/chance/)
 
 ### 早期投票与重训对照
 
@@ -90,6 +92,8 @@ PIv0 定名前的独立探索按清理清单移除了本地运行文件。硕士
 ## 本地开发
 
 在 `MastersThesis/` 中使用 `thesis-python.ps1`。该入口为当前进程设置源码路径，并将 Matplotlib、Numba 缓存放入本工作树的 `tmp/`。共享环境中已有的可编辑安装指向会议参考版。
+
+Windows 上，部分旧实验的回归测试会创建硬链接，临时文件名包含完整摘要。在普通 PowerShell 中使用下面的短临时目录参数可以避免路径过长。
 
 ```powershell
 .\thesis-python.ps1 -c "import minppi_mofs; print(minppi_mofs.__file__)"

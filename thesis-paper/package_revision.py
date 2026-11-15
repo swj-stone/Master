@@ -23,6 +23,7 @@ REASSESSMENT = PACKAGES/"thesis-refit-reassessment-evidence.zip"
 OPERATING = PACKAGES / "thesis-operating-evidence.zip"
 TRANSPORT = PACKAGES / "thesis-transport-evidence.zip"
 ROBUSTNESS = PACKAGES / "thesis-robustness-evidence.zip"
+DECISION = PACKAGES / "thesis-decision-evidence.zip"
 
 
 def digest(path):
@@ -153,11 +154,14 @@ def guard_targets(folder):
 def transport():
     files = {ROOT / name for name in ("README.md", "AGENTS.md", "thesis-python.ps1", "pyproject.toml",
                                        "requirements.txt", "src/minppi_mofs/__init__.py",
-                                       "experiments/test/run_piv0_seed42.py", "tests/test_matched_stopping.py")}
+                                       "experiments/test/run_piv0_seed42.py", "tests/test_matched_stopping.py",
+                                       "tests/test_comparison_design.py")}
     files.update({PAPER / "README.md", PAPER / "minpi.pdf", PAPER / "minpi-source.zip",
                   Path(__file__).resolve(), EVIDENCE / "transport-release.md", EVIDENCE / "robustness-release.md",
+                  EVIDENCE / "decision-release.md", PAPER / "final-review/README.md",
+                  PAPER / "final-review/response.md", EVIDENCE / "budget_comparison/timed-source.py",
                   PAPER / "identification-bounds.tex", PAPER / "audit/rounds/pmlb_baselines.py"})
-    for pattern in ("transport*", "robustness*", "refit_observation*", "refit-observation*", "identification_bounds*"):
+    for pattern in ("transport*", "robustness*", "decision-*", "refit_observation*", "refit-observation*", "identification_bounds*"):
         files.update((PAPER / "audit").glob(pattern))
     files.update(p for p in (PAPER / "formal").iterdir() if p.suffix in {".lean", ".wl"}
                  or p.name == "lean-toolchain")
@@ -173,7 +177,8 @@ def transport():
                  "wide_slate", "chance", "margin_factorial", "receiver", "opportunities", "marginal",
                  "concordance", "ensemble_cells", "transcript_permutations", "transcript_information",
                  "gain_increment", "forest_cross", "filter_neighborhood", "neighborhood_replicates",
-                 "transcript_swaps", "score_resolution", "ordinal_decomposition", "matched_stopping"):
+                 "transcript_swaps", "score_resolution", "ordinal_decomposition", "matched_stopping",
+                 "budget_comparison", "class_precision", "within_tier", "joint_choice", "transfer_choice"):
         files.update(p for p in (EVIDENCE / name).glob("*") if p.suffix in {".csv", ".json", ".md", ".zip", ".npz"})
     campaigns = ["transport-uci", "transport-mammographic-four", "wide-uci", "matched-signal-r2",
                  "refit-opportunity", "low-fidelity", "wide-slate", "ballot-refinement-first", "ballot-refinement-wide"]
@@ -312,6 +317,8 @@ def replay_archived_tables():
         transcript_information, transcript_permutations, transcript_swaps, neighborhood_replicates_score,
         score_resolution_replay, score_resolution_check, ordinal_decomposition, matched_stopping,
         matched_stopping_audit,
+        budget_comparison, class_precision, class_precision_check, joint_choice, joint_choice_check,
+        plan_comparison, transfer_choice, transfer_choice_audit, within_tier, within_tier_audit,
     )
 
     def compare(path, frame):
@@ -366,6 +373,12 @@ def replay_archived_tables():
         (score_resolution_replay.replay, "score_resolution", ("occupancy", "proposals", "tasks", "summary")),
         (ordinal_decomposition.replay, "ordinal_decomposition", ("folds", "task-contrasts", "summary")),
         (matched_stopping.replay, "matched_stopping", ("folds", "summary", "timing-summary")),
+        (budget_comparison.replay, "budget_comparison", ("folds", "summary", "contrasts")),
+        (class_precision.replay, "class_precision", ("mobility", "proposals", "tasks", "summary")),
+        (joint_choice.replay, "joint_choice", ("pairs", "summary", "case-study", "attribution")),
+        (within_tier.replay, "within_tier", ("policies", "opportunities", "fold-bounds", "tasks", "means",
+                                             "contrasts", "envelopes", "ties-only")),
+        (transfer_choice.replay, "transfer_choice", ("held", "summary")),
     ))
 
     # Remove the reference copies in the temporary extraction so each scorer must create its outputs.
@@ -386,6 +399,18 @@ def replay_archived_tables():
     if read(resolution_audit) != expected_checks:
         raise ValueError("The independent finite-orbit verification changed")
     matched_stopping_audit.audit()
+    within_tier_audit.verify()
+    transfer_choice_audit.verify()
+    for folder, verify in (("class_precision", class_precision_check.check), ("joint_choice", joint_choice_check.audit)):
+        audit_path = EVIDENCE / folder / "audit.json"
+        golden = read(audit_path)
+        audit_path.unlink()
+        verify()
+        if golden != read(audit_path):
+            raise ValueError(f"Independent verification disagreed in {folder}")
+    design = plan_comparison.assess(plan_comparison.original_wide(), target_pp=5)
+    if not design["target_ruled_out"] or abs(design["upper_pp"] - 100 / 36) > 1e-12:
+        raise ValueError("The label-free design check disagrees with the original guarded supports")
     collisions = PAPER / "audit/refit-observation-collisions.csv"
     reference = pd.read_csv(collisions)
     collisions.unlink()
@@ -416,8 +441,8 @@ def verify_transport(archive):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--robustness-evidence", "--transport-evidence", "--evidence", action="store_true",
-                        help="Build the current supplement as thesis-robustness-evidence.zip")
+    parser.add_argument("--decision-evidence", "--robustness-evidence", "--transport-evidence", "--evidence",
+                        action="store_true", help="Build the current supplement as thesis-decision-evidence.zip")
     parser.add_argument("--verify-transport", type=Path, metavar="ZIP",
                         help="Replay an existing transport evidence ZIP in an isolated extraction")
     parser.add_argument("--verify-source", action="store_true", help="Compile the ZIP alone and compare every page's text")
@@ -431,8 +456,8 @@ def main():
     write_archive(archive, paper_source())
     if args.verify_source:
         verify_source(archive, pdf)
-    if args.robustness_evidence:
-        release = ROBUSTNESS
+    if args.decision_evidence:
+        release = DECISION
         PACKAGES.mkdir(exist_ok=True)
         with TemporaryDirectory(prefix="transport-release-", dir=PACKAGES) as staging:
             candidate = Path(staging) / release.name
@@ -440,7 +465,7 @@ def main():
             verify_transport(candidate)
             candidate.replace(release)
     materials = [pdf, archive, PACKAGES/"thesis-pmlb-evidence-r1.zip",
-                 PACKAGES/"thesis-context-revision-evidence.zip", REASSESSMENT, OPERATING, TRANSPORT, ROBUSTNESS]
+                 PACKAGES/"thesis-context-revision-evidence.zip", REASSESSMENT, OPERATING, TRANSPORT, ROBUSTNESS, DECISION]
     entries = []
     for path in materials:
         if path.exists():

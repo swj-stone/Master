@@ -1,6 +1,6 @@
 # Masked predictions, Gain controls and alternative classifiers
 
-The [manuscript](../minpi.pdf) and [self-contained LaTeX sources](../minpi-source.zip) accompany the [evidence archive](../../packages/thesis-robustness-evidence.zip). The evidence includes the records from the [earlier transport release](transport-release.md) and the following experiments. The earlier release remains available under its original checksum.
+The [frozen tenth reading](../../packages/transport-review-drafts/reading-10.pdf) and its standalone LaTeX sources are preserved in the [evidence archive](../../packages/thesis-robustness-evidence.zip). The evidence includes the records from the [earlier transport release](transport-release.md) and the following experiments. The earlier release remains available under its original checksum.
 
 | Scientific question | Evidence and scope |
 |---|---|
@@ -19,4 +19,4 @@ Run the following from the thesis checkout. The verifier extracts the supplied a
 .\thesis-python.ps1 thesis-paper/package_revision.py --verify-transport packages/thesis-robustness-evidence.zip
 ```
 
-The [artifact ledger](revision/artifacts.json) records the digest of the distributed archive. The packaging switches `--robustness-evidence`, `--transport-evidence` and `--evidence` build the current supplement under its new name. The verifier runs the replay code inside whichever archived edition is supplied. The [independent review history](../audit/robustness-review-history.md) identifies the manuscript editions read by the reviewers.
+The [artifact ledger](revision/artifacts.json) records the digest of the distributed archive. To build the latest supplement, follow the [decision release guide](decision-release.md). The archived robustness ZIP retains this edition. The verifier runs the replay code inside whichever archived edition is supplied. The [independent review history](../audit/robustness-review-history.md) identifies the manuscript editions read by the reviewers.

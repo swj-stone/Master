@@ -1,8 +1,10 @@
 # What Do Masked Losses Reveal About Feature Deletion After Retraining?
 
-[Manuscript PDF](minpi.pdf) · [LaTeX sources](minpi-source.zip) · [Evidence and replay](evidence/robustness-release.md) · [Study protocols](../experiments/context_review/README.md) · [Independent reviews](audit/robustness-review-history.md)
+[Manuscript PDF](minpi.pdf) · [LaTeX sources](minpi-source.zip) · [Evidence, replay and design check](evidence/decision-release.md) · [Study protocols](../experiments/context_review/README.md) · [Revision against the supplied review](final-review/response.md)
 
-The current study characterizes attainable refit outcomes for fixed finite tree ensembles. On a known dictionary of outer rows, the unmasked probability vector alone determines the observed tolerance decision for all 704 historical proposals; over 93% of row occurrences have a unique vector within their fold. Frequency-matched randomized identifiers test how much this row resolution can explain. [Finite-ensemble characterization](ensemble-identification.tex) · [Quantization and random-code controls](evidence/score_resolution/)
+The matched lottery, joint candidate decisions, class-preserving controls, new full-pipeline timings and complete-source transfer checks are indexed in the [decision release](evidence/decision-release.md). Earlier protocols and their archives follow below.
+
+The study characterizes attainable refit outcomes for fixed finite tree ensembles. On a known dictionary of outer rows, the unmasked probability vector alone determines the observed tolerance decision for all 704 historical proposals; over 93% of row occurrences have a unique vector within their fold. Frequency-matched randomized identifiers test how much this row resolution can explain. [Finite-ensemble characterization](ensemble-identification.tex) · [Quantization and random-code controls](evidence/score_resolution/)
 
 In a matched Gain shortlist with a single masked point margin as the tie rule, adding the minimum vote changed one nomination in ten tasks and none in the six wider tasks. With a random forest for both masking and refits, the continuous margin beat the ordinal rule on the original Gain slates. In a second design with ANOVA anchors and local candidate exchanges, ordinal voting led on the ten-task average over three draws, and the sign on the wider panel changed with the draw. [Matched Gain comparisons](evidence/gain_increment/) · [Crossed learners](evidence/forest_cross/) · [Replicated neighborhoods](evidence/neighborhood_replicates/)
 
@@ -39,7 +41,7 @@ The refit experiments count a deletion as harmful when the outer-fold comparison
 
 ## Reproduce the paper, figures and formal checks
 
-Run the following commands in the `MastersThesis` checkout. The three historical generators read portable [benchmark evidence](evidence/revision/), [refit evidence](evidence/reassessment/) and [operating evidence](evidence/operating/README.md). The current manuscript uses the bundled NeurIPS style, BibTeX and `latexmk`. The formal directory pins the Lean version. The [transport release guide](evidence/transport-release.md) covers the new data and scoring commands.
+Run the following commands in the `MastersThesis` checkout. The three historical generators read portable [benchmark evidence](evidence/revision/), [refit evidence](evidence/reassessment/) and [operating evidence](evidence/operating/README.md). The current manuscript uses the bundled NeurIPS style, BibTeX and `latexmk`. The formal directory pins the Lean version. The [decision release guide](evidence/decision-release.md) covers the current data and scoring commands.
 
 ```powershell
 .\thesis-python.ps1 thesis-paper/revision_results.py
@@ -56,6 +58,7 @@ lean ProposalCost.lean
 lean IdentificationBounds.lean
 lean TranscriptCells.lean
 lean DecisionEnvelope.lean
+lean JointChoice.lean
 Pop-Location
 Push-Location thesis-paper
 latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=build main.tex
@@ -72,12 +75,13 @@ wolframscript -file thesis-paper/formal/RefitTarget.wl
 wolframscript -file thesis-paper/formal/ProposalCost.wl
 wolframscript -file thesis-paper/formal/IdentificationBounds.wl
 wolframscript -file thesis-paper/formal/TranscriptCells.wl
+wolframscript -file thesis-paper/formal/JointChoice.wl
 ```
 
-The packaging command assembles the current PDF and source ZIP. Add `--robustness-evidence` to build and replay the current research supplement. The earlier transport and operating archives retain their original names and digests. [Current supplement](../packages/thesis-robustness-evidence.zip) · [Earlier transport archive](../packages/thesis-transport-evidence.zip) · [Archive checksums](evidence/revision/artifacts.json)
+The packaging command assembles the current PDF and source ZIP. Add `--decision-evidence` to build and replay the current research supplement. The earlier transport and operating archives retain their original names and digests. [Current supplement](../packages/thesis-decision-evidence.zip) · [Previous robustness archive](../packages/thesis-robustness-evidence.zip) · [Earlier transport archive](../packages/thesis-transport-evidence.zip) · [Archive checksums](evidence/revision/artifacts.json)
 
 ```powershell
-.\thesis-python.ps1 thesis-paper/package_revision.py --robustness-evidence --verify-source
+.\thesis-python.ps1 thesis-paper/package_revision.py --decision-evidence --verify-source
 ```
 
 For a fresh collection from the completed runs, see the [campaign commands](../experiments/context_review/README.md). `operating_results.py --collect` refreshes the [portable tables](evidence/operating/README.md) and rebuilds the manuscript tables.
