@@ -56,10 +56,9 @@ def records(panel):
             lottery=vals.iloc[1:].mean() if len(vals)>1 else vals.iloc[0]
             evaluations={arm:vals.iloc[i] for arm,i in nominees.items()}
             evaluations["uniform"]=lottery
-            if len(pool)>1:
-                evaluations["hindsight"] = vals.iloc[1+np.argmax(vals.u.to_numpy()[1:])]
-            else:
-                evaluations["hindsight"] = vals.iloc[0]
+            # An oracle ceiling identifies maximum attainable utility. Several
+            # nominees can attain it with different risks and predictive scores.
+            evaluations["hindsight"] = pd.Series({"u": vals.u.max()})
             for arm,v in evaluations.items():
                 rows.append(dict(dataset=r["dataset"],fold=r["fold"],method=arm,tolerance=tau,candidates=len(pool)-1,
                           outer_ceiling=max(saved*o),joint_ceiling=max(vals.u),**v.to_dict()))
