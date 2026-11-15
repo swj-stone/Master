@@ -1,0 +1,20 @@
+{
+  "status": "Retrospective, locally fixed before computing these comparisons; archived targets and width-only results already known.",
+  "population": "42 folds of 14 PMLB tasks, all 704 unique fold-support records plus separate path (400) and uniform_deletions (379) memberships. Original XGBoost refit failure target, no threshold change. Never pool duplicated memberships when training on the union.",
+  "models": {
+    "width": ["x", "hinge25", "hinge50", "hinge75"],
+    "gain": ["width", "gain_mass", "rank_mass"],
+    "empty": ["gain", "point"],
+    "endpoint": ["empty", "endpoint_mean", "endpoint_max"],
+    "endpoint_vote": ["endpoint", "vote"],
+    "all_margins": ["endpoint", "all_mean", "all_max"],
+    "all_margins_vote": ["all_margins", "vote"]
+  },
+  "features": "x = fraction of anchor deleted. Hinges are positive parts x minus .25, .50, .75. gain_mass = fraction of anchor total split gain lost (XGBoost importance_type total_gain on the reconstructed training-only full model); rank_mass = fraction of anchor linear rank points lost, with k through 1 points in original descending training-only average-split-gain order, replayed against XGBoost gain. For metric m define e=(reference-reduced-t_m*abs(reference))/t_m where t_m=.03 (AUC and accuracy), .05 (applicable rare-class AP); margin=max_m e. This expresses excess in nominal metric-tolerance units without division by a vanishing reference. point = first original panel margin at empty extension. Endpoint summary uses unique empty/full extensions and first four panels; endpoint_mean and endpoint_max aggregate their paired continuous margins. all_mean and all_max use all unique separating extensions and first four panels. vote = maximum fraction dissenting across original separating contexts, exact archived tolerance/slack. Raw scores and masks are the same archived XGBoost ones as for voting. No new proposal labels as predictors.",
+  "analysis": "Leave a complete task out across all three folds for each fit. Evaluate union-to-union, path-to-path, uniform-to-uniform, path-to-uniform and uniform-to-path with no held-out-task or within-test adjustment. Original fold-equal/task-equal weighted scaler and ridge logistic objective, intercept unpenalized, lambda .01 on standardized slopes, no tuning. Use same predictions and observations for paired model comparisons. Main contrast endpoint_vote minus endpoint for log loss; secondary within-fold AUC, Brier, and within-width concordance (half credit tied). Also report sequential contrasts gain-width, empty-gain, endpoint-empty, all_margins-endpoint and all_margins_vote-all_margins. Ranking metrics require both labels in comparable pairs.",
+  "overlap": "In each held-out task, compare the path-trained and uniform-trained predictions on identical supports seen in both source collections. For transfer separately evaluate target proposals inside the source's within-fold joint support defined by the same retained width and the range [min,max] of lost_gain_mass among source proposals of that exact width on that fold (+/- 1e-12). Geometry only, including identical supports, with an exclusive-only sensitivity. Report coverage and fold/task/pair eligibility. Descriptive conditional generalization, no causal or covariate balance assertion.",
+  "uncertainty": "For each contrast and metric use percentile paired task bootstrap (conditional on fitted cross-validated predictions, 50000 replicates, seed 744210); equal weight within fold and over eligible folds and tasks. Report eligible task, fold, proposal and pair counts. Shared-support source-fit difference uses the identical pooled eligible observations. Results share training sets, labels and membership; no multiplicity adjustments, independent replications or population guarantees.",
+  "lambda": 0.01,
+  "bootstrap_replicates": 50000,
+  "bootstrap_seed": 744210
+}
