@@ -1,0 +1,8 @@
+{
+  "unique_proposals": 704,
+  "duplicate_memberships": 75,
+  "verified_model_fits": 294,
+  "max_independent_probability_difference": 3.3216003780811576e-07,
+  "checked_primary_contrast_metric_rows": 36,
+  "inputs": 273
+}
