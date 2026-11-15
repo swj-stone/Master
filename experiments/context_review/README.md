@@ -1,6 +1,10 @@
-# Feature deletion after retraining
+# Minimum-vote feature screening
 
-The [decision release](../../thesis-paper/evidence/decision-release.md) adds [pairwise shared-world decisions](joint_choice.md), [highest-vote candidate lotteries](within_tier.md), [class-conditioned recoding](class_precision.md), [matched eight-round budgets and the planning command](budget_comparison.md) and [whole-source transfer](transfer_choice.md). Each study has a scorer and independently checkable records. Use `--verify-transport packages/thesis-decision-evidence.zip` with the package verifier for the current edition.
+The [short paper](../../thesis-paper/minpi.pdf) uses the [best-first selector](../../src/minppi_mofs/minimum_vote.py). Run `.\thesis-python.ps1 -m experiments.context_review.vote_certificates` to reconstruct both traversals from recorded vote tables. Run `.\thesis-python.ps1 -m experiments.context_review.vote_certificate_timing verify` to check the three-way timing comparison. [Per-slate counts and fresh timings](../../thesis-paper/evidence/vote_certificates/) · [Package and replay](../../thesis-paper/README.md)
+
+## Prior feature-deletion studies
+
+The [decision release](../../thesis-paper/evidence/decision-release.md) adds [pairwise shared-world decisions](joint_choice.md), [highest-vote candidate lotteries](within_tier.md), [class-conditioned recoding](class_precision.md), [matched eight-round budgets and the planning command](budget_comparison.md) and [whole-source transfer](transfer_choice.md). Each study has a scorer and independently checkable records. Use `--verify-transport packages/thesis-decision-evidence.zip` with the package verifier for the historical R13 edition.
 
 The [earlier robustness release](../../thesis-paper/evidence/robustness-release.md) adds [continuous observation and single-swap tests](transcript_observers.md), [matched-precision codebooks](score_resolution.md), [Gain with matched tie rules](gain_increment.md), [changes of both learners](forest_cross.md), and [three ANOVA exchange slates per fold](neighborhood_replicates.md). Use the archive below to reproduce their tables together with the previous transport experiments.
 

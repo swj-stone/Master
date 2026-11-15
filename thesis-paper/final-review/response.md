@@ -1,6 +1,6 @@
 # 对终审意见的逐项回应
 
-[原审稿意见](README.md)针对[第十稿的冻结 PDF](../../packages/transport-review-drafts/reading-10.pdf)。[修订论文](../minpi.pdf)将可识别性与实际提名分成两个问题。下面的“收益”均指有效压缩 (U)，即在外测容差内实现的删列比例。外测超限率单列。
+[原审稿意见](README.md)针对[第十稿的冻结 PDF](../../packages/transport-review-drafts/reading-10.pdf)。[第十三稿](../supplement/decision-study.pdf)将可识别性与实际提名分成两个问题。下面的“收益”均指有效压缩 (U)，即在外测容差内实现的删列比例。外测超限率单列。
 
 | 审稿问题 | 做了什么 | 证据支持的判断 |
 |---|---|---|

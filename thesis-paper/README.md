@@ -1,6 +1,18 @@
-# What Do Masked Losses Reveal About Feature Deletion After Retraining?
+# Best-First Search for Minimum-Vote Feature Screening
 
-[Manuscript PDF](minpi.pdf) · [LaTeX sources](minpi-source.zip) · [Evidence, replay and design check](evidence/decision-release.md) · [Study protocols](../experiments/context_review/README.md) · [Revision against the supplied review](final-review/response.md)
+[Short paper](minpi.pdf) · [Standalone LaTeX source](minpi-source.zip) · [Replication package](../packages/thesis-minimum-vote-paper.zip) · [Independent checks and scope](audit/minimum-vote-review.md)
+
+The [selector](../src/minppi_mofs/minimum_vote.py) returns the earliest candidate with the largest minimum approval count. The [formal proof](formal/VoteCertificate.lean) gives the exact condition for the winner to be fixed by the observed votes. The paper proves the query bound for fixed restoration order and gives its exception. [Per-slate comparisons](evidence/vote_certificates/folds.csv) · [Raw nomination times](evidence/vote_certificates/timings.csv).
+
+From the thesis checkout, run the following command to regenerate the new query-count tables and verify all 1,656 timing records in an isolated extraction. Both the short paper package and the [frozen R13 prediction archive](../packages/thesis-decision-evidence.zip) are required.
+
+```powershell
+.\thesis-python.ps1 thesis-paper/package_revision.py --verify-screening packages/thesis-minimum-vote-paper.zip
+```
+
+## Earlier identification and decision study
+
+[Historical 46-page paper](supplement/decision-study.pdf) · [Its standalone source](supplement/decision-study-source.zip) · [Data, controls and replay](evidence/decision-release.md) · [R13 reviewer response](final-review/response.md)
 
 The matched lottery, joint candidate decisions, class-preserving controls, new full-pipeline timings and complete-source transfer checks are indexed in the [decision release](evidence/decision-release.md). Earlier protocols and their archives follow below.
 
@@ -41,7 +53,7 @@ The refit experiments count a deletion as harmful when the outer-fold comparison
 
 ## Reproduce the paper, figures and formal checks
 
-Run the following commands in the `MastersThesis` checkout. The three historical generators read portable [benchmark evidence](evidence/revision/), [refit evidence](evidence/reassessment/) and [operating evidence](evidence/operating/README.md). The current manuscript uses the bundled NeurIPS style, BibTeX and `latexmk`. The formal directory pins the Lean version. The [decision release guide](evidence/decision-release.md) covers the current data and scoring commands.
+Run the following commands in the `MastersThesis` checkout. The three historical generators read portable [benchmark evidence](evidence/revision/), [refit evidence](evidence/reassessment/) and [operating evidence](evidence/operating/README.md). The current manuscript uses the bundled NeurIPS style, BibTeX and `latexmk`. The formal directory pins the Lean version. The [decision release guide](evidence/decision-release.md) covers the R13 data and scoring commands.
 
 ```powershell
 .\thesis-python.ps1 thesis-paper/revision_results.py
@@ -59,6 +71,7 @@ lean IdentificationBounds.lean
 lean TranscriptCells.lean
 lean DecisionEnvelope.lean
 lean JointChoice.lean
+lean VoteCertificate.lean
 Pop-Location
 Push-Location thesis-paper
 latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=build main.tex
@@ -78,10 +91,10 @@ wolframscript -file thesis-paper/formal/TranscriptCells.wl
 wolframscript -file thesis-paper/formal/JointChoice.wl
 ```
 
-The packaging command assembles the current PDF and source ZIP. Add `--decision-evidence` to build and replay the current research supplement. The earlier transport and operating archives retain their original names and digests. [Current supplement](../packages/thesis-decision-evidence.zip) · [Previous robustness archive](../packages/thesis-robustness-evidence.zip) · [Earlier transport archive](../packages/thesis-transport-evidence.zip) · [Archive checksums](evidence/revision/artifacts.json)
+The packaging command assembles the current PDF and source ZIP. Add `--screening-release --verify-source` to rebuild the short-paper package and check it against the published data. The earlier transport and operating archives retain their original names and digests. [Short-paper package](../packages/thesis-minimum-vote-paper.zip) · [Frozen R13 evidence](../packages/thesis-decision-evidence.zip) · [Previous robustness archive](../packages/thesis-robustness-evidence.zip) · [Earlier transport archive](../packages/thesis-transport-evidence.zip) · [Archive checksums](evidence/revision/artifacts.json)
 
 ```powershell
-.\thesis-python.ps1 thesis-paper/package_revision.py --decision-evidence --verify-source
+.\thesis-python.ps1 thesis-paper/package_revision.py --screening-release --verify-source
 ```
 
 For a fresh collection from the completed runs, see the [campaign commands](../experiments/context_review/README.md). `operating_results.py --collect` refreshes the [portable tables](evidence/operating/README.md) and rebuilds the manuscript tables.

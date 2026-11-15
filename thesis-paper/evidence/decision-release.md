@@ -1,6 +1,6 @@
 # Choosing a deletion with one candidate refit
 
-The [revised paper](../minpi.pdf), [standalone LaTeX source](../minpi-source.zip) and [decision evidence archive](../../packages/thesis-decision-evidence.zip) accompany the [response to the supplied review](../final-review/response.md). The [previous release](../../packages/thesis-robustness-evidence.zip) contains the 43-page paper on which that review was based.
+The [R13 paper](../supplement/decision-study.pdf), [standalone R13 LaTeX source](../supplement/decision-study-source.zip) and [decision evidence archive](../../packages/thesis-decision-evidence.zip) accompany the [response to the supplied review](../final-review/response.md). The [previous release](../../packages/thesis-robustness-evidence.zip) contains the 43-page paper on which that review was based.
 
 | Question | Study inputs, implementation and outputs |
 |---|---|
@@ -19,4 +19,4 @@ From the parent `Paper` folder in PowerShell, these commands check the published
 
 The second command has no outer-label input. For new studies, pass a JSON file describing each policy's possible guarded returns and their probabilities instead of `--original-wide`. [Input example and assumptions](../../experiments/context_review/budget_comparison.md)
 
-To rebuild the release in the thesis checkout, compile `thesis-paper/main.tex` with `latexmk -pdf -outdir=build` from its directory, then run `.\thesis-python.ps1 thesis-paper/package_revision.py --decision-evidence --verify-source`. The [artifact ledger](revision/artifacts.json) records the current and earlier ZIP checksums. Earlier releases can be verified using the replay implementation bundled in each archive.
+The frozen R13 archive includes its own packaging program. Use the replay command above to verify that archive. The current short paper, source and overlay package are indexed in the [manuscript guide](../README.md). The [artifact ledger](revision/artifacts.json) records the checksums.

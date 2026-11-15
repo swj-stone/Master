@@ -1,0 +1,81 @@
+\section{Empirical evaluation}
+\label{sec:minimum-results}
+Ten UCI classification tasks with 4--41 predictors supplied 30 outer folds.
+Six wider tasks with 72--856 predictors supplied 16, including chronological
+splits for Ozone and SECOM, participant-level splits for Parkinson and the
+official Urban split. Development splits allocated 75\%, 12.5\% and 12.5\%
+to fitting, nomination and the refit check, by distinct dates in chronological
+order for Ozone and SECOM and by stratified rows elsewhere. We ranked split-used features by XGBoost gain
+and took the shortest tested prefix whose masked validation scores met the
+8\% relative allowance as the anchor. We kept its leading half as one
+candidate and sampled up to seven other subsets of the same size, rounding
+the retained width up. Eleven singleton-anchor folds offered no deletion and remained in all panel means.
+
+We report the fraction of anchor columns removed by the delivered model,
+counting zero when it breaches an outer tolerance or returns the anchor.
+We denote this effective compression by \(U\) and report the breach rate
+separately. We averaged folds within tasks and gave each task equal weight.
+Paired 95\% intervals resample whole tasks 30,000 times with their fitted
+models and folds held fixed.
+
+\begin{table}[tb]
+\centering\small
+\caption{Nomination cost and outer performance on identical Gain candidate
+sets. Random forests performed both masking and refitting. \(U\) and breach
+are task-weighted percentages. Masks count distinct predictions on the
+nomination sample. Seconds sum within-fold medians from three repetitions.
+The Gain prefix and uniform choice need no masked prediction.}
+\label{tab:minimum-cost-outcome}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrrr@{}}
+\toprule
+&\multicolumn{4}{c}{Ten tasks, 30 folds}&\multicolumn{4}{c}{Six wider tasks, 16 folds}\\
+\cmidrule(lr){2-5}\cmidrule(l){6-9}
+Rule & Masks & Sec. & \(U\) & Breach & Masks & Sec. & \(U\) & Breach\\
+\midrule
+Gain prefix     &0   &--- &1.56&3.33 &0     &--- &2.72 &16.67\\
+Uniform choice  &0   &--- &4.79&6.81 &0     &--- &8.21 &12.96\\
+Single point     &126 &0.61&6.33&10.00&125 &0.65&13.77&16.67\\
+Depth-first vote &189 &0.89&2.89&3.33 &366 &1.96&8.28 &16.67\\
+Best-first vote  &170 &0.81&2.89&3.33 &300 &1.63&8.28 &16.67\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Nomination cost.}
+Depth-first pruning visits candidates in tie order and abandons each row as soon
+as its upper bound cannot beat the incumbent. We kept both orders fixed, fitted a 100-tree forest per fold,
+and timed each rule with a fresh prediction cache on one pinned CPU.
+Each timed rule ran first, second and third once per candidate set. Both searches returned the
+exhaustive vote's nominee on the 46 original sets and on 138 sets from
+three draws of local feature exchanges around ANOVA-ranked anchors on the same folds. Exhaustive voting used 760
+and 1,334 masks on the two original panels. Best-first search cut the
+depth-first count by a further 10\% and 18\%. Nomination time fell by 9\%
+and 17\%, respectively. A single point was faster on both panels
+(Table~\ref{tab:minimum-cost-outcome}).
+Best-first used fewer masked predictions than depth-first on 41 of 184 lists and tied
+on 143. Of the 173 nonempty lists, 90 met the prefix minimum in Section~\ref{sec:certificate}.
+On the other 83 the first candidate won and every rival scored zero. Those lists took
+718 queries against a shortest total of 602. The clocks cover nomination, excluding ranking, model fitting,
+the guard and the final refit.
+
+\paragraph{Choice of subset.}
+The single-point rule maximizes the smallest normalized tolerance margin
+across metrics on the original panel with no features restored.
+Selecting this score across all candidates increased
+\(U\) over the minimum vote by 3.44 percentage points on the ten tasks
+(\([-4.67,15.00]\)) and 5.49 on the six wider tasks (\([0.00,11.05]\)).
+On the first panel its breach rate rose by 6.67 points. The first comparison
+was sensitive to ties. Choosing uniformly among the highest-vote candidates
+gave \(5.42\%\) effective compression, 2.53 points above the fixed order.
+
+To isolate the contribution of voting with a common tie rule, we used
+XGBoost for masking and refitting and retained the better half of each
+fold's candidate sets by Gain rank sum. We compared the highest point
+score on that shortlist with the highest point score among its
+maximum-vote candidates. Voting changed only the Seeds nomination on
+the ten tasks, improving \(U\) by 1.33 points (\([0,4.00]\)) with the
+same breach rate. It changed none of the sixteen wider-fold nominations
+and increased their total mask count from 71 to 168. This retrospective
+comparison reused the measured outcomes. On these shortlists the vote
+rarely altered the decision that received the refit.

@@ -1,0 +1,9 @@
+# Independent checks of the four-page algorithm paper
+
+The reviews concern [the short paper](../minpi.pdf), SHA-256 `1b9d50649a4c6724e0ba95612b60ec9b064f915de8dc7a09f50c13bc5597b20e`. The earlier simulated area-chair decision concerns the [46-page identification study](../supplement/decision-study.pdf).
+
+The mathematical reviewer independently reconstructed votes from the stored prediction and metric records, implemented a separate search without a heap, and enumerated possible winner prefixes to obtain the minimum query count. All 184 per-list records agreed. Among the 173 nonempty lists, 90 met this minimum. On the other 83 lists the first candidate won while all rivals scored zero. The reviewer also recovered 3,333 masked predictions for best-first search, 3,558 for depth-first search and 1,187 for single-point scoring. Summing the medians of three live nominations per list gave 17.64, 18.84 and 6.04 seconds, respectively. [Per-list records](../evidence/vote_certificates/folds.csv) · [Timing receipt](../evidence/vote_certificates/timing-receipt.json)
+
+The first editorial reading identified an undefined depth-first comparator, an unclear budget for the final refit, the exception's missing frequency, and a description that allocated chronological splits by row count. The final reading checked each correction against the four-page PDF. The proof and counterexample appear together on page 2. Table 1 gives nomination cost, effective compression and outer breaches for the same candidate sets.
+
+The reviewers considered the result defensible as a short methods note. Best-first minimax is established, this traversal preserves the existing ordinal decision, and single-point screening had a stronger observed time and mean compression trade-off on the two original panels. These checks concern the mathematical and empirical claims in this paper. They supply no external acceptance decision.

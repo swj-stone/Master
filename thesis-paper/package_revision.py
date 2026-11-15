@@ -12,7 +12,7 @@ from shutil import copyfile
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
 PAPER = Path(__file__).resolve().parent
@@ -24,6 +24,14 @@ OPERATING = PACKAGES / "thesis-operating-evidence.zip"
 TRANSPORT = PACKAGES / "thesis-transport-evidence.zip"
 ROBUSTNESS = PACKAGES / "thesis-robustness-evidence.zip"
 DECISION = PACKAGES / "thesis-decision-evidence.zip"
+SCREENING = PACKAGES / "thesis-minimum-vote-paper.zip"
+DECISION_SHA256 = "659b22b062baa1d6e69a78f59197100831b09c0b2a7384f8e23ed5407c4cfe41"
+FROZEN_STUDY = {
+    PAPER / "supplement/decision-study.pdf":
+        "e128184e2e5e826b7e35a055be6e83e27a1e8a28511d2446882dc2076b321460",
+    PAPER / "supplement/decision-study-source.zip":
+        "2daeab06b5d36d8f982bdfd2de0c3b02da6c31eb8d58a8092fe7cb56ca448838",
+}
 
 
 def digest(path):
@@ -63,18 +71,21 @@ def paper_source():
 
 
 def write_archive(destination, members):
-    tmp = destination.with_suffix(".partial.zip")
-    with ZipFile(tmp, "w", compression=ZIP_DEFLATED, compresslevel=3) as pack:
-        for member, path in sorted(members.items()):
-            if isinstance(path, bytes):
-                pack.writestr(member, path)
-            else:
-                pack.write(path, member)
-    with ZipFile(tmp) as pack:
-        invalid = pack.testzip()
-        if invalid or set(pack.namelist()) != set(members):
-            raise ValueError(f"Archive verification failed at {invalid}")
-    tmp.replace(destination)
+    with TemporaryDirectory(prefix="pack-", dir=destination.parent) as staging:
+        tmp = Path(staging) / destination.name
+        with ZipFile(tmp, "w") as pack:
+            for member, value in sorted(members.items()):
+                # Fixed ZIP headers keep source archives stable across checkout times and platforms.
+                info = ZipInfo(member, date_time=(1980, 1, 1, 0, 0, 0))
+                info.create_system = 3
+                info.external_attr = 0o100644 << 16
+                data = value if isinstance(value, bytes) else value.read_bytes()
+                pack.writestr(info, data, compress_type=ZIP_DEFLATED, compresslevel=3)
+        with ZipFile(tmp) as pack:
+            invalid = pack.testzip()
+            if invalid or set(pack.namelist()) != set(members):
+                raise ValueError(f"Archive verification failed at {invalid}")
+        tmp.replace(destination)
 
 
 def verify_source(archive, pdf):
@@ -439,45 +450,158 @@ def verify_transport(archive):
         print(result.stdout.decode(errors="replace").splitlines()[-1])
 
 
+def screening_members(pdf, source):
+    for path, expected in FROZEN_STUDY.items():
+        if digest(path) != expected:
+            raise ValueError(f"Frozen supporting study differs from its R13 release: {path}")
+    if DECISION.exists() and digest(DECISION) != DECISION_SHA256:
+        raise ValueError(f"Archived prediction release differs from R13: {DECISION}")
+    files = [
+        ROOT / "src/minppi_mofs/minimum_vote.py",
+        ROOT / "experiments/context_review/vote_certificates.py",
+        ROOT / "experiments/context_review/vote_certificate_timing.py",
+        ROOT / "tests/test_vote_certificates.py",
+        PAPER / "formal/VoteCertificate.lean",
+        PAPER / "formal/lean-toolchain",
+        *FROZEN_STUDY,
+    ]
+    results = EVIDENCE / "vote_certificates"
+    evidence = sorted(p for p in results.iterdir() if p.is_file())
+    if not any(p.suffix == ".csv" for p in evidence):
+        raise FileNotFoundError(f"No certificate result tables found in {results}")
+    required = {"summary.csv", "folds.csv", "timing-summary.csv", "timings.csv", "timing-receipt.json"}
+    missing = required - {p.name for p in evidence}
+    if missing:
+        raise FileNotFoundError(f"Missing certificate evidence in {results}: {sorted(missing)}")
+    files.extend(evidence)
+    members = {p.relative_to(ROOT).as_posix(): p for p in files}
+    members["minimum-vote.pdf"] = pdf
+    members["minimum-vote-source.zip"] = source
+    manifest = {
+        "members_sha256": {name: digest(path) for name, path in sorted(members.items())},
+        "prediction_archive": {"name": DECISION.name, "sha256": DECISION_SHA256},
+        "replay": (
+            "Extract the prediction archive to a fresh directory, then extract this release in the "
+            "same directory. Install the dependencies specified by the archived pyproject.toml or "
+            "use the existing thesis environment. Include the extraction directory and its src "
+            "subdirectory in PYTHONPATH. From the extraction directory run "
+            "python -m experiments.context_review.vote_certificates, then "
+            "python -m experiments.context_review.vote_certificate_timing verify. "
+            "Fresh wall times require the raw predictors. The recorded clocks can be rescored from the archives."
+        ),
+    }
+    members["release.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
+    return members
+
+
+def verify_screening(archive, predictions):
+    """Reconstruct the new result tables from the pinned forest release and measured clocks."""
+    scratch = ROOT / "tmp"
+    scratch.mkdir(exist_ok=True)
+    with ZipFile(archive) as short, ZipFile(predictions) as previous:
+        manifest = json.loads(short.read("release.json"))
+        if manifest["prediction_archive"]["sha256"] != DECISION_SHA256 or digest(predictions) != DECISION_SHA256:
+            raise ValueError("Expected the original R13 prediction archive")
+        entries = manifest["members_sha256"]
+        if set(short.namelist()) != set(entries) | {"release.json"}:
+            raise ValueError("Release contents differ from the manifest")
+        for name, expected in entries.items():
+            if hashlib.sha256(short.read(name)).hexdigest() != expected:
+                raise ValueError(f"Changed short-release member: {name}")
+        with TemporaryDirectory(prefix="vote-", dir=scratch) as temp:
+            folder = Path(temp)
+            previous.extractall(folder)
+            short.extractall(folder)
+            results = folder / "thesis-paper/evidence/vote_certificates"
+            expected = {p: p.read_text(encoding="utf8") for p in (
+                results / "folds.csv", results / "summary.csv", results / "timing-summary.csv")}
+            for path in expected:
+                path.unlink()
+            env = {**os.environ, "PYTHONPATH": os.pathsep.join(map(str, [folder / "src", folder])),
+                   "PYTHONDONTWRITEBYTECODE": "1", "NUMBA_CACHE_DIR": str(folder / "cache"),
+                   "MPLCONFIGDIR": str(folder / "mpl")}
+            for args in (["experiments.context_review.vote_certificates"],
+                         ["experiments.context_review.vote_certificate_timing", "verify"]):
+                proc = subprocess.run([sys.executable, "-B", "-m", *args], cwd=folder, env=env,
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                if proc.returncode:
+                    raise RuntimeError(proc.stdout.decode(errors="replace"))
+            for path, text in expected.items():
+                if path.read_text(encoding="utf8") != text:
+                    raise ValueError(f"Archived and recomputed {path.name} differ")
+    print("Recomputed all three certificate and timing tables from the two releases.")
+
+
+def record_artifacts(paths):
+    # Keep the recorded digests of historical releases even in a checkout without local data archives.
+    ledger = {row["path"]: row for row in read(ARTIFACTS)}
+    for path in paths:
+        name = path.relative_to(ROOT).as_posix()
+        item = dict(path=name, bytes=path.stat().st_size, sha256=digest(path))
+        if path.suffix == ".zip":
+            with ZipFile(path) as pack:
+                item["members"] = len(pack.namelist())
+        ledger[name] = item
+        print(name, item["sha256"])
+    with TemporaryDirectory(dir=ARTIFACTS.parent) as staging:
+        updated = Path(staging) / ARTIFACTS.name
+        updated.write_text(json.dumps(list(ledger.values()), indent=2) + "\n", encoding="utf8")
+        updated.replace(ARTIFACTS)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--decision-evidence", "--robustness-evidence", "--transport-evidence", "--evidence",
-                        action="store_true", help="Build the current supplement as thesis-decision-evidence.zip")
-    parser.add_argument("--verify-transport", type=Path, metavar="ZIP",
-                        help="Replay an existing transport evidence ZIP in an isolated extraction")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--screening-release", "--evidence", action="store_true",
+                      help="Package the current short paper, its study supplement and certificate replay")
+    for flag, path in (("--decision-evidence", DECISION), ("--robustness-evidence", ROBUSTNESS),
+                       ("--transport-evidence", TRANSPORT)):
+        mode.add_argument(flag, dest="frozen", action="store_const", const=path,
+                          help=f"Verify the frozen {path.name} using its archived replay code")
+    mode.add_argument("--verify-transport", type=Path, metavar="ZIP",
+                      help="Replay an existing research evidence ZIP in an isolated extraction")
+    mode.add_argument("--verify-screening", type=Path, metavar="ZIP",
+                      help="Replay the short paper's certificate tables using the R13 prediction archive")
     parser.add_argument("--verify-source", action="store_true", help="Compile the ZIP alone and compare every page's text")
     args = parser.parse_args()
+    if args.verify_screening:
+        verify_screening(args.verify_screening, DECISION)
+        return
+    if args.frozen:
+        expected = next(row["sha256"] for row in read(ARTIFACTS)
+                        if row["path"] == args.frozen.relative_to(ROOT).as_posix())
+        if digest(args.frozen) != expected:
+            raise ValueError(f"Archived release does not match the ledger: {args.frozen}")
+        if args.verify_source:
+            with TemporaryDirectory() as staging, ZipFile(args.frozen) as frozen:
+                folder = Path(staging)
+                for name in ("minpi.pdf", "minpi-source.zip"):
+                    (folder / name).write_bytes(frozen.read("thesis-paper/" + name))
+                verify_source(folder / "minpi-source.zip", folder / "minpi.pdf")
+        verify_transport(args.frozen)
+        return
     if args.verify_transport:
         verify_transport(args.verify_transport)
         return
-    pdf = PAPER/"minpi.pdf"
-    archive = PAPER/"minpi-source.zip"
-    copyfile(PAPER/"build/main.pdf", pdf)
-    write_archive(archive, paper_source())
-    if args.verify_source:
-        verify_source(archive, pdf)
-    if args.decision_evidence:
-        release = DECISION
-        PACKAGES.mkdir(exist_ok=True)
-        with TemporaryDirectory(prefix="transport-release-", dir=PACKAGES) as staging:
-            candidate = Path(staging) / release.name
-            write_archive(candidate, transport())
-            verify_transport(candidate)
-            candidate.replace(release)
-    materials = [pdf, archive, PACKAGES/"thesis-pmlb-evidence-r1.zip",
-                 PACKAGES/"thesis-context-revision-evidence.zip", REASSESSMENT, OPERATING, TRANSPORT, ROBUSTNESS, DECISION]
-    entries = []
-    for path in materials:
-        if path.exists():
-            item = dict(path=path.relative_to(ROOT).as_posix(), bytes=path.stat().st_size,
-                        sha256=digest(path))
-            if path.suffix == ".zip":
-                with ZipFile(path) as pack:
-                    item["members"] = len(pack.namelist())
-            entries.append(item)
-    ARTIFACTS.write_text(json.dumps(entries, indent=2)+"\n", encoding="utf8")
-    for item in entries:
-        print(item["path"], item["sha256"])
+    pdf = PAPER / "minpi.pdf"
+    source = PAPER / "minpi-source.zip"
+    outputs = [pdf, source]
+    with TemporaryDirectory(prefix="paper-", dir=PAPER) as staging:
+        folder = Path(staging)
+        copyfile(PAPER / "build/main.pdf", folder / pdf.name)
+        write_archive(folder / source.name, paper_source())
+        if args.verify_source or args.screening_release:
+            verify_source(folder / source.name, folder / pdf.name)
+        if args.screening_release:
+            PACKAGES.mkdir(exist_ok=True)
+            members = screening_members(folder / pdf.name, folder / source.name)
+            write_archive(folder / SCREENING.name, members)
+            if DECISION.is_file():
+                verify_screening(folder / SCREENING.name, DECISION)
+            outputs.append(SCREENING)
+        for path in outputs:
+            (folder / path.name).replace(path)
+    record_artifacts([*outputs, *FROZEN_STUDY])
 
 
 if __name__ == "__main__":

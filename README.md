@@ -2,17 +2,19 @@
 
 硕士研究在 `MastersThesis/` 的 `thesis/masters` 分支进行，与 `../Master/` 共享 Git 仓库及 Python 环境。会议最终版在 `../Master/` 的 `main` 分支，供只读参考。工作树中的 `data/`、`results/` 和 `packages/` 是独立的本地文件，受 Git 忽略规则管理。
 
-## 遮蔽损失能揭示多少删列重训后的信息？
+## 最低票数特征筛选的最佳优先搜索
 
-论文从两个层面研究删列。在已知的有限样本中，单靠原模型的连续输出就能锁定全部 704 个提案的容差判定，精度降低后会出现与同一记录相容的相反判定。在实际选列时，给相同 Gain 候选和单点平票规则再加投票，只改变了常规组的一个提名，宽数据组为零。换用随机森林和 ANOVA 的局部候选后，两类评分的相对表现随数据来源与候选抽样变化。[当前论文](thesis-paper/minpi.pdf) · [完整证据、复现命令与新研究设计检查](thesis-paper/evidence/decision-release.md) · [终审意见逐项回应](thesis-paper/final-review/response.md) · [实验协议](experiments/context_review/README.md)
+[短篇论文](thesis-paper/minpi.pdf) · [独立 LaTeX 源码](thesis-paper/minpi-source.zip) · [算法和复现入口](thesis-paper/README.md) · [新的结果包](packages/thesis-minimum-vote-paper.zip)
 
-本次根据终审意见增加了同一批测试行上的成对比较、最高票组内的均匀抽选、预测类内重编码、八轮法的完整计时和留一来源选择。实验目录按问题索引，会议版本保存在另一工作树。[实验索引](thesis-paper/evidence/decision-release.md)
+每个候选的分数是各恢复情境中最低的赞成票数。每步检查当前上界最大的候选，平票按原顺序处理。在同样的 184 组候选上，最佳优先和深度优先搜索选出的子集逐组相同，分别查询 2,382 和 2,582 个候选–情境组合。单点遮蔽在两个原始森林面板上耗时更少，平均有效压缩更高。[逐组记录](thesis-paper/evidence/vote_certificates/folds.csv) · [实测提名用时](thesis-paper/evidence/vote_certificates/timing-summary.csv)
 
-在 704 个历史候选列集中，有 136 个在同一折与另一个同宽候选得到完全相同的二元选票，但重训后的损失一个超限、一个未超限。新实验让各策略从同一组半宽候选中提名一个列集，再用独立重训检查决定是否接受。首批 10 个 UCI 任务上，单次连续遮蔽评分、最差背景票数、均匀随机提名的容差内平均压缩分别为 7.29%、1.33%、5.49%。在另外 6 个较高维任务的 16 个划分上，四种主策略的压缩均为 7.34%，各有 3 次外测超限。[论文 PDF](thesis-paper/minpi.pdf) · [原始两组实验的证据](thesis-paper/evidence/transport-release.md) · [逐任务结果](thesis-paper/evidence/chance/)
+### 前期识别研究
+
+第 13 稿独立保存了有限树模型的可识别性分析、共同配对、平票及低成本重训对照。[长篇研究报告](thesis-paper/supplement/decision-study.pdf) · [证据索引](thesis-paper/evidence/decision-release.md) · [第 13 稿的审稿与回应](thesis-paper/final-review/response.md)
 
 ### 早期投票与重训对照
 
-算法先用 Compact Gain 选出初始列集，再提议删除其中若干列。每次恢复一组背景列，在同一个已训练模型上比较候选与初始列集。四个验证面板投票，所有恢复情形都要有至少三票同意。这里的 min 作用于一项删列提案，会议版 MinPI 衡量的是单个特征的最差边际投票。两者的定义和输出不同。[英文论文](thesis-paper/minpi.pdf) · [论文与复现说明](thesis-paper/README.md)
+算法先用 Compact Gain 选出初始列集，再提议删除其中若干列。每次恢复一组背景列，在同一个已训练模型上比较候选与初始列集。四个验证面板投票，所有恢复情形都要有至少三票同意。这里的 min 作用于一项删列提案，会议版 MinPI 衡量的是单个特征的最差边际投票。两者的定义和输出不同。[背景研究](thesis-paper/supplement/decision-study.pdf) · [论文与复现说明](thesis-paper/README.md)
 
 在已用于比较的 14 个 PMLB 分类任务上，我们用独立于选择的外折测试行计算删列重训损失。与只检查空、全两种背景相比，加入分离设计的中间背景，在 400 个历史搜索提案上多识别了 11 个超容差提案，同时额外拒绝了 20 个重训仍在容差内的提案。在另行抽取的 379 个删列集合上，多识别 0 个，多误拒 9 个。按任务看，搜索提案的 11 个额外检出中有 7 个来自 Sonar。另一次实验给候选和 Gain 前缀相同的独立重训检查，两者的平均外折 AUC 都为 0.93327。[逐任务图](thesis-paper/figures/refit-vetoes.pdf) · [独立复核与适用范围](thesis-paper/audit/refit-review.md)
 
@@ -32,7 +34,7 @@
 | 查找内容 | 入口 |
 | --- | --- |
 | 复现实验或查看逐项结果 | [实验协议与执行命令](experiments/context_review/README.md) · [本轮证据包](packages/thesis-transport-evidence.zip) · [早期操作策略证据](thesis-paper/evidence/operating/README.md) · [早期重训对照汇总](thesis-paper/evidence/reassessment/) |
-| 稿件、复审和可验证的数学命题 | [论文 PDF](thesis-paper/minpi.pdf) · [论文源文件包](thesis-paper/minpi-source.zip) · [复审意见](thesis-paper/audit/transport-area-chair.md) · [独立复算记录](thesis-paper/audit/transport-forensic.md) · [可识别范围证明](thesis-paper/formal/IdentificationBounds.lean) |
+| 稿件、复审和可验证的数学命题 | [背景研究 PDF](thesis-paper/supplement/decision-study.pdf) · [历史源文件包](thesis-paper/supplement/decision-study-source.zip) · [复审意见](thesis-paper/audit/transport-area-chair.md) · [独立复算记录](thesis-paper/audit/transport-forensic.md) · [可识别范围证明](thesis-paper/formal/IdentificationBounds.lean) |
 | 投票、min 与提案搜索 | [搜索实现](src/minppi_mofs/context_vote.py) · [恢复列设计](src/minppi_mofs/context_design.py) · [历史六集的机制检验](experiments/context_diagnostics/README.md) |
 | 已用于开发或对照的基准 | [14 个 PMLB 任务与高维挑战](experiments/context_study/README.md) · [早期基线核查](thesis-paper/audit/rounds/README.md) |
 

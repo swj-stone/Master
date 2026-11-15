@@ -5,69 +5,31 @@
 \renewcommand{\@noticestring}{Anonymous research draft for internal review.}
 \makeatother
 \usepackage[T1]{fontenc}
-\usepackage{amsmath,amssymb,amsthm,booktabs,graphicx,microtype,xcolor}
-\newtheorem{proposition}{Proposition}
-\usepackage{tikz}
+\usepackage{amsmath,amssymb,amsthm,booktabs,microtype}
 \usepackage[hidelinks]{hyperref}
-\graphicspath{{./}}
+\newtheorem{proposition}{Proposition}
+
 \begin{document}
-\title{What Do Masked Losses Reveal About Feature Deletion After Retraining?}
+\title{Best-First Search for Minimum-Vote Feature Screening}
 \author{Anonymous Author(s)}
 \maketitle
+
 \begin{abstract}
-Which outcomes after refitting are compatible with a fitted model's masked predictions? When only one feature subset can receive a full refit check, how much does the masking measurement improve that choice? For finite tree ensembles we characterize the jointly attainable AUC and accuracy conditional on the fitted models and admissible evaluation inputs. On a known outer feature dictionary, an unmasked prediction at full precision identified all 704 historical tolerance decisions. Across 1,283 overlapping same-width pairs, individual point-mask observations already fixed both candidates' outcomes for 1,218 pairs. After observing both masks and their anchor, enforcing a common row assignment ruled out a strict ordering on three pairs. These comparisons assume both candidates are delivered. On six wider tasks, two nomination rules returned different subsets on only one fold. Their average effective compression could differ by at most 2.78 percentage points before the outer outcomes were scored. Adding a minimum vote to a point tie-break on matched Gain shortlists changed one nomination on ten tasks and none on six wider tasks. In forest experiments we compared continuous scores with uniform sampling among exactly the same maximum-vote candidates. Full margins gained 0.91 and 2.71 points of effective compression on the two original panels; on locally exchanged slates the differences were $-0.25$ and $+1.26$. All four paired task intervals included zero.
+A fitted classifier can screen proposed feature deletions before one candidate is refit. For each subset, we count the validation panels on which masking preserves predictive performance within tolerance, then take the lowest count across feature restorations. Best-first search reads the next restoration of the candidate with the highest remaining upper bound. We give a necessary and sufficient stopping condition and determine when the search uses the fewest queries for the fixed restoration order. It attained this minimum on 90 of 173 nonempty candidate lists. On the other 83, the first candidate won and every rival scored zero. Across all 184 lists from 16 classification tasks, it preserved every exhaustive nomination and used 2,382 candidate--restoration evaluations against 2,582 for depth-first pruning. Single-point masking was faster and achieved higher mean compression within tolerance on both original task panels.
 \end{abstract}
 
 \section{Introduction}
-A fitted classifier may use just one of two predictive columns. Masking its preferred column can destroy its predictions even when a new classifier could recover the signal from the other. Feature selection creates a practical version of this problem. Given several proposed deletions and enough time to retrain on only one, an analyst can cheaply measure the fitted model's loss for each proposal. What part of that measurement helps identify a deletion the new fit can tolerate?
+A classifier trained on two interchangeable features may use only one of them. Masking that feature can destroy the fitted classifier's predictions even though retraining on the other feature would recover the signal. This distinction matters when several deletions are proposed and only one candidate can be checked by retraining. A screening rule decides which deletion gets that check. Wrappers spend fits to compare subsets directly~\cite{kohavi1997wrappers}. Masking offers a cheaper measurement with a different target~\cite{covert2021removing,hooker2019roar}.
 
-Consider two proposals for which the reference model exceeds its accuracy allowance on every validation panel. One misses by a single prediction, the other by half the sample. A rule counting approvals assigns both zero votes. Restoring additional columns can reveal a dependency that a single mask misses, yet taking the worst approval count over restorations can also leave more candidates tied. The first question concerns identification given specified observations. The second concerns the decision available to an analyst with one candidate refit. Even large uncertainties for two individual candidates can cancel when both face the same reassignment of evaluation rows.
+We study a screen that votes on each proposed deletion with some of the other features restored. A candidate's lowest vote across restorations determines its rank. One bad restoration can therefore eliminate a candidate, whereas a high score on an early restoration leaves its rank unresolved. We use this asymmetry to choose the next prediction. The search is an application of best-first minimax~\cite{stockman1979,plaat1995} to a table with few possible vote counts and a fixed tie order. Our analysis identifies the observations needed for this particular feature-selection decision and measures their cost against depth-first pruning and single-point screening.
 
-The six wider tasks illustrate a limit of the decision experiment. After the inner checks the point and full rules differed on one fold of weight $1/18$, where each delivered set saved half the features. The supports alone bounded the panel improvement by 2.78 percentage points before outer scoring. The locally prespecified success rule required the lower paired confidence limit to exceed five points with no increase in breach rate.
+\input{minimum-vote}
+\input{minimum-certificate}
+\input{minimum-results}
 
-We characterize attainable refit metrics when the trained trees are known and evaluation inputs are partially observed. A matched random identifier tests how much ambiguity disappears when a precise outer prediction identifies a feature vector. We then compare nomination rules with one refit guard. External sources include participant-level, time-ordered and official test splits. We vary the masking and refitted learner on identical slates, then replace tree-based anchors and global subsets with a univariate filter and local exchanges.
-
-\paragraph{Relation to prior work.}
-Removing features at prediction time and fitting a predictor on a reduced input set define different quantities~\cite{covert2021removing}. Carter et al.\ mask individual inputs to find subsets sufficient for a particular prediction~\cite{carter2019sufficient}. Hooker et al.\ remove features and retrain to evaluate a ranking~\cite{hooker2019roar}. Test-time replacements can also take a model outside its training distribution~\cite{hase2021ood}. Wrappers and recursive elimination evaluate candidate subsets by fitting predictors~\cite{kohavi1997wrappers,guyon2002rfe}. Gao et al.\ approximate a retrained wide neural network by linearizing around the full fit~\cite{gao2022lazy}. Sun and Raskutti warm-start from a masked solution and stop learning early, with theory for sufficiently wide networks and symmetric weak trees~\cite{sun2025warm}. We evaluate the information in a cheap signal for a particular decision, comparing it with the outcomes of actual reduced fits. Our limited-training control fits a fresh eight-round tree ensemble on each subset. Tree-ensemble verification has used mixed-integer optimization to find inputs that change a model's prediction~\cite{kantchelian2016evasion}. Our feasible set links two fitted models and the aggregate ranking and classification metrics of labeled evaluation rows.
-
-\section{The measurement and the target}
-\label{sec:measurements}
-Let $A$ be the starting set of columns (the \emph{anchor}), $S\subset A$ a proposed retained subset, and $T$ the remaining eligible columns outside $A$. We first fit a full predictor and rank its split-used columns by average split gain. Among tested prefixes we use the shortest whose masked validation metrics lie within 8\% of the full model. This defines $A$ and fixes the ranking within it. For any restoration $E\subseteq T$, the fitted model sees $S\cup E$ for the candidate and $A\cup E$ for its reference. Hidden columns take fitting-sample median values. Varying $E$ probes how the fitted model's response depends on the other visible inputs.
-
-For metric $i$ and panel $b$, let $Q_{bi}(D)$ be the score of the fitted model with visible columns $D$. Let $s_i=1$ for a higher-is-better metric and $s_i=-1$ for a loss. Write $R_{bi}=Q_{bi}(A\cup E)$ and $V_{bi}=Q_{bi}(S\cup E)$, suppressing their dependence on $E$. With $\epsilon=10^{-12}$, panel $b$ approves when
-\begin{equation}
- I_b(S,E)=\mathbf 1\{\ s_i(R_{bi}-V_{bi})\leq\tau_i|R_{bi}|+\epsilon\ \text{for all }i\}\,.
- \label{eq:ballot}
-\end{equation}
-We use 3\% relative allowances for AUC and accuracy, and a 5\% average-precision allowance on binary folds where the smaller class constitutes at most 5\% of the proposal sample. Multiclass AUC averages one-versus-rest AUCs. The first panel scores the sampled proposal rows, with weights for subsampling. Three bootstrap panels reweight the same observations. An approval fraction from these four dependent panels has no calibrated confidence interpretation.
-
-The restoration family $\mathcal E$ includes the empty and full tail and interiors giving each tail column a distinct, equal-weight binary signature~\cite{spencer1970separating}. For any ordered pair of distinct tail columns, some restoration contains the first and omits the second. A minimum vote $v(S)=\min_{E\in\mathcal E}\sum_b I_b(S,E)$ accepts when $v(S)\geq3$. This adapts the minimum in a min-marginal feature power index~\cite{shi2026minpi} to testing a proposed group. Its pair-coverage property follows from incomparable signatures. Its explanatory reach is limited. In 226 earlier testable proposals, an ordered-pair rule that vetoes exactly when one column is present and another absent reproduced the observed decisions for zero proposals on either of two panel samples (Appendix~\ref{sec:context-design}).
-
-The target is a tolerance \emph{breach} after retraining the specified learner on $S$. We fit separate candidate and anchor models on identical training rows. A breach occurs if their metrics on the same outer-test rows violate any inequality in~\eqref{eq:ballot}. The outer target uses no restored features or bootstrap votes. A guard, when present, checks the same inequalities using a different training and evaluation split before deciding whether to keep the candidate.
-
-\input{diagnostic-evidence}
-\input{transport-study}
-
-\section{Discussion}
-On a known dictionary, high-precision outputs often identify a row. Even randomized codes resolved most decisions at the original precision. The class-preserving control shows that at four bits the fitted score's grouping also matters. On the proposal panels, unrounded metrics distinguished each support within a fold and width, while some ballots merged opposite outcomes. Neither retrospective lookup estimates failure on a new deletion.
-
-On the forest Gain slates, changing the order of maximum-vote ties accounted for much of the observed gain. All four full-minus-uniform compression intervals included zero. The Parkinson fold illustrates what compression can conceal: two returned models that passed with equal savings differed in AUC. For a study with one candidate guard, start with a point mask, bound the possible gain from the two policies' guarded returns before opening outer labels, then report both compression and breaches.
-
-Holding out whole sources gave little guidance on when to pay for more masks. At a breach penalty of half an anchor's savings the tie rule chosen on other sources changed net return over unrestricted point masking by $-4.17,-6.18,+1.69,-1.35$ points on the two Gain and two local panels (Appendix~\ref{sec:transfer-choice}). Every omission on the only positive panel selected the original tie order.
-
-The task collections are purposive. Outer folds share training rows, and the forest uses one seed per fold. Tolerance choice, mask replacement, and candidate construction each limit transfer. Two sixteen-row masking backgrounds gave opposite full-minus-point results on the wider boosted-tree panel, $+5.44$ and $-5.50$ points (Appendix~\ref{sec:masking-background}). Column counts also leave acquisition costs unmeasured.
+\section{Scope}
+Exactness concerns the winner of the specified ballot. The four panels reuse proposal rows, so their votes do not provide four independent measurements of risk. The one-candidate budget counts the nominee sent to the guard. For outer evaluation we refit the returned subset and its reference on all development rows and compare them on held-out rows. A nominee that passes the guard may still breach an outer tolerance. The benchmark reuses 16 purposively selected sources and one forest seed per fold. A stable prediction advantage on new sources has yet to be established.
 
 \bibliographystyle{plainnat}
 \bibliography{references,revision,ensemble-sources}
-\clearpage
-\appendix
-\input{identification-bounds}
-\input{ensemble-identification}
-\input{transport-details}
-\input{forest-diagnostics}
-\input{within-tier-contrasts}
-\input{transfer-choice}
-\input{original-comparisons}
-\input{supporting-studies}
-\input{transport-checklist}
 \end{document}
