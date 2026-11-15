@@ -1,5 +1,11 @@
 # Feature deletion after retraining
 
+The [robustness release](../../thesis-paper/evidence/robustness-release.md) adds [continuous observation and single-swap tests](transcript_observers.md), [matched-precision codebooks](score_resolution.md), [Gain with matched tie rules](gain_increment.md), [changes of both learners](forest_cross.md), and [three ANOVA exchange slates per fold](neighborhood_replicates.md). Use the archive below to reproduce their tables together with the previous transport experiments.
+
+```powershell
+.\thesis-python.ps1 thesis-paper/package_revision.py --verify-transport packages/thesis-robustness-evidence.zip
+```
+
 The two external panels ask which candidate should receive a single refit check. Their probability archives support rescoring at the fold and task levels, including the expected outcome of uniform nomination over all measured candidates. The ten-task study used 30 record-level folds. The six wider sources contributed 16 splits, including chronological, participant-aggregated and official holdouts. [Ten-task design](transport_external.md) · [Wide-panel design](wide_panel.md) · [Exact lottery contrasts](../../thesis-paper/evidence/chance/)
 
 To replay the collected outcomes without training a model, use the command below from the thesis checkout. The release guide indexes every campaign, its source, its locks, and the additional inputs used for fresh fits. [Archive and replay guide](../../thesis-paper/evidence/transport-release.md) · [Historical matched-risk study](matched_signal.md)

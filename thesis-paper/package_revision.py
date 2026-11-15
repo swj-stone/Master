@@ -22,6 +22,7 @@ ARTIFACTS = PAPER / "evidence/revision/artifacts.json"
 REASSESSMENT = PACKAGES/"thesis-refit-reassessment-evidence.zip"
 OPERATING = PACKAGES / "thesis-operating-evidence.zip"
 TRANSPORT = PACKAGES / "thesis-transport-evidence.zip"
+ROBUSTNESS = PACKAGES / "thesis-robustness-evidence.zip"
 
 
 def digest(path):
@@ -154,9 +155,9 @@ def transport():
                                        "requirements.txt", "src/minppi_mofs/__init__.py",
                                        "experiments/test/run_piv0_seed42.py")}
     files.update({PAPER / "README.md", PAPER / "minpi.pdf", PAPER / "minpi-source.zip",
-                  Path(__file__).resolve(), EVIDENCE / "transport-release.md",
+                  Path(__file__).resolve(), EVIDENCE / "transport-release.md", EVIDENCE / "robustness-release.md",
                   PAPER / "identification-bounds.tex", PAPER / "audit/rounds/pmlb_baselines.py"})
-    for pattern in ("transport*", "refit_observation*", "refit-observation*", "identification_bounds*"):
+    for pattern in ("transport*", "robustness*", "refit_observation*", "refit-observation*", "identification_bounds*"):
         files.update((PAPER / "audit").glob(pattern))
     files.update(p for p in (PAPER / "formal").iterdir() if p.suffix in {".lean", ".wl"}
                  or p.name == "lean-toolchain")
@@ -170,7 +171,9 @@ def transport():
     files.update(reviews)
     for name in ("transport", "wide", "low_fidelity", "refinement", "matched_signal", "opportunity",
                  "wide_slate", "chance", "margin_factorial", "receiver", "opportunities", "marginal",
-                 "concordance"):
+                 "concordance", "ensemble_cells", "transcript_permutations", "transcript_information",
+                 "gain_increment", "forest_cross", "filter_neighborhood", "neighborhood_replicates",
+                 "transcript_swaps", "score_resolution", "ordinal_decomposition", "matched_stopping"):
         files.update(p for p in (EVIDENCE / name).glob("*") if p.suffix in {".csv", ".json", ".md", ".zip", ".npz"})
     campaigns = ["transport-uci", "transport-mammographic-four", "wide-uci", "matched-signal-r2",
                  "refit-opportunity", "low-fidelity", "wide-slate", "ballot-refinement-first", "ballot-refinement-wide"]
@@ -305,7 +308,9 @@ def replay_archived_tables():
     from experiments.context_review import (
         ballot_refinement, candidate_concordance, chance_nomination, decision_opportunities, lottery_reference,
         low_fidelity_score, marginal_replay, matched_signal, receiver_transport, transport_mammographic,
-        transport_score,
+        transport_score, ensemble_identification, filter_neighborhood_score, forest_replay, gain_increment_score,
+        transcript_information, transcript_permutations, transcript_swaps, neighborhood_replicates_score,
+        score_resolution_replay, score_resolution_check, ordinal_decomposition, matched_stopping,
     )
 
     def compare(path, frame):
@@ -344,6 +349,23 @@ def replay_archived_tables():
                       ("costs", "agreement", "folds", "tasks", "means", "contrasts")))
     producers.append((candidate_concordance.main, "concordance",
                       ("candidates", "folds", "tasks", "summary", "contrasts")))
+    producers.extend((
+        (ensemble_identification.main, "ensemble_cells", ("metric-sets", "summary")),
+        (transcript_permutations.replay, "transcript_permutations", ("proposals", "summary")),
+        (transcript_information.replay, "transcript_information", ("proposals", "summary")),
+        (gain_increment_score.main, "gain_increment",
+         ("folds", "tasks", "means", "paired-folds", "paired-tasks", "contrasts", "costs")),
+        (forest_replay.replay, "forest_cross", ("policies", "tasks", "means", "contrasts", "rank-folds",
+         "rank-tasks", "rank-means", "rank-contrasts", "score-collisions", "candidates", "costs")),
+        (filter_neighborhood_score.replay, "filter_neighborhood",
+         ("bounds", "candidates", "contrasts", "costs", "fold-bounds", "means", "policies", "task-bounds", "tasks", "ties")),
+        (neighborhood_replicates_score.replay, "neighborhood_replicates",
+         ("policies", "candidates", "overlap", "draw-tasks", "draw-means", "draw-contrasts", "tasks", "means", "contrasts")),
+        (transcript_swaps.replay, "transcript_swaps", ("proposals", "tasks", "summary")),
+        (score_resolution_replay.replay, "score_resolution", ("occupancy", "proposals", "tasks", "summary")),
+        (ordinal_decomposition.replay, "ordinal_decomposition", ("folds", "task-contrasts", "summary")),
+        (matched_stopping.replay, "matched_stopping", ("folds", "summary", "timing-summary")),
+    ))
 
     # Remove the reference copies in the temporary extraction so each scorer must create its outputs.
     table_count = len(summary)
@@ -356,6 +378,12 @@ def replay_archived_tables():
         for path, frame in expected.items():
             compare(path, frame)
         table_count += len(paths)
+    resolution_audit = EVIDENCE / "score_resolution/audit.json"
+    expected_checks = read(resolution_audit)
+    resolution_audit.unlink()
+    score_resolution_check.check()
+    if read(resolution_audit) != expected_checks:
+        raise ValueError("The independent finite-orbit verification changed")
     collisions = PAPER / "audit/refit-observation-collisions.csv"
     reference = pd.read_csv(collisions)
     collisions.unlink()
@@ -366,7 +394,7 @@ def replay_archived_tables():
         if name.split(".")[0] in {"experiments", "minppi_mofs"} and getattr(module, "__file__", None):
             if not Path(module.__file__).resolve().is_relative_to(ROOT):
                 raise ValueError(f"Replay imported {name} from outside the extracted archive")
-    print(f"Verified {table_count} archived tables, including the logistic receiver, and all wide policy/fold scores.")
+    print(f"Verified {table_count} archived tables, both masking learners, and the outer policy/fold scores.")
 
 
 def verify_transport(archive):
@@ -386,8 +414,8 @@ def verify_transport(archive):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--transport-evidence", "--evidence", action="store_true",
-                        help="Build and replay the transport evidence archive")
+    parser.add_argument("--robustness-evidence", "--transport-evidence", "--evidence", action="store_true",
+                        help="Build the current supplement as thesis-robustness-evidence.zip")
     parser.add_argument("--verify-transport", type=Path, metavar="ZIP",
                         help="Replay an existing transport evidence ZIP in an isolated extraction")
     parser.add_argument("--verify-source", action="store_true", help="Compile the ZIP alone and compare every page's text")
@@ -401,15 +429,16 @@ def main():
     write_archive(archive, paper_source())
     if args.verify_source:
         verify_source(archive, pdf)
-    if args.transport_evidence:
+    if args.robustness_evidence:
+        release = ROBUSTNESS
         PACKAGES.mkdir(exist_ok=True)
         with TemporaryDirectory(prefix="transport-release-", dir=PACKAGES) as staging:
-            candidate = Path(staging) / TRANSPORT.name
+            candidate = Path(staging) / release.name
             write_archive(candidate, transport())
             verify_transport(candidate)
-            candidate.replace(TRANSPORT)
+            candidate.replace(release)
     materials = [pdf, archive, PACKAGES/"thesis-pmlb-evidence-r1.zip",
-                 PACKAGES/"thesis-context-revision-evidence.zip", REASSESSMENT, OPERATING, TRANSPORT]
+                 PACKAGES/"thesis-context-revision-evidence.zip", REASSESSMENT, OPERATING, TRANSPORT, ROBUSTNESS]
     entries = []
     for path in materials:
         if path.exists():
