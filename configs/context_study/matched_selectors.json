@@ -1,0 +1,8 @@
+{
+  "purpose": "Exploratory equal-compression comparison after observing the same-width Gain results. Every primary PMLB fold is included. No method tuning or dataset exclusions.",
+  "width": "Receive k from the frozen separating design for that fold. Give RFE and ANOVA access to all original columns on the outer development rows. All methods use the same external test rows, class order, final predictor and exact feature count.",
+  "rfe": "Native sklearn.feature_selection.RFE with the primary XGBClassifier specification, average split gain, block step 0.2 and n_features_to_select=k. Fit on the entire median-imputed outer development set. Imputer fitted only on development rows. RFE uses its internal final estimator for selection; a new common predictor is fitted for reporting.",
+  "anova": "Native sklearn.feature_selection.SelectKBest(f_classif,k=k) on the same development rows. The selector is fitted once, without external test labels. Use scikit-learn's default behavior for tied or constant columns.",
+  "outcome": "Per-dataset average of three external fold AUCs, accuracies and retained fractions. Save actual probabilities, selected features, times and donor ID. Conditional costs exclude the donor's width search. Report all arms and descriptive paired effects; no new significance claims.",
+  "limits": "One hardware thread per predictor, fixed CPU histogram tree model, one hour per dataset-fold process."
+}

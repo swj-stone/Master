@@ -1,0 +1,9 @@
+{
+  "scope": "Exploratory sensitivity specified after computing the original crossed outcome. Restrict to the same 26 frozen ranking-endpoint passes with interior coverage. Also show their fixed 16-member subset passing original guard endpoints. Membership never depends on alternative weights.",
+  "contrasts": [
+    "Compare the observed point panel to the original strict majority using exactly the same rows, masks and predictions. This alters both weighting and aggregation.",
+    "On each row partition compare original to five new four-panel majorities. Keep the original point weights, draw three independent stratified bootstrap weight vectors at the same per-class sample sizes and masses. This changes only bootstrap weights, preserving the sum threshold and selected row IDs.",
+    "Use one unresampled point panel with equal within-class weights. Fix the class total masses to the averaged two original point panels on both row partitions. Changing row partition then changes cases, with the single-panel functional and class masses held fixed. This is an evaluation diagnostic, unrelated to learning or selecting a model."
+  ],
+  "random": "SeedSequence([5119, archived seed, dataset index in primary factorial.json, partition index rank=0/guard=1, replicate index 0 to 4]); five new draws are repeated measurements, reported as a range or mean with each draw printed."
+}

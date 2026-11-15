@@ -1,0 +1,8 @@
+{
+  "stage": "Third, exploratory scheduling round after the working-set experiment. Every one of the 42 original PMLB folds included. No change to the fitted predictor, anchor, panel weights, separating masks, tolerance or tie handling.",
+  "direct": "Weakest-first dyadic block/singleton trajectory and canonical context order.",
+  "recent": "Same proposals. Always test the empty restoration first. After a veto by a nonempty restoration, move that restoration just behind the empty restoration for the next proposal. Other relative positions persist. Verify identical proposal/decision trajectory and downstream predictions.",
+  "ddmin": "Complement-based ddmin from Andreas Zeller's The Debugging Book, Reducing Failure-Inducing Inputs (https://www.debuggingbook.org/html/DeltaDebugger.html), with feasibility as the interesting predicate and empty output inadmissible. Weakest-first columns, initial granularity 2, chunk length floor(current size/granularity), on success continue with max(2,granularity-1), otherwise double to at most current size. Use exactly the same separating oracle and short-circuit context order as direct. Verify its local stopping condition with independent exhaustive singleton and context tests.",
+  "cost": "One predictor and frozen inputs per fold, three sequential schedules with fresh caches, rotated arm order and separate evaluated masks and in-process deletion/validation-refit times. Compare mask work first, durations second. One hour cap per fold; report all outcomes.",
+  "inference": "Exploratory algorithmic controls. Exact equality of recent versus direct is a deterministic property. No requirement that ddmin match the support, size or predictions. No hypothesis tests on this added comparison."
+}

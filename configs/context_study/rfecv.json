@@ -1,0 +1,8 @@
+{
+  "study": "prospective-pmlb-rfecv-r1",
+  "cohort": "All 14 tasks and all 42 outer partitions of prospective-pmlb-contexts-r1.",
+  "stage": "Additional method chosen in response to review while the primary protocol was already running, before inspection of primary model scores. Keep all RFECV outcomes, no parameter changes based on performance.",
+  "implementation": "sklearn.feature_selection.RFECV, native ranking/elimination using fitted XGBClassifier importance_type=gain; step=.20 of input width, min_features_to_select=1; inner 3-fold stratified shuffled CV seeded 31173+outer fold. Score binary roc_auc, multiclass roc_auc_ovr (macro). Choose k according to sklearn native maximal mean CV scoring and its tie-handling. Keep all outer development rows for RFECV and final XGB. Each inner fit is a Pipeline of fit-only median imputation and same 100-tree XGB; importance_getter=named_steps.classifier.feature_importances_.",
+  "time": "Separate run, one native CPU thread and one sklearn job. Fit RFECV and then independently fresh same XGB refit/predict for held-out scores, time both (conservative total including RFECV's own fitted estimator). Acquisition, subprocess startup and disk persistence excluded. Cap 3600s per fold. Resource use from other processes may vary across time batches.",
+  "outputs": "All fold masks, per-candidate inner scores for all three folds, final held-out probabilities, API source/versions/code digests, elapsed times and failures."
+}

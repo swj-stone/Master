@@ -1,0 +1,15 @@
+{
+  "study": "prospective-pmlb-fixed-margins-r1",
+  "status": "Post hoc exploratory mechanism study specified after observing the five row-size-matched families. Use all 14 PMLB datasets and 42 original folds, no tuning or exclusions.",
+  "offsets": [
+    600000,
+    700000,
+    800000
+  ],
+  "seed": "offset + fold (0,1,2), independently initialized per arm with same paired seed; previously unexamined family seeds.",
+  "proposals": 2048,
+  "switch": "Starting from the coded interior matrix, for each of exactly 2048 proposals draw an ordered pair of distinct interior rows uniformly. If there are fewer than two rows, hold. Draw one column uniformly from each opposite row difference (ascending feature id before sampling); hold if either difference is empty. Swap the two selected columns between the two rows. Reject any duplicate row or endpoint row; refusals consume proposals. All row sizes and per-column frequencies stay fixed. Finite switch-chain control without a uniformity/mixing claim.",
+  "permute": "Permute tail labels uniformly by Python random.Random(effective_seed).shuffle on the frozen ranked tail; apply this single bijection to every interior row and both endpoints, preserving full ordered-pair coverage.",
+  "fixed": "Shared primary selection-only fitted predictor, retained anchor and gain order, row IDs, training/background and rank ballots. Min over all family rows, original search and each support gets a fresh primary XGB outer-development refit. For each fold validate original separating support and mask count before ranking results. One CPU thread, max 3600s/fold.",
+  "outputs": "For each dataset-arm average 3 outer folds per seed family, then 3 family seeds. Report AUC, accuracy, retained fraction, accepted switch count, and actual ordered-pair coverage. Empty eligible-pair denominator is NA; show per-fold coverage on informative tails and total pair-count-weighted coverage. Report Sonar and all datasets. Include all 252 outcomes, masks, predictions, and receipts; no independent-task count increase or best seed selection."
+}

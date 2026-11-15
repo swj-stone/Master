@@ -1,0 +1,14 @@
+{
+  "study": "prospective-pmlb-random-families-r1",
+  "stage": "Exploratory sensitivity fixed after inspecting the one-family main results. All 14 datasets, all 42 frozen outer folds. Draws are not independent tasks or new datasets.",
+  "seed_offsets": [
+    100000,
+    200000,
+    300000,
+    400000,
+    500000
+  ],
+  "effective_seed": "Family's fixed offset + fold index 0,1,2. Original 77531+fold is shown separately and excluded from five-family means.",
+  "method": "Reuse primary fitted XGB protocol, selection split, original loaded anchor and order. Independently sample interior masks uniformly by original separating-code mask size, reject duplicates, include empty and full endpoints. Same strict four paired ballots, block/singleton search and final XGB refit for every support.",
+  "analysis": "For each dataset and family average three split AUCs, accuracies, kept fractions. Report five family mean and min/max on each named dataset, separating minus mean and Sonar details. For overall range independently average each fixed seed family over all 14 datasets. Do not select most favorable seed. Store all per-fold scores, probabilities, masks and hashes. No cross-study timing inference. 3600s cap per fold."
+}

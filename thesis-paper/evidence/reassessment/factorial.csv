@@ -1,0 +1,22 @@
+dataset,condition,total,eligible,subset,guard_endpoint_veto_all,ranking_endpoint_veto_all,rank_ends,rank_interior,guard_ends,guard_interior,rank_matched_budget_failure,guard_matched_budget_failure,nested_flagged_fail,nested_flagged_no_fail,separating_flagged_fail,separating_flagged_no_fail,random_matched_flagged_fail,random_matched_flagged_no_fail
+ALL,all probeable,274,216,216,241,248,190,207,185,200,0.8016203703703703,0.7834666105499438,187,5,196,7,197,7
+ALL,ranking endpoints pass,274,216,26,241,248,0,17,10,14,0.3243589743589744,0.35480769230769227,1,1,10,3,11,3
+ALL,ranking and guard endpoints pass,274,216,16,241,248,0,7,0,5,0.17656249999999998,0.13020833333333334,1,1,4,2,4,2
+abalone,all probeable,58,0,0,56,58,0,0,0,0,,,0,0,0,0,0,0
+abalone,ranking endpoints pass,58,0,0,56,58,0,0,0,0,,,0,0,0,0,0,0
+abalone,ranking and guard endpoints pass,58,0,0,56,58,0,0,0,0,,,0,0,0,0,0,0
+credit_card_fraud,all probeable,38,38,38,23,28,28,35,23,29,0.769078947368421,0.6400119617224881,26,4,28,5,28,5
+credit_card_fraud,ranking endpoints pass,38,38,10,23,28,0,7,2,4,0.3291666666666667,0.305,1,1,3,2,3,2
+credit_card_fraud,ranking and guard endpoints pass,38,38,8,23,28,0,5,0,2,0.28125,0.17083333333333334,1,1,2,2,2,2
+gisette,all probeable,60,60,60,50,51,51,55,50,54,0.6508333333333334,0.6495833333333334,50,1,52,2,52,2
+gisette,ranking endpoints pass,60,60,9,50,51,0,4,4,4,0.1962962962962963,0.3037037037037037,0,0,2,1,2,1
+gisette,ranking and guard endpoints pass,60,60,5,50,51,0,0,0,1,0.0,0.04833333333333334,0,0,0,0,0,0
+isolet,all probeable,60,60,60,59,56,56,60,59,60,0.9245833333333333,0.9495833333333332,56,0,60,0,60,0
+isolet,ranking endpoints pass,60,60,4,59,56,0,4,3,4,0.7520833333333332,0.6375,0,0,4,0,4,0
+isolet,ranking and guard endpoints pass,60,60,1,59,56,0,1,0,1,0.4499999999999999,0.35,0,0,1,0,1,0
+madelon,all probeable,26,26,26,26,26,26,26,26,26,0.9996794871794872,0.9708333333333333,26,0,26,0,26,0
+madelon,ranking endpoints pass,26,26,0,26,26,0,0,0,0,,,0,0,0,0,0,0
+madelon,ranking and guard endpoints pass,26,26,0,26,26,0,0,0,0,,,0,0,0,0,0,0
+spambase,all probeable,32,32,32,27,29,29,31,27,31,0.7315104166666667,0.7411458333333334,29,0,30,0,31,0
+spambase,ranking endpoints pass,32,32,3,27,29,0,2,1,2,0.12222222222222223,0.2972222222222222,0,0,1,0,2,0
+spambase,ranking and guard endpoints pass,32,32,2,27,29,0,1,0,1,0.0625,0.0625,0,0,1,0,1,0

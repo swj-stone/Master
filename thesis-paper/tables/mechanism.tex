@@ -1,0 +1,18 @@
+\begin{table}[tb]
+\centering
+\caption{Short-circuit and exhaustive evaluation on split 42. The same proposal path and final features are required in each pair. Calls count distinct witness masks, excluding anchor construction. Selection and cold times are in seconds. Each time is one measurement.}
+\label{tab:mechanism}
+\small
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Data set & Trials & Calls S & Calls E & Sel. S & Sel. E & Cold S & Cold E \\
+\midrule
+Abalone & 19 & 15 & 26 & 0.035 & 0.048 & 4.73 & 4.63 \\
+Spambase & 9 & 10 & 18 & 0.037 & 0.054 & 4.34 & 4.51 \\
+Madelon & 16 & 11 & 33 & 0.049 & 0.099 & 4.71 & 4.71 \\
+Fraud & 5 & 8 & 12 & 0.222 & 0.243 & 5.72 & 5.84 \\
+Gisette & 45 & 53 & 111 & 0.157 & 0.257 & 4.76 & 4.81 \\
+ISOLET & 249 & 210 & 386 & 2.242 & 3.830 & 16.05 & 17.88 \\
+\bottomrule
+\end{tabular}
+\end{table}

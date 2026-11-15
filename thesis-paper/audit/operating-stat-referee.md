@@ -1,0 +1,82 @@
+# Independent statistical assessment of the operating rule
+
+## Criteria set before inspecting the study outputs
+
+1. Define the diagnostic label, observational unit, denominators, and population weighting for conditional sensitivity and false-positive rates. Check that matched controls, repeated features and shared folds retain their dependence through every resample.
+2. Track the number of independent clusters and support for both label classes. Identify unidentified ratios, post-selection and sensitivity to task influence. Distinguish descriptive stability intervals from claims about a deployment population.
+3. Derive the cost threshold directly from the confusion counts. Check the orientation of asymmetric harms and the assumptions connecting the study sample to deployment prevalence and losses.
+4. Compare the named vote against alternative aggregations, cutoffs and deletion policies with common source data, opportunity sets and loss units. Check training and test boundaries wherever a rule is selected or tuned.
+5. Attempt independent numerical reproduction and look for evidence both for and against retaining the operating rule. Distinguish a supported conclusion from an open question.
+
+The assessment is an internal simulated statistical review. Manuscript-facing judgments will be bound to the version actually inspected.
+
+## Raw-study findings
+
+The frozen decision CSV contains 400 path and 379 drawn cases across 14 tasks and three outer folds each. Seventy-five fold–support pairs occur in both cohorts. The voters do not see the held-out fold labels. The label is a finite test-fold loss relative to that fold's refitted anchor. A second bootstrap of correlated panel weights would not create independent test observations.
+
+- **Conditional rates and dependence.** The rate denominators are observed failures and passes. The paired resampling keeps every proposal and every rule in a sampled task-fold together. It redraws folds independently for each occurrence of a task, which does not recreate dependence from overlapping training sets. The whole-task sensitivity retains that dependence. Both analyses condition on fitted predictors, the 14 named tasks, the proposal mechanism and the observed test labels. No population coverage follows from either. The alternative joint-mass weighting gives equal mass to tasks and their folds *before* conditioning on failure or pass. It does not average task-specific conditional rates. Using fresh random draws (30,000; seed 19910101), I obtained path paired TPR and FPR change intervals of [0, 13.68] and [4.58, 15.18] percentage points. Drawn intervals were [0, 0] and [0.53, 9.09]. Monte Carlo differences against the archived intervals are small.
+- **Cost threshold and influence.** Separating adds 11 detections and 20 false alarms on paths. Four tasks contribute all 11 detections, including seven from Sonar. The empirical crossover against endpoints is 20/11. A redraw with zero added detections and positive false alarms cannot prefer separating for any finite miss cost. Treating such draws honestly leaves the upper end unbounded. Drawn proposals contribute zero additional detections and nine false alarms. These are results for the chosen reference, prevalence and label definition. The fixed-quarter comparator and veto-all eliminate separating from the pooled restricted frontier. Equal task/fold weights bring it back on the restricted path frontier.
+- **Choice of four-panel minimum.** With the same 3% mask tolerance, increasing from four to twelve panels preserves pooled TP totals (184 path, 161 drawn) while reducing FP totals (194 to 191 path, 178 to 177 drawn). The increase in panel work is unpriced in FP + r FN. The unchanged four-panel unanimous rule on just the two endpoints gets 185 TP and 188 FP on paths, 161 TP and 179 FP on drawn proposals. Across the 360 settings there are 15 grid entries on paths, 21 on draws, with no higher observed FP or FN and at least one strictly lower than the four-panel separating rule. Some entries are decision-equivalent. This post hoc grid enumeration does not select a generalizable winner.
+- **Changing the definition of harm.** I held the primary mask decisions fixed and independently relabeled the observed refit losses at 1%, 2%, 3%, 4% and 5% relative AUC/accuracy tolerance. The path incremental TP/FP pairs are 14/17, 13/18, 11/20, 7/24 and 5/26. The implied path crossover ranges from 1.21 to 5.20. The drawn incremental pairs are 3/6, 1/8, 0/9, 0/9 and 0/9. Drawn domination by endpoints therefore depends on the loss threshold. This is separate from changing the mask-side loss allowance in the grid. The 3% reconstructed labels agree on all 779 records.
+- **Rule selection and leakage.** I rebuilt six size cutoffs from the candidate width and the anchor width with exact integer comparisons, added both constant rules, and reconstructed training loss for the two libraries from their 42 fold totals. For each of the 224 task/cohort/ratio/library choices, I recovered the complete training minimizer set and verified the selected rule belongs to it. All 16 held-out aggregate losses reproduce. Training uses pooled proposal counts. Its equal-task transfer summary weights each task equally, proposals equally within task. The conditional-rate equal-task/fold estimand instead gives folds within tasks equal weight. The estimates therefore need their own weighting descriptions. Hyperparameter families were fixed for retrospective comparison after these datasets had been examined. The split protects against direct use of the omitted task's outcomes in fitting a previously specified policy. It cannot undo study-level adaptation.
+- **Comparative scope.** Both strategies act on identical candidates and error costs, and both include constant rules. The strategies differ in library size and parameterization, and one uses masks while the other uses size. This comparison measures how those strategies performed. It does not isolate whether a ballot adds decision value *conditional on* size. Higher false alarms against one operating rule and modest ranking improvements can coexist.
+
+### Additional independent decision-cost test
+
+I used the 779 saved whole-task-held-out probabilities from the two incremental predictors. For each fixed ratio, a policy vetoes when the fitted probability of failure is at least $1/(1+r)$, since a veto costs $1-p$ in conditional expectation and allowing deletion costs $rp$. This is an implementable fixed cutoff. Its optimality for an individual proposal would require accurate conditional probabilities. There is no ratio tuning. Both policies use the identical support, refit label and denominator. Prediction CSV SHA-256 is `823532cb3f71069e2c662b261d44774942e0b2a472a3c00ba736d77349725b1f`.
+
+| Source | Miss cost | Size cost | Size + vote cost | Difference per 100 proposals | Range after omitting each task and refitting | Equal task/fold difference per 100 |
+|---|---:|---:|---:|---:|---:|---:|
+| Path | 1 | 155 | 148 | −1.75 | [−2.20, +3.02] | −3.77 |
+| Path | 2 | 190 | 210 | +5.00 | [+0.55, +6.59] | +3.37 |
+| Path | 5 | 214 | 222 | +2.00 | [−2.47, +5.91] | +1.68 |
+| Path | 10 | 211 | 223 | +3.00 | [−1.65, +10.93] | +2.56 |
+| Drawn | 1 | 130 | 132 | +0.53 | [−2.92, +4.78] | −0.79 |
+| Drawn | 2 | 156 | 134 | −5.80 | [−6.41, −1.14] | −7.14 |
+| Drawn | 5 | 184 | 178 | −1.58 | [−2.04, +2.92] | −0.69 |
+| Drawn | 10 | 216 | 199 | −4.49 | [−8.45, −2.92] | −2.38 |
+
+I reproduced the task-held-out fits independently using scikit-learn's Newton–Cholesky solver, training-only weighted centering/scaling and the archived ridge penalty. The maximum absolute difference from the two sets of saved probabilities was 2.04 × 10⁻⁸. For each omitted task I refitted each model on 12 of the remaining tasks, testing on the other one in turn. The ranges in the table use all 14 complete task omissions. At drawn miss costs 2 and 10, equal-task/fold omission ranges were also entirely favorable to the combined model, at [−7.69, −2.14] and [−5.13, −1.07] cost units per 100 respectively. At drawn miss cost 1 the selected standalone size-cutoff library had 98 errors; neither probability-based model matched this count. These are conditional, retrospective observations. The costs omit generating ballots.
+
+Independent reproduction of the extra test uses the archive's predictors and labels as follows (Python).
+
+```python
+import pandas as pd
+
+df = pd.read_csv("results/context_review/incremental-prediction/predictions.csv")
+for cohort, part in df.groupby("cohort"):
+    failing = part["fail"].astype(bool)
+    for r in (1, 2, 5, 10):
+        costs = []
+        for model in ("p_size", "p_size_vote"):
+            veto = part[model] >= 1 / (1 + r)
+            costs.append((veto & ~failing).sum() + r * ((~veto) & failing).sum())
+        print(cohort, r, *costs)
+```
+
+The supplied `incremental_prediction_audit.py` independently implements weighted model fitting. For the omission ranges, drop a task from both the training and evaluation data first, use weights $1/(12\,n_{\rm folds}\,n_{\rm proposals\ in\ fold})$ in each fit, and apply the same cutoff and pooled scoring to the remaining held-out tasks.
+
+## First manuscript reading
+
+I verified the first PDF SHA-256 as `9D61FC924668248492C3EF1A7B2E20719438AF0747511DD0A804108819CF274B` (`packages/operating-review-drafts/reading-1.pdf`). I read the abstract, design, operating analysis, guarded experiment, external studies and discussion from the PDF and inspected rendered Tables 2 and 3.
+
+**Round-one decision: revision requested on operating interpretation.** The central paired-rate analysis is correct as written. Pages 6–7 state the conditional denominators, matching, cohort overlap, dependence and finite outcome. Pages 8–9 derive the cost ratios in the right direction, show Sonar influence, give a two-stage versus whole-task crossover sensitivity, and identify the change in weighting that alters the empirical frontier. Page 10 distinguishes the log-loss result from improved discrimination. The primary guarded policy on pages 10–12 is a fair same-budget, same-opportunity-set test of within-width nomination. The negative external result and the concentration of the historical utility gain in one fold are prominent. These passages support a useful diagnostic paper. I did not find an arithmetic error in them.
+
+1. **Decision value is incompletely conveyed on pp. 9–10.** The mask-only versus size-only strategies answer a different question from whether adding the ballot to a size-based policy helps. The paper goes from a mask-versus-size contest at fixed error costs to a hybrid model evaluated only by probabilistic and ranking scores. This can be repaired in a paragraph with a truly nested decision comparison at the fixed error cutoffs. The independent check above shows favorable, unfavorable and weighting-sensitive cases; the drawn-cost result at r=2 reverses the apparent direction of the library comparison. The guarded fixed-width experiment does not settle incremental *error* costs for vetoing individual proposals, and its observation on one fold should retain its limited scope.
+2. **Strengthen the operating-point explanation on pp. 8–9.** Table 3 already gives a direct counterexample to an optimal four-panel minimum. Twelve panels match pooled detections and reduce false alarms in both cohorts. State the consequence for all finite error ratios and the absent price on extra panel work. The path equal-weight frontier refers to the eight original rules plus two constants and the quarter-width rule. Explicitly preserve this limited comparison family when discussing optimality.
+3. **Qualify the practical utility interpretation.** Page 11's one-refit break-even condition accurately describes observed task means and measured component times. The vote advantage in realized safe compression and the harm from extra breaches occur on different tasks. It cannot estimate expected benefit for a deployment site without identifying its case mix and costs. The manuscript already recognizes most of this.
+
+The additional cross-width learned nomination and refreshed timings were absent from this PDF. I offer no conclusion about these pending results in round one. The post hoc test of the outer failure tolerance above is helpful for interpretation; its full table is optional if every scientific claim retains the observed 3% definition.
+
+## Second manuscript reading
+
+I verified the revised PDF SHA-256 as `24D7E93C721C46D91CA104A8A17489BD9ABA91E990F81D3F65B66ECFF99F4865` (`packages/operating-review-drafts/reading-2.pdf`). I read its opening, §5 in full, the benchmark context and the discussion. I inspected the rendered pages containing the nested veto-cost results and learned policy.
+
+**Decision: accept the statistical analysis as a diagnostic study of the stated historical tasks.** All three round-one issues are resolved at the level of the paper's methods and conclusions. I have one minor abstract edit. Report both directions at miss cost two: adding votes raised path cost from 190 to 210 and lowered drawn cost from 156 to 134. The current abstract gives the favorable case, although §§5.3 and 7 already show the reversal. This is an editorial balance issue, and no data correction is required.
+
+- **Rates, costs and choice of rule.** Pages 7–10 give conditional denominators and paired reweighting intervals, identify the dependence and tie structures, and correctly state the restricted frontier. Twelve panels weakly improve pooled detection and false-alarm counts, with strictly lower observed false-alarm cost under both cohorts. This is explicitly scoped to cost excluding computation. I checked all eight learner-crossed counts on p. 8 against the archived paired grid. Page 10 reports the nested fixed-cutoff decision comparison for every specified ratio and both collections, its drawn r=2 task-deletion sensitivity and the stronger simple cutoff comparator at r=1. These numbers independently reproduce as documented above. Improved ordering can coexist with higher decision cost.
+- **Guarded choice.** I independently rebuilt every one of 168 learned nominations from held-out-task coefficients, the full candidate pools, gain ranks and the specified score. I verified disjoint training, proposal and guard row identities and the outer test exclusion in the PMLB data. The scoring coefficients excluded the target task. I independently recovered the guard outcomes, chosen final supports, outer AUC/accuracy and every recorded breach and U using raw PMLB/Optdigits labels and the saved probability arrays. There were 41 PMLB fold decisions per arm and 1 separate, previously opened Optdigits fold. For the drawn-trained comparison, the equal-task mean U changed from 0.089367 to 0.119159, mean AUC from 0.932910 to 0.930424, and the breach count from 1 to 4. The path-trained comparison gave 0.076380 to 0.102771 in U, 0.932952 to 0.931314 in mean AUC and 1 to 3 breaches. The disjoint guard can reject a promising nominee or pass a harmful one. Pages 12–13 accurately distinguish the nomination score from achieved utility, report the training width range and identify the subsequent Optdigits reuse as retrospective.
+- **Measured resource cost.** I verified all four order positions in every clocked split form two counterbalanced pairs on a single logical CPU. Re-aggregating the 164 PMLB runs gives 0.842345 and 0.865809 seconds and 11.72619 extra mask evaluations. The reproduced whole-task interval for the mean wall-time difference is [−0.058407, 0.104577] seconds. The text ties the resulting observed utility inequality to measured point estimates for these tasks. This permits no universal runtime claim.
+- **What remains unsupported.** These convenience tasks provide no population calibration of failure probabilities, fixed-sign benefit for a future application, choice of a universal cost ratio, or proof that the majority/minimum rule is optimal. Multiple retrospective operating comparisons share data. Frozen-prediction and task-reweighting intervals do not recover study-level selection uncertainty. The additional three breaches under the learned model and its task interval spanning zero preclude a general recommendation to buy its votes. The manuscript's revised empirical discussion stays inside these limits.
+
+Signed, independent simulated statistical referee for the operating analysis.

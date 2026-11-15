@@ -1,0 +1,159 @@
+\documentclass[runningheads]{llncs}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,graphicx,microtype}
+\usepackage[hidelinks]{hyperref}
+\graphicspath{{./}}
+\begin{document}
+\title{Can Masked-Model Votes Predict Which Feature Deletions Exceed a Refit Loss Tolerance?}
+\titlerunning{Predicting Refit Tolerance Breaches}
+\author{Anonymous Author(s)}
+\institute{Anonymous affiliation}
+\maketitle
+\begin{abstract}
+Can masking columns in a fitted classifier predict whether retraining without them will exceed a loss tolerance? On 14 previously studied classification tasks, a four-panel voting rule flagged 97.4\% of 189 observed refit failures among 400 search-path proposals. It also flagged 91.9\% of passing refits. Adding interior feature restorations to two endpoint tests detected 11 more failures and rejected 20 more passes. On 379 separately drawn deletions the additions were zero and nine. Both trade-offs depended on the voting threshold and the refitted learner. Adding votes to deletion size improved candidate ordering on held-out tasks, with inconclusive changes in log loss. When a miss cost twice a false alarm, adding votes reduced total proposal error cost from 156 to 134 on drawn deletions and increased it from 190 to 210 on search paths. With one refit available at half width, voting improved compression within tolerance on one of 41 folds and increased tolerance breaches from one to three. A learned rule choosing across widths changed more decisions and also incurred more breaches. On a separate handwritten-digit test, the fixed-width rules chose identical supports.
+
+\keywords{Feature selection \and Model refitting \and Masking \and Voting}
+\end{abstract}
+
+\section{Introduction}
+Feature selection often ends by training a new predictor on the retained columns. Repeating that fit for every candidate can be expensive. Masking a column in a fitted tree offers a cheaper test, but it asks a different question. A tree can depend on a split whose information another column could supply after retraining. A deletion that looks harmless on the rows used to rank columns can also harm a refit on new cases.
+
+The starting set of columns, or \emph{anchor}, is a prefix of a feature ranking. In the tree experiments, Gain ranks columns by their contribution to fitted splits. We take the shortest tested prefix whose masked scores stay within an 8\% allowance relative to the full predictor. Subsequent deletion tests use the narrower 3\% allowance relative to this anchor. The lower-ranked eligible columns form the \emph{tail}. To test a deletion from the anchor, we substitute fitting-sample medians for hidden inputs and predict on validation rows. We then restore selected tail inputs to their observed values for both the candidate and the anchor. Under the primary rule, each tested restoration must satisfy a majority of validation panels. A single restoration with too few approvals vetoes the deletion. The minimum is motivated by the min-marginal power index~\cite{shi2026minpi}, which scores individual features in a quota game. Here the panels assess a proposed set of columns.
+
+We ask what those votes add when the proposed width and Gain ranking are already known. A counterexample first shows that even complete mask scores can agree while the reduced predictors attain different performance. On data, we compare vetoes with the measured loss after refitting and vary the learner, the voting rule and the relative cost of the two errors. Next we test whether votes improve failure predictions on a held-out task. Finally, we give competing rules the same number of refits and check how much compression survives on new cases. The primary handwritten-digit test uses previously unscored outcomes. The participant and future-batch experiments evaluate final feature sets under changes in population.
+
+\input{related-work}
+
+\section{Testing a proposed deletion}
+Let $A$ be a ranked anchor, $S\subseteq A$ a proposed retained set, and $T$ the remaining eligible features. A restoration $E\subseteq T$ makes the same tail features visible when evaluating $S\cup E$ and $A\cup E$ in the fitted predictor. Hidden inputs take their training reference values. Every deletion is compared with the original anchor, including deletions proposed after others have passed.
+
+Let $Q_{bi}(D)$ denote metric $i$ on validation panel $b$ when the visible set is $D$. Write $s_i=1$ for a higher-is-better metric and $s_i=-1$ for a loss. Panel $b$ approves the deletion if every observed loss satisfies its tolerance,
+\begin{equation}
+ I_b(S,E)=\mathbf 1\!\left\{\ \forall i,\quad
+ s_i[Q_{bi}(A\cup E)-Q_{bi}(S\cup E)]
+ \leq \tau_i|Q_{bi}(A\cup E)|+10^{-12}\right\}.
+ \label{eq:ballot}
+\end{equation}
+The selector accepts precisely when
+\begin{equation*}
+ \min_{E\in\mathcal E}\left(\frac{2}{B}\sum_{b=1}^B I_b(S,E)-1\right)>0 .
+\end{equation*}
+With $B=4$, every context needs three approvals. One panel uses the sampled ranking rows and three apply fixed bootstrap weights to those same rows. The 3-of-4 rule has no calibrated error probability. Classification uses AUC and accuracy with $\tau_i=0.03$. For binary tasks with positive prevalence at most 5\%, it also uses average precision with $\tau_i=0.05$. Multiclass AUC is the macro one-versus-rest mean. The archived regression ballots use MAE and clipped $R^2$.
+
+The endpoint tests restore none or all of $T$. The nested design adds the first $\min(|A|,|T|)$ features in the tail ranking, dropping duplicate masks. A separating design gives each tail feature a distinct signature across queries, as described below. Its random control samples distinct interior masks of the same sizes and keeps the same endpoints. Starting from $A$, the search proposes weak-feature-first blocks, subdivides a failed block, and repeats singleton sweeps until no single deletion passes or just one feature remains. The first failing context decides the outcome of a minimum test. The cache stores previously calculated mask scores. At termination the retained set passes the tested family and admits no passing single deletion that leaves a nonempty set. This local property is conditional on the predictor, panels and family.
+
+\input{context-theory}
+\input{refit-identifiability}
+
+\section{What made a frozen-model vote change?}
+\input{mechanism-results}
+
+\input{operating-analysis}
+\input{operating-policy}
+
+\section{Which columns survived selection?}
+\subsection{Fourteen classification tasks}
+The 14 tasks came from PMLB~\cite{romano2022pmlb} and spanned 5--90 columns and 208--10,992 rows. The cohort was chosen before its first scoring, after development on the six archived datasets. Each task supplied three stratified outer folds. Of the remaining rows, 75\% supplied the fitting split and 25\% supplied the ranking split. For the final predictions all selectors used training-side median imputation and a fresh XGBoost model on their chosen columns and all outer-development rows (100 boosting rounds, depth four, learning rate 0.1, single-thread histogram splits)~\cite{chen2016xgboost}. We averaged folds within task and weighted tasks equally~\cite{demsar2006comparisons}. The tasks are a convenience sample of tabular row-level problems.
+
+\paragraph{Independent widths.}
+Compact Gain ranks split-used columns by average split gain. For total gains $g_j$ its initial width is $\lceil(\sum_jg_j)^2/\sum_jg_j^2\rceil$, or one if all gains vanish. It inspects up to 12 prefixes by masking the fitted model and takes the shortest observed prefix within an 8\% relative loss allowance on all ranking rows. This prefix is $A$. The subsequent voting search uses up to 256 ranking rows with weights recovering ranking-split class prevalences. The masking background is the median of up to 512 fitting rows. Exhaustive direct Gain, the comparator used in earlier MinPI experiments, instead fits a model at every width along the full gain ranking and selects the width of maximum ranking AUC. On these 42 folds the exhaustive selector made 1,251 fits and achieved 0.9433 AUC and 83.76\% accuracy with 74.5\% of columns, taking 4.97 seconds per fold in a separate timing batch. These two Gain rules have different objectives and costs. L1 uses the support of standardized one-versus-rest logistic fits chosen by ranking AUC over $C\in\{0.01,0.1,1,10\}$. RFECV uses three inner folds with fold-local imputation and eliminates 20\% of the original width per step with the same tree predictor~\cite{guyon2002rfe,pedregosa2011sklearn}.
+
+\paragraph{Comparisons at a supplied width.}
+Gain prefixes receive the width of the nested or separating selector. Scikit-learn RFE and univariate ANOVA $F$ selection receive the separating width on every fold and may select from all original columns using all development rows. These controls compare feature identities at the same realized compression. The width itself already depends on the voting method.
+
+\input{tables/external}
+From full width, Compact Gain removed 53.0 percentage points of the original columns on average. The separating vote removed a further 9.1 points (Table~\ref{tab:external}). Approximately 85\% of the total mean reduction occurred before voting. The additional compression cost 0.00936 in mean AUC, 0.57 percentage points in accuracy and 0.085 seconds per fold in the original in-process benchmark. At equal widths, separating exceeded Gain prefixes and the univariate filter. Its average AUC was 0.00064 below RFE's and its accuracy was 0.57 points higher. RFECV attained the highest mean AUC among the selectors in the table and retained more than twice as many columns as the separating selector. Its elapsed time includes 3.22 seconds for RFECV and a separate 0.22 seconds for the common refit and prediction.
+
+The median task-level AUC difference between separating and nested masks was 0.00036. The comparison with random masks matched for number and sizes gave five wins, seven ties and two losses. Appendix~\ref{sec:more-controls} gives the fold variation, random assignments and dependence checks.
+
+\subsection{A new participant holdout}
+UCI Human Activity Recognition Using Smartphones contains waist-mounted accelerometer and gyroscope readings from 30 people performing six activities. The supplied 561 measurements are engineered features of 2.56-second windows with 50\% overlap~\cite{hardata}. The official split assigns 21 people to training and nine to test. We used 15 of the 21 for fitting and the other six for ranking. The learner and voting rules were transferred from PMLB. For the primary protocol the worker recorded all planned supports and final predictions before the local scorer read the official test labels. The protocol was specified locally after the PMLB experiments. Its primary endpoint gave each test participant equal weight in mean within-person window accuracy.
+
+Full width gave 93.59\% mean participant accuracy. Compact Gain gave 89.89\% at 35 columns, and separating gave 89.40\% at 22. Its 22-column Gain control, ranked on the same inner fit, scored 87.25\%. The paired separating-minus-Gain difference had median $+1.83$ percentage points across participants (range $-0.34$ to $+7.91$, seven wins, one tie). Same-width RFE used all 21 training people and scored 90.68\%. A retrospective control trained the RFE ranking on only the 15 people who supplied the voting predictor's initial fit. With the same final fit on 21 people, its accuracy was 89.47\%, only 0.065 percentage points above voting. Voting also used the other six people's labels to select its columns. Against the original 21-person RFE the paired difference had median $-1.99$ points (range $-6.46$ to $+4.69$, two wins, seven losses). Three random restoration families retained 21--23 columns and scored 86.72--87.77\%. At independent budgets of 6, 57, 141 and 281 columns, RFE achieved 79.63\%, 92.21\%, 93.02\% and 93.23\%.
+
+A supplementary control drew twenty 22-column sets from all 561 inputs and twenty from the 35-column anchor. Their identities were fixed before the primary scorer opened test labels. We fitted and scored them after the primary results. Uniform draws from all inputs averaged 80.22\% accuracy (range 72.60--86.82\%). Draws from the anchor averaged 87.87\% (85.19--90.26\%), and five of twenty matched or surpassed the separating support. The 22 chosen columns still require both source sensors and include 11 frequency-domain features. The reported column savings do not measure sensor or processing costs. The participant split applies to training and selection conditional on the supplier's normalized inputs. Overlapping windows from the same person share observations.
+
+\subsection{A forward test under sensor drift}
+The UCI Gas Sensor Array Drift Dataset records a 16-sensor array under exposure to six gases. The table supplies eight features per sensor across ten chronological batches~\cite{gasdriftdata}. We fitted on batches 1--5, selected on batch 6 and applied the refit check on batch 7 using models trained on batches 1--6. All final predictors used batches 1--7. For the primary protocol the worker saved the supports and future predictions before the scoring stage read labels from batches 8--10. Each future batch contained all six classes. The specified primary measure was mean per-class recall within batch, averaged equally over the three batches (294, 470 and 3,600 observations).
+
+The vote kept six of 42 anchor columns. Its mean recall was 35.81\%, down from 61.75\% for the anchor and 68.02\% for all 128 features. At the same six-column width, the Gain prefix achieved 43.92\% and RFE 57.80\%. On batches 8, 9 and 10, respectively, recall was 28.79\%, 41.61\% and 37.03\% for voting, against 65.20\%, 65.37\% and 42.83\% for RFE. The proposed extra maximin deletion reached 34.65\% at five columns, compared with 36.52\% for dropping the weakest Gain column and 57.41\% for five-column RFE. All three guarded variants fell back to the 42-column anchor. Different choices of six columns gave substantially different results even at this small width. The three batches belong to one array at different times. RFE and ANOVA could use all seven historical batches to select columns. The voting proposal used the first six, and its refit check had access to batch 7. After observing the outcome, we repeated RFE at the published widths with fewer batches for selecting columns, holding the final training rows fixed. At six columns, RFE using batches 1--5, 1--6 and 1--7 reached 41.72\%, 52.63\% and 57.80\% macro recall. At five columns the corresponding recalls were 40.67\%, 57.88\% and 57.41\%. The comparison therefore depends on access to historical labels, but each of these six-column RFE supports exceeded the voting support on this forward test.
+
+\section{Discussion}
+On the 14 tasks, masked-model dissent helped order deletions by the chance of a refit tolerance breach. Turning that ordering into a decision required specifying the proposal population and the cost of each error. At twice the cost for a miss, adding dissent to a size-based predictor reduced cost on drawn deletions and increased it on search-path proposals. The four-panel separating veto alone gave high sensitivity at the cost of rejecting most passing refits. Both the model producing its votes and the learner used for the final refit changed which warnings were justified.
+
+A refit budget gives the votes another role. On New Thyroid, they distinguished two equally small candidates and nominated the one that survived both the guard and outer test. Often all candidates received the same minimum score. Among the 41 half-width comparisons, the extra compression within tolerance came from this one fold and two other folds incurred additional breaches. Allowing the vote to influence the proposed width yielded more gains and losses. The separate Optdigits test gave the same result with or without fixed-width votes. In the original variable-width search, the guarded vote and its guarded, width-matched Gain prefix also had nearly identical mean AUC (Appendix Table~\ref{tab:adjudication}).
+
+The repeated PMLB analyses condition on historical proposals, overlapping outer training sets and their measured test-fold outcomes. Changing the refitted learner changed the failure label on over a fifth of these proposals. No PMLB fold qualified for the rare-positive metric, and mask replacements can place a fitted model outside the distribution on which it was trained~\cite{hase2021ood}. The per-person activity, forward sensor and per-example digit experiments each test a different population and decision. Guard coverage in a new population and the clinical or acquisition costs of the retained features remain unknown.
+
+The replication materials contain configurations, feature sets, fold assignments, metric calculations and refit predictions. Lean checks the finite vote identities and the rational arithmetic in the refit counterexample. Wolfram Language independently evaluates the mask metrics and reduced optimal scores in that example. The archive also documents PMLB's dataset-specific license metadata and AI assistance in implementation, writing and internal review.
+
+\bibliographystyle{splncs04}
+\bibliography{references,revision}
+\appendix
+\section{Additional operating comparisons}
+\label{sec:operating-appendix}
+\subsection{Veto counts and outcome tolerance}
+Table~\ref{tab:refits} gives the counts underlying the original eight masking rules in Table~\ref{tab:operating-rates}. Holding the masked votes fixed and changing the \emph{outer} AUC and accuracy loss tolerances to 1\% or 5\% gave, respectively, 14 or five extra detections and 17 or 26 extra false alarms for separating versus endpoints on paths. On drawn deletions the corresponding additions were three detections and six false alarms at 1\%, and zero and nine at 5\%. This change of the outcome definition differs from varying the voting tolerance in Sect.~\ref{sec:refit}.
+
+\input{tables/refit-decision}
+
+\subsection{Checking a completed search by refitting}
+Here the search determined its own width before the guard checked its result. As in Sect.~\ref{sec:budgeted}, we split the earlier ranking rows equally into proposal and guard partitions, stratifying by class. The selector used only the proposal rows to form $A$ and choose $S$. Trees fitted on the original fitting rows and the proposal rows were evaluated once on the guard. If $S$ exceeded the loss allowance relative to $A$, the rule switched back to $A$. Every final support was refitted on all development rows. One Wine Quality fold had only one ranking observation in a class and could not be split as specified. We report 41 folds, first averaging available folds within each of the 14 tasks. These new anchors differ from those obtained with all ranking rows.
+
+\input{tables/heldout-adjudication}
+
+After the guard, the mean AUC difference between the voting support and its width-matched prefix was about $10^{-6}$ (Table~\ref{tab:adjudication}). A prefix of the first $\lceil |A|/2\rceil$ gain-ranked features with the same guard achieved higher mean AUC and used fewer columns. The guard rejected this aggressive prefix on 75\% of folds after equal weighting by task, so most of its final predictions came from the anchor. Restricting the summary to the 13 tasks with all three folds gave 0.94187 AUC for both guarded width-matched methods and 0.94346 for the guarded half-anchor prefix. In this experiment checking the simpler half-width prefix gave higher mean compression and a higher mean AUC.
+
+We also tested one additional deletion beyond the stopping point. For each remaining column we considered its removal and used the minimum number of approvals over all restorations as its score. We removed the column with the highest score, breaking ties by lower Gain. Testing the weakest Gain columns first lets the running minimum stop an uncompetitive candidate early. At the same mean width (31.61\% retained), the maximin choice attained 0.90684 AUC and simply dropping the weakest Gain column attained 0.91071. Checking the new candidate, then $S$, against the refitted anchor gave 0.93145 AUC at 40.87\% retained and 0.93189 at 40.41\%, respectively. Cold-cache evaluation used 1,303 distinct masks for all nominations across 41 folds, against 3,181 for exhaustive evaluation of the same choices. Of 40 supports with at least two features, 32 had a tie for the highest minimum vote and 15 assigned the same score to every possible deletion. Only 17 chose a different column from the weakest-Gain rule. The score's low resolution limits how often the vote can change this decision.
+
+\paragraph{Voting directly on refitted predictions.}
+In a final retrospective experiment we changed what the panels judged. Each of the 41 eligible folds supplied up to four Gain prefixes, at the distinct rounded-up quarter, half, three-quarter and full anchor widths. We fitted each prefix once on the fitting and proposal rows and compared its predictions with the anchor on the disjoint guard. Three rules chose the smallest passing prefix. The first checked only the global metrics on the original guard sample. The second also required each class's recall to reach 97\% of the anchor recall. The third applied these global and class-specific checks to the original guard and three class-stratified bootstrap panels. Every global or class context needed three approvals. Here the minimum is taken over outcome groups, and the panels see fresh predictions. All three rules shared the 147 inner fits.
+
+The global rule, the one-panel class rule and the four-panel class vote retained 38.63\%, 43.21\% and 44.26\% of the original columns, respectively. Their mean outer AUCs were 0.93054, 0.93139 and 0.93089. On the outer test, at least one class lost more than 3\% of its anchor recall in 16, eight and seven folds. The original global loss tolerance was exceeded in two, two and three folds. Adding the bootstrap votes to the class rule changed four of 41 widths. It required 576 logical panel checks across the grid, compared with 199 for the one-panel class rule, and retained more columns. Most of the reduction in observed class-level failures occurred when we first required a separate check for each class. Five guards contained just one case of their least frequent class. Resampling within that class repeats the same case on every panel. On one New Thyroid fold the additional votes admitted a two-column support in place of three columns, lowering outer macro recall from 91.11\% to 85.00\%.
+
+\subsection{Search cost with a fixed predicate}
+With deterministic panels, an earlier veto ends a proposal without changing its decision. We compared three implementations on one logical CPU using three cyclically ordered repetitions of each of 42 folds (378 complete executions, each with a new reference and final fit). The timer began after loading the data and split assignments. It included imputation, reference fitting, anchor choice, deletion checks, final refit and outer prediction. All runs returned identical supports, proposal decisions and outer probabilities within each fold. Table~\ref{tab:timing} uses median times within fold. It comes from a different timing experiment from Table~\ref{tab:external}.
+
+\begin{table}[tb]
+\centering
+\caption{Costs of evaluating the same vote. Seconds are task means for the complete pipeline and deletion search alone. Counts cover one pass over all 42 folds.}
+\label{tab:timing}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Order and implementation & Total s & Search s & Masks & Calls & Full scores\\
+\midrule
+Fixed & 0.4814 & 0.10982 & 3,304 & 3,304 & 3,304\\
+Recent veto & 0.4731 & 0.09964 & 3,004 & 3,004 & 3,004\\
+Recent, batched and deferred & 0.4669 & 0.09377 & 3,004 & 2,770 & 2,436\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Promoting the recent veto saved 300 masked evaluations, 193 of them on Movement Libras. Eight of 14 tasks saved zero. The third implementation predicts two requested masks in one call when neither is cached. If all four panels already fail on accuracy, it can defer sorting to calculate AUC or average precision. Compared with recent order alone, its median task-level search time fell by 9.00\%; 13 of 14 tasks ran the search faster. For the full pipeline the paired median wall-time reductions were 0.85\% for recent versus fixed, 2.12\% for both changes versus fixed and 1.32\% for both changes versus recent. All missed the specified 5\% end-to-end target. Each paired median full CPU time ratio was 1.000 at the available timer resolution.
+
+Starting with only the empty restoration and restarting from the anchor each time an additional check vetoed the result increased the mask count to 5,714. Replacing block subdivision with complement-only \texttt{ddmin}~\cite{zeller2025debuggingbook} under the same anchor, predicate and feature order gave the same support on 30 of 42 folds. It used 3,360 masks and achieved 0.9327 mean AUC. One task, Sonar, gained 0.0667 AUC. The other 13 averaged $-0.00014$. Thus even for the same voting rule the choice of search can change the result.
+
+\section{Additional benchmark controls}
+\label{sec:more-controls}
+\subsection{Mask design on the 14 PMLB tasks}
+The nested, separating and random families covered, respectively, 8.6\%, 100\% and 84.3\% of ordered pairs over 41 folds with at least two tail features. The higher AUC of separating relative to nested accompanies a larger family and a higher retained fraction. The two planned task-level AUC contrasts gave Holm-adjusted exact two-sided sign-test $p=0.043$ (separating versus nested, nine wins, four ties, one loss) and $p=0.453$ (versus size-matched random, five wins, seven ties, two losses). These tests assume independent, equally likely signs in nontied tasks under the null. The median gain over nested was 0.00036. Sonar supplied the largest gain over nested and largest loss against random (Fig.~\ref{fig:external-pairs}).
+
+\begin{figure}[tb]
+\centering
+\includegraphics[width=.95\linewidth]{figures/external-pairs.pdf}
+\caption{Separating minus nested or size-matched random AUC, in percentage points. Dots show task means, lines the smallest to largest of the three paired fold differences.}
+\label{fig:external-pairs}
+\end{figure}
+
+Five further random draws averaged 0.93005 AUC with 37.3\% retained, compared with 0.92808 and 37.9\% for the fixed design. To hold restoration frequencies per column and sizes of masks fixed, we permuted feature signatures in three random assignments per fold. Coverage remained complete and mean AUC was 0.92980. A second control proposed 2,048 binary swaps per assignment~\cite{miklos2004randomization}. Its mean coverage was 95.93\% and mean AUC 0.93114. The finite swap procedure has no uniform-mixing guarantee. Omitting Sonar changed the swapped design's AUC difference relative to the original from $+0.00306$ to $-0.00009$. Complete pair coverage did not identify the assignment with highest refitted AUC.
+
+\paragraph{Dependence between rows.}
+Across the 14 datasets, 1,003 held-out rows had an identical predictor vector in development. We reran the four tasks with more than 10\% overlap with exact vectors grouped in both outer and inner partitions. Separating, random and nested achieved 0.8792, 0.8705 and 0.8694 AUC. Their accuracies on these same splits ranked in reverse order (73.12\%, 73.77\%, 74.21\%). Exact-vector grouping leaves other forms of dependence unresolved. Sonar includes 111 echoes from a metal cylinder recorded at different angles and under different conditions. PenDigits originally held out 14 writers. Randomly repartitioning its rows addresses a different task from prediction for new writers~\cite{sonardata,pendigitsdata}.
+
+\subsection{High-dimensional challenge data}
+Arcene, Dexter and Dorothea were the three NIPS feature-selection challenge datasets outside the original development collection~\cite{guyon2004challenge}. Each used the organizer's labeled validation set. Across five inner training/ranking splits of the official training set the same validation cases were reused. We kept the challenge endpoint, balanced error rate (BER), and reported each task separately. A supervised $F$ screen on fitting rows reduced the original 10,000, 20,000 or 100,000 columns to 256. The subsequent selector used maximum-absolute scaling, an L2 logistic predictor and absolute coefficient ranks. Its anchor was the shortest prefix whose masked ranking AUC and accuracy satisfied the 8\% allowance. The equal-width control received the separating selector's width. For L1, ranking AUC of a fresh L2 fit determined the sparse support.
+
+\input{tables/challenge}
+Separating had lower BER than an equal-width coefficient prefix on Arcene (29.7\% versus 37.8\%) and Dorothea (32.4\% versus 42.1\%). Dexter differed by 0.1 percentage point. Keeping all 256 screened columns achieved 24.7\% on Arcene, 9.1\% on Dexter and 26.0\% on Dorothea. The supervised screen accounts for most of the raw-to-final dimensional reduction. On Dorothea, one additional missed positive case changes an individual fit's BER by 1.47 points because the validation sample contains only 34 positives.
+\end{document}

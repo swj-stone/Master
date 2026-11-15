@@ -1,0 +1,21 @@
+{
+  "scope": "Subsequent retrospective analysis after inspecting the published-rule frontier and the completed rule grid. Lock before computing held-out policy selections. Unit of exclusion is an entire PMLB dataset. No prospective deployment or independent task sample.",
+  "grid": "results/context_review/rule-sensitivity/by-fold.csv.gz",
+  "grid_uncompressed_sha256": "656b8d25ba3e448520258a7a26dee19bf88889ed5d2435511d85e13a06eac93f",
+  "rules": "results/context_review/rule-sensitivity/rules.csv",
+  "rules_sha256": "b9bf491e6f13e02b809caa371f0d9785196ec71dcef021cdcc0863be250431ad",
+  "decisions": "thesis-paper/evidence/reassessment/decisions.csv",
+  "decisions_sha256": "ab12c0406a6c7e7e052ddcc76df00f0c3481a8b6b946a20e893ab6fb0b7bb1c9",
+  "contexts": "results/context_review/refit-target/{dataset}/fold-{fold}/selection.json",
+  "voter": "xgb",
+  "target": "xgb",
+  "outcome": "Fixed joint outer refit failure threshold of 3% relative AUC or accuracy loss and 5% relative AP loss when applicable. Hold out all three folds of one dataset from rule choice.",
+  "cohorts": ["path", "uniform_deletions"],
+  "cost_ratios": [1, 2, 5, 10],
+  "cost": "Within each cohort and cost ratio minimize the sum of FP+r*FN across proposals from the other 13 datasets; dividing by the common size does not alter the selected rule. Evaluate both chosen policies on exactly the held-out dataset's proposals.",
+  "mask_library": "All 360 archived mask rules, plus no veto and veto all.",
+  "size_cutoffs": ["1/12", "1/6", "1/4", "1/3", "1/2", "3/4"],
+  "size_library": "Veto iff the removed fraction of anchor columns is >= the cutoff, plus no veto and veto all. Use integer cross-multiplication.",
+  "ties": "Within a training-cost tie, prefer constants (no veto then veto all), then minimum number of nominal model masks on the training proposals (per fold one shared anchor plus one mask per candidate for each distinct context), then fewer panels. Break any remaining mask ties by family order empty, endpoints, nested, separating, random, minimum before pooled, strict majority before half or more, three quarters or more, unanimous, then vote allowance 3,1,5. For size policies prefer the larger cutoff once constants are considered. Held-out features, labels and costs have no role in these choices.",
+  "summaries": "Per fold and task: confusion counts and held-out FP+r*FN, training minimizers, selected policy and train sample size. Pool held-out cost totals with proposal denominators, report equal-task mean cost per proposal, task wins/ties/losses and observed selection frequencies. Whole-dataset deletion sensitivity: remove each dataset completely from training and evaluation, rerun leave-one-dataset-out among the remaining 13 tasks with the other 12 tasks selecting the policy, and report the range of pooled paired cost differences. Shared training libraries/splits preclude treating 14 cross-fitted results as independent observations."
+}

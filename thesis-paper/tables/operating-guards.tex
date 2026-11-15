@@ -1,0 +1,21 @@
+\begin{table}[tb]
+\centering
+\caption{Comparing proposals at the same guard-refit budget. $U$ is the fraction of anchor columns saved when the final refit passes the outer tolerance, and zero otherwise. Breaches count folds; other columns weight tasks equally.}
+\label{tab:operating-guards}
+\small\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Budget & Within-width order & $100\bar U$ & Breaches & AUC \\
+\midrule
+One & Gain & 9.33 & 1/41 & 0.9351 \\
+ & Vote, then Gain & 10.12 & 3/41 & 0.9341 \\
+ & Lottery & 11.29 & 5/41 & 0.9307 \\
+ & Vote, then lottery & 12.48 & 4/41 & 0.9321 \\
+\midrule
+Up to three & Gain & 15.36 & 2/41 & 0.9305 \\
+ & Vote, then Gain & 16.75 & 6/41 & 0.9279 \\
+ & Lottery & 11.55 & 10/41 & 0.9286 \\
+ & Vote, then lottery & 12.66 & 11/41 & 0.9281 \\
+\bottomrule
+\end{tabular}
+\end{table}

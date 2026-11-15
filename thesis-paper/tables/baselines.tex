@@ -1,0 +1,26 @@
+\begin{table}[tb]
+\centering
+\caption{Five splits of each of six tasks. The upper block uses the current study runs and its controls. The lower block uses archived runs on the same splits. Sec. is mean cold elapsed time. AUC and accuracy average the five classification tasks. AP and MAE concern Fraud and Abalone, respectively.}
+\label{tab:baselines}
+\small
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Method & Kept \% & Sec. & Fits & AUC & Acc. & AP & MAE \\
+\midrule
+MinPI & 29.0 & 6.56 & 3.0 & 0.9324 & 0.8738 & 0.7376 & 1.517 \\
+Pooled votes & 26.5 & 6.92 & 3.0 & 0.9191 & 0.8604 & 0.6970 & 1.521 \\
+One panel & 26.6 & 6.58 & 3.0 & 0.9322 & 0.8738 & 0.7393 & 1.524 \\
+Compact Gain & 34.5 & 6.06 & 3.0 & 0.9377 & 0.8782 & 0.7741 & 1.517 \\
+Five-block MinPI & 32.9 & 6.35 & 3.0 & 0.9336 & 0.8775 & 0.7496 & 1.517 \\
+\midrule
+Full & 100.0 & 5.25 & 2.0 & 0.9458 & 0.8893 & 0.8083 & 1.515 \\
+Permutation & 61.1 & 5.97 & 2.9 & 0.9463 & 0.8894 & 0.8050 & 1.515 \\
+TreeSHAP & 35.4 & 5.92 & 3.0 & 0.9399 & 0.8817 & 0.8154 & 1.526 \\
+SamplingSHAP & 32.7 & 16.37 & 3.0 & 0.9408 & 0.8821 & 0.7786 & 1.539 \\
+NSGA-II & 52.6 & 22.67 & 26.0 & 0.9397 & 0.8776 & 0.7973 & 1.537 \\
+Banzhaf & 56.9 & 53.44 & 65.9 & 0.9447 & 0.8849 & 0.8119 & 1.526 \\
+ShapG & 58.1 & 190.87 & 249.8 & 0.9386 & 0.8785 & 0.7892 & 1.521 \\
+MinShap & 3.6 & 215.68 & 199.9 & 0.6328 & 0.6166 & 0.0017 & 2.069 \\
+\bottomrule
+\end{tabular}
+\end{table}

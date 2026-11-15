@@ -1,0 +1,15 @@
+dataset,side,proposals,all_pass,all_veto,mixed,endpoint_veto,endpoint_pass_interior_veto,sign_compatible,same_pair_both_sign,margin_compatible,same_pair_both_margin
+abalone,rank,10,0,10,0,10,0,0,0,0,0
+abalone,guard,10,0,10,0,10,0,0,0,0,0
+credit_card_fraud,rank,38,3,10,25,28,7,0,0,0,0
+credit_card_fraud,guard,38,8,8,22,23,7,0,0,0,0
+gisette,rank,60,5,1,54,51,4,0,0,0,0
+gisette,guard,60,3,5,52,50,7,0,0,0,0
+isolet,rank,60,0,24,36,56,4,0,0,0,0
+isolet,guard,60,0,36,24,59,1,0,0,0,0
+madelon,rank,26,0,23,3,26,0,0,0,0,0
+madelon,guard,26,0,22,4,26,0,0,0,0,0
+spambase,rank,32,1,1,30,29,2,0,0,0,0
+spambase,guard,32,1,4,27,27,4,0,0,0,0
+all,rank,226,9,69,148,200,17,0,0,0,0
+all,guard,226,12,85,129,195,19,0,0,0,0

@@ -1,0 +1,9 @@
+cohort,score,mean,count,eligible_folds
+path,endpoint_votes,0.638203797231575,12,28
+path,min_votes,0.6386275953984287,12,28
+path,rank_mass,0.7389149013280957,12,28
+path,size,0.7856078142536477,12,28
+uniform_deletions,endpoint_votes,0.6623994271721544,11,28
+uniform_deletions,min_votes,0.641204796886615,11,28
+uniform_deletions,rank_mass,0.7474055125570277,11,28
+uniform_deletions,size,0.7791289518562245,11,28

@@ -44,6 +44,7 @@ conference-paper/paper/*.fls
 conference-paper/paper/*.log
 conference-paper/paper/*.out
 conference-paper/paper/*.synctex.gz
+thesis-paper/build-*/
 
 # Editors
 .idea/

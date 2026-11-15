@@ -1,0 +1,7 @@
+{
+  "question": "How does the project’s historical exhaustive refit-prefix direct Gain selector perform on the exact 14 PMLB outer partitions with the current CPU learner?",
+  "cohort": "All 14 previously inspected PMLB tasks, all three original folds, no exclusion. Exploratory new baseline. No new hypothesis test.",
+  "faithfulness": "Follow experiments/test/run_piv0_seed42.py: include every original column, rank by decreasing average tree split gain with higher column position on exact tie, evaluate k=1..d on the ranking split, reuse the full fit at k=d, fit each strict subset in original input order; pick the first maximum validation AUC up to 1e-14. Refit on all outer development rows and score once. The CPU model, multiclass task and data splits belong to the present benchmark; this reproduces the selection rule, not the old GPU timing experiment.",
+  "outcomes": "AUC, accuracy, retained fraction, actual number of fits and serial per-arm stage times (training-side imputation, all ranking and prefix fits, and final imputation/refit/prediction). Historical validation-half diagnostics were not used to select a width. Do not compare CPU wall time as a deployment guarantee. Preserve the complete rank curve and all outer predictions.",
+  "limit": "One hour per dataset-fold; write complete folds and verify hashes on resume."
+}

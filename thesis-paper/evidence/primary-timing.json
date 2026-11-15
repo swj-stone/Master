@@ -1,0 +1,203 @@
+{
+  "groups": [
+    {
+      "dataset": "abalone",
+      "folder": "runs/seed-42/abalone",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-42/spambase",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-42/madelon",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-42/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-42/gisette",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "isolet",
+      "folder": "retries/attempt-1/seed-42/isolet",
+      "invalid_attempts": [
+        {
+          "folder": "runs/seed-42/isolet",
+          "reasons": [
+            "min: returned after watchdog deadline",
+            "group wall time 16718.941s reached 3600s"
+          ]
+        }
+      ],
+      "seed": 42
+    },
+    {
+      "dataset": "abalone",
+      "folder": "retries/attempt-1/seed-123/abalone",
+      "invalid_attempts": [
+        {
+          "folder": "runs/seed-123/abalone",
+          "reasons": [
+            "point: returned after watchdog deadline",
+            "min: budget_exhausted",
+            "group wall time 11980.478s reached 3600s"
+          ]
+        }
+      ],
+      "seed": 123
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-123/spambase",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-123/madelon",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-123/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-123/gisette",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "isolet",
+      "folder": "runs/seed-123/isolet",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "abalone",
+      "folder": "runs/seed-456/abalone",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-456/spambase",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-456/madelon",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-456/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-456/gisette",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "isolet",
+      "folder": "runs/seed-456/isolet",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "abalone",
+      "folder": "runs/seed-789/abalone",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-789/spambase",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-789/madelon",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-789/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-789/gisette",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "isolet",
+      "folder": "runs/seed-789/isolet",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "abalone",
+      "folder": "runs/seed-1024/abalone",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-1024/spambase",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-1024/madelon",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-1024/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-1024/gisette",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "isolet",
+      "folder": "runs/seed-1024/isolet",
+      "invalid_attempts": [],
+      "seed": 1024
+    }
+  ],
+  "protocol_sha256": "b70e03cb82ac6a98d14f79aa091f0d163070a636275c9d0be2ce5a3e510a3f3b",
+  "rule": "replace entire dataset-seed if any incomplete arm, cold elapsed >= remaining limit, or sum >= 3600s"
+}

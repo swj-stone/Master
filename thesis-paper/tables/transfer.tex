@@ -1,0 +1,15 @@
+\begin{table}[tb]
+\centering
+\caption{Linear predictors on three external data sets, averaged over five prespecified splits. Test scores are AUC for the two classifiers and MAE for Diabetes (lower is better). $p$ is the input width and $k$ is MinPI's retained width. Prefix receives the realized MinPI width.}
+\label{tab:transfer}
+\small
+\begin{tabular}{@{}lrrrrrrrr@{}}
+\toprule
+Data set & $p$ & $k$ & MinPI & Pooled & Point & Prefix & Anchor & Full \\
+\midrule
+Breast cancer & 30 & 4.4 & 0.9875 & 0.9628 & 0.9876 & 0.9693 & 0.9843 & 0.9948 \\
+Wine & 13 & 5.0 & 0.9991 & 0.9964 & 0.9962 & 0.9986 & 1.0000 & 1.0000 \\
+Diabetes & 10 & 5.0 & 44.54 & 45.11 & 44.49 & 44.81 & 44.07 & 43.47 \\
+\bottomrule
+\end{tabular}
+\end{table}

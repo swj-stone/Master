@@ -1,0 +1,15 @@
+\begin{table}[tb]
+\centering
+\caption{Original-width inputs at seed 42, using exactly the same rows as the corresponding prepared splits. Test AUCs and cold times use a fresh fit for each arm. Times in the final column are seconds for MinPI, Gain and Full, in that order.}
+\label{tab:width}
+\small
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Data set & $p$ & $k_{M}$ & $k_{G}$ & MinPI & Gain & Full & Cold sec. \\
+\midrule
+Madelon & 500 & 8 & 8 & 0.8939 & 0.8939 & 0.8427 & 6.2/4.5/4.5 \\
+Gisette & 5000 & 10 & 33 & 0.9731 & 0.9912 & 0.9975 & 11.4/7.6/10.1 \\
+ISOLET & 617 & 85 & 154 & 0.9984 & 0.9988 & 0.9991 & 26.8/18.8/18.0 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,21 @@
+\begin{table}[tb]
+\centering
+\caption{True/false veto counts after changing one aspect of the four-panel separating minimum. Each learner judges its own refits. The proposal-side tolerance varies only in the last two rows. The outer tolerance stays fixed. Logistic refits exceeded it in 216 of 400 path and 187 of 379 drawn proposals.}
+\label{tab:operating-rules}
+\small\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lrr@{\quad}rr@{}}
+\toprule
+&\multicolumn{2}{c}{XGBoost}&\multicolumn{2}{c}{Logistic regression}\\
+Rule & Path & Drawn & Path & Drawn \\
+\midrule
+Both endpoints & 173/174 & 161/169 & 211/159 & 182/144 \\
+Separating minimum & 184/194 & 161/178 & 213/176 & 184/173 \\
+Pooled votes & 156/139 & 153/148 & 203/122 & 174/124 \\
+One panel & 179/193 & 160/175 & 212/172 & 183/169 \\
+Twelve panels & 184/191 & 161/177 & 213/178 & 183/171 \\
+Ties accepted & 178/186 & 161/171 & 212/168 & 183/162 \\
+Vote tolerance 1\% & 184/204 & 162/201 & 216/182 & 187/189 \\
+Vote tolerance 5\% & 174/166 & 157/162 & 211/159 & 180/155 \\
+\bottomrule
+\end{tabular}
+\end{table}

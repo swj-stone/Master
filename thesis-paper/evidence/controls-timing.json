@@ -1,0 +1,186 @@
+{
+  "groups": [
+    {
+      "dataset": "abalone",
+      "folder": "runs/seed-42/abalone",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-42/spambase",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-42/madelon",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-42/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-42/gisette",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "isolet",
+      "folder": "runs/seed-42/isolet",
+      "invalid_attempts": [],
+      "seed": 42
+    },
+    {
+      "dataset": "abalone",
+      "folder": "runs/seed-123/abalone",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-123/spambase",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-123/madelon",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-123/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-123/gisette",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "isolet",
+      "folder": "runs/seed-123/isolet",
+      "invalid_attempts": [],
+      "seed": 123
+    },
+    {
+      "dataset": "abalone",
+      "folder": "runs/seed-456/abalone",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-456/spambase",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-456/madelon",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-456/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-456/gisette",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "isolet",
+      "folder": "runs/seed-456/isolet",
+      "invalid_attempts": [],
+      "seed": 456
+    },
+    {
+      "dataset": "abalone",
+      "folder": "runs/seed-789/abalone",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-789/spambase",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-789/madelon",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-789/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-789/gisette",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "isolet",
+      "folder": "runs/seed-789/isolet",
+      "invalid_attempts": [],
+      "seed": 789
+    },
+    {
+      "dataset": "abalone",
+      "folder": "runs/seed-1024/abalone",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "spambase",
+      "folder": "runs/seed-1024/spambase",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "madelon",
+      "folder": "runs/seed-1024/madelon",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "credit_card_fraud",
+      "folder": "runs/seed-1024/credit_card_fraud",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "gisette",
+      "folder": "runs/seed-1024/gisette",
+      "invalid_attempts": [],
+      "seed": 1024
+    },
+    {
+      "dataset": "isolet",
+      "folder": "runs/seed-1024/isolet",
+      "invalid_attempts": [],
+      "seed": 1024
+    }
+  ],
+  "protocol_sha256": "2d94e2ef8bc59bc68ebdb3f5c9f188ccd1a66d0f732cde6646a60dd900794525",
+  "rule": "replace entire dataset-seed if any incomplete arm, cold elapsed >= remaining limit, or sum >= 3600s"
+}

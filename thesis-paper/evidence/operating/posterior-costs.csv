@@ -1,0 +1,17 @@
+cohort,miss_cost,model,fp,fn,total
+path,1,p_size,89,66,155
+path,1,p_size_vote,85,63,148
+path,2,p_size,144,23,190
+path,2,p_size_vote,154,28,210
+path,5,p_size,209,1,214
+path,5,p_size_vote,197,5,222
+path,10,p_size,211,0,211
+path,10,p_size_vote,203,2,223
+uniform_deletions,1,p_size,89,41,130
+uniform_deletions,1,p_size_vote,101,31,132
+uniform_deletions,2,p_size,116,20,156
+uniform_deletions,2,p_size_vote,112,11,134
+uniform_deletions,5,p_size,164,4,184
+uniform_deletions,5,p_size_vote,163,3,178
+uniform_deletions,10,p_size,216,0,216
+uniform_deletions,10,p_size_vote,179,2,199

@@ -1,0 +1,9 @@
+{
+  "status": "Outcome-blind supplementary control. Specified after the training-only separating width and anchor were known and before the primary worker finished all independent budgets or opened the official test labels.",
+  "question": "How does the separating support compare with random subsets of the same size on the engineered input representation? Does restricting the draw to the same train-selected anchor explain its success?",
+  "families": ["all_original_columns", "compact_gain_anchor"],
+  "draws_each": 20,
+  "rng": "For draw d=0..19 and family index j=0,1 use numpy.default_rng(SeedSequence([918273,j,d])).choice(sorted(pool), k, replace=False), and sort the chosen column IDs. The width k is supplied by the separating support; every method uses the same held-out participants, model and evaluation metrics.",
+  "analysis": "For each source pool report the mean, minimum and maximum subject-balanced test accuracy across the 20 draws and the number at least as accurate as the separating method. Also report the realized subject-level differences and all draws. Draws represent model-selection variations on one cohort. Each of the 40 trials and each of the nine people is retained. No new significance tests or changes to the primary model.",
+  "timing": "Time the common final refit and prediction for every draw. Conditioning on the anchor or a supplied width excludes the cost of finding it."
+}

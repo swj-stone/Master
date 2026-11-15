@@ -1,0 +1,37 @@
+[
+  {
+    "path": "thesis-paper/minpi.pdf",
+    "bytes": 541377,
+    "sha256": "4a0ca3fd689e6d010554505ae0e8cb32f3b015b74bf0a157994847eb2c9699a8"
+  },
+  {
+    "path": "thesis-paper/minpi-source.zip",
+    "bytes": 128809,
+    "sha256": "900ca36a480dd7c1352fab9b32a4750e53ac053ae81deb248817a14f751fa6d7",
+    "members": 19
+  },
+  {
+    "path": "packages/thesis-pmlb-evidence-r1.zip",
+    "bytes": 12440025,
+    "sha256": "159bad149ad6771f215b8203c16d7bd6ef065803808e142b13d55cae37f2da7b",
+    "members": 435
+  },
+  {
+    "path": "packages/thesis-context-revision-evidence.zip",
+    "bytes": 136087225,
+    "sha256": "d4c78f5aab6a035c5d1a9bb47890887e68afd35a665ba7b9214e362d92dc233f",
+    "members": 961
+  },
+  {
+    "path": "packages/thesis-refit-reassessment-evidence.zip",
+    "bytes": 40008238,
+    "sha256": "96b671883cc1364c65729cf6efe6a1d6f7241007ebcf4959ea964e5199197313",
+    "members": 1220
+  },
+  {
+    "path": "packages/thesis-operating-evidence.zip",
+    "bytes": 52448489,
+    "sha256": "b1e967c21cdd27db214002bc6cbf0cc9979f0d29bad1fc5e6390dd7fc135efb6",
+    "members": 897
+  }
+]

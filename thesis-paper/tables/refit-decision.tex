@@ -1,0 +1,21 @@
+\begin{table}[tb]
+\centering
+\caption{Deletion vetoes against the observed loss after refitting candidate and anchor. A positive outcome exceeds the joint tolerance on the outer test rows. Counts weight each sampled proposal equally. The two sources share 75 fold--support pairs.}
+\label{tab:refits}
+\small\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}lrrrr@{\quad}rrrr@{}}
+\toprule
+ & \multicolumn{4}{c}{Search path ($n=400$)} & \multicolumn{4}{c}{Drawn ($n=379$)} \\
+ & TP & FP & FN & TN & TP & FP & FN & TN \\
+\midrule
+Empty, point panel & 167 & 165 & 22 & 46 & 151 & 159 & 12 & 57 \\
+Empty, four panels & 169 & 165 & 20 & 46 & 160 & 164 & 3 & 52 \\
+Both endpoints & 173 & 174 & 16 & 37 & 161 & 169 & 2 & 47 \\
+Nested minimum & 174 & 177 & 15 & 34 & 161 & 172 & 2 & 44 \\
+Separating, point panel & 179 & 193 & 10 & 18 & 160 & 175 & 3 & 41 \\
+Separating, pooled votes & 156 & 139 & 33 & 72 & 153 & 148 & 10 & 68 \\
+Separating minimum & 184 & 194 & 5 & 17 & 161 & 178 & 2 & 38 \\
+Size-matched random minimum & 182 & 196 & 7 & 15 & 161 & 183 & 2 & 33 \\
+\bottomrule
+\end{tabular}
+\end{table}

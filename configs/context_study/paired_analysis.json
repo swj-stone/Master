@@ -1,0 +1,9 @@
+{
+  "scope": "Locked before reading any new PMLB or challenge performance results. The two contrasts and false-positive family below concern only the 14 prespecified PMLB tasks. Mechanism simulations and the separate NIPS challenge study are descriptive.",
+  "unit": "One average of the three outer-fold scores per dataset and method. Preserve all exact ties. Two datasets from a similar domain still count as two named tasks. No assumption that the cohort is a random sample of all applications.",
+  "primary_endpoint": "Test macro one-versus-rest AUC, binary positive-class AUC for binary tasks.",
+  "primary_contrasts": ["separating minus nested MinPI", "separating minus size-and-count-matched random contexts"],
+  "analysis": "Each contrast has an unweighted task mean and median, range, positive/tied/negative task counts and a two-sided exact paired sign test on numerically nonzero differences (>1e-12). Holm-adjust across these two tests. Sign probabilities use the exchangeable-direction null for the included tasks. Nonsignificance does not establish equivalence.",
+  "secondary": "Report task-level paired retention, absolute percentage points and measured time; summarize full, L1, Gain, conditional prefix, optimized point and other aggregation controls. Task-level differences in AUC exceeding +/-0.005 may be shown descriptively. This descriptive threshold is not a noninferiority margin.",
+  "exclusions": "Report all frozen datasets and all missing/failed folds, with reasons. Do not replace tasks using observed performance. Run metadata supply the distinction between algorithm-stage time and process-cold time."
+}

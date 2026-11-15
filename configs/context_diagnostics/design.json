@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "status": "Fixed locally before computing any outcome in these two diagnostics. This is a follow-up to results inspected previously. It was not externally preregistered.",
+  "synthetic": {
+    "anchor": [0, 1, 2],
+    "tail": [3, 4, 5, 6, 7],
+    "distribution": "Independent uniform Rademacher coordinates and independent unit-variance Rademacher outcome noise. Training and selection are replaced by a known fixed polynomial. Mask to zero, the population mean.",
+    "main_effects": [0.08, 1.0, 0.0],
+    "interaction_amplitude": 0.4,
+    "models": ["additive", "correct_interaction", "spurious_interaction", "opposed_interactions"],
+    "placements": "All 20 ordered pairs of distinct tail positions (useful, spurious), including positions that lie either inside or outside the ranked middle. Terms are x0 times the corresponding context variable. The spurious term exists in the tested predictor only. The first model has neither term.",
+    "proposals": "All three anchor single deletions. Report the focal feature 0 separately from the always-important feature 1 and inert feature 2.",
+    "ground_truth": "3% relative excess population squared risk against the same-context anchor. Enumerate every subset of the five tail features (32 in total). Failure means at least one such context violates tolerance.",
+    "observed_ballots": "Four weighted panels, the original 256 rows plus three shared paired bootstrap resamples. Also evaluate population ballots exactly, replicating the deterministic truth over four columns only for API compatibility. Squared risk is a deliberately different metric with tractable population truth.",
+    "seeds": [18300, 18301, 18302, 18303, 18304, 18305, 18306, 18307, 18308, 18309, 18310, 18311, 18312, 18313, 18314, 18315, 18316, 18317, 18318, 18319]
+  },
+  "archived_trees": {
+    "datasets": ["abalone", "spambase", "madelon", "credit_card_fraud", "gisette", "isolet"],
+    "seeds": [42, 123, 456, 789, 1024],
+    "candidates_per_split": 12,
+    "proposal_population": "Reconstruct distinct nonempty support proposals in order of first occurrence from the effective existing min trajectory. If more than 12, take 12 evenly spaced indices including first and last, without consulting scores or the final outcome. This diagnostic conditions on the old search path; we also evaluate different full searches separately elsewhere.",
+    "rows": "Reconstruct the original fitted XGBoost predictor, train-median background, ranking rows and paired weights; require agreement of ranking votes with the archived record. Independently sample up to 256 rows from the reserved validation guard and form four new weights by the same task-specific procedure. Never access test files. Guard thresholds apply to the same frozen-model masking task, not retraining.",
+    "held_out": "For each split, exclude all contexts used by any rule. Sample up to four novel masks without replacement at each DISTINCT interior size in {round(t/4),round(t/2),round(3t/4),min(k,t)}, clamped to [1,t-1], where t=active tail size and k=anchor size. Each sample is uniform within its cardinality. Include all masks when fewer than four remain. Report datasets/splits/candidates with zero eligible masks and use no substitute. Ground event on guard: at least one of these finite shared masks fails the same strict-majority test. Report ranking-versus-guard classifications on identical novel masks as separate endpoints.",
+    "guard_rng_stream": 67112,
+    "family_rng_stream": 67113,
+    "heldout_rng_stream": 67114,
+    "masks_per_stratum": 4,
+    "watchdog_seconds_per_dataset_seed": 3600
+  },
+  "rules": "Empty-majority; empty and full-tail endpoints; original nested min; pooled over nested contexts; original nested with a uniform same-size middle; equal-weight signature family (lexicographic rank, minimum q with C(q,floor(q/2)) >= t, include endpoints); random comparator with the same number of distinct contexts, each matching the corresponding signature-row cardinality, using a single uniform family per split/seed; random sampling of distinct contexts without replacement within each cardinality. A context passes if at least three of four ballots pass. Decision rules evaluated on identical proposals and identical candidate/reference panels. For simulated population results one deterministic exact ballot per context suffices.",
+  "endpoints": "By rule: acceptance/coverage, fraction of all decisions accepting despite a failure in the reference set; fraction rejecting despite no reference failure; discordant identity-sensitive decisions and numbers of context visits. Report conditional failure among accepted proposals when defined. Reference set is exhaustive on synthetic, finite novel contexts on held-out rows on real data. No independence assumed for candidate-level decisions. Aggregate descriptively by splits and tasks as well as explicit numerators/denominators."
+}

@@ -1,0 +1,3 @@
+# Repeated-observation sensitivity
+
+This secondary check was specified while the PMLB batch was running, before inspection of any new predictive scores. For each outer fold mark a row if all original input values, without the target, occur together in a development row. Restrict the test outcomes and all frozen predictions to the remaining rows. Report the number removed and each arm's macro one-vs-rest AUC and accuracy on the reduced test set. Retain all headline results under the original row-split design. This check identifies identical recorded feature vectors and cannot resolve unrecorded subject, site, or time relationships. A restricted fold missing one or more classes has undefined macro AUC; retain its counts and accuracy.
