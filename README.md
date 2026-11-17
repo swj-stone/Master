@@ -2,9 +2,15 @@
 
 硕士研究在 `MastersThesis/` 的 `thesis/masters` 分支进行，与 `../Master/` 共享 Git 仓库及 Python 环境。会议最终版在 `../Master/` 的 `main` 分支，供只读参考。工作树中的 `data/`、`results/` 和 `packages/` 是独立的本地文件，受 Git 忽略规则管理。
 
-## 最低票数特征筛选的最佳优先搜索
+## MinPI 特征压缩
 
-[短篇论文](thesis-paper/minpi.pdf) · [独立 LaTeX 源码](thesis-paper/minpi-source.zip) · [算法和复现入口](thesis-paper/README.md) · [新的结果包](packages/thesis-minimum-vote-paper.zip)
+当前论文研究单个特征的最小边际票。给联盟重拟合 Ridge 并在独立验证行上投票；加入某一列使赢票变成输票，即得到该列的负票见证。论文比较了共用矩阵分解检验多个单列、复用已观测票值、在嵌套联盟间二分定位负票三种计算策略。[论文 PDF](thesis-paper/minpi.pdf) · [独立 LaTeX 源码](thesis-paper/minpi-source.zip) · [实验指令与逐数据集结果](experiments/minpi_compression/README.md) · [复现包](packages/thesis-minpi-compression.zip)
+
+新八集、原六集及额外四集使用各自登记的比较规则。原六集同时比较直接 Gain 排名、系数排名及下游预测器；每次运行分别记录筛选时间与完成预测的时间。[原六集对照](thesis-paper/evidence/minpi_compression/legacy-gain/README.md) · [四个新增数据集](thesis-paper/evidence/minpi_compression/chain-validation/README.md) · [八集独立核验](thesis-paper/audit/minpi-compression-audit.md)
+
+## 历史 R14：最低票数特征筛选的最佳优先搜索
+
+[R14 短篇论文](thesis-paper/supplement/minimum-vote-study.pdf) · [R14 独立 LaTeX 源码](thesis-paper/supplement/minimum-vote-study-source.zip) · [R14 结果包](packages/thesis-minimum-vote-paper.zip)
 
 每个候选的分数是各恢复情境中最低的赞成票数。每步检查当前上界最大的候选，平票按原顺序处理。在同样的 184 组候选上，最佳优先和深度优先搜索选出的子集逐组相同，分别查询 2,382 和 2,582 个候选–情境组合。单点遮蔽在两个原始森林面板上耗时更少，平均有效压缩更高。[逐组记录](thesis-paper/evidence/vote_certificates/folds.csv) · [实测提名用时](thesis-paper/evidence/vote_certificates/timing-summary.csv)
 

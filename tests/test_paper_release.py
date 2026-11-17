@@ -64,3 +64,21 @@ def test_ledger_keeps_releases_absent_from_clean_checkout(release, tmp_path, mon
     rows = json.loads(ledger.read_text())
     assert rows[0] == historic
     assert rows[1]["sha256"] == hashlib.sha256(paper.read_bytes()).hexdigest()
+
+
+def test_screening_flag_verifies_old_release_without_packaging_new_paper(release, tmp_path, monkeypatch):
+    frozen = tmp_path / "r14.zip"
+    frozen.write_bytes(b"frozen screening release")
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text(json.dumps([{"path": frozen.name, "sha256": release.digest(frozen)}]))
+    monkeypatch.setattr(release, "ROOT", tmp_path)
+    monkeypatch.setattr(release, "ARTIFACTS", ledger)
+    monkeypatch.setattr(release, "SCREENING", frozen)
+    calls = []
+    monkeypatch.setattr(release, "verify_screening", lambda paper, prior: calls.append(paper))
+    monkeypatch.setattr(sys, "argv", ["package_revision.py", "--screening-release"])
+    release.main()
+    assert calls == [frozen] and frozen.read_bytes() == b"frozen screening release"
+    frozen.write_bytes(b"modified")
+    with pytest.raises(ValueError, match="ledger"):
+        release.main()

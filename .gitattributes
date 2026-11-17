@@ -11,3 +11,9 @@ docs/thesis/archives/piv1/*.json -text
 docs/thesis/archives/piv1/*.csv -text
 thesis-paper/evidence/budget_comparison/timings.csv text eol=crlf
 thesis-paper/evidence/budget_comparison/timed-source.py text eol=lf
+experiments/minpi_compression/*.py text eol=lf
+experiments/minpi_compression/*.md text eol=lf
+experiments/minpi_compression/*.json text eol=lf
+src/minppi_mofs/sampled_linear_minpi.py text eol=lf
+src/minppi_mofs/dictator_minpi.py text eol=lf
+src/minppi_mofs/chain_minpi.py text eol=lf

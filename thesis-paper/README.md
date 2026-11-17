@@ -1,6 +1,25 @@
-# Best-First Search for Minimum-Vote Feature Screening
+# Finding Negative Min-Marginal Votes for Feature Selection
 
-[Short paper](minpi.pdf) · [Standalone LaTeX source](minpi-source.zip) · [Replication package](../packages/thesis-minimum-vote-paper.zip) · [Independent checks and scope](audit/minimum-vote-review.md)
+[Manuscript](minpi.pdf) · [Standalone LaTeX source](minpi-source.zip) · [Replication package](../packages/thesis-minpi-compression.zip) · [Protocols and commands](../experiments/minpi_compression/README.md)
+
+The [shared-ridge sampler](../src/minppi_mofs/sampled_linear_minpi.py) evaluates features against common base coalitions. The [partial-vote procedure](../src/minppi_mofs/dictator_minpi.py) reuses observations across features. The [chain sampler](../src/minppi_mofs/chain_minpi.py) localizes negative marginal votes by querying nested supports. Negative witnesses certify the vote change on their coalition. The held-out prediction comparison measures the effect of using these rankings to choose a model.
+
+The [eight-source audit](audit/minpi-compression-audit.md) checks the first predictive panel and exhaustive small games. The [four-source validation](evidence/minpi_compression/chain-validation/README.md), [matched Gain comparison](evidence/minpi_compression/legacy-gain/README.md) and [wider source transfer](evidence/minpi_compression/wide-transfer/sources.csv) give separate results. The archive includes the observed clocks and predictions, the [ridge identities](formal/SampledMarginal.lean), and proofs about [positive indices](formal/Dictator.lean) and the [sharp upper bound](formal/PartialUpper.lean).
+
+To rebuild the current paper and replication package from the thesis checkout:
+
+```powershell
+Push-Location thesis-paper
+latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=build main.tex
+Pop-Location
+.\thesis-python.ps1 thesis-paper/package_revision.py --compression-release --verify-source
+```
+
+The [release instructions](../experiments/minpi_compression/release.md) give the offline forecast audit and directions for rerunning the original six datasets.
+
+## Frozen R14 screening study
+
+[R14 paper](supplement/minimum-vote-study.pdf) · [R14 standalone LaTeX source](supplement/minimum-vote-study-source.zip) · [R14 replication package](../packages/thesis-minimum-vote-paper.zip) · [Independent checks and scope](audit/minimum-vote-review.md)
 
 The [selector](../src/minppi_mofs/minimum_vote.py) returns the earliest candidate with the largest minimum approval count. The [formal proof](formal/VoteCertificate.lean) gives the exact condition for the winner to be fixed by the observed votes. The paper proves the query bound for fixed restoration order and gives its exception. [Per-slate comparisons](evidence/vote_certificates/folds.csv) · [Raw nomination times](evidence/vote_certificates/timings.csv).
 
@@ -51,9 +70,9 @@ Stand-alone half-width timings span **168 completed executions** on one logical 
 
 The refit experiments count a deletion as harmful when the outer-fold comparison exceeds a stated relative loss tolerance. Finite test folds give an uncertain estimate of predictive loss. The historical PMLB proposals, folds and study outcomes had been seen by the time of reassessment. The later HAR, gas-sensor and Optdigits studies used locally recorded protocols and publicly available test labels. The nine HAR participants are from one study, and the gas batches come from one sensor array.
 
-## Reproduce the paper, figures and formal checks
+## Reproduce the historical tables and formal checks
 
-Run the following commands in the `MastersThesis` checkout. The three historical generators read portable [benchmark evidence](evidence/revision/), [refit evidence](evidence/reassessment/) and [operating evidence](evidence/operating/README.md). The current manuscript uses the bundled NeurIPS style, BibTeX and `latexmk`. The formal directory pins the Lean version. The [decision release guide](evidence/decision-release.md) covers the R13 data and scoring commands.
+Run the following commands in the `MastersThesis` checkout. The three historical generators read portable [benchmark evidence](evidence/revision/), [refit evidence](evidence/reassessment/) and [operating evidence](evidence/operating/README.md). The formal directory pins the Lean version. The [decision release guide](evidence/decision-release.md) covers the R13 data and scoring commands.
 
 ```powershell
 .\thesis-python.ps1 thesis-paper/revision_results.py
@@ -73,10 +92,6 @@ lean DecisionEnvelope.lean
 lean JointChoice.lean
 lean VoteCertificate.lean
 Pop-Location
-Push-Location thesis-paper
-latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=build main.tex
-Pop-Location
-.\thesis-python.ps1 thesis-paper/package_revision.py --verify-source
 ```
 
 The refit counterexample constructs two populations with the same mask scores. The best score available from the surviving variable has AUC 0.99 in one and 0.50 in the other. Lean verifies the finite arithmetic, and a separate Wolfram Language program enumerates all four masks. A second Lean file proves that a running minimum bounds a candidate's final score, which justifies stopping evaluations once the candidate cannot beat the incumbent. Neither proof estimates the error of a fitted model. [Refit arithmetic](formal/RefitTarget.lean) · [Wolfram enumeration](formal/RefitTarget.wl) · [Pruning lemma](formal/Challenger.lean)
@@ -91,7 +106,7 @@ wolframscript -file thesis-paper/formal/TranscriptCells.wl
 wolframscript -file thesis-paper/formal/JointChoice.wl
 ```
 
-The packaging command assembles the current PDF and source ZIP. Add `--screening-release --verify-source` to rebuild the short-paper package and check it against the published data. The earlier transport and operating archives retain their original names and digests. [Short-paper package](../packages/thesis-minimum-vote-paper.zip) · [Frozen R13 evidence](../packages/thesis-decision-evidence.zip) · [Previous robustness archive](../packages/thesis-robustness-evidence.zip) · [Earlier transport archive](../packages/thesis-transport-evidence.zip) · [Archive checksums](evidence/revision/artifacts.json)
+The historical command verifies the archived R14 source against its PDF and replays its screening tables from the R13 prediction archive. The earlier transport and operating archives retain their original names and digests. [Short-paper package](../packages/thesis-minimum-vote-paper.zip) · [Frozen R13 evidence](../packages/thesis-decision-evidence.zip) · [Previous robustness archive](../packages/thesis-robustness-evidence.zip) · [Earlier transport archive](../packages/thesis-transport-evidence.zip) · [Archive checksums](evidence/revision/artifacts.json)
 
 ```powershell
 .\thesis-python.ps1 thesis-paper/package_revision.py --screening-release --verify-source
@@ -101,7 +116,7 @@ For a fresh collection from the completed runs, see the [campaign commands](../e
 
 ## Earlier context-design experiments used in the reassessment
 
-The first PMLB campaign established the original 14-task, three-fold grid. Its nested, separating and random families shared a common Compact Gain anchor. The exhaustive direct Gain comparator added later refits a fresh model at each ranked width. Both comparators appear by name in the current manuscript.
+The first PMLB campaign established the original 14-task, three-fold grid. Its nested, separating and random families shared a common Compact Gain anchor. The exhaustive direct Gain comparator added later refits a fresh model at each ranked width. The archived identification study reports both comparators.
 
 | Material | Source |
 |---|---|

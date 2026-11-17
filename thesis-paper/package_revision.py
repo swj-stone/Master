@@ -25,6 +25,13 @@ TRANSPORT = PACKAGES / "thesis-transport-evidence.zip"
 ROBUSTNESS = PACKAGES / "thesis-robustness-evidence.zip"
 DECISION = PACKAGES / "thesis-decision-evidence.zip"
 SCREENING = PACKAGES / "thesis-minimum-vote-paper.zip"
+COMPRESSION = PACKAGES / "thesis-minpi-compression.zip"
+FROZEN_SCREENING = {
+    PAPER / "supplement/minimum-vote-study.pdf":
+        "1b9d50649a4c6724e0ba95612b60ec9b064f915de8dc7a09f50c13bc5597b20e",
+    PAPER / "supplement/minimum-vote-study-source.zip":
+        "d5985733b33e2bbb3f2947361486ca2a9bb471443000f64fd2e30bbe3626b4a9",
+}
 DECISION_SHA256 = "659b22b062baa1d6e69a78f59197100831b09c0b2a7384f8e23ed5407c4cfe41"
 FROZEN_STUDY = {
     PAPER / "supplement/decision-study.pdf":
@@ -450,48 +457,99 @@ def verify_transport(archive):
         print(result.stdout.decode(errors="replace").splitlines()[-1])
 
 
-def screening_members(pdf, source):
-    for path, expected in FROZEN_STUDY.items():
+def compression_members(pdf, source):
+    """Collect the measured outcomes, their original inputs and the local import closure."""
+    for path, expected in {**FROZEN_STUDY, **FROZEN_SCREENING}.items():
         if digest(path) != expected:
-            raise ValueError(f"Frozen supporting study differs from its R13 release: {path}")
-    if DECISION.exists() and digest(DECISION) != DECISION_SHA256:
-        raise ValueError(f"Archived prediction release differs from R13: {DECISION}")
-    files = [
-        ROOT / "src/minppi_mofs/minimum_vote.py",
-        ROOT / "experiments/context_review/vote_certificates.py",
-        ROOT / "experiments/context_review/vote_certificate_timing.py",
-        ROOT / "tests/test_vote_certificates.py",
-        PAPER / "formal/VoteCertificate.lean",
-        PAPER / "formal/lean-toolchain",
-        *FROZEN_STUDY,
-    ]
-    results = EVIDENCE / "vote_certificates"
-    evidence = sorted(p for p in results.iterdir() if p.is_file())
-    if not any(p.suffix == ".csv" for p in evidence):
-        raise FileNotFoundError(f"No certificate result tables found in {results}")
-    required = {"summary.csv", "folds.csv", "timing-summary.csv", "timings.csv", "timing-receipt.json"}
-    missing = required - {p.name for p in evidence}
-    if missing:
-        raise FileNotFoundError(f"Missing certificate evidence in {results}: {sorted(missing)}")
-    files.extend(evidence)
+            raise ValueError(f"Historical supplement differs from its release: {path}")
+    suite = ROOT / "experiments/minpi_compression"
+    evidence = EVIDENCE / "minpi_compression"
+    files = {ROOT / p for p in (
+        "pyproject.toml", "requirements.txt", "thesis-python.ps1",
+        "configs/context_study/prospective.json", "configs/context_review/wide_panel.json",
+        "thesis-paper/evidence/wide/sources.json", "experiments/minpi_compression/PMLB-LICENSE.txt",
+        "docs/thesis/archives/piv1/protocol.json",
+        "docs/thesis/archives/piv1/evidence.sha256", "docs/thesis/archives/piv1/final_results_by_seed.csv")}
+    files.add(PAPER / "formal/lean-toolchain")
+    files.update(p for p in suite.iterdir() if p.suffix in {".md", ".json", ".py"})
+    files.update(p for p in evidence.rglob("*") if p.suffix in {".md", ".json", ".npz", ".csv", ".zip"})
+    files.update(PAPER / "formal" / p for p in
+                 ["SampledMarginal.lean", "SampledMarginal.wl", "Dictator.lean", "PartialUpper.lean"])
+    files.update(PAPER / "audit" / p for p in ["minpi-compression-audit.md", "sampled-minpi-referee.md",
+                                               "sampled-minpi-final.md", "minpi-area-chair.md"])
+    files.update(ROOT / "tests" / p for p in
+                 ["test_sampled_linear_minpi.py", "test_dictator_minpi.py", "test_minpi_chain_replay.py",
+                  "test_minpi_greedy_rls.py"])
+    files.update(ROOT / "data/minpi_compression" / (name + ".zip") for name in
+                 ["glass", "raisin", "wifi", "leaves", "airfoil", "yacht", "slump", "energy",
+                  "landsat", "biodeg", "aquatic", "power"])
+    for name in ["ionosphere", "vehicle", "sonar"]:
+        files.update(p for p in (ROOT / "data/context_study/pmlb" / name).iterdir() if p.is_file())
+    layouts = sorted((RUNS / "wide-uci").glob("*/fold-*/layout.json"))
+    if len(layouts) != 16:
+        raise ValueError("Expected 16 wide-transfer folds")
+    for layout in layouts:
+        files.update([layout, layout.with_name("inputs.npz"), layout.with_name("targets.npz")])
+    for phase, size in (("pilot", 20), ("confirmation", 40)):
+        strict = ROOT / "results/minpi_compression/zero_tolerance" / phase
+        lock = read(strict / "lock.json")
+        if len(lock) != size or lock != read(evidence / "zero_tolerance" / phase / "lock.json"):
+            raise ValueError(f"Unexpected sensitivity receipts for {phase}")
+        files.add(strict / "lock.json")
+        for key, checksum in lock.items():
+            receipt, forecast = strict / key / "selection.json", strict / key / "predictions.npz"
+            if digest(receipt) != checksum or digest(forecast) != read(receipt)["predictions"]:
+                raise ValueError(f"Changed sensitivity forecasts for {key}")
+            files.update([receipt, forecast])
+    for panel in ["pilot", "confirmation", "wide-transfer", "chain-validation", "legacy-gain",
+                  "legacy-gain/xgb-receiver"]:
+        files.update(evidence / panel / p for p in ["forecasts.zip", "scores.csv"])
+    include_imports(files)
+    files.add(Path(__file__).resolve())
     members = {p.relative_to(ROOT).as_posix(): p for p in files}
-    members["minimum-vote.pdf"] = pdf
-    members["minimum-vote-source.zip"] = source
-    manifest = {
-        "members_sha256": {name: digest(path) for name, path in sorted(members.items())},
-        "prediction_archive": {"name": DECISION.name, "sha256": DECISION_SHA256},
-        "replay": (
-            "Extract the prediction archive to a fresh directory, then extract this release in the "
-            "same directory. Install the dependencies specified by the archived pyproject.toml or "
-            "use the existing thesis environment. Include the extraction directory and its src "
-            "subdirectory in PYTHONPATH. From the extraction directory run "
-            "python -m experiments.context_review.vote_certificates, then "
-            "python -m experiments.context_review.vote_certificate_timing verify. "
-            "Fresh wall times require the raw predictors. The recorded clocks can be rescored from the archives."
-        ),
-    }
+    members["README.md"] = (suite / "release.md").read_text(encoding="utf8").replace("](../../", "](").encode()
+    members["thesis-paper/minpi.pdf"] = pdf
+    members["thesis-paper/minpi-source.zip"] = source
+    piv1 = PACKAGES / "thesis-piv1-evidence.zip"
+    if digest(piv1) != (ROOT / "docs/thesis/archives/piv1/evidence.sha256").read_text().split()[0]:
+        raise ValueError("Prior predictions differ from the frozen PIv1 release")
+    with ZipFile(piv1) as archive, BytesIO() as payload:
+        names = sorted(n for n in archive.namelist() if "PIv1-all-seeds-" in n and
+                       n.endswith(("/direct_gain/predictions.npz", "/PIv1/predictions.npz")))
+        if len(names) != 60:
+            raise ValueError("Expected the 60 original Gain and PIv1 forecast arrays")
+        with ZipFile(payload, "w") as subset:
+            for name in names:
+                subset.writestr(ZipInfo(name), archive.read(name), compress_type=ZIP_DEFLATED)
+        members["packages/piv1-original-forecasts.zip"] = payload.getvalue()
+    manifest = {name: hashlib.sha256(p).hexdigest() if isinstance(p, bytes) else digest(p)
+                for name, p in sorted(members.items())}
     members["release.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
     return members
+
+
+def verify_compression(archive, rebuild_source=False):
+    scratch = ROOT / "tmp"
+    scratch.mkdir(exist_ok=True)
+    with TemporaryDirectory(prefix="minpi-replay-", dir=scratch) as staging, ZipFile(archive) as pack:
+        dest = Path(staging)
+        manifest = json.loads(pack.read("release.json"))
+        if sorted(pack.namelist()) != sorted([*manifest, "release.json"]):
+            raise ValueError("Unexpected or missing replication archive member")
+        for name, expected in manifest.items():
+            if not (dest / name).resolve().is_relative_to(dest):
+                raise ValueError(f"Unsafe archive path: {name}")
+            with pack.open(name) as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != expected:
+                    raise ValueError(f"Incorrect digest for {name}")
+        pack.extractall(dest)
+        if rebuild_source:
+            verify_source(dest / "thesis-paper/minpi-source.zip", dest / "thesis-paper/minpi.pdf")
+        env = {**os.environ, "PYTHONPATH": os.pathsep.join(map(str, [dest / "src", dest])),
+               "PYTHONDONTWRITEBYTECODE": "1", "NUMBA_CACHE_DIR": str(dest / "cache"),
+               "MPLCONFIGDIR": str(dest / "mpl")}
+        subprocess.run([sys.executable, "-B", "-m", "experiments.minpi_compression.replay_release"],
+                       cwd=dest, env=env, check=True)
 
 
 def verify_screening(archive, predictions):
@@ -553,7 +611,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--screening-release", "--evidence", action="store_true",
-                      help="Package the current short paper, its study supplement and certificate replay")
+                      help="Verify the archived R14 minimum-vote paper in read-only mode")
+    mode.add_argument("--compression-release", action="store_true",
+                      help="Publish the current feature-level MinPI paper and offline replication package")
+    mode.add_argument("--verify-compression", type=Path, metavar="ZIP",
+                      help="Replay the archived MinPI outcomes in a clean temporary extraction")
     for flag, path in (("--decision-evidence", DECISION), ("--robustness-evidence", ROBUSTNESS),
                        ("--transport-evidence", TRANSPORT)):
         mode.add_argument(flag, dest="frozen", action="store_const", const=path,
@@ -564,6 +626,26 @@ def main():
                       help="Replay the short paper's certificate tables using the R13 prediction archive")
     parser.add_argument("--verify-source", action="store_true", help="Compile the ZIP alone and compare every page's text")
     args = parser.parse_args()
+    if args.verify_compression:
+        expected = next(row["sha256"] for row in read(ARTIFACTS)
+                        if row["path"] == COMPRESSION.relative_to(ROOT).as_posix())
+        if digest(args.verify_compression) != expected:
+            raise ValueError("Compression archive does not match the release ledger")
+        verify_compression(args.verify_compression, args.verify_source)
+        return
+    if args.screening_release:
+        expected = next(row["sha256"] for row in read(ARTIFACTS)
+                        if row["path"] == SCREENING.relative_to(ROOT).as_posix())
+        if digest(SCREENING) != expected:
+            raise ValueError(f"Archived release does not match the ledger: {SCREENING}")
+        if args.verify_source:
+            with TemporaryDirectory() as staging, ZipFile(SCREENING) as pack:
+                folder = Path(staging)
+                for name in ("minimum-vote.pdf", "minimum-vote-source.zip"):
+                    (folder / name).write_bytes(pack.read(name))
+                verify_source(folder / "minimum-vote-source.zip", folder / "minimum-vote.pdf")
+        verify_screening(SCREENING, DECISION)
+        return
     if args.verify_screening:
         verify_screening(args.verify_screening, DECISION)
         return
@@ -590,18 +672,17 @@ def main():
         folder = Path(staging)
         copyfile(PAPER / "build/main.pdf", folder / pdf.name)
         write_archive(folder / source.name, paper_source())
-        if args.verify_source or args.screening_release:
+        if args.verify_source or args.compression_release:
             verify_source(folder / source.name, folder / pdf.name)
-        if args.screening_release:
+        if args.compression_release:
             PACKAGES.mkdir(exist_ok=True)
-            members = screening_members(folder / pdf.name, folder / source.name)
-            write_archive(folder / SCREENING.name, members)
-            if DECISION.is_file():
-                verify_screening(folder / SCREENING.name, DECISION)
-            outputs.append(SCREENING)
+            members = compression_members(folder / pdf.name, folder / source.name)
+            write_archive(folder / COMPRESSION.name, members)
+            verify_compression(folder / COMPRESSION.name)
+            outputs.append(COMPRESSION)
         for path in outputs:
             (folder / path.name).replace(path)
-    record_artifacts([*outputs, *FROZEN_STUDY])
+    record_artifacts([*outputs, *FROZEN_STUDY, *FROZEN_SCREENING])
 
 
 if __name__ == "__main__":

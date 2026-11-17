@@ -1,6 +1,6 @@
 # 硕士论文模拟顶会审稿意见
 
-审阅稿为 2026 年 11 月 15 日的 43 页匿名版 [*What Do Masked Losses Reveal About Feature Deletion After Retraining?*](../minpi.pdf)。以下页码均指这份 PDF。评审依据限于正文、图表和附录，实验数字均为稿件报告值。
+审阅稿为 2026 年 11 月 15 日的 43 页匿名版 [*What Do Masked Losses Reveal About Feature Deletion After Retraining?*](../../packages/transport-review-drafts/reading-10.pdf)。以下页码均指这份 PDF。评审依据限于正文、图表和附录，实验数字均为稿件报告值。
 
 ## 总体判断
 
