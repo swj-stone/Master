@@ -8,8 +8,12 @@ From the thesis checkout, run these commands sequentially with the shared virtua
 
 ```powershell
 .\thesis-python.ps1 -m experiments.split_vote.run --tag six-paired --seeds 42 123 456 789 1024 --methods min_mass gain_grid exhaustive
+.\thesis-python.ps1 -m experiments.minpi_replication.common_slack freeze development
+.\thesis-python.ps1 -m experiments.minpi_replication.common_slack score development
 .\thesis-python.ps1 -m experiments.anchored_vote.run --names abalone madelon spambase gisette credit_card_fraud isolet --seeds 42 123 456 789 1024 --tag original-r3 --device cuda --arms min mean gain
 .\thesis-python.ps1 -m experiments.anchored_vote.prepared_report
 ```
 
 The report validates all 150 paired-arm forecast receipts before accessing the test responses. It computes ordinary held-out AUC and accuracy or uncensored R² and raw MAE. Paired seed-level wall-time and width differences govern source decisions. The permitted width increase is the larger of 1 column and 5% of that seed's comparator width. The companion score gate allows 0.01 of AUC or R² loss. Source tables also show how many seeds actually satisfy all conditions simultaneously.
+
+`prepared-common-slack.csv` compares exhaustive Gain and minimum voting when each can trade 0.005 validation utility for compression. It uses measured test predictions at the corresponding selected widths. For exhaustive Gain the 0.005 support sometimes differed from its argmax, and the additional final fits did not capture the exhaustive end-to-end time with that decision rule.

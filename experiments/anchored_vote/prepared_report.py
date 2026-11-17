@@ -111,6 +111,24 @@ def score():
     OUT.mkdir(parents=True,exist_ok=True)
     frame.to_csv(OUT/"prepared-seeds.csv",index=False)
     sources.to_csv(OUT/"prepared-sources.csv",index=False)
+    # Changing the exhaustive tolerance changes the final refit cost. Most such
+    # refits were performed separately and lack a measured full-pipeline time.
+    # Compare their actual supports and forecasts here without imputing timing.
+    near = pd.read_csv(r2.ROOT/"thesis-paper/evidence/minpi_replication/common-slack-development.csv")
+    keys = ["dataset","seed"]
+    m = frame[frame.method=="min"].merge(near, on=keys, suffixes=("_min","_near"), validate="one_to_one")
+    if len(m) != len(SOURCES)*len(SEEDS):
+        raise ValueError("Incomplete common-tolerance deployments")
+    m["width_excess"] = m.k_min-m.k_near-np.maximum(1.,.05*m.k_near)
+    m["primary_delta"] = m.primary_min-m.primary_near
+    m["passes_width_and_quality"] = (m.width_excess<=0) & (m.primary_delta>=-.01)
+    grouped = m.groupby("dataset")
+    selected = ["k_min","k_near","primary_min","primary_near","width_excess","primary_delta",
+                "accuracy_min","accuracy_near","mae_min","mae_near"]
+    summary = grouped[selected].median()
+    summary["seeds_width_and_quality"] = grouped.passes_width_and_quality.sum()
+    summary["width_and_quality"] = (summary.width_excess<=0)&(summary.primary_delta>=-.01)
+    summary.to_csv(OUT/"prepared-common-slack.csv")
     print(sources.groupby("baseline")[["pass_joint","pass_with_quality","paired_pass_seeds","quality_pass_seeds"]].sum())
 
 
