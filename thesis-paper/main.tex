@@ -11,60 +11,63 @@
 \newtheorem{proposition}{Proposition}
 
 \begin{document}
-\title{MinPI for Input Compression in Boosted Trees}
+\title{MinPI for Forest Input Compression under Partial Availability}
 \author{Anonymous Author(s)}
 \maketitle
-
 \begin{abstract}
-A fitted tree ensemble can dispense with a measurement by stopping each
-affected path at its first unavailable split. We study the smallest input
-set reached by greedy deletion under a calibration budget for the change in
-ensemble margins. MinPI compares deletion candidates using votes from small,
-intermediate and full-size feature coalitions. The expected marginal output
-in each size class has a closed form in terms of the sets of split features
-on tree paths. The least favorable vote can rule out a deletion while
-preserving the complete greedy path. On 13 held-out datasets, greedy deletion
-retained 10.6\% fewer inputs than repeated deletion in ascending split-gain
-order. Macro AUC and accuracy differed by $-0.0025$ and $-0.0015$ across
-seven classification tasks. Ranking by the full-model effect of a single
-deletion reduced the width advantage to 1.2\%. Most of the reduction in
-exact norm calculations came from the full-coalition vote. A compiled
-scan of partial distances reproduced the same paths in less time.
+Removing a column from a fitted forest can have a different cost when another
+measurement is already missing. MinPI assigns one vote to each possible
+number of available inputs. A deletion passes if its excess squared loss
+stays within budget at every size. We integrate these votes exactly for
+trees that stop at the first unavailable split. Products of path increments
+give a finite set of coefficients that successive deletions can reuse.
+The resulting test covers every row-independent exchangeable mask law on
+the calibration sample. Choosing a globally narrowest feasible support is
+NP-hard even for depth-two trees. Across seven prospectively selected
+datasets, exact selection took 23\% less time than a matched 128-permutation
+implementation and 2.6\% less time including training. On identical candidate
+paths, enforcing every size in place of their average reduced held-out
+budget violations from 14 to 10 of 35 runs at a mean cost of 0.23 columns.
+Adding the MinPI deletion path to impurity ranking reduced geometric mean width by 6.5\%,
+below the prespecified 10\% target, and increased selection-plus-training
+time by 25\%.
 \end{abstract}
 
 \section{Introduction}
-Dropping an input to a boosted tree can change the value of later splits
-on other inputs. A single ranking measures each feature once, even after
-earlier deletions have changed which branches can be reached.
-We consider a fixed, global set of inputs available at prediction time.
-When a split feature is absent, prediction stops at that node and uses a
-weighted average of descendant margins. This permits deployment on selected
-columns without acquiring substitutes or fitting a second ensemble.
+A measurement omitted from a deployed model cannot be used even on days
+when it is available. Consider a forest trained with a temperature sensor
+and a pressure sensor. If some pressure readings are lost, the cost of
+permanently dropping temperature depends on which paths remain reachable.
+We study one global set of retained columns. On each case a tree follows
+its original splits until it encounters an unavailable input. Prediction
+then uses the mean training response at that node. Both the original and
+compressed forests face the same available measurements.
 
-The original min-marginal power index (MinPI) asks whether adding a feature to
-a coalition changes a binary performance vote~\citep{shi2026minpi}. Its worst
-coalition can establish a negative index. For a fitted ensemble we change the
-question faced by each vote. A candidate competes to be the next input deleted.
-Coalitions of a given size supply a mean prediction change for that candidate.
-If its projection along even one such direction already puts it outside the
-current budget, more precise evaluation of that candidate can be skipped.
-The least favorable vote now has an auditable consequence for an actual
-search step. The original binary index and the size-conditioned deletion
-vote have different values and interpretations.
+Feature deletion has been used to model test-time failures
+~\citep{globerson2006nightmare}. Expected losses under corrupted features can
+also be integrated analytically during training~\citep{vandermaaten2013mcf}.
+Post-training pruning can trade prediction error against the expected cost
+of features visited by a forest~\citep{nan2016pruning}. A probabilistic tree
+predictor can integrate missing values under a learned feature density
+~\citep{khosravi2020missing}; early stopping needs only the stored node value.
+Our cost is the
+number of distinct columns the deployed model may ever request. Our loss
+compares the two forests' squared errors against the same observed responses
+at each availability size. Each size votes on this loss. The minimum vote determines
+whether a support passes. This retains voting and the least favorable
+decision in the original min-marginal power index~\citep{shi2026minpi};
+the new vote measures excess predictive loss, so the index itself changes.
 
-Post-training forest pruning has been used to trade expected acquisition cost
-against prediction error~\citep{nan2016pruning}. Here the cost is the number
-of distinct input columns needed for any case. Path contributions have long
-been computed from changes between parent and child values
-~\citep{palczewska2013forest,saabasTreeInterpreter}. TreeSHAP gives a different
-allocation of model output to features~\citep{lundberg2020treeshap}.
-Our comparison uses both these established attribution ideas and direct
-full-model ablation. We measure which deletion rule gives a smaller input
-set and, holding its decisions fixed, how much computation the votes save.
+We derive the size votes for Brier and squared-error loss, give an example
+where an intermediate size alone rejects a support, and show why fast vote
+evaluation still leaves a hard support search. The experiments distinguish
+the cost of computing a vote, the value of requiring every size to pass,
+and the value of adding a greedy deletion path to standard impurity ranking.
 
-\input{minpi-tree}
-\input{minpi-tree-study}
-
+\input{minpi-predictive-method}
+\input{minpi-predictive-study}
 \bibliographystyle{plainnat}
 \bibliography{references,minpi-related}
+\appendix
+\input{minpi-hardness}
 \end{document}

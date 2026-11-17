@@ -1,0 +1,137 @@
+\section{Experiments}
+\paragraph{Design.}
+We fixed seven new UCI sources, their transformations and the evaluation
+rules before fitting. Four tasks are binary classification and three are
+regression (Table~\ref{tab:panel}). Each fit used a 100-tree random forest
+of maximum depth four. Approximately 48\% of rows fit the model, 16\%
+determined the deletion order, 16\% selected the support and 20\% measured
+performance. Source-specific splits respected declared groups, identical
+input vectors and, for Seoul and Beijing, chronology. Those two sources
+used five forest seeds on the same four time periods. The other sources
+used five seeded partitions. In both prospective experiments, forecasts were
+sealed before test labels were released to the scorers. The UCI identifiers in
+table order are 105, 563, 225, 573, 560, 501 and 440. The archive contains the source records,
+row assignments, sampling caps, seeds and hashes.
+
+On the acceptance partition, every candidate faced an intact-data check.
+Macro AUC and accuracy could each fall by at most .01 relative to the full
+forest. For regression, $R^2$ could fall by .02 and MAE could increase by
+$.02$ times the fitting-sample response standard deviation.
+The protocol called the latter a development-scale check; the code used
+the fitting rows for all methods. For cross-source reporting we scale
+outer MAE by the development standard deviation. Table~\ref{tab:panel}
+reports MAE in each source's response units.
+
+To separate ranking from acceptance, we evaluated the impurity path
+(MDI), greedy paths using the maximum, mean or intact-size loss, and a
+static single-deletion ranking. We also paired each of the four alternative
+paths with MDI. Each candidate family faced four acceptance rules:
+intact predictive metrics alone, or those metrics plus the intact-size,
+mean-size or worst-size loss quota. The full forest completed the 37 arms.
+We first average paired differences or log ratios over seeds within a
+source, then weight sources equally. Brackets give descriptive 95\%
+percentile intervals obtained by resampling whole sources. Repeated seeds
+share observations and the seven applications form a convenience panel.
+
+\begin{table}[t]
+\centering\small
+\caption{Mean columns retained and test performance over five seeds. Both
+selection methods use worst-size acceptance. Scores are AUC / accuracy
+in the first four rows and $R^2$ / MAE in the last three. MinPI includes
+the MDI path.}\label{tab:panel}
+\begin{tabular}{lrrrrr}
+\toprule
+Source & Inputs & MDI & MinPI & Full forest & MinPI\\
+\midrule
+\tableinput{minpi-predictive-rows.tex}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Compression and prediction.}
+The selected forests retained a geometric mean of 52.3\% of the original
+columns. Our prespecified target was a further 10\% reduction against MDI
+under the same acceptance rule. The observed reduction was 6.5\% (width
+ratio $.935$ [$ .861,1.000$]). MinPI returned a narrower set in seven runs,
+four in Beijing and three on liver patients. Ten supports exceeded the held
+quota against nine for MDI. MinPI's fit-inclusive time was
+$1.247$ times MDI's [$1.144,1.361$]. Adding a mean-size path to MDI was
+as competitive: MinPI's relative width was $1.009$ [$ .990,1.030$].
+The average changes from the full forest were $-.0054$ AUC and $-.0009$
+accuracy. Regression lost $.0358$ in $R^2$ and added $.0241$ in scaled MAE.
+The five Seoul fits all exceeded the held-out loss quota. Liver patients
+lost $.014$ AUC while gaining $.007$ accuracy.
+
+\paragraph{What does the minimum change?}
+Holding both candidate paths fixed, switching acceptance from the mean
+to the worst size reduced test quota violations from 14 to 10 of 35,
+at a mean cost of $.229$ retained columns. The difference in violation
+rate was $-.114$ [$-.229,-.029$]. Only three sources changed, all in the
+same direction (two-sided exact sign test $p=.25$). The source-average
+positive part of the worst normalized excess fell by $.0041$.
+An intermediate size attained the maximum in 15 runs. For House voting,
+seed 42, the intact-size excess was $.01637$ but size 11 of 16 reached
+$.02512$. This was the only run where the held-out minimum-rule support
+passed the intact-size quota and failed at an interior size. These
+comparisons measure different consequences of the rule: changing
+acceptance can change the selected support even when its eventual
+violation is visible with all inputs available.
+
+\paragraph{Computing the votes.}
+In a separately frozen timing experiment, every solver started with the
+same fitted forest and performed the same one-path search on the voting
+sample. We paired permutations with their reversals, shared each bank
+across candidates, and compared against a native sparse implementation.
+At 128 permutations exact integration took $.770$ times the selector time
+[$.690,.852$], including coefficient construction, and $.974$ times the
+fit-inclusive time. It matched 34 of 35 sampled supports and 27 complete
+paths. With eight permutations a direct implementation that avoided the
+Gram matrix was faster on five of seven seed-42 runs and recovered all
+seven final supports. Exact search and each of the three sampling budgets
+exceeded the test quota on the same 13 of 35 runs. Exact integration removes
+calibration integration error; this experiment gives no evidence of
+better test predictions from removing that error.
+
+To isolate early rejection, we also timed native kernels on five fits for
+each of 25 sources (the seven above and 18 previously examined). Screening
+evaluated 41.0\% of the size dot products. With allocation-free coefficient
+updates, the full ranking took $.961$ times the time of a straight native
+loop over all sizes [$ .923,.991$]. The corresponding ratios were $.867$
+above 50 inputs and $.999$ on the seven fresh sources, all of which had
+at most 16 inputs. Thus few evaluated size votes need not translate to
+large wall-clock savings. The implementations returned identical orders.
+
+\paragraph{Search and earlier benchmarks.}
+After scoring we exhaustively minimized the voting-sample worst excess
+at each width on the seven small sources. Greedy search missed the optimum
+by more than $10^{-8}$ of the null loss at 13 widths across 12 fits. The
+largest gap was $.00750$. Substituting one optimal support per width for
+the greedy path, then applying exactly the same independent acceptance
+rules alongside MDI, reproduced all 35 selected supports. This diagnostic
+does not optimize the joint acceptance checks over all supports.
+The corresponding unrestricted empirical quota problem is already
+NP-hard for a fixed budget (Appendix~\ref{app:hardness}).
+
+On the six previously studied preprocessed datasets (30 fits, up to 100
+columns), the same forest procedure gave a width ratio of $.932$ and
+a fit-inclusive time ratio of $1.491$ against MDI. On Madelon it retained
+40.0 columns on average against 53.6, with AUC $.724$ for both. On these
+same test rows, the archived gain-ranked XGBoost retrained on a selected
+subset retained only 20.4 columns and reached $.830$ AUC. This comparator
+can use the full development set to refit its trees. Frozen-forest compression
+would be a poor choice on Madelon if retraining is available. An
+earlier boosted-tree version used margin distortion and split gain. Its
+13-source width ratio was $.894$ against gain but $.988$ against static
+ablation. Its objective and fitted models differ from the supervised
+forest comparison; we keep its results separate in the release.
+
+\section{Scope}
+The strongest observed benefit of using the minimum was fewer failed
+held-out checks at a small column cost. The alternative mean-size
+ranking matched its compression. Calibration failed under the Seoul
+time shift, and the analytic speed advantage depended on the sampling
+precision and how much training cost was included. The experiments
+treat columns as equally costly and generate masks by size. They measure
+neither field acquisition costs nor the natural frequency of joint sensor
+failures. Deeper forests can generate many overlapping path sets, and
+the Gram construction then limits the practical scope of the method.

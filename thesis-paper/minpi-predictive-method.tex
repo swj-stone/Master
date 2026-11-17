@@ -1,0 +1,61 @@
+\section{Votes for a compressed forest}
+Let $N$ contain the $p$ inputs used for training. The deployed model may request
+only inputs in $S\subseteq N$. If the measurements available for a case are
+$T\subseteq N$, the full forest can use $T$ and the compressed forest can use
+$S\cap T$. Each tree stops at its first unavailable split and returns the
+prediction at that node. For a classification forest this is the training
+class distribution weighted by the bootstrap counts. For regression it is
+the training response mean at the node. An available measurement with a
+missing value uses the training median before traversal.
+
+For each voting row, subtract the parent prediction from the child prediction
+on each traversed edge. The increment contributes if all split features up
+to that edge are available. Denote this set by $H$ and group increments with
+the same $H$ into a vector $a_H$ over rows and output coordinates. The
+increments telescope, yielding
+\[
+ f_T=f_\varnothing+\sum_{H\subseteq T}a_H.
+\]
+Joint path contributions use this same grouping~\citep{palczewska2013forest,
+saabasTreeInterpreter}. A depth-$D$ forest has $|H|\le D$ even if one
+feature occurs at several nodes on a path. Denote by $m$ the number of groups.
+
+\input{minpi-proper-quota}
+
+In particular, $V_s(S)$ is a polynomial of degree at most $2D-1$ in $s$.
+The calculation uses no frequencies estimated from sampled coalitions. The
+exchangeability condition allows any distribution on coalition size; within
+a size it assigns equal mass to the masks. For example, an installation
+that always loses the same laboratory instrument requires a different
+weighting of the masks. The result also conditions on the voting rows.
+Generalization to future cases is an empirical question.
+
+An interior size can supply the only veto. On one regression row set $p=3$,
+$z=1$, $a_{\{1,2\}}=1/2$, $a_{\{1,2,3\}}=-1/2$, and all other increments
+to zero. Only the mask $\{1,2\}$ improves the teacher's squared loss over the
+empty predictor, by $3/4$. Deploying the empty support gives normalized
+excesses $(0,3/8,0)$ at sizes one through three. Testing both endpoints misses
+the violation. The average size vote also passes at any budget between $1/8$
+and $3/8$.
+
+\paragraph{Choosing the inputs.}
+Starting from $S=N$, delete the feature $j$ that minimizes
+$\max_s V_s(S\setminus\{j\})$, and continue to the empty set. While
+examining a candidate, a single size whose cost exceeds the incumbent can
+end the comparison. We try the last winning candidate's worst size and the
+endpoints first. Equality uses the recorded input order. We also generate
+the deletion path from ascending forest impurity importance (MDI).
+On a separate acceptance sample, visit every width on both paths. Return
+the narrowest support that passes every size vote at $\epsilon=.02$ and
+the intact-prediction check described below. A tie goes to the smaller
+worst excess, followed by a fixed method order. A path may contain
+feasible supports after an infeasible one because the weights $w_U$ are
+signed. The search attains the smallest feasible width on its two supplied
+paths. It does not exhaust all $2^p$ supports.
+
+For one fixed deletion order, a union $U$ ceases to contribute when its
+earliest member is dropped. Binning its weight at that step yields all
+acceptance-sample excesses by cumulative sums. Pairing paths therefore
+reuses the forest fit, calibration predictions and Gram matrix. For shallow
+forests the degree limits the number of coefficients per candidate. Dense
+group Gram matrices can still require $O(m^2)$ memory.

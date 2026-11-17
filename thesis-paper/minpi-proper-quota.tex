@@ -27,8 +27,9 @@ For each $s=1,\ldots,p$ the excess loss per available fraction is
 \]
 Every size votes to accept $S$ when
 $\min_{1\le s\le p}\{\epsilon\|z\|^2-V_s(S)\}\ge0$.
-This is equivalent to bounding expected excess loss under every exchangeable
-availability law by $\epsilon\,\mathbb E[|T|]\,\|z\|^2/p$.
+For a common mask law independent of the row and its label, this is equivalent
+to bounding expected excess loss under every exchangeable availability law by
+$\epsilon\,\mathbb E[|T|]\,\|z\|^2/p$.
 \end{proposition}
 \begin{proof}
 Expanding the two squares cancels $\|z\|^2$. A linear term disappears when
