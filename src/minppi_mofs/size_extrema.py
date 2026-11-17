@@ -138,3 +138,99 @@ def select(current, delta, keep, w, tol, last, low, high, absmax):
         if keep[j] and values[j] <= best+tol:
             return j, args[j], checks, intervals
     raise ArithmeticError("No finite worst-size vote")
+
+
+@njit(cache=True)
+def _disable(feature, alive, live, delta, linear, gp, gi, gv, ip, ii, jp, ji, unions):
+    """Retire every live group hit by the deletion and each affected pair once."""
+    for pos in range(jp[feature], jp[feature+1]):
+        g = ji[pos]
+        if not alive[g]:
+            continue
+        a,b = ip[g],ip[g+1]
+        for k in range(a,b):
+            col = ii[k]
+            live[col] -= 1
+            delta[col,b-a] -= linear[g]
+        for edge in range(gp[g],gp[g+1]):
+            h = gi[edge]
+            if not alive[h]:
+                continue
+            degree = unions[edge]
+            magnitude = gv[edge] if h==g else 2.*gv[edge]
+            for k in range(a,b):
+                delta[ii[k],degree] += magnitude
+            if h!=g:
+                k = a
+                for m in range(ip[h],ip[h+1]):
+                    f = ii[m]
+                    while k<b and ii[k]<f:
+                        k += 1
+                    if k==b or ii[k]!=f:
+                        delta[f,degree] += magnitude
+        alive[g] = False
+
+
+@njit(cache=True)
+def rank_arrays(initial, linear, gp, gi, gv, ip, ii, jp, ji, unions, w, tol):
+    """Trace one exact greedy path; compress identical dormant proposals."""
+    low,high,absmax = difference_tree(w)
+    p = len(jp)-1
+    live = np.diff(jp)
+    keep = np.ones(p,np.bool_)
+    dormant = np.zeros(p,np.bool_)
+    alive = np.ones(len(ip)-1,np.bool_)
+    delta = initial.copy()
+    current = np.zeros(initial.shape[1])
+    order = np.empty(p,np.int64)
+    t = queries = intervals = 0
+    last = p-1
+    while t<p:
+        candidates = keep.copy()
+        first = -1
+        for j in range(p):
+            if not keep[j] or live[j]:
+                continue
+            # State updates can leave tiny nonzero residues after the last live group dies.
+            # A batched deletion must leave the stored binary64 current vector unchanged.
+            unchanged = True
+            for h in range(len(current)):
+                if current[h]+delta[j,h]!=current[h]:
+                    unchanged = False
+                    break
+            dormant[j] = unchanged
+            if unchanged:
+                if first<0:
+                    first = j
+                else:
+                    candidates[j] = False
+        j,last,nq,ni = select(current,delta,candidates,w,tol,last,low,high,absmax)
+        queries += nq
+        intervals += ni
+        if dormant[j]:
+            for col in range(j,p):
+                if keep[col]:
+                    if not dormant[col]:
+                        break
+                    order[t] = col
+                    t += 1
+                    keep[col] = False
+        else:
+            current += delta[j]
+            _disable(j,alive,live,delta,linear,gp,gi,gv,ip,ii,jp,ji,unions)
+            keep[j] = False
+            order[t] = j
+            t += 1
+    return order,queries,intervals
+
+
+def rank_minimum(game):
+    """Return the complete minimum-vote deletion order and number of scalar size scores."""
+    structure = game.structure
+    inc,by,gram = structure.incidence,structure.by_feature,structure.gram
+    p = inc.shape[1]
+    w = np.ascontiguousarray(structure.weights[1:]*p/np.arange(1,p+1)[:,None])
+    tol = 128*np.finfo(float).eps*(np.abs(game.linear).sum()+np.abs(gram.data).sum()+game.null)
+    order,n,_ = rank_arrays(game.initial,game.linear,gram.indptr,gram.indices,gram.data,
+                            inc.indptr,inc.indices,by.indptr,by.indices,structure.unions,w,tol)
+    return order,n

@@ -9,6 +9,7 @@ from experiments.minpi_rework import quota_coalition_rf as forest
 from experiments.minpi_rework.predictive_guard import margin_path
 from experiments.minpi_rework.predictive_mask_study import centered
 from minppi_mofs.predictive_quota import PredictiveGame
+from minppi_mofs.size_extrema import rank_minimum
 
 
 @dataclass
@@ -19,8 +20,10 @@ class AcceptancePath:
     intact: np.ndarray
 
 
-def prepare_paths(model, x_vote, y_vote, x_width, y_width, task, include_min=True):
+def prepare_paths(model, x_vote, y_vote, x_width, y_width, task, include_min=True, *, rank_backend="native"):
     """Materialize the original path predictions and vote curves exactly once."""
+    if rank_backend not in ("native", "interval"):
+        raise ValueError("Expected native or interval ranking")
     costs = {}
     start = perf_counter()
     calibration = model.game(x_width)
@@ -36,7 +39,10 @@ def prepare_paths(model, x_vote, y_vote, x_width, y_width, task, include_min=Tru
         voting = model.game(x_vote)
         voting_game = PredictiveGame.from_paths(voting.a, voting.incidence,
                                                 centered(model, y_vote, task))
-        orders["min"], _ = voting_game.ranked_path("min")
+        if rank_backend == "interval":
+            orders["min"], _ = rank_minimum(voting_game)
+        else:
+            orders["min"], _ = voting_game.ranked_path("min")
         costs["min_rank"] = perf_counter() - start
 
     paths = {}
@@ -89,7 +95,7 @@ def select_width(paths, null, y, task, scale, epsilon=.02, policy="min_first"):
 
 
 def select_forest(x_fit, y_fit, x_vote, y_vote, x_width, y_width, task, seed=42,
-                  epsilon=.02):
+                  epsilon=.02, *, rank_backend="interval"):
     """Fit the original two-path MinPI forest. Classification uses contiguous class IDs."""
     if task not in ("classification", "regression"):
         raise ValueError("Expected classification or regression")
@@ -103,7 +109,7 @@ def select_forest(x_fit, y_fit, x_vote, y_vote, x_width, y_width, task, seed=42,
         y_fit, y_vote, y_width = (y.astype(int) for y in (y_fit, y_vote, y_width))
     started = perf_counter()
     model = forest.fit(x_fit, y_fit, task, seed)
-    paths, null, _ = prepare_paths(model, x_vote, y_vote, x_width, y_width, task)
+    paths, null, _ = prepare_paths(model, x_vote, y_vote, x_width, y_width, task, rank_backend=rank_backend)
     columns, trace = select_width(paths, null, y_width, task, max(float(np.std(y_fit)), 1e-12),
                                   epsilon)
     trace["elapsed_s"] = perf_counter() - started

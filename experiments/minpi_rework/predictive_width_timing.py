@@ -23,7 +23,7 @@ def evaluate(panel, name, seed, x, y, task, idx):
     model = rf.fit(x[idx["fit"]], y[idx["fit"]], task, seed)
     fit_s = perf_counter() - start
     paths, null, costs = prepare_paths(model, x[idx["vote"]], y[idx["vote"]],
-                                     x[idx["width"]], y[idx["width"]], task)
+                                     x[idx["width"]], y[idx["width"]], task, rank_backend="native")
     tag = "predictive-confirmation" if panel == "external" else "predictive-prepared"
     folder = benchmark.ROOT / "results/minpi_rework" / tag / f"{name}-{seed}"
     receipt = json.loads((folder / "selection.json").read_bytes())["records"]
@@ -84,7 +84,8 @@ def main():
     y = (x[:, 0] > 0).astype(int)
     for task, truth in (("classification", y), ("regression", x[:, 0])):
         model = rf.fit(x[:30], truth[:30], task, 89, n_estimators=3)
-        paths, null, _ = prepare_paths(model, x[30:60], truth[30:60], x[60:], truth[60:], task)
+        paths, null, _ = prepare_paths(model, x[30:60], truth[30:60], x[60:], truth[60:], task,
+                                       rank_backend="native")
         for policy in POLICIES[:3]:
             select_width(paths, null, truth[60:], task, 1., policy=policy)
     prepared = legacy_gain.jobs()

@@ -2,8 +2,8 @@
 import numpy as np
 from numba import njit
 from minppi_mofs.availability_minpi import probabilities
-from minppi_mofs.size_extrema import difference_tree, maximum, select, _dot
-from experiments.minpi_rework.predictive_veto_native import straight
+from minppi_mofs.size_extrema import difference_tree, maximum, select, _dot, rank_arrays
+from experiments.minpi_rework.predictive_veto_native import straight, fused, merge_update
 
 
 @njit(cache=True)
@@ -58,6 +58,19 @@ def check():
             assert got == want, (n, i, got, want)
             ncases += 1
     print(f"{ncases} scalar extrema and tolerance decisions; {interior} strict interior and {plateaus} tied maxima")
+    # Model a one-ulp accumulated residual on a column whose last dependent group has died.
+    # With tolerance zero it remains distinguishable from the other dormant columns.
+    p = 5
+    weights = np.ascontiguousarray(probabilities(p,1)[1:]*p/np.arange(1,p+1)[:,None])
+    delta = np.zeros((p,2))
+    delta[0,1] = np.finfo(float).eps
+    empty = np.empty(0,dtype=np.int32)
+    ptr = np.array([0],dtype=np.int32)
+    state = (delta,np.empty(0),ptr,empty,np.empty(0),ptr,empty,np.zeros(p+1,np.int32),
+             empty,empty,weights,0.)
+    expected = fused(straight,merge_update,*state)[0]
+    np.testing.assert_array_equal(expected,[1,2,3,4,0])
+    np.testing.assert_array_equal(rank_arrays(*state)[0],expected)
 
 
 if __name__ == "__main__":
