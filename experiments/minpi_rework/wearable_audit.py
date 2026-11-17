@@ -63,5 +63,7 @@ def verify():
 
 
 if __name__=="__main__":
-    with threadpool_limits(1):
+    from experiments.minpi_rework.wearable_assets import cli_args,inputs
+    args = cli_args()
+    with threadpool_limits(1),inputs(args.prepared,args.archive,args.output):
         verify()

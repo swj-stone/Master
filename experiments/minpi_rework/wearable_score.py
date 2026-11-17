@@ -73,4 +73,7 @@ def score():
 
 
 if __name__=="__main__":
-    score()
+    from experiments.minpi_rework.wearable_assets import cli_args,inputs
+    args = cli_args()
+    with inputs(args.prepared,args.archive,args.output):
+        score()
