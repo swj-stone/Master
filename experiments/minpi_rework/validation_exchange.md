@@ -13,3 +13,17 @@ The first 13 held-out sources had already been scored before this panel was asse
 Use seeds 42–46 and the disjoint fit, vote, width and outer test APIs from the prior project. For every source except Tecator, partition distinct units approximately 48/16/16/20%. Group CTG by recording, Telemonitoring by patient, and other records by exact input vector. Link exact duplicates across declared units. Use task-independent group randomization for CTG and Telemonitoring. Stratify credit groups by the representative record's label. For Tecator, reserve its published test, then split the 172 development rows 60/20/20%. The outer test is identical across its five seeds. Report it as one source in source-level analyses. Within each partition every classification class must be represented. Freeze the complete row-membership digests, shapes and counts before fitting. All declared sources must appear in reports of completeness and failures. For CTG and Telemonitoring report equal-recording and equal-patient sensitivity alongside ordinary equal-row performance. No broader patient-level split is possible on CTG. These are five convenience samples.
 
 Use `split(name, seed)` for selection. It supplies all X and disjoint index arrays, with all outer labels masked. `score(name, seed, forecast_path, frozen_sha256)` verifies a stored prediction digest before reading protected outcomes. Only use it once predictions are frozen and release is authorized. Raw data stay in the ignored data directory. The four UCI archives are credited at the linked UCI records under CC BY 4.0. For Tecator retain the original permission notice on any data redistribution; the original document includes a request for instrument credit and a publication preprint. The shared environment needs `xlrd==2.0.2` for the two legacy Excel workbooks.
+
+## Predictor-only partition audit
+
+The Tecator input audit detected 22 pairs of identical spectra among the 215 interpolation records. Seven pairs straddled the published boundary. Before any forecast was permitted, we retained the 43 published test records, excluded the seven matching development records and split the other 165 development records by exact spectrum. Thus the analytic table contains 208 rows and 193 unique spectra. The released test stays fixed at all five seeds. This amendment supersedes only the earlier count of 172 development records. It uses no outcome information.
+
+| Source | Analytic rows | Input columns | Distinct split units | Seed 42 fit / vote / width / test rows |
+|---|---:|---:|---:|---:|
+| CTG | 2,126 | 21 | 352 recordings | 962 / 365 / 392 / 407 |
+| Taiwan | 4,000 | 20 | 3,965 input groups | 1,916 / 642 / 639 / 803 |
+| Telemonitoring | 5,875 | 18 | 42 people | 2,658 / 1,021 / 961 / 1,235 |
+| Student mathematics | 395 | 25 | 395 input groups | 189 / 63 / 64 / 79 |
+| Tecator | 208 | 100 | 193 spectra | 97 / 34 / 34 / 43 |
+
+All 25 partitions passed group-disjointness and masking checks. The [source manifest](validation_exchange_sources.json) records all download URLs and archive SHA-256 digests. The [partition receipt](../../thesis-paper/evidence/minpi_rework/exchange-validation/panel.json) gives all five seeds' partition sizes, numbers of groups and SHA-256 digests of the sorted zero-based positions encoded as little-endian int64. Reproduce the receipt from the thesis checkout with `.\thesis-python.ps1 -m experiments.minpi_rework.validation_exchange --fetch`. For a machine-readable copy, add `--write-receipt` followed by a destination path.
