@@ -1,4 +1,8 @@
 """Size-specific held-row evidence for a shared feature quota."""
+from fractions import Fraction
+from math import comb
+import json
+
 import numpy as np
 from xgboost import DMatrix
 
@@ -39,3 +43,30 @@ def margin_votes(model,x,y,task,seed):
     singleton=2*np.einsum("npc,nc->p",parts,residual)-energy
     dependence=2*(np.einsum("npc,nc->p",parts,parts.sum(axis=1))-energy)
     return normalized(singleton[None,:]-np.array([0.,.5,1.])[:,None]*dependence)
+
+
+def path_votes(model,p):
+    """Split gain is reachable only when the whole preceding path is available.
+
+    For the weighted unanimity game on distinct path variables, a member is
+    pivotal when all d−1 other members appear in a uniform coalition of size k.
+    """
+    trees=json.loads(model.get_booster().save_raw(raw_format="json"))["learner"]["gradient_booster"]["model"]["trees"]
+    mass=np.zeros((5,p))
+    for tree in trees:
+        groups=[]
+        for i,left in enumerate(tree["left_children"]):
+            prior=() if i==0 else groups[tree["parents"][i]]
+            if left<0:
+                groups.append(prior)
+                continue
+            j=tree["split_indices"][i]
+            group=prior if j in prior else prior+(j,)
+            groups.append(group)
+            mass[len(group),list(group)]+=max(0.,tree["loss_changes"][i])
+    tiers=(0,(p-1)//2,p-1)
+    prob=np.zeros((3,len(mass)))
+    for s,k in enumerate(tiers):
+        for d in range(1,min(len(mass),p+1)):
+            prob[s,d]=float(Fraction(comb(k,d-1),comb(p-1,d-1)))
+    return normalized(prob@mass)

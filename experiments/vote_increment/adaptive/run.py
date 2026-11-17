@@ -46,6 +46,8 @@ def select(x,y,task,idx,seed,arm,design):
     else:
         if design=="margin":
             votes=game.margin_votes(model,x[v],y[v],task,seed)
+        elif design=="path":
+            votes=game.path_votes(model,p)
         else:
             raise ValueError(design)
         ranks=votes.min(axis=0) if arm=="min" else votes.mean(axis=0)
