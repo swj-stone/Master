@@ -59,6 +59,8 @@ TABLES = {
     "predictive-width": ("contrasts.csv",),
     "wide-veto-ablation": ("scores.csv","source-means.csv","contrasts.csv","width-ratios.csv"),
     "predictive-universe": ("scores.csv","source-means.csv","fixed-summary.csv","reselection.csv"),
+    "field-cost": ("scores.csv","means.csv"),
+    "wearable-groups": ("held.csv","acceptance-subsets.csv","clocks.csv","summary.csv","refit-held.csv","refit-summary.csv"),
     "predictive-veto-timing": (
         "contrasts.csv","source-contrasts.csv","split-medians.csv",
         "native-contrasts.csv","native-source-contrasts.csv","native-split-medians.csv",
@@ -155,8 +157,9 @@ def raw_sources():
     for manifest in ("validation_exchange_sources.json","validation_predictive_sources.json"):
         pins.update({v["filename"]:v["sha256"] for v in read(manifest).values()})
     pins.update({f"veto-{v[0]}.zip":v[2] for v in read("wide_veto_sources.json").values()})
-    if len(pins)!=29:
-        raise ValueError("Expected 29 independent provider inputs")
+    pins["field-cost-45.zip"] = json.loads((EVIDENCE/"field-cost/lock.json").read_bytes())["source"]
+    if len(pins)!=30:
+        raise ValueError("Expected 30 public raw inputs in the core package")
     for name, pin in pins.items():
         path = base/name
         if digest(path)!=pin:
@@ -210,7 +213,8 @@ def release_files():
     roots = []
     for pattern in ("quota_compress_tree*.py","quota_compress_scale*.py","tree_*py","stratified_tree*.py",
                     "span_*.py","scalar_tree*.py","compress_model*.py","validation*.py",
-                    "predictive*.py","wide_veto*.py","observed_availability.py","prepared_forest_comparison.py",
+                    "predictive*.py","wide_veto*.py","field_cost*.py","wearable*.py",
+                    "observed_availability.py","prepared_forest_comparison.py",
                     "quota_coalition_rf_check.py","availability_checks.py"):
         roots.extend(EXPERIMENT.glob(pattern))
     roots.append(EXPERIMENT/"quota_compress_rescue_check.py")
@@ -220,6 +224,18 @@ def release_files():
     files.update(p.with_suffix(".md") for p in modules if p.with_suffix(".md").exists())
     files.update(EXPERIMENT.glob("validation*.json"))
     files.update(EXPERIMENT.glob("predictive*.md"))
+    files.update((EXPERIMENT/"wearable_protocol.md",EXPERIMENT/"wearable_sources.json",EXPERIMENT/"field_cost_protocol.md"))
+    files.update(EXPERIMENT.glob("wearable*.md"))
+    device_archive = PACKAGES/"minpi-wearable-forecasts.zip"
+    if digest(device_archive)!=(EVIDENCE/"wearable-groups/archive-sha256.txt").read_text().split()[0]:
+        raise ValueError("Unexpected wearable forecast package")
+    files.add(device_archive)
+    refit_archive = PACKAGES/"minpi-wearable-refit-forecasts.zip"
+    if digest(refit_archive)!=(EVIDENCE/"wearable-groups/refit-archive-sha256.txt").read_text().split()[0]:
+        raise ValueError("Unexpected bounded wearable refit forecast package")
+    files.add(refit_archive)
+    files.update((PAPER/"build_reviewer.py",PAPER/"reviewer_scores.py",PAPER/"reviewer-scores.md",
+                  PAPER/"reviewer-requirements.txt"))
     files.update((EXPERIMENT/"wide_veto_sources.json",EXPERIMENT/"wide_veto_protocol.md"))
     files.update((EXPERIMENT/"README.md",EXPERIMENT/"span_findings.md",EXPERIMENT/"stratified_tree_protocol.md",
                   EXPERIMENT/"validation_protocol.md",ROOT/"experiments/minpi_compression/protocol.json",
@@ -233,7 +249,7 @@ def release_files():
                    "predictive-confirmation","predictive-mc-confirmation","predictive-prepared","predictive-validation",
                    "predictive-lattice","predictive-veto-timing","observed-availability","wide-veto",
                    "predictive-refit","predictive-polynomial","predictive-reachable","predictive-width",
-                   "predictive-universe","wide-veto-ablation"):
+                   "predictive-universe","wide-veto-ablation","field-cost","wearable-groups"):
         files.update(p for p in (EVIDENCE/folder).rglob("*") if p.is_file())
     files.update(EVIDENCE/group/name for group,names in TABLES.items() for name in names)
     for folder in ("tree-ranking-controls","quota-tree"):
@@ -280,7 +296,20 @@ def prepared_files():
     return files
 
 
-def build(with_prepared):
+def wearable_windows():
+    from experiments.minpi_rework import wearable_data, wearable_assets
+
+    files = {}
+    for name,pin in wearable_assets.PREPARED.items():
+        key = f"data/minpi_rework/wearable-{name}-prepared.npz"
+        file = ROOT/key if (ROOT/key).exists() else wearable_data.prepare(name)
+        if digest(file)!=pin:
+            raise ValueError(f"Changed portable wearable window file: {name}")
+        files[key] = file
+    return files
+
+
+def build(with_prepared, with_wearable_raw=False):
     (ROOT/"tmp").mkdir(exist_ok=True)
     with TemporaryDirectory(dir=ROOT/"tmp",prefix="tree-manuscript-") as tmp:
         folder = Path(tmp)
@@ -302,16 +331,24 @@ def build(with_prepared):
         staged = {name:folder/name for name in manuscript}
         archive(PACKAGES/"minpi-tree-source.zip",{**staged,"main.pdf":folder/"main.pdf"})
         members = {p.relative_to(ROOT).as_posix():p for p in release_files()}
+        members.update(wearable_windows())
         members.update({"thesis-paper/"+name:source for name,source in staged.items()})
         guide = PAPER/"tree-replication.md"
         entry = folder/"README.md"
         guide_text = guide.read_text(encoding="utf8").replace("](../experiments/","](experiments/")
-        entry.write_text(guide_text.replace("](evidence/","](thesis-paper/evidence/"),encoding="utf8")
+        guide_text = guide_text.replace("](evidence/","](thesis-paper/evidence/")
+        entry.write_text(guide_text.replace("](reviewer-scores.md)","](thesis-paper/reviewer-scores.md)"),encoding="utf8")
         members.update({"README.md":entry,"thesis-paper/minpi-tree.pdf":folder/"main.pdf"})
         archive(PACKAGES/"minpi-tree-replication.zip",members)
     if with_prepared:
         archive(PACKAGES/"minpi-tree-prepared-six.zip",{p.relative_to(ROOT).as_posix():p for p in prepared_files()},
                 "PREPARED-SHA256SUMS.json")
+    if with_wearable_raw:
+        pins = json.loads((EXPERIMENT/"wearable_sources.json").read_bytes())
+        originals = {f"data/minpi_rework/wearable-{name}.zip":ROOT/f"data/minpi_rework/wearable-{name}.zip" for name in pins}
+        if any(digest(originals[f"data/minpi_rework/wearable-{name}.zip"])!=pin for name,pin in pins.items()):
+            raise ValueError("Wearable source digest mismatch")
+        archive(PACKAGES/"minpi-wearable-raw.zip",originals,"WEARABLE-RAW-SHA256SUMS.json")
 
 
 def verify_manifest(name="SHA256SUMS.json"):
@@ -351,6 +388,32 @@ def restore():
                     if not dest.exists():
                         dest.write_bytes(raw)
         print(f"Verified and restored {cohort.count} locked {cohort.group} runs",flush=True)
+    with ZipFile(PACKAGES/"minpi-wearable-forecasts.zip") as z:
+        expected_names = set()
+        for source,n in (("mhealth",10),("dsads",8)):
+            lock_name = f"lock-{source}.json"
+            expected_names.add(lock_name)
+            raw_lock = z.read(lock_name)
+            if raw_lock!=(EVIDENCE/"wearable-groups"/lock_name).read_bytes():
+                raise ValueError("Wearable support lock differs")
+            locks = json.loads(raw_lock)["receipts"]
+            if set(locks)!={f"{source}-{i}" for i in range(n)}:
+                raise ValueError("Incomplete wearable participant folds")
+            for key,pin in locks.items():
+                rec = json.loads(z.read(f"{key}/selection.json"))
+                for filename,checksum in (("selection.json",pin),("forecasts.npz",rec["forecast_sha256"])):
+                    member = f"{key}/{filename}"
+                    expected_names.add(member)
+                    raw = z.read(member)
+                    dest = ROOT/"results/minpi_rework/wearable-groups"/member
+                    if hashlib.sha256(raw).hexdigest()!=checksum or (dest.exists() and dest.read_bytes()!=raw):
+                        raise ValueError(f"Mismatch in sealed {member}")
+                    dest.parent.mkdir(parents=True,exist_ok=True)
+                    if not dest.exists():
+                        dest.write_bytes(raw)
+        if set(z.namelist()) != expected_names:
+            raise ValueError("Unexpected wearable forecast ZIP members")
+    print("Verified and restored 18 held-participant forecast sets",flush=True)
 
 
 def replay_mc_costs():
@@ -432,7 +495,10 @@ def verify(check_tex, prepared):
                  ("predictive_polynomial_check",),("predictive_polynomial_report",),("predictive_reachable_score",),
                  ("prepared_forest_comparison",),("predictive_width_timing","--summarize"),
                  ("wide_veto_ablation","score"),("predictive_universe","score"),("predictive_universe_report",),
-                 ("predictive_stability",)])
+                 ("predictive_stability",),("predictive_group_check",),("field_cost","score"),
+                 ("wearable_score","--prepared","data/minpi_rework"),
+                 ("wearable_refit_offline","--prepared","data/minpi_rework","--refit-archive",
+                  "packages/minpi-wearable-refit-forecasts.zip")])
     try:
         checked([sys.executable,"-B",str(Path(__file__).resolve()),"replay-mc-costs"],ROOT,env=env,capture=True)
         for series in ("pipeline","production","mdi"):
@@ -497,23 +563,28 @@ def verify_printed_scores(pdf_text, evidence):
     print(f"Verified widths and scores in all {len(labels)} PDF table rows.",flush=True)
 
 
-def verify_archives(prepared):
+def verify_archives(prepared,wearable_raw=False):
     """Reproduce the published scores using only files inside fresh extracted copies."""
     (ROOT/"tmp").mkdir(exist_ok=True)
     with TemporaryDirectory(dir=ROOT/"tmp",prefix="tree-release-test-") as tmp:
         dest = Path(tmp)/"replication"
         with ZipFile(PACKAGES/"minpi-tree-replication.zip") as z:
             z.extractall(dest)
+        manuscript = Path(tmp)/"source"
+        with ZipFile(PACKAGES/"minpi-tree-source.zip") as z:
+            z.extractall(manuscript)
         if prepared:
             with ZipFile(PACKAGES/"minpi-tree-prepared-six.zip") as z:
+                z.extractall(dest)
+        if wearable_raw:
+            with ZipFile(PACKAGES/"minpi-wearable-raw.zip") as z:
                 z.extractall(dest)
         env = {**os.environ,"PYTHONPATH":os.pathsep.join(map(str,(dest/"src",dest))),
                "PYTHONDONTWRITEBYTECODE":"1","NUMBA_CACHE_DIR":str(dest/"tmp/numba")}
         args = [sys.executable,"-B","thesis-paper/tree_release.py","verify","--tex"]
+        if wearable_raw:
+            checked([sys.executable,"-B",str(dest/"thesis-paper/tree_release.py"),"verify-wearable-raw"],dest,env=env)
         checked(args+(["--prepared"] if prepared else []),dest,env=env)
-        manuscript = Path(tmp)/"source"
-        with ZipFile(PACKAGES/"minpi-tree-source.zip") as z:
-            z.extractall(manuscript)
         for name,h in json.loads((manuscript/"SHA256SUMS.json").read_bytes()).items():
             if digest(manuscript/name)!=h:
                 raise ValueError(f"Standalone source archive differs at {name}")
@@ -528,22 +599,40 @@ def verify_archives(prepared):
         print("Standalone and replication manuscripts reproduce the complete included PDF text.",flush=True)
 
 
+def verify_wearable_raw():
+    import numpy as np
+    from experiments.minpi_rework import wearable_data
+
+    verify_manifest("WEARABLE-RAW-SHA256SUMS.json")
+    for name in wearable_data.SOURCES:
+        rebuilt = wearable_data.prepare(name)
+        with np.load(rebuilt,allow_pickle=False) as one, np.load(wearable_data.DATA/f"wearable-{name}-prepared.npz",allow_pickle=False) as two:
+            for key in ("x","y","subject","unit"):
+                np.testing.assert_array_equal(one[key],two[key])
+    print("Both original wearable archives reproduce every released window, label, subject, and device assignment.",flush=True)
+
+
 if __name__=="__main__":
     cli = argparse.ArgumentParser(description=__doc__)
     sub = cli.add_subparsers(dest="action",required=True)
     make = sub.add_parser("build")
     make.add_argument("--with-prepared",action="store_true")
+    make.add_argument("--with-wearable-raw",action="store_true")
     replay = sub.add_parser("verify")
     replay.add_argument("--tex",action="store_true")
     replay.add_argument("--prepared",action="store_true")
     audit = sub.add_parser("verify-archives")
     audit.add_argument("--prepared",action="store_true")
+    audit.add_argument("--wearable-raw",action="store_true")
+    sub.add_parser("verify-wearable-raw")
     sub.add_parser("replay-mc-costs",help="Rebuild MC work summaries from locked timing receipts")
     args = cli.parse_args()
     if args.action=="build":
-        build(args.with_prepared)
+        build(args.with_prepared,args.with_wearable_raw)
     elif args.action=="verify-archives":
-        verify_archives(args.prepared)
+        verify_archives(args.prepared,args.wearable_raw)
+    elif args.action=="verify-wearable-raw":
+        verify_wearable_raw()
     elif args.action=="replay-mc-costs":
         replay_mc_costs()
     else:
