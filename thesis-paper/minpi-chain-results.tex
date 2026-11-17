@@ -1,0 +1,87 @@
+\section{Reusing observed coalition votes}
+\label{sec:chain-evidence}
+On the eight primary sources, checking all observed neighbouring coalitions
+raised the number of independently verified negative indices from 14 to 17
+out of 47 on the enumerable games. The additional witnesses came from Raisin
+and Energy. Only two of the 40 selected supports changed: on two Energy
+splits the receiver retained four features in place of six and eight.
+Across the four regression sources the resulting width ratio to coefficient
+ranking was .947, with a change of $+.0059$ in $R^2$ and $-.0103$ in scaled
+MAE. Selection took $1.37$ times as long. These post-hoc gains were
+concentrated in one source. On the 16 wider folds all predictions stayed
+identical to those of the original sampler.
+
+\paragraph{Bisection at a fixed query budget.}
+On the eight primary sources only four of 40 splits required interior queries.
+In all four the budget exhausted the available interior prefixes, so choosing
+them uniformly produced exactly the same result. On the 16 wider folds,
+800 initial endpoint votes identified nontrivial brackets in two Parkinson
+folds and one SECOM fold.
+Bisection found nine negative feature--fold pairs in 49 additional distinct
+queries. Uniform sampling of the same number of prefixes from the same
+brackets found zero in the recorded draws. Its exact conditional expectation
+was .923 over those draws (summing each feature's probability of detection).
+Across all 16 folds this changed the delivered subset twice relative to uniform
+sampling. Mean AUC increased by .0016 and accuracy fell by .0002. Discovering
+more witnesses here had little effect on the final predictions.
+
+\begin{table}[t]
+\centering\small
+\caption{Chain search on the four additional sources. Columns and scores
+are arithmetic means over five splits. Paired entries give chain/full ridge.
+Time is mean complete selection time in milliseconds.}
+\label{tab:chain-four}
+\begin{tabular}{@{}lrrllr@{}}
+\toprule
+Source & $p$ & Kept & AUC or $R^2$ & Accuracy or MAE & Time\\
+\midrule
+Landsat           & 36 & 14.4 & .9125/.9145 & .7343/.7445 & 66.3\\
+Biodegradation    & 41 & 31.0 & .9099/.9149 & .8499/.8565 & 24.0\\
+Aquatic Toxicity  &  8 &  6.0 & .4920/.5002 & .9254/.9164 &  9.1\\
+Power Plant       &  4 &  2.0 & .9184/.9306 & 3.877/3.605 MW & 10.4\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{New sources.}
+We fixed the chain search before testing it on four further UCI sources
+(Table~\ref{tab:chain-four}). Landsat retains the official test set across
+all five seeds. For the two QSAR tasks we grouped duplicate descriptor vectors;
+the test assesses new records without a scaffold holdout. Power Plant uses
+one of the five reshufflings distributed by the repository. Across the two
+classification and two regression sources the chain rule retained 52.4\%
+and 59.8\% of the columns geometrically. The average metric changes met the
+predefined margins. Landsat individually lost 1.02 accuracy points.
+
+Relative to univariate $F$, chain search retained 21.8\% fewer features in
+classification and 12.9\% fewer in regression within the same predictive
+margins. Selection took 9.2\% and 14.4\% longer. Against individual
+addition sampling, chain search took 7.7\% and 22.7\% less selection time,
+respectively, but the regression supports were 2.9\% wider. Neither domain
+met the registered joint criterion of 10\% less time at no larger width.
+The individual-addition sampler found 43 negative feature--split pairs,
+chain bisection nine, and its matched random control six. Bisection changed
+one final support relative to that control. Coefficient ranking gave the
+same supports as bisection on 16 of 20 splits and took less time in both
+domains. On Landsat and Power Plant, bisection found zero negative features
+on all five splits despite substantial compression.
+
+An additional comparison used greedy forward regularized least squares
+with leave-one-row-out squared loss~\cite{pahikkala2010rls}. We implemented
+the rank-one smoother updates and checked the resulting orders against explicit
+leave-one-out refits on scalar and multioutput problems. Stopping at the
+last tested prefix before full width preserved all predictions. Across nine
+interleaved timings per split, the chain rule took 71.6\% of this wrapper's
+selection time in classification and 107.0\% in regression. Its supports
+were 15.9\% and 23.1\% wider.
+
+\paragraph{Deleting witnessed features directly.}
+In a retrospective test on all twelve sources, we first selected the coefficient
+prefix, then proposed removing only its witnessed negatives. A single additional
+refit checked the proposal. Nine classification and seven regression splits
+out of 60 contained eligible features.
+The guard accepted nine batches when targeted by witness, three when targeting
+the same number of lowest coefficients and six when targeting random columns.
+Across all splits the extra step saved 1.7\% of coefficient-selected columns
+in classification and 5.6\% in regression. Both reductions fell short of the
+registered 10\% width target. Selection time increased by 14\% and 83\%, respectively.

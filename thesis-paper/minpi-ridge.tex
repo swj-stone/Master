@@ -1,0 +1,66 @@
+\section{Sampled MinPI with shared ridge fits}
+\label{sec:sampled-minpi}
+Let \(N\) index the \(p\) columns. Fit a ridge predictor on each coalition \(S\)
+and measure its loss \(L(S)\) on a separate voting split. We use mean squared
+Euclidean error, with a scalar response for regression and a one-hot response
+for classification. The classification scores are unconstrained least-squares
+outputs. Write \(b=L(\varnothing)\), replacing zero by one in this scale
+factor. The positive utility \(U(S)=(1+L(S)/b)^{-1}\) gives the original
+quota game and feature index~\cite{shi2026minpi}
+\[
+ v(S)=\mathbf{1}\{U(S)\ge\alpha U(N)\},\qquad
+ m_i=\min_{S\subseteq N\setminus\{i\}}\bigl[v(S\cup\{i\})-v(S)\bigr].
+\]
+A negative marginal records a passing model that fails the quota after adding
+\(i\). It identifies that particular coalition; the effect of removing \(i\)
+from a delivered model is evaluated separately.
+
+\paragraph{One factorization for many additions.}
+Let \(X,Z\) denote the fitting and voting matrices, and \(Y,T\) their responses.
+Center both splits using fitting means so the intercept is unpenalized. For a base
+\(S\) set \(H=X_S^\top X_S+\lambda I\) with \(\lambda>0\),
+\(B=H^{-1}X_S^\top Y\), and \(E=T-Z_S B\). For a new column with fitting
+and voting vectors \(x,z\), define
+\[
+ q=X_S^\top x,\quad c=H^{-1}q,\quad
+ d=\|x\|^2+\lambda-q^\top c,\quad
+ a=(Y-X_SB)^\top x/d,\quad r=z-Z_Sc .
+\]
+\begin{proposition}
+The enlarged model changes the voting predictions by \(ra^\top\).
+Its loss change on \(n\) voting rows is
+\[
+ L(S\cup\{i\})-L(S)=
+ \bigl(\|r\|^2\|a\|^2-2r^\top E a\bigr)/n .
+\]
+\end{proposition}
+\begin{proof}
+The enlarged Gram matrix has diagonal blocks \(H\) and \(\|x\|^2+\lambda\)
+and cross-block \(q\). Its Schur complement satisfies
+\(d=\lambda+\|x-X_Sc\|^2+\lambda\|c\|^2>0\). Substitution in the block
+normal equations gives coefficients \(B-ca^\top\) and \(a^\top\).
+Multiplying by the voting design yields the prediction change. Expanding
+\(\|E-ra^\top\|_F^2-\|E\|_F^2\) gives the stated loss.
+\end{proof}
+Thus a single Cholesky factor of \(H\) serves every individual addition to \(S\).
+The identity is exact in real arithmetic. Close to the quota, the implementation
+can check an endpoint by direct refitting.
+
+\paragraph{Sampling and stopping.}
+Each round shuffles the columns and divides them into four nearly equal blocks.
+For each target block in cyclic order, form three bases from the next one,
+two, or three blocks. Evaluate every target column individually against each base.
+For \(p<4\), use \(p\) singleton blocks and the next \(0,\ldots,p-1\) blocks.
+For \(p\ge4\), one complete round schedules \(3p\) additions with at most twelve
+base factorizations, excluding numerical boundary checks. The Gram matrix
+still requires quadratic storage in \(p\).
+
+The sampled minimum is an upper bound on \(m_i\). Its first \(-1\) fixes
+\(m_i=-1\) and ends sampling for that feature. After seeing a zero we may
+skip any losing base, since an addition to it cannot yield a negative
+marginal. For fixed data let \(q_i\) be the probability that one random
+partition contains any negative witness for \(i\). With \(R\) independent
+partitions the probability of missing all such witnesses is \((1-q_i)^R\).
+This calculation allows arbitrary dependence among the bases within a round.
+Some coalition sizes are absent when \(p\ge4\), so a feature can have a
+negative exact index even when \(q_i=0\).

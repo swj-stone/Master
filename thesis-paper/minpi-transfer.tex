@@ -1,0 +1,69 @@
+\section{Timing and transfer}
+We isolated the arithmetic cost of voting by giving two implementations the
+same columns, seeds, pruning rules and tie order. The reference caches direct
+Cholesky fits and reuses the full Gram matrix. At seed 42 the two methods
+returned identical indices, rankings and first negative witnesses on all 14
+sources tested. On six previously studied sources with 72--100 columns,
+sharing the base fit gave a geometric mean $8.73$-fold ranking speedup.
+Seven of the eight newer sources have at most nine columns. Here direct fits
+were faster on seven sources and the direct-to-batched time ratio averaged
+$.94$ geometrically. Matrix updates for fast regularized least-squares
+selection have a substantial prior literature~\cite{pahikkala2010rls,pahikkala2016rlscore}.
+The identical-game comparison measures their value for this sampling schedule.
+
+The six wider classification sources supplied 16 archived folds. We preserved
+their training, voting, width and test rows and used at most the first 100 columns
+in dataset order. The primary rule retained 32.8\% of the available columns
+geometrically. Mean AUC and accuracy changed by $+.0016$ and $+.0080$ relative
+to full ridge. Compared with unit-step RFE, MinPI took 44.5\% of the selection
+time and retained $1.95$ times as many columns. Against coefficient ranking it
+took $1.21$ times as long and retained $1.08$ times as many columns. These
+comparisons revisit known sources. In particular, truncating CNAE to its first
+100 columns left full-model accuracy at .302.
+
+\paragraph{The original six benchmark sources.}
+The prior experiments used a GPU histogram booster with 100 depth-four trees,
+ranking columns by mean split gain~\cite{chen2016xgboost}. On the original
+prepared splits, all 30 gain orders matched the archive, including ties.
+Both rankers use the original training rows; MinPI also reads the reserved
+voting outcomes. Gain uses an RTX 5070 Laptop GPU and ridge one host thread.
+Table~\ref{tab:gain-receiver} pairs each ranker with a common receiver for
+width validation and final prediction. The game used for voting always refits
+ridge. On the five classification sources the 95\% source-resampling intervals
+for the MinPI-to-gain width ratio were $[.72,1.20]$ with ridge and
+$[1.18,1.77]$ with boosted trees. On 25 of the 30 ridge splits, coefficient
+ranking alone selected the same columns as MinPI.
+
+\begin{table}[h]
+\centering\small
+\caption{Sampled MinPI relative to original CUDA gain on the same candidate
+widths. Time ratios cover ranking and width validation. Width and time are
+paired geometric ratios. Predictive differences subtract the gain result.
+The five classification sources receive equal weight; regression is Abalone
+alone. Each source has five splits. Ridge clocks use three timed repeats,
+XGBoost clocks one.}
+\label{tab:gain-receiver}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+Receiver & Domain & Time ratio & Width ratio & $\Delta$AUC or $\Delta R^2$ & $\Delta$Acc.\ or $\Delta$MAE\\
+\midrule
+Ridge & Classification & .272 & .906 & $+.00001$ & $-.00126$\\
+XGBoost & Classification & .896 & 1.467 & $-.00357$ & $-.00511$\\
+Ridge & Abalone & .097 & .977 & $+.00742$ & $-.01404$\\
+XGBoost & Abalone & .920 & 1.516 & $+.00286$ & $-.00650$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On ISOLET both rankings returned 75 columns on average with XGBoost.
+MinPI and gain gave .829 and .827 accuracy and took 26.75 and 30.28 seconds
+to select. On Madelon all 500 feature--split indices were sampled zeros.
+MinPI returned 40.2 columns against gain's 20.4 and its accuracy fell from
+.758 to .730. The previously deployed gain pipeline, which examined every
+prefix with XGBoost, gave .846 AUC there; replacing both the ranking and
+the predictor with ridge MinPI gave .624. Across the five classification
+sources that replacement cost .058 AUC and 7.44 accuracy points.
+Using XGBoost for both validation and deployment reduced these gaps to
+.009 AUC and .89 points. The receiver follow-up reused the historical
+splits. Excluding test rows whose prepared predictor vector occurred in
+development gave similar paired differences.

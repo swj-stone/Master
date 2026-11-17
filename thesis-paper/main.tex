@@ -1,8 +1,8 @@
 \documentclass{article}
 \PassOptionsToPackage{numbers,sort&compress}{natbib}
-\usepackage[eandd]{neurips_2026}
+\usepackage[preprint]{neurips_2026}
 \makeatletter
-\renewcommand{\@noticestring}{Anonymous research draft for internal review.}
+\renewcommand{\@noticestring}{Anonymous research manuscript.}
 \makeatother
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsthm,booktabs,microtype}
@@ -10,26 +10,35 @@
 \newtheorem{proposition}{Proposition}
 
 \begin{document}
-\title{Best-First Search for Minimum-Vote Feature Screening}
+\title{Finding Negative Min-Marginal Votes for Feature Selection}
 \author{Anonymous Author(s)}
 \maketitle
 
 \begin{abstract}
-A fitted classifier can screen proposed feature deletions before one candidate is refit. For each subset, we count the validation panels on which masking preserves predictive performance within tolerance, then take the lowest count across feature restorations. Best-first search reads the next restoration of the candidate with the highest remaining upper bound. We give a necessary and sufficient stopping condition and determine when the search uses the fewest queries for the fixed restoration order. It attained this minimum on 90 of 173 nonempty candidate lists. On the other 83, the first candidate won and every rival scored zero. Across all 184 lists from 16 classification tasks, it preserved every exhaustive nomination and used 2,382 candidate--restoration evaluations against 2,582 for depth-first pruning. Single-point masking was faster and achieved higher mean compression within tolerance on both original task panels.
+A negative min-marginal power index (MinPI) means that adding a feature turns at least one passing coalition into a failing one. We derive the tightest upper bound on each index from the observed binary votes. Reusing votes collected for other features recovered 17 of 47 exact negatives on seven enumerable sources, compared with 14 before reuse, without further fits. When two nested coalitions bracket a drop, bisection locates a negative edge within logarithmically many queries. On four new sources chain search retained 21.8\% fewer features in classification and 12.9\% fewer in regression than univariate filtering, within the registered mean prediction-loss margins. Direct coefficient ranking selected identical supports on 16 of 20 splits and was faster. On the five original classification sources, sampled MinPI took 27\% of boosted-tree gain's selection time under a common ridge predictor. With boosted trees also used for width selection and prediction, it took 90\% as long and retained 47\% more features. These results support using the search when a feature-level witness is needed; most of the measured compression was also available from simpler rankings.
 \end{abstract}
 
 \section{Introduction}
-A classifier trained on two interchangeable features may use only one of them. Masking that feature can destroy the fitted classifier's predictions even though retraining on the other feature would recover the signal. This distinction matters when several deletions are proposed and only one candidate can be checked by retraining. A screening rule decides which deletion gets that check. Wrappers spend fits to compare subsets directly~\cite{kohavi1997wrappers}. Masking offers a cheaper measurement with a different target~\cite{covert2021removing,hooker2019roar}.
+Adding a feature to one fitted model can lower its validation score even if the feature improves prediction in another model. The min-marginal power index of Shi and Zhao~\cite{shi2026minpi} records whether such an addition ever turns a passing coalition into a failing one. A negative index has a verifiable witness. An average marginal importance, as in Shapley-based feature attribution~\cite{zhao2025shapg,covert2020sage}, summarizes the distribution of gains over a specified coalition game. A minimum can be settled by a single observed drop.
 
-We study a screen that votes on each proposed deletion with some of the other features restored. A candidate's lowest vote across restorations determines its rank. One bad restoration can therefore eliminate a candidate, whereas a high score on an early restoration leaves its rank unresolved. We use this asymmetry to choose the next prediction. The search is an application of best-first minimax~\cite{stockman1979,plaat1995} to a table with few possible vote counts and a fixed tie order. Our analysis identifies the observations needed for this particular feature-selection decision and measures their cost against depth-first pruning and single-point screening.
+Computing an index for each feature by checking all coalitions requires exponentially many fits. We study two sampling strategies. The sampler can measure many additions to one base coalition, sharing its fit. It can also look for a pair of nested coalitions with opposite votes, then spend further fits only where a negative marginal is guaranteed. We study how much each choice costs and whether the resulting votes change which features are retained. The utility in this study comes from refitted ridge regressions, including one-hot regression for classification. The downstream rule chooses a width by validation. The earlier multi-objective search is outside these comparisons.
 
-\input{minimum-vote}
-\input{minimum-certificate}
-\input{minimum-results}
+\input{minpi-ridge}
+\input{minpi-search}
+
+\section{Evaluation}
+We first developed the shared-fit sampler on Ionosphere, Vehicle, Sonar and Diabetes. We fixed four rounds, $\lambda=1$, and $\alpha=.95$ before scoring the next eight sources. Glass, Raisin, WiFi and Leaves are classification tasks. Airfoil, Yacht, Slump and Energy have continuous responses. Seven sources have five to nine features. Leaves has 64 margin descriptors for 100 species. In each of five seeded splits, 20\% of groups form the outer test. The remaining groups supply fitting, voting and width-selection rows in a 60/20/20 ratio. Identical predictor rows stay together; Airfoil setups, Yacht hulls and Energy geometries also stay together. WiFi measures repeat observations in known rooms. We fit imputers and scalers on the training portion of each operation.
+
+The shared-fit sampler sorts features by decreasing sampled index, breaking ties by the full ridge coefficient norm and then by column number. A coefficient-only control uses the identical tie order. An arithmetic-mean control uses every scheduled continuous utility increment. Univariate $F$ and unit-step ridge recursive feature elimination (RFE)~\cite{guyon2002rfe,pedregosa2011sklearn} can both use the pooled fitting and voting rows. Every ranking uses the same widths $1$ and $\lceil fp\rceil$ for $f\in\{1/8,1/4,1/2,3/4,1\}$. We fit each prefix on the pooled rows and compare it with the full model on width-selection rows. Select the smallest tested width within .01 of full macro one-versus-rest AUC and accuracy, or within .02 of full $R^2$ and .02 training response standard deviations of full MAE. The selected model is refitted on all development rows. For comparing with full ridge on the outer test we registered the same margins and a geometric retained fraction at most .85.
+
+We rotate method order over three single-thread timings and take the median per split. Clocked selection ends at the width decision; deployment includes refitting and prediction. Predictions are sealed before outer scoring. Repeated splits from one source share observations. Source-level contrasts use equal source weights, and reported intervals resample sources keeping all their splits together.
+\input{minpi-results}
+\input{minpi-transfer}
+\input{minpi-chain-results}
 
 \section{Scope}
-Exactness concerns the winner of the specified ballot. The four panels reuse proposal rows, so their votes do not provide four independent measurements of risk. The one-candidate budget counts the nominee sent to the guard. For outer evaluation we refit the returned subset and its reference on all development rows and compare them on held-out rows. A nominee that passes the guard may still breach an outer tolerance. The benchmark reuses 16 purposively selected sources and one forest seed per fold. A stable prediction advantage on new sources has yet to be established.
+The sharp upper bound treats unobserved coalition votes as free bits. Ridge fits to a fixed design constrain these bits further. The verified witness concerns the voting split and quota; it can coexist with a useful feature in the final predictor. The Gram matrix takes quadratic storage, and a linear model can miss nonlinear signal even on a good support. Data-source heterogeneity, the small number of independent sources per comparison and the cost of a strong downstream predictor limit the conclusions that can be drawn from small timing and metric differences.
 
 \bibliographystyle{plainnat}
-\bibliography{references,revision,ensemble-sources}
+\bibliography{references,minpi-related}
 \end{document}
