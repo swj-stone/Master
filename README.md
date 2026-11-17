@@ -2,11 +2,11 @@
 
 硕士研究在 `MastersThesis/` 的 `thesis/masters` 分支进行，与 `../Master/` 共享 Git 仓库及 Python 环境。会议最终版在 `../Master/` 的 `main` 分支，供只读参考。工作树中的 `data/`、`results/` 和 `packages/` 是独立的本地文件，受 Git 忽略规则管理。
 
-## 当前论文：提升树的 MinPI 输入压缩
+## 当前论文：特征可用性不确定时的 MinPI 筛选
 
-当前方法在已训练的 XGBoost 树上逐步删除输入列。预测走到已删除列的分裂时，在该节点返回加权后代值；部署端可以仅采集保留列。论文比较了联盟规模投票、直接精确扫描和 Gain 顺序删除。[当前论文 PDF](thesis-paper/minpi-tree.pdf) · [独立 LaTeX 源码](packages/minpi-tree-source.zip) · [复现包](packages/minpi-tree-replication.zip) · [复现指引](thesis-paper/tree-replication.md) · [训练和部署](experiments/minpi_rework/README.md)
+当前方法针对已训练的随机森林，在每个非空联盟规模上计算少采集若干特征带来的平均损失变化。分类使用 Brier 损失，回归使用平方损失。最不利的联盟规模决定候选子集能否通过删列检查。主实验在七个外部数据集上各跑五个种子；精确计算与 Monte Carlo 的对照使用同一批划分，分别封存预测和计算耗时。[当前论文 PDF](thesis-paper/minpi-tree.pdf) · [独立 LaTeX 源码](packages/minpi-tree-source.zip) · [复现包](packages/minpi-tree-replication.zip) · [复现指引](thesis-paper/tree-replication.md)
 
-13 个公开来源各使用五个种子。另有一项独立的五来源校准实验，原来的六个预处理任务用于开发对照。各组使用的目标、预测文件和访问方式均在复现指引中逐项列出。
+原来的六个预处理任务用于开发对照。复现包另含此前 13 来源的提升树保真度实验与独立的五来源校准实验；这些来源在设计当前方法时已经使用过。保留列预测命令对应提升树版本。[提升树训练与部署](experiments/minpi_rework/README.md)
 
 ## 历史 Ridge 版本的 MinPI 特征压缩
 

@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from typing import NamedTuple
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 
@@ -20,14 +21,37 @@ ROOT = PAPER.parent
 PACKAGES = ROOT / "packages"
 EXPERIMENT = ROOT / "experiments/minpi_rework"
 EVIDENCE = PAPER / "evidence/minpi_rework"
+
+
+class Cohort(NamedTuple):
+    archive: str
+    group: str
+    count: int
+    receipt: str = "selection.json"
+    forecast: str = "forecasts.npz"
+    archive_hash: str = "forecast-sha256.txt"
+    artifacts: str = "forecast"
+
+
 COHORTS = (
-    ("minpi-quota-tree-forecasts.zip","quota-tree-confirmation","selection.json","forecasts.npz",65),
-    ("minpi-scale-five-forecasts.zip","quota-scale-confirmation","complete.json","all-forecasts.npz",25),
+    Cohort("minpi-quota-tree-forecasts.zip","quota-tree-confirmation",65),
+    Cohort("minpi-scale-five-forecasts.zip","quota-scale-confirmation",25,"complete.json","all-forecasts.npz"),
+    Cohort("minpi-predictive-seven-forecasts.zip","predictive-confirmation",35,artifacts="files"),
+    Cohort("minpi-predictive-mc-seven-forecasts.zip","predictive-mc-confirmation",35,
+           archive_hash="archive-sha256.txt",artifacts="hashes"),
 )
 TABLES = {
     "quota-tree-confirmation": ("scores.csv","rank-control-scores.csv","source-means.csv","source-contrasts.csv"),
     "quota-scale-confirmation": ("scores.csv","source-means.csv","source-contrasts.csv"),
     "stratified-tree": ("contrasts.csv","source-results.csv","subject-scores.csv"),
+    "predictive-confirmation": ("scores.csv","paper-contrasts.csv","source-means.csv","independent-mask-audit.csv"),
+    "predictive-mc-confirmation": ("repeats.csv","jobs.csv","contrasts.csv","released-scores.csv","released-contrasts.csv"),
+    "predictive-prepared": ("source-means.csv","paper-contrasts.csv"),
+    "predictive-lattice": ("scores.csv",),
+    "predictive-veto-timing": (
+        "contrasts.csv","source-contrasts.csv","split-medians.csv",
+        "native-contrasts.csv","native-source-contrasts.csv","native-split-medians.csv",
+    ),
 }
 
 
@@ -82,7 +106,7 @@ def tex_files():
         if path.suffix!=".tex":
             continue
         body = re.sub(r"(?<!\\)%[^\n]*","",path.read_text(encoding="utf8"))
-        inputs = re.findall(r"\\(?:input|include)\s*\{([^}]+)\}",body)
+        inputs = re.findall(r"\\(?:input|include|tableinput)\s*\{([^}]+)\}",body)
         inputs += re.findall(r"\\tableinput\s+([\w./-]+\.tex)",body)
         for value in inputs:
             child = path.parent/value
@@ -117,9 +141,10 @@ def raw_sources():
     read = lambda name: json.loads((EXPERIMENT/name).read_bytes())
     pins = {v[0]:v[2] for v in read("validation_sources.json").values()}
     pins.update({f"wide-{k}.zip":v[1] for k,v in read("validation_wide_sources.json").items()})
-    pins.update({v["filename"]:v["sha256"] for v in read("validation_exchange_sources.json").values()})
-    if len(pins)!=18:
-        raise ValueError("Expected 18 independent provider inputs")
+    for manifest in ("validation_exchange_sources.json","validation_predictive_sources.json"):
+        pins.update({v["filename"]:v["sha256"] for v in read(manifest).values()})
+    if len(pins)!=25:
+        raise ValueError("Expected 25 independent provider inputs")
     for name, pin in pins.items():
         path = base/name
         if digest(path)!=pin:
@@ -164,15 +189,16 @@ def local_modules(paths):
 
 def release_files():
     files = set(raw_sources())
-    for name, group, _, _, _ in COHORTS:
-        path = PACKAGES/name
-        expected = (EVIDENCE/group/"forecast-sha256.txt").read_text().split()[0]
+    for cohort in COHORTS:
+        path = PACKAGES/cohort.archive
+        expected = (EVIDENCE/cohort.group/cohort.archive_hash).read_text().split()[0]
         if digest(path)!=expected:
-            raise ValueError(f"Sealed forecast archive mismatch: {name}")
+            raise ValueError(f"Sealed forecast archive mismatch: {path.name}")
         files.add(path)
     roots = []
     for pattern in ("quota_compress_tree*.py","quota_compress_scale*.py","tree_*py","stratified_tree*.py",
-                    "span_*.py","scalar_tree*.py","compress_model*.py","validation*.py"):
+                    "span_*.py","scalar_tree*.py","compress_model*.py","validation*.py",
+                    "predictive*.py","quota_coalition_rf_check.py","availability_checks.py"):
         roots.extend(EXPERIMENT.glob(pattern))
     roots.append(EXPERIMENT/"quota_compress_rescue_check.py")
     roots.append(ROOT/"src/minppi_mofs/__init__.py")
@@ -186,8 +212,13 @@ def release_files():
                   ROOT/"docs/thesis/archives/piv1/protocol.json",ROOT/"pyproject.toml",Path(__file__).resolve(),
                   PAPER/"tree-replication.md",PAPER/"tree-requirements.txt"))
     files.add(PAPER/"evidence/minpi_compression/legacy-gain/novel-input-rows.npz")
-    for folder in ("quota-tree","quota-tree-confirmation","quota-scale-confirmation","stratified-tree","exchange-validation"):
+    files.update((PAPER/"minpi-tree-rows.tex",PAPER/"minpi-predictive-rows.tex"))
+    files.add(EVIDENCE/"availability/two-sample-five.csv")
+    for folder in ("quota-tree","quota-tree-confirmation","quota-scale-confirmation","stratified-tree","exchange-validation",
+                   "predictive-confirmation","predictive-mc-confirmation","predictive-prepared","predictive-validation",
+                   "predictive-lattice","predictive-veto-timing"):
         files.update(p for p in (EVIDENCE/folder).rglob("*") if p.is_file())
+    files.update(EVIDENCE/group/name for group,names in TABLES.items() for name in names)
     for folder in ("tree-ranking-controls","quota-tree"):
         files.update(p for p in (ROOT/"results/minpi_rework"/folder).rglob("*")
                      if p.suffix in {".npz",".json"})
@@ -212,6 +243,15 @@ def prepared_files():
     # The historical tree/guard experiments use these previously frozen receivers.
     files.update(p for p in (ROOT/"results/minpi_compression/legacy-gain/xgb-receiver").rglob("*")
                  if p.suffix in {".json",".npz"})
+    prepared_receipts = json.loads((EVIDENCE/"predictive-prepared/receipts.json").read_bytes())
+    if len(prepared_receipts)!=30:
+        raise ValueError("Expected 30 completed original-six predictive forest fits")
+    for key,pin in prepared_receipts.items():
+        folder = ROOT/"results/minpi_rework/predictive-prepared"/key
+        rec,forecasts = folder/"selection.json",folder/"forecasts.npz"
+        if digest(rec)!=pin or digest(forecasts)!=json.loads(rec.read_bytes())["forecast"]:
+            raise ValueError(f"Prepared predictive run differs: {key}")
+        files.update((rec,forecasts))
     return files
 
 
@@ -227,6 +267,12 @@ def build(with_prepared):
         compile_paper(folder)
         pdf = PAPER/"minpi-tree.pdf"
         shutil.copyfile(folder/"main.pdf",pdf)
+        build_folder = PAPER/"build-tree"
+        build_folder.mkdir(exist_ok=True)
+        for ext in ("pdf","log","bbl","blg","aux","out"):
+            item = folder/("main."+ext)
+            if item.exists():
+                shutil.copyfile(item,build_folder/item.name)
         # The live manuscript can be edited while the clean copy is compiling.
         staged = {name:folder/name for name in manuscript}
         archive(PACKAGES/"minpi-tree-source.zip",{**staged,"main.pdf":folder/"main.pdf"})
@@ -251,29 +297,50 @@ def verify_manifest(name="SHA256SUMS.json"):
 
 
 def restore():
-    for filename, group, receipt_name, forecast_name, size in COHORTS:
-        sealed = PACKAGES/filename
-        lock_file = EVIDENCE/group/"lock.json"
+    for cohort in COHORTS:
+        sealed = PACKAGES/cohort.archive
+        lock_file = EVIDENCE/cohort.group/"lock.json"
         locks = json.loads(lock_file.read_bytes())["receipts"]
-        if len(locks)!=size or digest(sealed)!=(EVIDENCE/group/"forecast-sha256.txt").read_text().split()[0]:
-            raise ValueError(f"Forecast archive mismatch: {group}")
+        if len(locks)!=cohort.count or digest(sealed)!=(lock_file.parent/cohort.archive_hash).read_text().split()[0]:
+            raise ValueError(f"Forecast archive mismatch: {cohort.group}")
         with ZipFile(sealed) as z:
             if z.read("lock.json")!=lock_file.read_bytes():
-                raise ValueError(f"Sealed receipt lock differs: {group}")
+                raise ValueError(f"Sealed receipt lock differs: {cohort.group}")
             for key,expected in locks.items():
-                d = ROOT/"results/minpi_rework"/group/key
+                d = ROOT/"results/minpi_rework"/cohort.group/key
                 d.mkdir(parents=True,exist_ok=True)
-                rec = z.read(f"{key}/{receipt_name}")
-                preds = z.read(f"{key}/{forecast_name}")
-                if hashlib.sha256(rec).hexdigest()!=expected or hashlib.sha256(preds).hexdigest()!=json.loads(rec)["forecast"]:
-                    raise ValueError(f"Corrupt receipt/predictions for {key}")
-                for name,raw in ((receipt_name,rec),(forecast_name,preds)):
+                rec = z.read(f"{key}/{cohort.receipt}")
+                fields = json.loads(rec)[cohort.artifacts]
+                if cohort.artifacts=="forecast":
+                    fields = {cohort.forecast:fields}
+                elif set(fields)!={"forecasts.npz","increments.npz","incidence.npz"}:
+                    raise ValueError(f"Incomplete mask game in {key}")
+                for name,pin in {cohort.receipt:expected,**fields}.items():
+                    raw = z.read(f"{key}/{name}")
+                    if hashlib.sha256(raw).hexdigest()!=pin:
+                        raise ValueError(f"Corrupt sealed file: {key}/{name}")
                     dest = d/name
                     if dest.exists() and dest.read_bytes()!=raw:
                         raise ValueError(f"Existing run differs from archive: {dest}")
                     if not dest.exists():
                         dest.write_bytes(raw)
-        print(f"Verified and restored {size} locked {group} runs",flush=True)
+        print(f"Verified and restored {cohort.count} locked {cohort.group} runs",flush=True)
+
+
+def replay_mc_costs():
+    """Recover setup and search clocks from the signed measurement rows without timing the verifier."""
+    import pandas as pd
+    from experiments.minpi_rework.predictive_mc_report import summary
+
+    folder = EVIDENCE/"predictive-mc-confirmation"
+    keys = json.loads((folder/"lock.json").read_bytes())["receipts"]
+    runs = ROOT/"results/minpi_rework/predictive-mc-confirmation"
+    rows = [row for key in keys for row in json.loads((runs/key/"selection.json").read_bytes())["rows"]]
+    repeat = pd.DataFrame(rows)
+    repeat.to_csv(folder/"repeats.csv",index=False)
+    jobs = repeat.groupby(["dataset","seed","draw","method"],as_index=False).median(numeric_only=True)
+    jobs.to_csv(folder/"jobs.csv",index=False)
+    summary(jobs[~jobs.method.str.startswith("direct")]).to_csv(folder/"contrasts.csv",index=False)
 
 
 def verify(check_tex, prepared):
@@ -297,8 +364,8 @@ def verify(check_tex, prepared):
                 raise ValueError(f"Historical original-six receipt mismatch: {family}/{key}")
     print("Verified 90 historical original-six arm-family receipt/prediction pairs",flush=True)
     expected = {EVIDENCE/group/name:pd.read_csv(EVIDENCE/group/name) for group,names in TABLES.items() for name in names}
-    table = PAPER/"minpi-tree-rows.tex"
-    table_before = table.read_text(encoding="utf8")
+    tables_before = {p:p.read_text(encoding="utf8") for p in
+                     (PAPER/"minpi-predictive-rows.tex",PAPER/"minpi-tree-rows.tex")}
     env = {**os.environ,"PYTHONPATH":os.pathsep.join(map(str,(ROOT/"src",ROOT))),
            "PYTHONDONTWRITEBYTECODE":"1","NUMBA_CACHE_DIR":str(ROOT/"tmp/numba")}
     checked([sys.executable,"-B","-c",
@@ -307,26 +374,48 @@ def verify(check_tex, prepared):
     jobs = [("quota_compress_tree_confirmation","score"),("tree_rank_controls","score"),
             ("quota_compress_scale_confirmation","score"),("quota_compress_tree_report",),
             ("quota_compress_scale_confirmation_report",),("tree_paper_results",)]
-    snapshots = {p:p.read_bytes() for p in [*expected,table]}
+    snapshots = {p:p.read_bytes() for p in [*expected,*tables_before]}
     if prepared:
         seeds = ("--seeds","42","123","456","789","1024")
         jobs.extend([("quota_compress_tree_run","score",*seeds),
                      ("quota_compress_tree_run","score","--controls",*seeds),
-                     ("quota_compress_tree_guard","score",*seeds)])
+                     ("quota_compress_tree_guard","score",*seeds),("predictive_prepared",)])
+        pred_dir = EVIDENCE/"predictive-prepared"
+        for filename in ("scores.csv","receipts.json"):
+            p = pred_dir/filename
+            snapshots[p] = p.read_bytes()
+        expected[pred_dir/"scores.csv"] = pd.read_csv(pred_dir/"scores.csv")
+        locked = json.loads(snapshots[pred_dir/"receipts.json"])
+        jobs_root = ROOT/"results/minpi_rework/predictive-prepared"
+        if len(locked)!=30 or any(digest(jobs_root/key/"selection.json")!=pin for key,pin in locked.items()):
+            raise ValueError("Original-six supervised receipts incomplete or stale")
         for short in ("","controls-","guard-"):
             key = short+"42-123-456-789-1024"
             for pattern in (f"lock-{key}.json",f"receipts-{key}.zip",f"historical-{key}.csv"):
                 p = EVIDENCE/"quota-tree"/pattern
                 snapshots[p] = p.read_bytes()
             expected[p] = pd.read_csv(p)
+    jobs.extend([("predictive_confirmation","score"),("predictive_mc_score",),("predictive_paper",),
+                 ("predictive_mask_audit","packages/minpi-predictive-seven-forecasts.zip",
+                  "thesis-paper/evidence/minpi_rework/predictive-confirmation"),
+                 ("predictive_lattice","--check"),("predictive_lattice",),
+                 ("predictive_veto_report",),("predictive_veto_report","--native")])
     try:
+        checked([sys.executable,"-B",str(Path(__file__).resolve()),"replay-mc-costs"],ROOT,env=env,capture=True)
         for name,*arguments in jobs:
             print("Replaying",name,*arguments,flush=True)
             checked([sys.executable,"-B","-m","experiments.minpi_rework."+name,*arguments],ROOT,env=env,capture=True)
         for path, frame in expected.items():
-            assert_frame_equal(pd.read_csv(path),frame,check_dtype=False,rtol=1e-12,atol=1e-12)
-        if table.read_text(encoding="utf8")!=table_before:
-            raise ValueError("Regenerated LaTeX source table changed")
+            actual = pd.read_csv(path)
+            if path==EVIDENCE/"predictive-lattice/scores.csv":
+                # The lattice is refit and timed anew. Check every support and score.
+                if not actual["lattice_s"].gt(0).all():
+                    raise ValueError("Incomplete fresh lattice clocks")
+                actual,frame = actual.drop(columns="lattice_s"),frame.drop(columns="lattice_s")
+            assert_frame_equal(actual,frame,check_dtype=False,rtol=1e-12,atol=1e-12)
+        for path,table in tables_before.items():
+            if path.read_text(encoding="utf8")!=table:
+                raise ValueError(f"Regenerated LaTeX source table changed: {path.name}")
     finally:
         # Restore exact archive bytes (including line endings and ZIP metadata).
         for path,raw in snapshots.items():
@@ -334,7 +423,7 @@ def verify(check_tex, prepared):
                 path.write_bytes(raw)
     if check_tex:
         compile_paper(PAPER)
-    print(f"Recomputed {len(expected)} archived CSV tables and verified the typeset numerical table.",flush=True)
+    print(f"Recomputed {len(expected)} archived CSV tables and {len(tables_before)} typeset numerical tables.",flush=True)
 
 
 def verify_archives(prepared):
@@ -377,10 +466,13 @@ if __name__=="__main__":
     replay.add_argument("--prepared",action="store_true")
     audit = sub.add_parser("verify-archives")
     audit.add_argument("--prepared",action="store_true")
+    sub.add_parser("replay-mc-costs",help="Rebuild MC work summaries from locked timing receipts")
     args = cli.parse_args()
     if args.action=="build":
         build(args.with_prepared)
     elif args.action=="verify-archives":
         verify_archives(args.prepared)
+    elif args.action=="replay-mc-costs":
+        replay_mc_costs()
     else:
         verify(args.tex,args.prepared)
