@@ -1,0 +1,4 @@
+# Receipts hash the exact Windows-generated manifest bytes on every platform.
+preflight.json -text
+sealed.json -text
+forecasts.zip binary
