@@ -21,7 +21,8 @@ def all_mask_risks(increment, incidence, centered_target, supports):
     p = incidence.shape[1]
     mask = np.arange(1 << p)
     sizes = np.fromiter((int(i).bit_count() for i in mask), dtype=int, count=len(mask))
-    path_bits = incidence @ (1 << np.arange(p))
+    assert np.all(incidence.data == 1)
+    path_bits = incidence.astype("int64") @ (1 << np.arange(p))
     if len(path_bits) != paths or p > 18:
         raise ValueError("Wrong path basis or impractical enumeration")
     sums = {key: np.zeros(p + 1) for key in supports}
@@ -60,12 +61,26 @@ def discrepancy(archive, scores, name, seed):
     target = np.eye(len(offset))[test] if task == "classification" else test[:, None]
     centered = (target - offset).ravel()
     by_arm = {arm: tuple(sorted(info["support"])) for arm, info in receipt["records"].items()}
+    a = sparse.load_npz(BytesIO(raw("increments.npz"))).tocsr()
+    incidence = sparse.load_npz(BytesIO(raw("incidence.npz"))).tocsr()
+    scale = np.std(y[np.concatenate([idx[part] for part in ("fit", "vote", "width")])])
+    reconstructed = {}
+    for support in set(by_arm.values()):
+        omitted = np.ones(x.shape[1], dtype=bool)
+        omitted[list(support)] = False
+        alive = np.asarray(incidence @ omitted).ravel() == 0
+        reconstructed[support] = np.reshape(a @ alive, target.shape) + offset
     with np.load(BytesIO(raw("forecasts.npz"))) as archived:
         errs = []
+        pred_errors = []
+        assert set(archived.files) == set(by_arm)
         for arm in by_arm:
             pred = archived[arm]
             row = scores.loc[(name, seed, arm)]
+            assert len(by_arm[arm]) == len(set(by_arm[arm])) == row.k
+            pred_errors.append(np.max(np.abs(pred.reshape(target.shape) - reconstructed[by_arm[arm]])))
             if task == "classification":
+                np.testing.assert_allclose(pred.sum(axis=1), 1, atol=1e-11, rtol=0)
                 aucs = []
                 for c in range(pred.shape[1]):
                     diff = pred[test == c, c][:, None] - pred[test != c, c]
@@ -73,12 +88,12 @@ def discrepancy(archive, scores, name, seed):
                 metrics = [abs(row.accuracy - accuracy_score(test, pred.argmax(axis=1))),
                            abs(row.auc - np.mean(aucs))]
             else:
-                metrics = [abs(row.r2 - r2_score(test, pred)), abs(row.mae - mean_absolute_error(test, pred))]
+                mae = mean_absolute_error(test, pred)
+                metrics = [abs(row.r2 - r2_score(test, pred)), abs(row.mae - mae),
+                           abs(row.scaled_mae - mae / scale)]
             errs.extend(metrics)
     risk_error = np.nan
     if seed == 42:
-        a = sparse.load_npz(BytesIO(raw("increments.npz"))).tocsr()
-        incidence = sparse.load_npz(BytesIO(raw("incidence.npz"))).tocsr()
         curves = all_mask_risks(a, incidence, centered, set(by_arm.values()))
         error = []
         for arm, support in by_arm.items():
@@ -87,7 +102,8 @@ def discrepancy(archive, scores, name, seed):
             error.extend([abs(row.outer_worst - r.max()), abs(row.outer_intact - r[-1]),
                           abs(row.outer_mean - r.mean()), abs(row.outer_positive - max(r.max(), 0))])
         risk_error = max(error)
-    return dict(source=name, seed=seed, arms=len(by_arm), clean_error=max(errs), risk_error=risk_error)
+    return dict(source=name, seed=seed, arms=len(by_arm), clean_error=max(errs),
+                prediction_error=max(pred_errors), risk_error=risk_error)
 
 
 def check(bundle, evidence):
@@ -101,7 +117,7 @@ def check(bundle, evidence):
                 rows.append(discrepancy(archive, scores, name, seed))
     audit = pd.DataFrame(rows)
     assert len(audit) == 35 and audit.risk_error.notna().sum() == 7
-    assert audit.clean_error.max() < 1e-10 and audit.risk_error.max() < 1e-10
+    assert max(audit.clean_error.max(), audit.risk_error.max(), audit.prediction_error.max()) < 1e-10
     audit.to_csv(evidence / "independent-mask-audit.csv", index=False)
 
 
