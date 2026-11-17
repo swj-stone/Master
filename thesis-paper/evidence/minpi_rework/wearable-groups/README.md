@@ -31,3 +31,30 @@ To reproduce the original scores offline, place the signed forecast ZIP and both
 .\thesis-python.ps1 -m experiments.minpi_rework.wearable_score --prepared data/minpi_rework --archive packages/minpi-wearable-forecasts.zip --output results/minpi_rework/wearable-rescore
 .\thesis-python.ps1 -m experiments.minpi_rework.wearable_audit --prepared data/minpi_rework --archive packages/minpi-wearable-forecasts.zip --output results/minpi_rework/wearable-runtime-replay
 ```
+
+## Follow-up with path-nominated refits
+
+After seeing the frozen study outcomes, we registered a comparison of nominated refits in `21d9769` and sealed its forecasts in `ca12510`. The study reused the same subjects. Three rankings nominated one support at each width, using impurity, minimum or pooled size votes. The one-step alternatives trained only the proposed one-device retirement and returned the full forest on rejection. All methods used the same acceptance rules and retrained their nominated forests from the original fitting subjects. Clocks include selection and intact prediction, with one interleaved complete run per arm and held participant. Fits include the full reference forest. The joint column counts held participants satisfying both the outage quota and the intact floors.
+
+| Dataset | Nominations | Mean devices | Mean fits | Median s | AUC | Accuracy | Joint |
+|---|---|---:|---:|---:|---:|---:|---:|
+| MHEALTH | One MDI retirement | 2.30 | 2 | .343 | .9973 | .9235 | 7/10 |
+| | MDI path | 2.20 | 3 | .495 | .9957 | .9056 | 6/10 |
+| | Minimum path | 2.30 | 3 | .508 | .9973 | .9235 | 7/10 |
+| | Pooled path | 2.40 | 3 | .508 | .9974 | .9226 | 8/10 |
+| | MDI + minimum paths | 2.20 | 3.40 | .514 | .9957 | .9056 | 6/10 |
+| | Exhaustive refits | 2.10 | 7 | 1.080 | .9952 | .8950 | 6/10 |
+| Daily and Sports Activities | One MDI retirement | 4.625 | 2 | 1.940 | .9863 | .8213 | 8/8 |
+| | MDI path | 3.50 | 5 | 3.871 | .9817 | .8104 | 7/8 |
+| | Minimum path | 3.50 | 5 | 4.090 | .9817 | .8104 | 7/8 |
+| | Pooled path | 3.50 | 5 | 4.094 | .9817 | .8104 | 7/8 |
+| | MDI + minimum paths | 3.50 | 5.125 | 4.096 | .9817 | .8104 | 7/8 |
+| | Exhaustive refits | 1.50 | 31 | 22.431 | .9818 | .7913 | 3/8 |
+
+On MHEALTH the single MDI retirement and the entire minimum path selected identical supports and forecasts for all ten held subjects. On the sports data the MDI, minimum and pooled paths selected identical supports in all eight folds. Adding the minimum path to MDI changed no selected support across either dataset. In the sports source the path methods saved about 18 s per fold against exhaustive refitting and retained two additional devices on average. Exhaustive search minimized width on acceptance participants. The minimum vote supplied no observed advantage beyond the cheaper impurity-based control on either physical acquisition task.
+
+All nine arms and all subject-level measurements are in `refit-held.csv` and `refit-summary.csv`. Their deterministic offline replay uses the original data summaries and both sealed forecast archives.
+
+```powershell
+.\thesis-python.ps1 -m experiments.minpi_rework.wearable_refit_offline --prepared data/minpi_rework --archive packages/minpi-wearable-forecasts.zip --refit-archive packages/minpi-wearable-refit-forecasts.zip --output results/minpi_rework/wearable-refit-rescore
+```
