@@ -1,0 +1,18 @@
+{
+  "kernel": "Wolfram Language 15.0.1 for Linux x86 (64-bit)",
+  "evaluator": "WolframLanguageEvaluator",
+  "files": [
+    {
+      "file": "TreeProjection.wl",
+      "source_commit": "f94cd96",
+      "source_sha256": "7bc5092bb91eeb51d8c4bc22ee420d6d1c0d1eb8a574be1b2fd8ceadb9fa238f",
+      "output": [true, true, true, true, true]
+    },
+    {
+      "file": "QuotaDirectional.wl",
+      "source_commit": "ab733a0",
+      "source_sha256": "c34ffc0b1fd1794c3949069b102c055ed4de16fc2930dcb8a2749e5bc668d097",
+      "output": [true, true, true, true, true, true]
+    }
+  ]
+}
