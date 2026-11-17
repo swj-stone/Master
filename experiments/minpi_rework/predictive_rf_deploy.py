@@ -94,6 +94,8 @@ def main(argv=None):
     fit.add_argument("--target")
     fit.add_argument("--task", choices=["classification", "regression"])
     fit.add_argument("--seed", default=42, type=int)
+    fit.add_argument("--reachable-only", action="store_true",
+                     help="Export only features used by a reachable split in the selected forest")
     fit.add_argument("--model", type=Path, required=True)
     infer = cmd.add_parser("predict")
     infer.add_argument("--model", type=Path, required=True)
@@ -121,6 +123,8 @@ def main(argv=None):
             names, parts = from_csv(sources, args.target)
             task = args.task
         model = fit_parts(parts, names, task, args.seed)
+        if args.reachable_only:
+            model = model.reachable_schema()
         model.save(args.model)
         print(json.dumps(model.metadata, ensure_ascii=False))
     elif args.action == "inspect":

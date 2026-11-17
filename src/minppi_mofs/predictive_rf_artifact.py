@@ -108,6 +108,21 @@ class RestrictedRF:
                 not np.allclose(self.value.sum(axis=1), 1. / len(self.roots), rtol=1e-10, atol=1e-12)):
             raise ValueError("Invalid class probabilities")
 
+    def reachable_schema(self):
+        """Drop input names that no surviving internal node can request."""
+        used = np.unique(self.feature[self.left >= 0])
+        if len(used) == len(self.names):
+            return self
+        remapped = self.feature.copy()
+        live = self.left >= 0
+        remapped[live] = np.searchsorted(used, self.feature[live])
+        metadata = dict(self.metadata, features=[self.names[i] for i in used],
+                        declared_features=len(self.names))
+        result = RestrictedRF(metadata, self.medians[used], self.roots, self.left,
+                              self.right, remapped, self.threshold, self.value)
+        result.validate()
+        return result
+
     def save(self, path):
         self.validate()
         path = Path(path)

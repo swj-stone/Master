@@ -63,6 +63,15 @@ def examples(directory, native=True):
         avail = rng.uniform(size=reduced.shape) < .55
         reference_rows = [forest.predict(test[i:i+1, cols[mask]], cols[mask])[0] for i, mask in enumerate(avail)]
         np.testing.assert_allclose(model.predict(reduced, avail), reference_rows, atol=1e-14, rtol=0)
+        # Add a declared but unreachable input before every actual index.
+        from dataclasses import replace
+        extended = replace(model, metadata=dict(model.metadata, features=["unused", *model.names]),
+                           medians=np.r_[0., model.medians],
+                           feature=np.where(model.left >= 0, model.feature + 1, model.feature))
+        compact = extended.reachable_schema()
+        used = [model.names.index(name) for name in compact.names]
+        assert "unused" not in compact.names and compact.reachable_schema() is compact
+        np.testing.assert_array_equal(compact.predict(reduced[:, used], avail[:, used]), model.predict(reduced, avail))
         frame = pd.DataFrame(reduced, columns=model.names).iloc[:, ::-1]
         flags = pd.DataFrame(avail.astype(int), columns=model.names)
         if len(cols):

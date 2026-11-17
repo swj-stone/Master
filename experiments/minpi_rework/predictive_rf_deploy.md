@@ -1,5 +1,7 @@
 # Fit and deploy a supervised MinPI random forest
 
+Pass `--reachable-only` to `fit` to export the smallest schema containing every split the selected forest can still reach. A feature appearing only below an excluded split disappears from both the artifact's required input names and its median vector. The output probabilities or regression predictions are identical under every additional availability mask.
+
 Run these commands in the thesis checkout. Fitting uses the supervised two-path selector from the paper, with 100 depth-four trees, seed 42 by default, and an acceptance quota of 0.02. Supply three disjoint labeled splits. Create those splits at the subject or time level when the sampling design requires it. The fitting sample trains the forest and median imputer, the voting sample ranks features, and the acceptance sample selects the width and winning path. The exported forest is the fitted forest truncated to the selected features.
 
 ```powershell
