@@ -20,6 +20,8 @@ Pop-Location
 
 [原六个预处理集的 CUDA 方案](evidence/anchored_vote/prepared.md) · [五个新数据源和分区](../experiments/minpi_replication/second_panel/protocol.md) · [投票的形式化计数](formal/SplitVote.lean)
 
+在同一批 25 组实验上，MinPI 相对 scikit-learn 的 RFECV 在五个数据集均更快且保留列数达标，加入预测分数要求后有四个达标。直接按模型平均重要性截断的 SelectFromModel 在五个数据集均更快。[两种标准方法的配置与实测](evidence/anchored_vote/standard/README.md) · [预测归档与独立复算](evidence/anchored_vote/replication.md)
+
 ## 此前的冻结森林论文
 
 [论文 PDF](minpi-tree.pdf) · [原版 LaTeX 源码](minpi-forest.tex) · [复现步骤](tree-replication.md) · [随机森林训练和部署](../experiments/minpi_rework/predictive_rf_deploy.md)
