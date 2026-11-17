@@ -1,0 +1,51 @@
+\section*{Pivotal votes for substitutable thresholds}
+Fix the $n$ columns still available to the selector. A threshold $b$ has weight
+$w_b>0$ and a set $R_b$ of columns that represent its split on the training
+sketch. Retain only thresholds missed by all columns chosen so far.
+A coalition covers $b$ if it contains any member of $R_b$. For $j\in R_b$,
+there are $\binom{n-1}{k}$ size-$k$ coalitions without $j$ and exactly
+$\binom{n-|R_b|}{k}$ that miss the other representatives. Thus the expected
+increase in covered weight from adding $j$ is
+\[
+ c_j(k)=\sum_{b:\,j\in R_b}w_b
+ \frac{\binom{n-|R_b|}{k}}{\binom{n-1}{k}},
+ \qquad 0\leq k<n .
+\]
+The empty sum is zero. Adding columns can only make a threshold less likely
+to need $j$, so the smallest raw vote always occurs at the largest size.
+The implemented rule instead takes the minimum share
+$q_j(k)=c_j(k)/\sum_i c_i(k)$ over the tested sizes with positive total credit.
+
+Let $M_d$ be the total weight of thresholds with $d$ representatives and
+$W_{jd}$ the weight among them represented by $j$. For $M_d>0$, put
+$h_{jd}=W_{jd}/(dM_d)$. Summing over columns counts every degree-$d$ threshold
+$d$ times, which gives
+\[
+ q_j(k)=
+ \frac{\sum_{d:\,M_d>0} dM_d\binom{n-d}{k}\,h_{jd}}
+      {\sum_{d:\,M_d>0} dM_d\binom{n-d}{k}} .
+\]
+Consequently the difference between the mean and minimum share is at most
+$\max_d h_{jd}-\min_d h_{jd}$. If all positive-weight thresholds have the same
+number of representatives, both rules give every column the same score as
+each other. More generally, $q_j(k)$ is constant over \emph{every} defined
+size precisely when $h_{jd}$ is constant over the represented degrees.
+Indeed, if $q_j(k)=a$, clearing the denominator gives
+$\sum_d dM_d(h_{jd}-a)\binom{n-d}{k}=0$. Evaluate this identity at $k=n-d$
+for the represented degrees $d$ in increasing order. Each new coefficient has
+multiplier one and all later coefficients have multiplier zero.
+
+For a strict change of choice, give feature $A$ one private threshold of
+weight 5, give $B,C$ a shared threshold of weight 11, and give $D,E$ one
+private threshold of weight 1 each. At $k=1,2,3$, the shares of $A$ are
+$(10/47,5/18,2/5)$ and those of either $B$ or $C$ are
+$(33/94,11/36,11/50)$. The mean chooses $A$. The minimum chooses $B$ or $C$.
+This example concerns weighted coverage on the sketch. The change in predictive
+loss after fitting the selected columns is a separate empirical quantity.
+
+For $p$ input columns, a dyadic width grid and two local refinements use at
+most $\min\{p,\lceil\log_2 p\rceil+3\}$ validation widths. Selecting the
+first widths that cover $1/2,3/4,7/8,15/16$ of total weight, together with
+the full set and one refinement, uses at most $\min\{p,6\}$. Both counts
+include the reused full training fit. Deployment adds one further fit.
+The bounds apply equally to a Gain ranking given the same width schedule.
