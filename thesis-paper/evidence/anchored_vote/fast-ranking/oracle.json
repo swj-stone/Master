@@ -1,0 +1,45 @@
+{
+  "cases": 130,
+  "rules": [
+    "min",
+    "pooled"
+  ],
+  "exact_oracle_mismatches": 0,
+  "sketches_compared_bit_for_bit": 36,
+  "old_disagreements": {
+    "128-min": {
+      "oracle": [
+        0,
+        1
+      ],
+      "frozen": [
+        1,
+        0
+      ]
+    },
+    "128-pooled": {
+      "oracle": [
+        0,
+        1
+      ],
+      "frozen": [
+        1,
+        0
+      ]
+    },
+    "129-min": {
+      "oracle": [
+        1,
+        0,
+        2
+      ],
+      "frozen": [
+        2,
+        1,
+        0
+      ]
+    }
+  },
+  "sub_ulp_case": 128,
+  "extreme_case": 129
+}
