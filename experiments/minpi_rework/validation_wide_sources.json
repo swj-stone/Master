@@ -1,0 +1,7 @@
+{
+  "derma": ["33/dermatology", "c86e681b3bd02d838b3602d88700b007952bb57eb80162c7ed8966d426f5c6c8"],
+  "arrhy": ["5/arrhythmia", "0890adae92ea2050caeb90bd98856d22826dce28ae10013e4c9c3c858c598e5d"],
+  "robotlp": ["138/robot+execution+failures", "cdfbe0b260f4a21c5249fe0da4b1baf4041959663a9182253885ee1f41a4568e"],
+  "ctloc": ["206/relative+location+of+ct+slices+on+axial+axis", "9411f92082678169d2a01356f036708498c3ab507f6595919456bbb04a1d942a"],
+  "news": ["332/online+news+popularity", "dba2ae526f62ccef6f2f8efb53b0268319f4d0d2719bb98d88958cfe31d58a22"]
+}
