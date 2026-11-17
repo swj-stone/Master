@@ -11,9 +11,7 @@ The complete ranking step was faster on the three wide sources. The change leave
 
 Seconds are source medians of per-split median wall-clock times from three interleaved complete fits. Ratios use paired log times over five seeds before taking the exponential. The per-split comparator was chosen from the original interleaved folded native endpoint veto, straight scalar exhaustive evaluation, and one-thread exhaustive BLAS ranks, including the original unfolded straight scan on Tehran. BLAS won on UJI and the folded endpoint veto won on the other three. Directly measured whole-pipeline times include group updates, RF fitting, vote and acceptance dictionaries, masks, native metrics, and actual predictions. Data loading and compilation are outside the clock. All outputs were checked against the locked selection order, support and forecast array. The 4-source intervals enumerate all 256 ordered bootstrap source resamples. The resulting intervals are marginal to each contrast and apply to these four sources.
 
-## Why an interval can be skipped
-
-### Cost against the single impurity path
+## Cost against the single impurity path
 
 The MDI-only selector fits the identical forest and uses its own calibrated path. It omits the voting-sample path dictionary and union-rank calculation. Across 20 signed comparisons, fitting the two-path portfolio and forecasting took 1.293 times as long (source bootstrap 1.035–1.616). The portfolio retained .883 as many nominal columns. Native traversal of its truncated trees used .893 as many distinct, reachable input columns (.826–.965). Both methods reproduced their original forecast arrays. On oral toxicity the two paths took 0.823 s, against 0.489 s for MDI alone, and used .802 times as many reachable inputs. On the two regression tasks the differences in both runtime and reachable inputs were smaller.
 
@@ -26,7 +24,7 @@ The MDI-only selector fits the identical forest and uses its own calibrated path
 
 The timing and support counts are in `mdi-repeats.csv` and `mdi-paired.csv`. Forecast quality by source is reported in the sibling `wide-veto/source-scores.csv`. The fit-to-forecast times can be reproduced with the pipeline module's `--mdi` flag.
 
-### Interval certificate
+## Why an interval can be skipped
 
 Let the fixed number of input variables be `p`, and let `c_h` be the current candidate's signed excess-loss coefficient at degree `h`. The all-size score after rate normalization is
 
