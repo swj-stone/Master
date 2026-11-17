@@ -1,0 +1,328 @@
+{
+ "schema": 2,
+ "rows": [
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "minimum2",
+   "repeat": 0,
+   "k": 1,
+   "p": 22,
+   "setup_s": 0.0021626000525429845,
+   "seconds": 0.08958740008529276,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "minimum",
+   "repeat": 0,
+   "k": 1,
+   "p": 22,
+   "setup_s": 0.00467020005453378,
+   "seconds": 0.08423210005275905,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "minimum0",
+   "repeat": 0,
+   "k": 22,
+   "p": 22,
+   "setup_s": 0.0021459999261423945,
+   "seconds": 0.1025510000763461,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    3,
+    6,
+    11
+   ],
+   "scale": 0.4872431103079849,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "direct",
+   "repeat": 0,
+   "k": 1,
+   "p": 22,
+   "setup_s": 6.00004568696022e-07,
+   "seconds": 0.09971959993708879,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "pooled",
+   "repeat": 0,
+   "k": 1,
+   "p": 22,
+   "setup_s": 0.002089699963107705,
+   "seconds": 0.0988501999527216,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "intact",
+   "repeat": 0,
+   "k": 1,
+   "p": 22,
+   "setup_s": 0.0008728000102564692,
+   "seconds": 0.08271410001907498,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "pooled",
+   "repeat": 1,
+   "k": 1,
+   "p": 22,
+   "setup_s": 0.002239600056782365,
+   "seconds": 0.1079624000703916,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "intact",
+   "repeat": 1,
+   "k": 1,
+   "p": 22,
+   "setup_s": 0.0008287000237032771,
+   "seconds": 0.09477169997990131,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "minimum0",
+   "repeat": 1,
+   "k": 22,
+   "p": 22,
+   "setup_s": 0.0023038999643176794,
+   "seconds": 0.09743269998580217,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    3,
+    6,
+    11
+   ],
+   "scale": 0.4872431103079849,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "direct",
+   "repeat": 1,
+   "k": 1,
+   "p": 22,
+   "setup_s": 4.00003045797348e-07,
+   "seconds": 0.07561200007330626,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "minimum2",
+   "repeat": 1,
+   "k": 1,
+   "p": 22,
+   "setup_s": 0.002225100062787533,
+   "seconds": 0.08779450005386025,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "anuran",
+   "task": "classification",
+   "method": "minimum",
+   "repeat": 1,
+   "k": 1,
+   "p": 22,
+   "setup_s": 0.002078499994240701,
+   "seconds": 0.07502819993533194,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 0.4872431103079849,
+   "cols": [
+    21
+   ],
+   "acceptance": {
+    "auc": 0.8832417039117193,
+    "accuracy": 0.7491467576791809
+   }
+  }
+ ],
+ "forecast": "01a224a843aab899f3ab175ef025ad028b27cac723e0142af86dd6a428c92144",
+ "input_rows": {
+  "fit": "3185ee532012600829435ae9da8157e41c61e5baf143e114f694d73e01a8b8e6",
+  "vote": "d6a126d341b34aab7443397699b653c3ae6601d86fee41dbbb3a4939ca0c4455",
+  "width": "e3247635bebb623e54bc7cc72834b95434c453df76e74e8e6c0607caa92bdd71",
+  "test": "928ef61ed120c8afc50d1e18730d2116634b07707db938d8dc0f3cf42a67a6d9"
+ }
+}

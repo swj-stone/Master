@@ -1,0 +1,288 @@
+{
+ "schema": 2,
+ "rows": [
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "minimum2",
+   "repeat": 0,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.0021724000107496977,
+   "seconds": 0.06522650003898889,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "minimum",
+   "repeat": 0,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.0023362000938504934,
+   "seconds": 0.06694029993377626,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "minimum0",
+   "repeat": 0,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.002139899996109307,
+   "seconds": 0.08605450007598847,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "direct",
+   "repeat": 0,
+   "k": 1,
+   "p": 26,
+   "setup_s": 5.00003807246685e-07,
+   "seconds": 0.06574049999471754,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "pooled",
+   "repeat": 0,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.0042863000417128205,
+   "seconds": 0.06585390004329383,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "intact",
+   "repeat": 0,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.0008388999849557877,
+   "seconds": 0.06979239999782294,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "pooled",
+   "repeat": 1,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.0020798000041395426,
+   "seconds": 0.06776650005485862,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "intact",
+   "repeat": 1,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.0008175000548362732,
+   "seconds": 0.06036240002140403,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "minimum0",
+   "repeat": 1,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.002091500093229115,
+   "seconds": 0.06457659997977316,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "direct",
+   "repeat": 1,
+   "k": 1,
+   "p": 26,
+   "setup_s": 5.00003807246685e-07,
+   "seconds": 0.05782719992566854,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "minimum2",
+   "repeat": 1,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.003133099991828203,
+   "seconds": 0.07003780000377446,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "appliances",
+   "task": "regression",
+   "method": "minimum",
+   "repeat": 1,
+   "k": 1,
+   "p": 26,
+   "setup_s": 0.002143200021237135,
+   "seconds": 0.07238939998205751,
+   "rounds": 128,
+   "fits": 2,
+   "rejected": [],
+   "scale": 112.59335446517387,
+   "cols": [
+    5
+   ],
+   "acceptance": {
+    "r2": -3.559119866350848,
+    "mae": 132.46540842634258,
+    "scaled_mae": 1.1764940218324813
+   }
+  }
+ ],
+ "forecast": "dbed4b5c23b67e3cb1491fb4b092b3b3fb4bee6a74d2438db8c74832d11fd593",
+ "input_rows": {
+  "fit": "d0b3735dc50f7c664cf6e588dad35634efbd3038f5514809b22b9a7a6738efc4",
+  "vote": "12899893199bd72ec77db0874242a4ce5962ceac2b489ef20f4b02360b83ca1f",
+  "width": "55dde6145a64575d88ee946dd7be7f76a76bec0d09ee46d26d7beb469d78f952",
+  "test": "3c14bb6d018fc029d107821e5f81666b62b723bae3eccbdce3442c6cffe4cd1a"
+ }
+}

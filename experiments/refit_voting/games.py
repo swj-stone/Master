@@ -4,7 +4,6 @@ from time import perf_counter
 
 import numpy as np
 from numba import njit
-from scipy.special import logsumexp
 
 
 def strata(y, classification):

@@ -1,0 +1,470 @@
+{
+ "schema": 2,
+ "rows": [
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "minimum2",
+   "repeat": 0,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.002361999941058457,
+   "seconds": 0.069326400058344,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "minimum",
+   "repeat": 0,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.002738800016231835,
+   "seconds": 0.06389700004365295,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "minimum0",
+   "repeat": 0,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.0032013000454753637,
+   "seconds": 0.09156840003561229,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "direct",
+   "repeat": 0,
+   "k": 12,
+   "p": 12,
+   "setup_s": 5.00003807246685e-07,
+   "seconds": 0.12878790008835495,
+   "rounds": 320,
+   "fits": 5,
+   "rejected": [],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "pooled",
+   "repeat": 0,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.002306399983353913,
+   "seconds": 0.07702999992761761,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "intact",
+   "repeat": 0,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.0010383999906480312,
+   "seconds": 0.07276600005570799,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "pooled",
+   "repeat": 1,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.002198499976657331,
+   "seconds": 0.08094290003646165,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "intact",
+   "repeat": 1,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.0008495999500155449,
+   "seconds": 0.11648730002343655,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "minimum0",
+   "repeat": 1,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.0021427000174298882,
+   "seconds": 0.06177949998527765,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "direct",
+   "repeat": 1,
+   "k": 12,
+   "p": 12,
+   "setup_s": 4.00003045797348e-07,
+   "seconds": 0.11000220000278205,
+   "rounds": 320,
+   "fits": 5,
+   "rejected": [],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "minimum2",
+   "repeat": 1,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.00619310000911355,
+   "seconds": 0.06487600004766136,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  },
+  {
+   "panel": "development",
+   "dataset": "grid",
+   "task": "regression",
+   "method": "minimum",
+   "repeat": 1,
+   "k": 12,
+   "p": 12,
+   "setup_s": 0.002046200097538531,
+   "seconds": 0.06123619992285967,
+   "rounds": 96,
+   "fits": 5,
+   "rejected": [
+    1,
+    2,
+    3,
+    6
+   ],
+   "scale": 0.03742858947591551,
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "acceptance": {
+    "r2": 0.8782713189193692,
+    "mae": 0.009940303667397751,
+    "scaled_mae": 0.26558050427719493
+   }
+  }
+ ],
+ "forecast": "12f64020a408de1dd42a3042e3eafdee55393f1df5543c316a40347c12c35cc3",
+ "input_rows": {
+  "fit": "49e51f4ddfc968959f970a0e93cf6edf2989df9fc1efeea60c26b0f1f6a5f0c9",
+  "vote": "a26a79d7a2c352d4320488bb806675630b8dc2a75af366271d5cd5e3f3175127",
+  "width": "620d2147fcf3c6ad972754e83f4350d4bf30d8dbc8ae192261a2f66a6a3d2933",
+  "test": "c94412e6bce9b6fd8b7b4c4d27e6052be95b76cd770e8545b1853a6e3aa961e4"
+ }
+}
