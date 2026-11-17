@@ -1,0 +1,44 @@
+{
+  "votes": {
+    "filename": "rf-final-votes.zip",
+    "url": "https://archive.ics.uci.edu/static/public/105/congressional+voting+records.zip",
+    "sha256": "ffec9d9328f28f151d95d2f8d36fd94ed8d2b0cdd0c9bd284bd8e65031a5e6a6",
+    "task": "classification"
+  },
+  "churn": {
+    "filename": "rf-final-churn.zip",
+    "url": "https://archive.ics.uci.edu/static/public/563/iranian+churn+dataset.zip",
+    "sha256": "696c3a1812267980751f30d19193a1b430ac4ad76172bb089e664c96813ead66",
+    "task": "classification"
+  },
+  "liver": {
+    "filename": "rf-final-liver.zip",
+    "url": "https://archive.ics.uci.edu/static/public/225/ilpd+indian+liver+patient+dataset.zip",
+    "sha256": "60e18fbfe7f84daf58c178ea280ba5fe8db7e2507aabce01b57425b3b822cf0b",
+    "task": "classification"
+  },
+  "german": {
+    "filename": "rf-final-german.zip",
+    "url": "https://archive.ics.uci.edu/static/public/573/south+german+credit+update.zip",
+    "sha256": "0b40d40eb7321693d559e247a556f88a6cc8df8489c3cb2ae084db7592584551",
+    "task": "classification"
+  },
+  "seoul": {
+    "filename": "rf-final-seoul.zip",
+    "url": "https://archive.ics.uci.edu/static/public/560/seoul+bike+sharing+demand.zip",
+    "sha256": "139e9908f0a3544bb222386855c9ce107e96467306bb8e4ce936aab59e7baac4",
+    "task": "regression"
+  },
+  "beijing": {
+    "filename": "rf-final-beijing.zip",
+    "url": "https://archive.ics.uci.edu/static/public/501/beijing+multi+site+air+quality+data.zip",
+    "sha256": "b04da438b2f331ac0ffd45aebdfec0d20d2367feb5f6948c4b1f7ce1191e33c4",
+    "task": "regression"
+  },
+  "sgemm": {
+    "filename": "rf-final-sgemm.zip",
+    "url": "https://archive.ics.uci.edu/static/public/440/sgemm+gpu+kernel+performance.zip",
+    "sha256": "8d3ee0d82708df11b54debc6a4fbade77c604a047f019fa7940413032eb7b096",
+    "task": "regression"
+  }
+}
