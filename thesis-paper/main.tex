@@ -3,6 +3,7 @@
 \usepackage[preprint]{neurips_2026}
 \makeatletter
 \renewcommand{\@noticestring}{Anonymous research manuscript.}
+\let\tableinput\@@input
 \makeatother
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsthm,booktabs,microtype}
@@ -10,34 +11,59 @@
 \newtheorem{proposition}{Proposition}
 
 \begin{document}
-\title{Finding Negative Min-Marginal Votes for Feature Selection}
+\title{MinPI for Input Compression in Boosted Trees}
 \author{Anonymous Author(s)}
 \maketitle
 
 \begin{abstract}
-A negative min-marginal power index (MinPI) means that adding a feature turns at least one passing coalition into a failing one. We derive the tightest upper bound on each index from the observed binary votes. Reusing votes collected for other features recovered 17 of 47 exact negatives on seven enumerable sources, compared with 14 before reuse, without further fits. When two nested coalitions bracket a drop, bisection locates a negative edge within logarithmically many queries. On four new sources chain search retained 21.8\% fewer features in classification and 12.9\% fewer in regression than univariate filtering, within the registered mean prediction-loss margins. Direct coefficient ranking selected identical supports on 16 of 20 splits and was faster. On the five original classification sources, sampled MinPI took 27\% of boosted-tree gain's selection time under a common ridge predictor. With boosted trees also used for width selection and prediction, it took 90\% as long and retained 47\% more features. On six further sources, deleting witnessed features from a coefficient-selected model passed validation on four of twelve eligible splits, against six for equal-size random deletions. The search can provide evidence for a particular downward crossing, but that evidence rarely improved on coefficient-based compression.
+A fitted tree ensemble can dispense with a measurement by stopping each
+affected path at its first unavailable split. We study the smallest input
+set reached by greedy deletion under a calibration budget for the change in
+ensemble margins. MinPI compares deletion candidates using votes from small,
+intermediate and full-size feature coalitions. The expected marginal output
+in each size class has a closed form in terms of the sets of split features
+on tree paths. The least favorable vote can rule out a deletion while
+preserving the complete greedy path. On 13 held-out datasets, greedy deletion
+retained 10.6\% fewer inputs than repeated deletion in ascending split-gain
+order. Macro AUC and accuracy differed by $-0.0025$ and $-0.0015$ across
+seven classification tasks. Ranking by the full-model effect of a single
+deletion reduced the width advantage to 1.2\%. Most of the reduction in
+exact norm calculations came from the full-coalition vote. A compiled
+scan of partial distances reproduced the same paths in less time.
 \end{abstract}
 
 \section{Introduction}
-Adding a feature to one fitted model can lower its validation score even if the feature improves prediction in another model. The min-marginal power index of Shi and Zhao~\cite{shi2026minpi} records whether such an addition ever turns a passing coalition into a failing one. A negative index has a verifiable witness. An average marginal importance, as in Shapley-based feature attribution~\cite{zhao2025shapg,covert2020sage}, summarizes the distribution of gains over a specified coalition game. A minimum can be settled by a single observed drop.
+Dropping an input to a boosted tree can change the value of later splits
+on other inputs. A single ranking measures each feature once, even after
+earlier deletions have changed which branches can be reached.
+We consider a fixed, global set of inputs available at prediction time.
+When a split feature is absent, prediction stops at that node and uses a
+weighted average of descendant margins. This permits deployment on selected
+columns without acquiring substitutes or fitting a second ensemble.
 
-Computing an index for each feature by checking all coalitions requires exponentially many fits. We study two sampling strategies. The sampler can measure many additions to one base coalition, sharing its fit. It can also look for a pair of nested coalitions with opposite votes, then spend further fits only where a negative marginal is guaranteed. We study how much each choice costs and whether the resulting votes change which features are retained. The utility in this study comes from refitted ridge regressions, including one-hot regression for classification. The downstream rule chooses a width by validation. The earlier multi-objective search is outside these comparisons.
+The original min-marginal power index (MinPI) asks whether adding a feature to
+a coalition changes a binary performance vote~\citep{shi2026minpi}. Its worst
+coalition can establish a negative index. For a fitted ensemble we change the
+question faced by each vote. A candidate competes to be the next input deleted.
+Coalitions of a given size supply a mean prediction change for that candidate.
+If its projection along even one such direction already puts it outside the
+current budget, more precise evaluation of that candidate can be skipped.
+The least favorable vote now has an auditable consequence for an actual
+search step. The original binary index and the size-conditioned deletion
+vote have different values and interpretations.
 
-\input{minpi-ridge}
-\input{minpi-search}
+Post-training forest pruning has been used to trade expected acquisition cost
+against prediction error~\citep{nan2016pruning}. Here the cost is the number
+of distinct input columns needed for any case. Path contributions have long
+been computed from changes between parent and child values
+~\citep{palczewska2013forest,saabasTreeInterpreter}. TreeSHAP gives a different
+allocation of model output to features~\citep{lundberg2020treeshap}.
+Our comparison uses both these established attribution ideas and direct
+full-model ablation. We measure which deletion rule gives a smaller input
+set and, holding its decisions fixed, how much computation the votes save.
 
-\section{Evaluation}
-We first developed the shared-fit sampler on Ionosphere, Vehicle, Sonar and Diabetes. We fixed four rounds, $\lambda=1$, and $\alpha=.95$ before scoring the next eight sources. Glass, Raisin, WiFi and Leaves are classification tasks. Airfoil, Yacht, Slump and Energy have continuous responses. Seven sources have five to nine features. Leaves has 64 margin descriptors for 100 species. In each of five seeded splits, 20\% of groups form the outer test. The remaining groups supply fitting, voting and width-selection rows in a 60/20/20 ratio. Identical predictor rows stay together; Airfoil setups, Yacht hulls and Energy geometries also stay together. WiFi measures repeat observations in known rooms. We fit imputers and scalers on the training portion of each operation.
-
-The shared-fit sampler sorts features by decreasing sampled index, breaking ties by the full ridge coefficient norm and then by column number. A coefficient-only control uses the identical tie order. An arithmetic-mean control uses every scheduled continuous utility increment. Univariate $F$ and unit-step ridge recursive feature elimination (RFE)~\cite{guyon2002rfe,pedregosa2011sklearn} can both use the pooled fitting and voting rows. Every ranking uses the same widths $1$ and $\lceil fp\rceil$ for $f\in\{1/8,1/4,1/2,3/4,1\}$. We fit each prefix on the pooled rows and compare it with the full model on width-selection rows. Select the smallest tested width within .01 of full macro one-versus-rest AUC and accuracy, or within .02 of full $R^2$ and .02 training response standard deviations of full MAE. The selected model is refitted on all development rows. For comparing with full ridge on the outer test we registered the same margins and a geometric retained fraction at most .85.
-
-We rotate method order over three single-thread timings and take the median per split. Clocked selection ends at the width decision; deployment includes refitting and prediction. Predictions are sealed before outer scoring. Repeated splits from one source share observations. Source-level contrasts use equal source weights, and reported intervals resample sources keeping all their splits together.
-\input{minpi-results}
-\input{minpi-transfer}
-\input{minpi-chain-results}
-
-\section{Scope}
-The sharp upper bound treats unobserved coalition votes as free bits. Ridge fits to a fixed design constrain these bits further. The verified witness concerns the voting split and quota; it can coexist with a useful feature in the final predictor. The Gram matrix takes quadratic storage, and a linear model can miss nonlinear signal even on a good support. Data-source heterogeneity, the small number of independent sources per comparison and the cost of a strong downstream predictor limit the conclusions that can be drawn from small timing and metric differences.
+\input{minpi-tree}
+\input{minpi-tree-study}
 
 \bibliographystyle{plainnat}
 \bibliography{references,minpi-related}

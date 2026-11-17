@@ -1,0 +1,117 @@
+\section{Predictive and computational comparisons}
+
+We developed the receiver on the six previously preprocessed tasks (Madelon,
+Spambase, Gisette, ISOLET, Credit Fraud and Abalone). A second assessment
+used eight previously unopened UCI datasets and a separately specified
+five-dataset extension chosen for its wider input sets. Table~\ref{tab:source}
+lists every source in these two panels. XGBoost ran 100 boosting rounds
+at depth four and learning rate .1, with one tree per class in each
+multiclass round~\citep{chen2016xgboost}. Within each split we estimated
+the ensemble on the pooled fitting and voting rows, selected inputs on
+separate calibration rows, then evaluated predictions on held-out rows.
+The test fraction was about one fifth. Recordings, animals, materials,
+locations and patients were kept in groups wherever the source provided
+identifiers. Appliances and Online News used chronological splits fixed
+across seeds. Five seeds per source yielded 65 paired comparisons.
+All prospective supports and test forecasts were hashed before scoring.
+The public data recipes give the exact outcomes, exclusions and group keys.
+
+Each selector got the same fitted ensemble, retained-column traversal and
+calibration budget. The primary control repeatedly swept the inputs in
+ascending mean split gain, taking every deletion that still passed fidelity.
+The Gain prefix control checked every retained width. Two additional controls,
+specified after opening the primary results, used the same repeated sweep
+with inputs ranked by their single deletion effect in the full ensemble or by
+mean absolute native TreeSHAP contribution over calibration rows and outputs.
+All outer labels were hidden while these rankings were computed.
+Another prespecified arm added a supervised calibration check along each
+deletion path. It required AUC and accuracy within .01 of the full model on
+classification tasks, or $R^2$ and MAE divided by the training target
+standard deviation within .02 on regression.
+
+We average paired log ratios over seeds within each source, then average
+sources equally and exponentiate. Score differences use the same weighting
+without the log transform. The 95\% percentile intervals resample sources,
+carrying all their seeds together. They describe variation on this small,
+purposively chosen panel. Classification uses macro one-versus-rest AUC
+and accuracy. Regression MAE remains in source units in the table;
+between-source differences in MAE are scaled by the development target
+standard deviation.
+
+\begin{table}[t]
+\centering
+\caption{Prospective tree compression. Widths are mean retained inputs over
+five splits. Each score pair shows held-out predictions from the full forest,
+the repeated Gain sweep or the greedy path shared by the projection and direct
+solvers. CT location uses 96 prespecified scan coordinates.}
+\label{tab:source}
+\small\setlength{\tabcolsep}{3.0pt}
+\begin{tabular}{lrrrlll}
+\toprule
+ & \multicolumn{3}{c}{Input columns} & \multicolumn{3}{c}{Held-out score pair}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Dataset & Full & Gain & Greedy & Full & Gain & Greedy\\
+\tableinput minpi-tree-rows.tex
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Inputs and prediction.}
+The greedy-to-Gain width ratio was .894 (95\% interval .847--.939);
+the eight-source estimate was .906 and the five-source estimate was .875.
+The 10\% width reduction specified before scoring was attained by the overall
+point estimate. The interval also includes reductions smaller than 10\%.
+Across seven classification sources, the AUC difference was $-.0025$
+($-.0081,.0019$) and the accuracy difference was $-.0015$ ($-.0055,.0022$).
+Robot LP1 saved four additional inputs on average and lost .0176 AUC
+and .0111 accuracy. Giving each frog recording equal weight changed the
+Anuran accuracy difference from $-.0059$ to $-.0011$.
+
+On six regression sources, the mean scaled MAE difference was $-.0153$
+($-.0508,.0045$). The mean $R^2$ gain of .120 came mainly from Appliances.
+Both compressed forecasters had $R^2$ below $-5$ there, substantially worse
+than the test-mean reference for $R^2$. Against the uncompressed teacher,
+CT location and Superconductor lost .057 and .049 $R^2$, respectively.
+The supervised guard gave a width ratio of .864 against the corresponding
+guarded Gain sweep, with mean differences of $-.0020$ AUC and $+.0014$
+accuracy. These are measurements on held-out cases. A fidelity check on
+calibration margins offers no distribution-free bound on those scores.
+
+The greedy width ratio was .768 against the Gain prefix control, .963
+(.944--.982) against the TreeSHAP sweep and .988 (.980--.995) against the
+full-model ablation sweep. The latter gives a competitive inexpensive rule
+for this same prediction objective. Re-fitting a learner after selecting
+columns changes the comparison. In the original development experiments,
+for example, re-fitted supervised Gain scored about .040 higher in AUC
+on Madelon than the guarded greedy refit.
+
+\paragraph{What the minimum saved.}
+We replayed every deletion on the 65 held-out splits and the 30 development
+splits. The size-conditioned and direct solvers agreed at every step.
+On the 65 held-out splits, 96,417 candidate visits involved 3,255 initial
+exact norms. Caching alone still required 6,859 fresh norms after that
+initialization. The full-size vote reduced these to 1,064, and the three
+sizes together to 1,041. The extra two sizes therefore saved 23 fresh norms.
+The two-feature example in Section~\ref{sec:tree-minpi} shows where the
+smaller sizes can matter; the measured incremental benefit was small.
+
+Timing included constructing the relevant caches and projections. A compiled
+control kept current deletion vectors contiguous and accumulated their
+squared error 32 coordinates at a time, stopping as soon as the incumbent
+was exceeded. This control recovered every deletion and was faster than the
+reference projection code. Discarding candidates before norm evaluation
+saves work only when that saving exceeds the cost of the bounds. The
+replication tables report standalone search and matched sums of fit,
+extraction, search and restricted prediction time, including an optimized
+Gain sweep and native full-forest prediction.
+
+\section{Scope}
+The method selects a single set of input measurements for a fitted numeric
+tree ensemble and a specified calibration distribution. The greedy path can
+miss a smaller feasible set, since two deletions may be feasible together
+even when each fails separately. Source shifts also affect the usefulness of
+matching the teacher. The observed advantage is a smaller global input set
+than Gain at modest mean predictive cost; it narrows considerably when
+the ranking measures single-feature deletion directly. The individual
+calibration votes explain which costly calculations can be omitted. Their
+number alone does not establish an advantage in elapsed time.
