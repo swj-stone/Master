@@ -1,0 +1,25 @@
+{
+  "pilot": ["ionosphere","vehicle","sonar","diabetes"],
+  "confirmation": ["glass","raisin","wifi","leaves","airfoil","yacht","slump","energy"],
+  "seeds": [42,43,44,45,46],
+  "repetitions": 3,
+  "methods": ["full","univariate","coefficient","rfe","mean","minpi"],
+  "engine": {"rounds":4,"ridge":1.0,"alpha":0.95},
+  "width_fractions": [0.125,0.25,0.5,0.75,1.0],
+  "population": "Four classification and four regression UCI sources held out of algorithm development. Purposive numeric tasks, limited to the specified sources, no data replacement. The 64 leaf margin descriptors constitute one view of the leaves. WiFi concerns held-out records at the same four room locations.",
+  "groups": "In every split group by all feature values. For energy hold out building geometries (first five inputs, 12 groups); yacht hold out hulls (first five); airfoil hold out airfoil setup (angle/chord). Exclude labels, IDs and unselected responses from predictors. Classify using group-stratified repeated 80/20 split and preserve all classes; regression splits shuffle groups. Within development retain 60/20/20 fit, vote, width partitions. Preprocessing fits only training rows.",
+  "ranking": "Engine on fit/vote. Coefficient uses the identical full fit/tie-break without voting. Mean utility uses same sampled family and continuous arithmetic-mean additions with all marginals evaluated. Univariate F and sklearn RFE(step=1, Ridge alpha=1, one-hot for classification) use the pooled fit+vote rows. Each ranking uses the same seven or fewer widths; smallest width passing both full inner floors. Ridge downstream on pooled fit+vote; refit on all development rows. Always include full width. CPU pinned single worker. Rotate each seeded random method order by two for the next repetition, median time per seed.",
+  "inner_floors": "Within 0.01 absolute of full validation AUC and accuracy in classification, R2 within 0.02 and MAE increase no more than 0.02 training-label SD in regression. Macro OVR AUC on raw ridge scores and argmax accuracy, real-valued R2 and MAE.",
+  "primary_success": "In each domain, feature compression success requires geometric mean retained fraction <=0.85 plus, averaged equally across sources after seeds, observed absolute AUC and accuracy losses <=0.01 for classification; R2 loss <=0.02 and scaled MAE increase <=0.02 for regression. State point decision and source-level uncertainty independently; small purposive panel is insufficient for population equivalence.",
+  "secondary_success": "Versus sklearn RFE assess same out-of-sample allowances. With these met a smaller geometric mean width is a compression improvement, or geometric mean paired selection time <=0.90 of RFE with geometric mean width ratio <=1 is a speed improvement. Report gains and failures against mean, coefficient, F and full regardless. No confirmatory data reused for a revised rule. Fixed-width results are not part of the primary endpoints.",
+  "source_sha256": {
+    "glass":"499c07a17115bf63100bb19cc1fdefad7f464bf5dc2b168930fa2071fd6b6e65",
+    "raisin":"5d516c040923fd154ecf85e31b6e1b5a096724fa0e68d588c33fb5a2f0c3e5db",
+    "wifi":"afb3e4f3674409642e6606e14faf4cb66edc3a8c74034839f1cee4e017c59a4e",
+    "leaves":"2313a70de450a8a6b81696174f52be1c037090af53b37c6a6313f11245e5fd4c",
+    "airfoil":"5c7767ba53ad827d3f48ba1eb9434117f4892df8f10bc4c99e118a9e8a7ae07c",
+    "yacht":"aa52b68f88c4bb552187a53ef4c5753fa178f6a36035a3771c5bc04e078487ac",
+    "slump":"68d6a6813261bf8ecf79d8d7cc82b665bd5e9e6800c7705a16e671688c78e491",
+    "energy":"499441eee27929a4b00417f58fd8c63c9cc14b8a71520cd0dd27fcb626738351"
+  }
+}
