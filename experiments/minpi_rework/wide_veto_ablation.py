@@ -135,21 +135,29 @@ def score():
             rows.append(dict(dataset=name, seed=seed, arm=arm, path=record["path"],
                 p=receipt["p"], width=len(record["columns"]), physical=len(cols), **scores[cols]))
     frame = pd.DataFrame(rows)
+    frame["quota_violation"] = frame.worst > .02 + 1e-12
     frame.to_csv(OUT/"scores.csv", index=False)
     frame.groupby(["dataset", "arm"]).mean(numeric_only=True).to_csv(OUT/"source-means.csv")
     paired = []
+    width_ratios = []
     for scope, prefix in (("fixed", ""), ("canonical", "portfolio_"), ("nominal", "portfolio_")):
         primary = frame[frame.arm == prefix+"min_"+scope].set_index(["dataset", "seed"])
         for name in ("pooled", "intact", "static", "mdi"):
             arm = ("" if name=="mdi" else prefix) + name + "_" + scope
             other = frame[frame.arm == arm].set_index(["dataset", "seed"]).loc[primary.index]
-            for column in ("width", "physical", "worst", "auc", "accuracy", "r2", "scaled_mae"):
-                delta = (primary[column]-other[column]).dropna().groupby(level=0).mean()
+            log_width = np.log(primary.physical/other.physical).groupby(level=0).mean()
+            draws = np.exp(np.random.default_rng(673).choice(log_width, (20000, len(log_width))).mean(axis=1))
+            width_ratios.append(dict(scope=scope, reference=name, ratio=np.exp(log_width.mean()),
+                lo=np.quantile(draws,.025), hi=np.quantile(draws,.975), narrower=int((primary.physical<other.physical).sum()),
+                tied=int((primary.physical==other.physical).sum()), **np.exp(log_width).to_dict()))
+            for column in ("width", "physical", "worst", "quota_violation", "auc", "accuracy", "r2", "scaled_mae"):
+                delta = (primary[column].astype(float)-other[column].astype(float)).dropna().groupby(level=0).mean()
                 draws = np.random.default_rng(673).choice(delta, (20000, len(delta)), replace=True).mean(axis=1)
                 paired.append(dict(scope=scope, reference=name, metric=column, sources=len(delta),
                     mean_delta=delta.mean(), lo=np.quantile(draws, .025), hi=np.quantile(draws, .975),
                     **delta.to_dict()))
     pd.DataFrame(paired).to_csv(OUT/"contrasts.csv", index=False)
+    pd.DataFrame(width_ratios).to_csv(OUT/"width-ratios.csv", index=False)
 
 
 if __name__ == "__main__":
