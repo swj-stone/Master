@@ -1,0 +1,114 @@
+\section{Greedy deletion in a fitted boosted forest}
+\label{sec:tree-minpi}
+Let $N$ be the $p$ input columns of a fitted forest. For a retained set
+$S\subseteq N$, traverse each tree until a leaf or the first split on a column
+outside $S$. At the latter node return the mean of the two child margins
+weighted by their training Hessian cover, applying the same definition
+recursively down to the leaves. Native missing-value routing still applies to
+retained columns. Let $f_S$ collect the resulting raw ensemble margins on the
+calibration rows, with one coordinate per row and output. The fidelity budget is
+$B=\rho^2\|f_N-f_\varnothing\|^2$, with $\rho=.20$ in the primary experiment.
+A deletion is feasible when its squared discrepancy from $f_N$ is at most $B$.
+This criterion uses the full predictor as the reference and uses no calibration
+outcomes.
+
+We precompute the child-minus-parent margin change for each edge traversed by
+each calibration row. Such changes telescope along tree paths, as in the
+feature contribution method of \citet{palczewska2013forest}. An edge in our
+truncated predictor survives only if the retained set contains \emph{every}
+split feature leading to it, including its parent's split. The joint
+contribution routine in \texttt{treeinterpreter}~\cite{saabasTreeInterpreter}
+already groups node increments by this set of prefix features. Use $a_H$
+for the resulting vector of increments with required set $H$.
+Then $f_S=f_\varnothing+\sum_{H\subseteq S}a_H$. At deployment the trees can
+be traversed with the retained raw columns alone.
+
+Write $r=f_N-f_S$ and let $\delta_j=\sum_{j\in H\subseteq S}a_H$ be the change
+from deleting $j\in S$. Greedy deletion removes the feasible column with the
+smallest resulting squared error,
+\begin{equation}
+ L_j=\|r+\delta_j\|^2=c_j+\|\delta_j\|^2,\qquad
+ c_j=\|r\|^2+2\langle r,\delta_j\rangle .
+ \label{eq:tree-error}
+\end{equation}
+It stops when every remaining deletion exceeds $B$. We retain the exact cross
+term by summing $\langle r,a_H\rangle$ over active groups requiring $j$. The
+expensive operation is assembling $\delta_j$ across calibration rows to
+recalculate its squared norm after another column has been removed.
+
+\paragraph{Votes by coalition size.}
+For each feature $j$ and size $s$, take a uniformly chosen $s$-subset $T$
+of $N\setminus\{j\}$. The direction $h_{js}$ is the expected change in raw
+predictions when $j$ joins $T$. Each path group is a unanimity game on its
+required features~\citep{shapley1953value}. If $j\in H$, adding $j$ activates
+that group precisely when $T$ contains the other $q_H=|H|-1$ features of $H$.
+Counting subsets gives the exact direction
+\begin{equation}
+ h_{js}=\mathbb E[f_{T\cup\{j\}}-f_T\mid |T|=s]
+       =\sum_{H\ni j}\frac{\binom{s}{q_H}}{\binom{p-1}{q_H}}\,a_H .
+ \label{eq:tree-size}
+\end{equation}
+A numerator is zero for $s<q_H$. Small coalitions give greater relative weight
+to increments that require fewer distinct columns. At $s=p-1$ every coefficient is one and
+$h_{j,p-1}=f_N-f_{N\setminus\{j\}}$. Size-conditioned marginals are the
+ingredients of symmetric semivalues~\citep{dubey1981semivalues}.
+
+Use the distinct sizes in $\mathcal S=\{0,\lfloor(p-1)/2\rfloor,p-1\}$.
+At a cutoff $b$, the size-$s$ vote passes if $c_j+Q_{js}\le b$, where
+\begin{equation}
+ Q_{js}=\frac{\langle h_{js},\delta_j\rangle^2}{\|h_{js}\|^2},\qquad
+ \min_{s\in\mathcal S}(b-c_j-Q_{js})=b-c_j-\max_{s\in\mathcal S}Q_{js}.
+ \label{eq:tree-vote}
+\end{equation}
+Set $Q_{js}=0$ when $h_{js}=0$. Each vote measures the squared projection onto
+one line, admitting both orientations of that direction. A failed vote rules
+out the current deletion. The original MinPI takes a minimum of changes in a
+utility-threshold vote across individual coalitions~\citep{shi2026minpi}. Here
+each size supplies a marginal \emph{prediction vector}; the minimum acts on
+its deletion-feasibility vote.
+
+For example, take a scalar game with $a_{\{1\}}=a_{\{2\}}=1$ and
+$a_{\{1,2\}}=-1$. Removing feature 2 from the full model leaves its prediction
+at one. Removing feature 1 next would reduce it to zero. Its full-size direction
+$h_{1,1}$ vanishes, while $h_{1,0}=1$ gives the exact squared loss of one.
+Only the small-coalition vote vetoes the second deletion when $0\le b<1$.
+
+\paragraph{Full-coalition controls.}
+A one-direction control uses $s=p-1$ alone. A second construction splits the
+coordinates of $h_{j,p-1}$ by sign ($>0$) and by whether absolute magnitude
+exceeds its root mean square. Let $v_b$ be this full-coalition vector masked
+to cell $b$, and $V_j$ the span of the nonzero cell vectors. Their disjoint
+supports give
+\[
+ Q_j=\sum_{v_b\ne0}\frac{\langle v_b,\delta_j\rangle^2}{\|v_b\|^2}
+     = \max_{u\in V_j,\,\|u\|\le1}\langle u,\delta_j\rangle^2 .
+\]
+This sum evaluates the minimum slack over all linear combinations of the four
+directions. Different coalition sizes in~\eqref{eq:tree-vote} cast separate
+votes.
+
+\begin{proposition}
+At each deletion step, testing the projection votes and evaluating the surviving
+candidates exactly gives the same deletion, including the chosen tie, as
+evaluating~\eqref{eq:tree-error} for every candidate in exact arithmetic.
+\end{proposition}
+\begin{proof}
+For any one of the tested spaces $V$ with projection $P_V$, the gap between
+$L_j$ and $c_j+\|P_V\delta_j\|^2$ is $\|\delta_j-P_V\delta_j\|^2\ge0$
+by the orthogonal projection identity~\citep{melrose2013bessel}. Thus the
+largest of the tested lower bounds is still valid. Begin with cutoff $B$ and lower it
+whenever a better feasible candidate is evaluated exactly. A candidate whose
+lower bound strictly exceeds the cutoff cannot win. Candidates at equality remain
+eligible. Equal errors are resolved by removing the later member of the
+descending Gain order, which ranks larger column IDs first at tied Gain.
+Applying the argument after each deletion gives identical paths.
+\end{proof}
+
+Initially $\delta_j=h_{j,p-1}$, so the full-size bound is exact. After each deletion only groups
+that lose a required column are removed, and their contributions to
+the tested projections are subtracted from cached inner products.
+Previously computed exact norms remain valid for unaffected features. An
+unresolved feature receives a fresh exact norm only if its lower bound can
+still win. Maintaining these bounds incurs an initialization and update cost.
+Greedy termination certifies that no further
+single deletion meets the calibration budget at the returned support.
