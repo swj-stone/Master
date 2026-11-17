@@ -17,7 +17,7 @@ from minppi_mofs.modeling import make_model
 def run_game(g,order,seed,repeats=3):
     oracle=None
     records=[]
-    arms=("dense","cache_only","directions")
+    arms=("dense","cache_only","directions","lazy_cache","lazy_directions")
     rng=np.random.default_rng(seed)
     for repeat in range(repeats):
         for method in rng.permutation(arms):
@@ -25,7 +25,7 @@ def run_game(g,order,seed,repeats=3):
             if method=="dense":
                 cols,diag=g.search("exact_greedy",order)
             else:
-                cols,diag=exact.search(g,order,method=="directions")
+                cols,diag=exact.search(g,order,"directions" in method,lazy=method.startswith("lazy"))
             seconds=perf_counter()-t
             path=diag.pop("deletion_order")
             if oracle is None:
@@ -82,7 +82,7 @@ def main():
                 all_results.extend(rec)
                 sub=pd.DataFrame(rec).groupby("method")[["seconds","recomputed"]].median()
                 print(name,seed,sub.to_string(),flush=True)
-    pd.DataFrame(all_results).to_csv(DEST/("exact-"+"-".join(map(str,args.seeds))+".csv"),index=False)
+    pd.DataFrame(all_results).to_csv(DEST/("exact-lazy-"+"-".join(map(str,args.seeds))+".csv"),index=False)
 
 
 if __name__=="__main__":

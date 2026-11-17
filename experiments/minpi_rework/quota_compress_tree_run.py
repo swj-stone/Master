@@ -139,8 +139,9 @@ def select(name,seed,job,controls=False):
     (sub/"selection.json").write_text(json.dumps(receipt),encoding="utf8")
 
 
-def score(jobs,seeds,controls=False):
-    output=OUT/"controls" if controls else OUT
+def score(jobs,seeds,controls=False,series=None):
+    series=series or ("controls" if controls else "")
+    output=OUT/series
     keys=[(n,s) for n in legacy.CONFIG["datasets"] for s in seeds]
     lock={}
     for n,s in keys:
@@ -151,7 +152,7 @@ def score(jobs,seeds,controls=False):
         assert rec["forecast_hash"]==b.digest(sub/"predictions.npz")
         lock[key]=b.digest(receipt)
     DEST.mkdir(parents=True,exist_ok=True)
-    suffix=("controls-" if controls else "")+"-".join(map(str,seeds))
+    suffix=(series+"-" if series else "")+"-".join(map(str,seeds))
     (DEST/f"lock-{suffix}.json").write_text(json.dumps(lock,indent=2),encoding="utf8")
     rows=[]
     with ZipFile(DEST/f"receipts-{suffix}.zip","w",ZIP_DEFLATED) as archive:
@@ -173,7 +174,7 @@ def score(jobs,seeds,controls=False):
                     for part,mask in masks.items():
                         metrics=b.metrics(y[mask],pred[arm][mask],rec["task"],rec["scale"])
                         rows.append(dict(dataset=n,seed=s,method=arm,part=part,
-                            **{k:v for k,v in entry.items() if k!="support"},**metrics))
+                            **{k:v for k,v in entry.items() if k not in ("support","trace")},**metrics))
     frame=pd.DataFrame(rows)
     frame.to_csv(DEST/f"historical-{suffix}.csv",index=False)
     print(frame[frame.part=="primary"].pivot_table(index="dataset",columns="method",values="k"),flush=True)
