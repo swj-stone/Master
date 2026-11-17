@@ -1,0 +1,7 @@
+dataset,seed,pass_both,pass_both_pareto,pass_both_five_pct,primary_diff_mean,width_diff_mean,fits_diff_mean,time_ratio_mean,narrower_mean,saved_refits_mean,pass_mean,accuracy_diff_mean,mae_diff_mean,primary_diff_gain,width_diff_gain,fits_diff_gain,time_ratio_gain,narrower_gain,saved_refits_gain,pass_gain,accuracy_diff_gain,mae_diff_gain
+abalone,42,False,False,False,0.0,0,0,1.0007110448135297,False,False,False,,0.0,0.0,0,0,0.874481087705349,False,False,False,,0.0
+credit_card_fraud,42,True,False,True,0.0064257325749658145,-12,1,0.8562489150076591,True,False,True,-5.2666690074087974e-05,,-0.004293990387376101,-6,0,0.871263490316832,True,False,True,-0.0001404445068642346,
+gisette,42,True,True,True,-0.0040530612244897846,-10,0,0.9839945323859235,True,False,True,-0.00642857142857145,,-0.004505102040816333,-16,0,0.9682887699330789,True,False,True,-0.0071428571428571175,
+isolet,42,True,False,True,-0.0007760683760684728,-10,0,1.0033576622811957,True,False,True,-0.014743589743589802,,-0.000643162393162422,-12,0,0.969733435858597,True,False,True,-0.010256410256410331,
+madelon,42,False,False,False,-0.0057100591715975035,-6,0,1.010907884720181,True,False,True,-0.007692307692307665,,-0.020961538461538476,22,0,1.0569728906765252,False,False,False,-0.011538461538461497,
+spambase,42,True,False,True,-0.002080926567730068,-4,0,0.9796164023462982,True,False,True,-0.006514657980456029,,-0.002080926567730068,-4,0,1.011203191158162,True,False,True,-0.006514657980456029,
