@@ -2,6 +2,8 @@
 
 Pass `--reachable-only` to `fit` to export the smallest schema containing every split the selected forest can still reach. A feature appearing only below an excluded split disappears from both the artifact's required input names and its median vector. The output probabilities or regression predictions are identical under every additional availability mask.
 
+To select entire devices or tests, supply `--groups devices.csv` when fitting. Its header is `feature,unit`; include each input column exactly once and use the same unit name for channels acquired together. The MDI baseline sums importance within each unit, and MinPI votes at each possible number of available units. The reported model metadata maps its actual columns to their units. For prediction, `--unit-availability observed.csv` reads 0/1 flags with one column per requested unit, aligned in row order with the prediction inputs. These flags can therefore disable all channels of an absent device together.
+
 Run these commands in the thesis checkout. Fitting uses the supervised two-path selector from the paper, with 100 depth-four trees, seed 42 by default, and an acceptance quota of 0.02. Supply three disjoint labeled splits. Create those splits at the subject or time level when the sampling design requires it. The fitting sample trains the forest and median imputer, the voting sample ranks features, and the acceptance sample selects the width and winning path. The exported forest is the fitted forest truncated to the selected features.
 
 ```powershell

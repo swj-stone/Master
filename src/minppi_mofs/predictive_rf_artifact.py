@@ -74,6 +74,10 @@ class RestrictedRF:
         names, labels = m.get("features"), m.get("classes")
         if not isinstance(names, list) or not all(isinstance(s, str) and s for s in names) or len(set(names)) != len(names):
             raise ValueError("Invalid selected feature names")
+        units = m.get("acquisition_units")
+        if units is not None and (not isinstance(units, dict) or set(units) != set(names)
+                                  or any(not isinstance(u, str) or not u for u in units.values())):
+            raise ValueError("Invalid feature-to-unit mapping")
         if not isinstance(labels, list) or not all(isinstance(s, str) and s for s in labels) or len(set(labels)) != len(labels):
             raise ValueError("Invalid class mapping")
         classification = m["task"] == "classification"
@@ -118,6 +122,9 @@ class RestrictedRF:
         remapped[live] = np.searchsorted(used, self.feature[live])
         metadata = dict(self.metadata, features=[self.names[i] for i in used],
                         declared_features=len(self.names))
+        if "acquisition_units" in metadata:
+            metadata["acquisition_units"] = {name: metadata["acquisition_units"][name]
+                                             for name in metadata["features"]}
         result = RestrictedRF(metadata, self.medians[used], self.roots, self.left,
                               self.right, remapped, self.threshold, self.value)
         result.validate()
