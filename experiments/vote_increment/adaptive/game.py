@@ -70,3 +70,53 @@ def path_votes(model,p):
         for d in range(1,min(len(mass),p+1)):
             prob[s,d]=float(Fraction(comb(k,d-1),comb(p-1,d-1)))
     return normalized(prob@mass)
+
+
+def pair_votes(model,x,y,task,seed):
+    """Exact pivotal credits for the largest observed supporting feature in a labeled pair."""
+    rng=np.random.default_rng(seed)
+    max_pairs=1024
+    if task=="classification":
+        classes=np.unique(y)
+        target=np.resize(rng.permutation(classes),max_pairs)
+        plus=np.empty(max_pairs,int)
+        minus=np.empty_like(plus)
+        for c in classes:
+            rows=target==c
+            plus[rows]=rng.choice(np.flatnonzero(y==c),rows.sum())
+            minus[rows]=rng.choice(np.flatnonzero(y!=c),rows.sum())
+    else:
+        lhs,rhs=rng.integers(0,len(y),size=(2,max_pairs))
+        plus=np.where(y[lhs]>=y[rhs],lhs,rhs)
+        minus=np.where(y[lhs]>=y[rhs],rhs,lhs)
+    keep=y[plus]!=y[minus]
+    plus,minus=plus[keep],minus[keep]
+    rows,inverse=np.unique(np.r_[plus,minus],return_inverse=True)
+    ix,iy=np.split(inverse,2)
+    dm=DMatrix(x[rows],nthread=1)
+    contrib=model.get_booster().predict(dm,pred_contribs=True,approx_contribs=True,strict_shape=True)
+    parts=contrib[:,:,:-1].transpose(0,2,1).astype(float)
+    if task=="classification":
+        parts,_=probability_parts(parts,contrib[:,:,-1].astype(float))
+        c=target[keep]
+        evidence=parts[ix,:,c]-parts[iy,:,c]
+    else:
+        evidence=(parts[ix,:,0]-parts[iy,:,0])*np.abs(y[plus]-y[minus])[:,None]
+    return facility_votes(np.maximum(evidence,0.))
+
+
+def facility_votes(values):
+    # A pair with nonnegative supports a_j contributes max_{j in S} a_j. Write this
+    # max as a weighted sum of OR games for the sets of its r strongest supporters.
+    n,p=values.shape
+    ranks=np.argsort(-values,axis=1,kind="stable")
+    sorted_value=np.take_along_axis(values,ranks,axis=1)
+    levels=sorted_value-np.column_stack((sorted_value[:,1:],np.zeros(n)))
+    tiers=(0,(p-1)//2,p-1)
+    result=[]
+    for k in tiers:
+        discount=np.array([comb(p-r,k)/comb(p-1,k) for r in range(1,p+1)])
+        credits=np.cumsum((levels*discount)[:,::-1],axis=1)[:,::-1]
+        mass=np.bincount(ranks.ravel(),weights=credits.ravel(),minlength=p)
+        result.append(mass)
+    return normalized(np.stack(result))
