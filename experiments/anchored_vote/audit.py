@@ -80,8 +80,8 @@ def load_panel():
                 forecasts = {}
                 with np.load(archive,allow_pickle=False) as arr:
                     np.testing.assert_array_equal(arr["indices"], test)
-                    needed = {"primary","near"} if method == "exhaustive" else {"primary"}
-                    require(set(arr.files) == needed|{"indices"}, f"Unexpected fields at {directory}")
+                    needed = ("primary","near") if method == "exhaustive" else ("primary",)
+                    require(set(arr.files) == set(needed)|{"indices"}, f"Unexpected fields at {directory}")
                     for field in needed:
                         preds = np.asarray(arr[field])
                         require(preds.shape == shape and np.isfinite(preds).all(),f"Invalid prediction at {directory}")

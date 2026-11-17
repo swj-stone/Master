@@ -14,11 +14,12 @@ from experiments.anchored_vote import audit
 def collect():
     root=audit.ROOT
     paths=set()
-    for name in ("audit.py","select.py","run.py","protocol.md"):
+    for name in ("audit.py","select.py","run.py","protocol.md","held_unit_uncertainty.py","vowel_diagnostic.py"):
         paths.add(root/"experiments/anchored_vote"/name)
     data=root/"experiments/minpi_replication/second_panel"
     paths.update(data/f for f in ("data.py","sources.json","protocol.md"))
-    paths.update(audit.OUT/f for f in ("receipts.csv","seeds.csv","sources.csv"))
+    paths.update(audit.OUT/f for f in ("receipts.csv","seeds.csv","sources.csv","held-unit-uncertainty.csv",
+                                       "held-unit-uncertainty.md","vowel-selected.csv","vowel-speakers.csv"))
     paths.update([root/"src/minppi_mofs/split_vote.py",root/"experiments/split_vote/path.py",
                   root/"experiments/minpi_replication/direct_gain.py",root/"thesis-paper/formal/SplitVote.lean",
                   root/"thesis-paper/formal/AnchoredGuard.lean",root/"thesis-paper/formal/SplitVote.wl",
