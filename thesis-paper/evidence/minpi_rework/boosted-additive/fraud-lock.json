@@ -1,0 +1,92 @@
+{
+  "credit_card_fraud-42": {
+    "selection": "60f2004d74184d01e3e5d289898e1100eb5d618001959bff20f15bf0da86a5de",
+    "predictions": "2d7e6c561a191ff6630cf3c09362b9264bc4e3e97c18100d7f6c401b6ed6b2f0",
+    "inputs": {
+      "train": "332ccb793b05f14d4d3a11c88475a44d40765bd17869c3e94fdff6686d6f7d65",
+      "val": "f84594e1fb718184f8a63a8aca6aadf13229478ec5ebd592b55f878d634bfe07",
+      "test": "7f35d209bd050c51dfe33623b5ca943b39482e9e4f64101d94c012d5d8a33918"
+    },
+    "deployment_component_s": {
+      "gain": 0.6429176999954507,
+      "shap_abs": 0.29956670000683516,
+      "raw_min": 0.32789439999032766,
+      "raw_pooled": 0.49894420010969043,
+      "raw_point": 0.32789439999032766,
+      "raw_energy": 0.2790444999700412,
+      "full": 1.1449380998965353
+    }
+  },
+  "credit_card_fraud-123": {
+    "selection": "266833ee4a055259fd5e5c8cd1ba1e5a518b6f053fdf97e7baa719c0371efc51",
+    "predictions": "d8863fecab3d56225c19da47b519fd615be46768d728adfae8366cf9c5ae385e",
+    "inputs": {
+      "train": "ddde123f3045fce0e8fb1a8314db316481233a1b5aa12f4e4fbdcb2ca43b9533",
+      "val": "7f782a5d5db50f675f60e6868513293dbcee18ad22e2eca937b73ce13cb24d01",
+      "test": "0172acb8affef3461b5913c2f03951a56cf93eb5c922631fe635effc0ebf24d2"
+    },
+    "deployment_component_s": {
+      "gain": 0.8989120000042021,
+      "shap_abs": 0.2844430999830365,
+      "raw_min": 0.2903666999191046,
+      "raw_pooled": 0.28483329992741346,
+      "raw_point": 0.2903666999191046,
+      "raw_energy": 0.2903666999191046,
+      "full": 1.222888799966313
+    }
+  },
+  "credit_card_fraud-456": {
+    "selection": "8a9cf0b9c54caf1e397f4edaafa52c6fe7b0c397ced04188af125072b26da5a3",
+    "predictions": "240c636637a1519a006d214973ba945a2afcdcc5b539682c6e603e908011b733",
+    "inputs": {
+      "train": "e69b71a5ae27ecaef0e70d7c43a905f8e3d5f7c5fbfb38ba992f87dabd7c5147",
+      "val": "682bcc42693daee64c668e74f7238e26f97442b8a706bb4f5bbe0b80e697b2eb",
+      "test": "ae1b75904cb1c8c57cc5f407360cf5113aee624795f37077fdad873a251fcff2"
+    },
+    "deployment_component_s": {
+      "gain": 0.4607659000903368,
+      "shap_abs": 0.27714920009020716,
+      "raw_min": 0.2786532000172883,
+      "raw_pooled": 0.4450797000899911,
+      "raw_point": 0.2786532000172883,
+      "raw_energy": 0.27714920009020716,
+      "full": 1.2014695000834763
+    }
+  },
+  "credit_card_fraud-789": {
+    "selection": "602b911aaac0024301f03c566235f036f3f42cdd29552dfc639fcaceee741eba",
+    "predictions": "bc19f96087df4464524e265e6c999091ba890b14161030b85b4f5e73374b9b23",
+    "inputs": {
+      "train": "b4da9b7bbeeeba1b0b756db24182b951ee4231c2a588e42af89f3344ef4cd234",
+      "val": "79945de7b3fe18469a503cf9f8fcc406862721b00fb9292c3babc5a2eb9a5a94",
+      "test": "bebd4ecad23c8f0aa1e12e5715bad81bd910ff6bd0e84bb38091f40424040741"
+    },
+    "deployment_component_s": {
+      "gain": 0.45042010000906885,
+      "shap_abs": 0.6673074000282213,
+      "raw_min": 0.4865866999607533,
+      "raw_pooled": 0.6787403000053018,
+      "raw_point": 0.4614074000855908,
+      "raw_energy": 0.6689048999687657,
+      "full": 1.1240943999728188
+    }
+  },
+  "credit_card_fraud-1024": {
+    "selection": "a9c412b53762a1fc1ab8d1e6054eb0757b17a39761d2e96fdff18bb02e142890",
+    "predictions": "d0498011459cf232f8f6762c7026759f5fcd8f4ee936459172f0388fe79424a1",
+    "inputs": {
+      "train": "64c23617a330784fa34645a6be859660c3720a8deb667a79aa0b080d04133642",
+      "val": "b27a2c1d70040061b7720a874df3dc5afa9db3c1d74f0b95d52f3526dcf020f5",
+      "test": "9f2fe39e1a5fc7bfb9f438a315cad02151cd21ea9c8c012eda9d69c5da307970"
+    },
+    "deployment_component_s": {
+      "gain": 0.5150135000003502,
+      "shap_abs": 0.3152402000268921,
+      "raw_min": 0.44939419999718666,
+      "raw_pooled": 0.4719022000208497,
+      "raw_point": 0.44939419999718666,
+      "raw_energy": 0.3152402000268921,
+      "full": 1.1270187000045553
+    }
+  }
+}
