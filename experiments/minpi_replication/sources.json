@@ -1,0 +1,18 @@
+{
+  "posture": {
+    "url": "https://archive.ics.uci.edu/static/public/391/mocap+hand+postures.zip",
+    "sha256": "8b4f1f6c115831b6dbf0f0e1d0ab97c1c17cb446dd2ad49301752a9576b5bbb7"
+  },
+  "bankruptcy": {
+    "url": "https://archive.ics.uci.edu/static/public/572/taiwanese+bankruptcy+prediction.zip",
+    "sha256": "c346f5ad2618cb198e7ed8306cf2f31fe3bb2ec60acdbbe1736788d50f269aac"
+  },
+  "turbine": {
+    "url": "https://archive.ics.uci.edu/static/public/551/gas+turbine+co+and+nox+emission+data+set.zip",
+    "sha256": "55fdb1acc25f05bd9c77aac285c424e9154ffb0dbf1bbadb56b69a1142231295"
+  },
+  "forecast": {
+    "url": "https://archive.ics.uci.edu/static/public/514/bias+correction+of+numerical+prediction+model+temperature+forecast.zip",
+    "sha256": "822659f0ed1e778c331a1f0b1db2bd21745ee476153fa93ef9c8e1b720938bb6"
+  }
+}
