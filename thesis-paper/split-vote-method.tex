@@ -1,0 +1,31 @@
+\section{Split coverage votes}
+
+Consider a training matrix with $p$ columns. Two financial ratios, for example, can place almost the same firms above and below a threshold. Fitting a tree on one ratio can give that ratio the full gain from the split. To measure which ratios can substitute for one another, we compare threshold partitions constructed on a common sample of training rows.
+
+\paragraph{Constructing the voters.}
+Fit XGBoost on the training rows and keep the total split gain $G_j$ attributed to each column~$j$~\citep{chen2016xgboost}. On a uniform sample of at most 512 training rows, take the seven empirical octiles of each column's finite values. A threshold indicator equals one for an observed value at or below its cut. Add the missingness indicator if applicable and discard constant or repeated indicators within a column. Each retained indicator $b$ is a voter. A column represents $b$ if one of its indicators, in either orientation, makes at most half as many row disagreements with $b$ as the better constant prediction. Write $R_b$ for its representatives. This compares splits on all sampled rows. A tree surrogate split usually measures agreement among the observations reaching one node~\citep{seifert2019surrogate}.
+
+Give each voter a weight $w_b$ by dividing its owner's $G_j$ among that owner's indicators in proportion to their between-group sums of squares for the target. Use one-hot targets for classification, summing over classes. Split the gain equally if all sums vanish. For a set $S$ of selected columns the covered weight is
+\begin{equation}
+ F(S)=\sum_b w_b\,\mathbf{1}\{S\cap R_b\ne\varnothing\}\,.
+ \label{eq:coverage}
+\end{equation}
+This is a weighted coverage game. Feature selection by coverage and facility location predates this work~\citep{liu2013coverage}. Here each threshold votes for the columns that represent its partition. Computing all pairs of agreements for $B$ thresholds on $m$ sampled rows costs $O(mB^2)$ operations and the implementation stores a $B$-by-$B$ matrix. This cost can dominate at high input dimension.
+
+\paragraph{Choosing a column.}
+Remove the voters covered by the current selection and let $n$ be the number of remaining columns. Fix a candidate $j$ and draw a set of $k$ from the other $n-1$ columns uniformly. Voter $b$ needs $j$ precisely when $j\in R_b$ and the draw misses its other representatives. The expected weight gained by adding $j$ and its share of total marginal weight at size $k$ are
+\begin{equation}
+ c_j(k)=\sum_{b:\,j\in R_b}w_b
+        \frac{\binom{n-|R_b|}{k}}{\binom{n-1}{k}},
+ \qquad
+ q_j(k)=\frac{c_j(k)}{\sum_{\ell}c_\ell(k)}\,.
+ \label{eq:pivotal}
+\end{equation}
+Indeed, the numerator of the binomial ratio counts the draws using only columns outside $R_b$. This evaluates the coalition average exactly for the sampled voters. No further model fit is required.
+
+Use the distinct integers nearest $(n-1)/6$, $(n-1)/2$ and $5(n-1)/6$, rounding half-integers to even and omitting sizes with zero total marginal weight. Append the column with the largest $\min_k q_j(k)$ and repeat. Higher average tree split gain, then higher column index, breaks ties and completes the order once the remaining votes vanish. The construction retains the minimum over coalition contexts of the min-marginal approach~\citep{shi2026minpi}. Its votes concern the extra split weight represented by including a column.
+
+Normalization by size matters. Each raw $c_j(k)$ decreases weakly with $k$, so its minimum always occurs at the largest tested size. If all remaining positive-weight voters have the same number of representatives, the common binomial ratio cancels and each $q_j(k)$ is constant across sizes. With unequal multiplicities the minimum and mean can choose different columns. Give $A$ a private vote of weight 5, $B$ and $C$ a shared vote of weight 11, and $D$ and $E$ private votes of weight 1. Across $k=1,2,3$ the smallest share of $A$ is $10/47$, just below the $11/50$ of $B$ and $C$. The mean ranks $A$ first. This calculation establishes a difference in ranking. Measuring its effect on predictions requires refitting on the selected columns.
+
+\paragraph{Choosing a width.}
+For each prefix of length $h$, compute $F(S_h)$ from the voters first covered along the order. Fit the first prefix reaching each of $1/2,3/4,7/8,15/16$ of total weight and reuse the full training fit at width $p$. For zero total mass use the corresponding fractions of $p$. Find the smallest tested width within 0.005 of the best validation utility. Try one intermediate width halfway to the previous tested width (or to zero) if the gap exceeds one, then apply the same selection rule to all scores. A nonmonotone utility curve can attain its optimum between tested widths. The procedure evaluates at most $\min(p,6)$ distinct widths and fits the selected support once more on training and validation rows for deployment. The same fit bound holds for an ordinary Gain ranking with the same search schedule.

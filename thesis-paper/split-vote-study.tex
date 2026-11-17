@@ -1,0 +1,34 @@
+\section{Evaluation}
+
+Each method ranks the same input matrix, chooses a prefix on validation data, and refits a predictor using only its selected columns. All fits use a depth-four XGBoost model with 100 boosting rounds, learning rate 0.1, native missing values and one CPU thread on the same CUDA device. We charge the initial fit, vote construction, search, final refit and test prediction to each method independently. Timing excludes common input loading and writing predictions to disk. The run order rotates across seeds.
+
+The direct comparator orders columns by average training split gain, refits every prefix and selects the narrowest validation maximizer. We also record the smallest width within 0.005 of its maximum. Three additional controls isolate the components of the search. Pooled voting replaces $\min_k q_j(k)$ with its arithmetic mean and uses the identical refit policy. Mass-scheduled Gain uses the ordinary Gain order, assigning each column its own total split gain for width selection. Geometric Gain tries powers of two and the full set, followed by at most two bisections below the observed near-best width. All three controls use the same 0.005 allowance.
+
+The timing and width criteria apply to each dataset. On each seed we record the time difference and the excess width after allowing the larger of one column and five percent of the comparator's width. A dataset meets the operational target if the median paired time difference is negative and the median adjusted width excess is nonpositive. We require this on at least 80\% of datasets in a panel. We separately count individual seeds satisfying both conditions, and datasets on which the median primary score falls by at most~0.01. The primary score is binary or macro one-vs-rest AUC for classification and $R^2$ for regression. We report accuracy and MAE in their native units. Validation truncates negative $R^2$ at zero in every arm, following the original selector. Test-set $R^2$ is untruncated.
+
+\paragraph{Data.}
+The six development datasets are Abalone, Credit Card Fraud, Gisette, ISOLET, Madelon and Spambase. All use the existing prepared columns and partitions. We then fixed four UCI collections and their splits before fitting a model to them~\citep{uciMoCap,uciBankruptcy,uciTurbine,uciTemperature}. MoCap Hand Postures has 36 coordinates and 2,800 frames, with at most 200 frames per person and disjoint subjects. Taiwanese Bankruptcy has 95 ratios and 6,819 financial records. Identical input vectors travel together across splits. The released table lacks firm and time identifiers. Turbine CO prediction uses nine plant and ambient readings, retaining every tenth observation in each year (3,676 rows). Seoul temperature forecasting uses 21 inputs and 7,723 station-days, with both observed future extrema removed. The last year is held out in each regression task. Both regressions reuse that same test year across five seeds, so these ten scores describe two test periods. The turbine release concerns another endpoint at a plant represented during earlier development.
+
+For the two classifications, models fit on approximately 48\% of groups, choose widths on the next 32\% and score the remaining 20\%. On the time splits the first two years fit the learner, the next two years jointly select widths, and refitting uses all four development years. Every arm sees the same rows. Fit-derived choices and forecast files were recorded before test scoring.
+
+\paragraph{External results for the split-coverage selector.}
+The selector ran faster than exhaustive Gain on all four collections. Three met the joint width and time criterion (Table~\ref{tab:base-external}). Seoul temperature prediction retained two more columns for a median $R^2$ gain of 0.0024, exceeding the one-column allowance. The registered threshold required all four datasets. Across individual seeds, 16 of 20 met both operational criteria.
+
+\begin{table}[htbp]
+\centering
+\caption{Five-seed medians for split coverage (MinPI) and exhaustive Gain. Each pair lists MinPI first. Primary scores are test AUC for the first two rows and test $R^2$ for the last two. The companion scores are accuracy and MAE, respectively. Counts give the number of seeds simultaneously meeting the width and timing criteria.}
+\label{tab:base-external}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Dataset & Columns & Seconds & Primary score & Companion score & Count\\
+\midrule
+Hand postures & 28 / 29 & 4.70 / 24.23 & .925 / .927 & .703 / .705 & 5/5\\
+Bankruptcy    & 30 / 61 & 1.38 / 17.19 & .941 / .947 & .975 / .971 & 4/5\\
+Turbine CO    & 2 / 2   & .77 / 1.48 & .576 / .576 & .965 / .965 & 5/5\\
+Temperature   & 16 / 14 & 1.07 / 3.37 & .657 / .655 & 1.362 / 1.388 & 2/5\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The comparator's width rule explains part of the apparent reduction. On Bankruptcy, exhaustive Gain retained a median of 61 columns at its validation maximum and 27 with the same 0.005 allowance as MinPI. Only hand postures and turbine CO still passed the width criterion after this change. Against each practical control (pooled voting, mass-scheduled Gain and geometric Gain), two of four datasets passed the joint criterion. On hand postures and temperature the minimum and mean deployed exactly the same columns and made the same predictions in all ten paired runs. On turbine CO the minimum improved $R^2$ by a paired median of 0.050 over the mean. Mass-scheduled Gain selected the very same two columns as the minimum on every seed. These comparisons identify a large saving from restricting the number of retrained widths. They supply little evidence that taking the smallest vote accounts for that saving.

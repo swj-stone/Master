@@ -1,0 +1,31 @@
+\documentclass{article}
+\PassOptionsToPackage{numbers,sort&compress}{natbib}
+\usepackage[preprint]{neurips_2026}
+\makeatletter
+\renewcommand{\@noticestring}{Anonymous research manuscript.}
+\makeatother
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,microtype}
+\usepackage[hidelinks]{hyperref}
+
+\title{MinPI for Feature Selection with a Limited Number of Refits}
+\author{Anonymous Author(s)}
+\begin{document}
+\maketitle
+\begin{abstract}
+Feature importance gives an order in which to try columns. Choosing how many to retain can still require one model fit per column. We study a feature selector that ranks columns by which thresholds they can represent for one another. A column earns a vote when adding it to a coalition covers a previously unrepresented threshold. MinPI takes the smallest of its relative voting shares at three coalition sizes. The votes have an exact counting formula, and cumulative covered weight identifies at most six widths for validation. On four held-out datasets, this selector took less time than refitting every prefix of an XGBoost gain ranking. It also kept a comparable or smaller number of columns on three datasets. Two datasets met the joint criterion against Gain with a bounded search. Replacing the minimum with a mean gave identical selected columns on two datasets across all five seeds. Much of the measured speed difference came from testing fewer widths.
+\end{abstract}
+
+\section{Introduction}
+A tree split assigns its training gain to a single input even when another input would make almost the same split. This assignment matters when selecting a few columns from many related measurements. The rank of an individual column gives little indication of how much it can add once its substitutes have been selected. Checking the prediction error after each change can settle that question on validation data, but on a path of $p$ widths it can also require $p$ separate training fits.
+
+We adapt the voting and minimum operations of the min-marginal power index~\citep{shi2026minpi} to select columns for retraining. The voters are threshold partitions of training observations. A candidate casts a marginal contribution to a coalition's covered weight whenever it can represent a partition that the coalition misses. We compute the expected marginal contribution at each of three coalition sizes and choose the column with the largest worst-size share. Once selected, a column's partitions leave the game. The resulting order and cumulative coverage determine a small number of models to train.
+
+Game-theoretic feature selection has previously used model predictions on representative samples to estimate feature contributions~\citep{zhaoStrategicInputs}. Here we use ordinary tree gain and split agreement to define a simpler game in which the coalition average has a closed form. Its utility measures coverage of an empirical collection of thresholds. Whether a downstream learner trained on those columns predicts well is an experimental question. We compare actual refits against both the exhaustive path and inexpensive searches using the same fitted model's gain ranking. This second comparison tests how much the votes add once the cost of searching every width has been removed.
+
+\input{split-vote-method}
+\input{split-vote-study}
+
+\bibliographystyle{plainnat}
+\bibliography{references,split-vote}
+\end{document}
