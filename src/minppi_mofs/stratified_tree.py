@@ -35,35 +35,32 @@ def marginal_anchors(a, inc, sizes, dense_full):
 
 
 @njit(cache=True)
-def _projection(j, s, weights, active, projected, length, mass, offsets, rows, values,
-                member_ptr, groups, memberships, incidence_ptr, scratch):
-    """Build one size anchor when it first has a candidate to screen."""
-    if length[j, s] < 0.:
-        scratch[:] = 0.
-        for pos in range(member_ptr[j], member_ptr[j+1]):
-            group = groups[pos]
-            cardinality = incidence_ptr[group+1] - incidence_ptr[group]
-            weight = weights[s, cardinality]
-            if weight:
-                for k in range(offsets[group], offsets[group+1]):
-                    scratch[rows[k]] += weight * values[k]
-        length[j, s] = np.sqrt(np.dot(scratch, scratch))
-        for pos in range(member_ptr[j], member_ptr[j+1]):
-            group = groups[pos]
-            if active[group]:
-                dot = 0.
-                for k in range(offsets[group], offsets[group+1]):
-                    dot += values[k] * scratch[rows[k]]
-                mass[memberships[pos], s] = dot
-                projected[j, s] += dot
-    if length[j, s] == 0.:
-        return 0.
-    v = projected[j, s] / length[j, s]
-    return v*v
-
+def _projection(j, s, sizes, weights, anchors, length, projected, delta, offsets, rows,
+                values, member_ptr, groups, incidence_ptr):
+    """Keep only the anchors a stale candidate actually needs and cache their last votes."""
+    if projected[j,s] >= 0.:
+        return projected[j,s]
+    vec = anchors[s,j]
+    if length[j,s] < 0.:
+        # The full-background anchor was copied before this feature first changed.
+        if sizes[s] != len(delta)-1:
+            vec[:] = 0.
+            for pos in range(member_ptr[j],member_ptr[j+1]):
+                g = groups[pos]
+                w = weights[s,incidence_ptr[g+1]-incidence_ptr[g]]
+                if w:
+                    for k in range(offsets[g],offsets[g+1]):
+                        vec[rows[k]] += w*values[k]
+        length[j,s] = np.sqrt(np.dot(vec,vec))
+    score = 0.
+    if length[j,s] > 0.:
+        ratio = np.dot(vec,delta[j])/length[j,s]
+        score = ratio*ratio
+    projected[j,s] = score
+    return score
 
 @njit(cache=True)
-def _native(n, offsets, rows, values, incidence_ptr, features, order, weights, rho):
+def _native(n, offsets, rows, values, incidence_ptr, features, order, sizes, weights, rho, rebuild_norms):
     p = len(order)
     strata = len(weights)
     ng = len(offsets)-1
@@ -77,7 +74,7 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, weights, r
     member_ptr = np.cumsum(member_ptr)
     next_slot = member_ptr[:-1].copy()
     groups = np.empty(len(features), np.int64)
-    memberships = np.empty(len(features), np.int64)
+
     for g in range(ng):
         for k in range(offsets[g], offsets[g+1]):
             full[rows[k]] += values[k]
@@ -85,7 +82,7 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, weights, r
         for ptr in range(incidence_ptr[g], incidence_ptr[g+1]):
             j = features[ptr]
             pos = next_slot[j]
-            groups[pos], memberships[pos] = g, ptr
+            groups[pos] = g
             next_slot[j] += 1
             for k in range(offsets[g], offsets[g+1]):
                 delta[j, rows[k]] += values[k]
@@ -100,9 +97,9 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, weights, r
     active = np.ones(ng,np.bool_)
     surviving_groups = np.diff(member_ptr)
     length = np.full((p,strata),-1.)
-    projected = np.zeros((p,strata))
-    mass = np.zeros((len(features),strata))
-    scratch = np.empty(n)
+    projected = np.full((p,strata),-1.)
+    anchors = np.empty((strata,p,n))
+    original_saved = np.zeros(p,np.bool_)
     residual = np.zeros(n)
     fixed = np.zeros(p)
     lower = np.empty(p)
@@ -133,8 +130,8 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, weights, r
             if stale[j] and fixed[j] <= best+cushion:
                 bound = 0.
                 for s in range(strata-1,-1,-1):
-                    vote = _projection(j,s,weights,active,projected,length,mass,offsets,rows,values,
-                                       member_ptr,groups,memberships,incidence_ptr,scratch)
+                    vote = _projection(j,s,sizes,weights,anchors,length,projected,delta,offsets,rows,
+                                       values,member_ptr,groups,incidence_ptr)
                     bound = max(bound,vote)
                     if s == strata-1:
                         full_lower[j] = fixed[j]+bound
@@ -172,6 +169,9 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, weights, r
                 j = features[ptr]
                 if not keep[j]:
                     continue
+                if strata and sizes[-1] == p-1 and not original_saved[j]:
+                    anchors[-1,j] = delta[j]
+                    original_saved[j] = True
                 known[j] = False
                 surviving_groups[j] -= 1
                 if surviving_groups[j] == 0:
@@ -180,8 +180,18 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, weights, r
                     for k in range(offsets[g],offsets[g+1]):
                         delta[j,rows[k]] -= values[k]
                 for s in range(strata):
-                    if length[j,s] >= 0.:
-                        projected[j,s] -= mass[ptr,s]
+                    projected[j,s] = -1.
+        if rebuild_norms:
+            # Large exponent gaps can destroy a small term when a large group is
+            # added then subtracted. Reconstruct changed marginals from active groups.
+            for j in range(p):
+                if keep[j] and not known[j]:
+                    delta[j,:] = 0.
+                    for pos in range(member_ptr[j],member_ptr[j+1]):
+                        g = groups[pos]
+                        if active[g]:
+                            for k in range(offsets[g],offsets[g+1]):
+                                delta[j,rows[k]] += values[k]
         rr = np.dot(residual,residual)
     return path[:count], keep, checked, extra, contenders
 
@@ -204,8 +214,10 @@ def greedy_path(a, incidence, gain_order, rho=.2, *, sizes=None, mode="all"):
     if not np.isfinite(a.data).all() or not np.all(inc.data == 1) or not inc.has_canonical_format:
         raise ValueError("Finite effects and unique binary feature memberships are required")
     nonzero = np.abs(a.data[a.data != 0])
+    rebuild_norms = False
     if len(nonzero):
         lo,hi = np.frexp([nonzero.min(),nonzero.max()])[1]
+        rebuild_norms = hi-lo>40
         if hi-lo>450:
             raise ValueError("Path effects span too many exponents for float64 moment screening")
         if hi>40 or hi< -40 or lo< -450:
@@ -225,6 +237,7 @@ def greedy_path(a, incidence, gain_order, rho=.2, *, sizes=None, mode="all"):
         for k in range(2,weights.shape[1]):
             weights[s,k] = weights[s,k-1] * (max(0,size-k+2)/(p-k+1))
     path,keep,checked,extra,contenders = _native(a.shape[0],a.indptr,a.indices,a.data,inc.indptr,
-                                                inc.indices,order,weights,float(rho))
+                                                inc.indices,order,np.asarray(sizes,dtype=np.int64),
+                                                weights,float(rho),rebuild_norms)
     return np.flatnonzero(keep),dict(deletion_order=path.tolist(),initial=p,refreshed=checked,
                                      contenders=contenders,extra_stratum_vetoes=extra)

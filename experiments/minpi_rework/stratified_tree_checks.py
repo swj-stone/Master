@@ -53,6 +53,14 @@ def check():
     for dtype in (np.int64,np.float32,np.float64):
         _,d=greedy_path(csc_matrix([[4000000000]],dtype=dtype),csr_matrix([[1]]),[0],rho=1.)
         assert d["deletion_order"]==[0]
+    # After removing j=1, its +A and -A groups vanish together. The sole
+    # remaining singleton has effect one, even when float64 rounds A + 1 to A.
+    inc = csr_matrix([[1,1],[0,1],[1,0]])
+    for exponent in (-500,0,500):
+        a = csc_matrix(np.ldexp([[2.**60,-2.**60,1.]],exponent))
+        for mode in ("cache","last","all"):
+            keep,d = greedy_path(a,inc,[0,1],rho=0.,mode=mode)
+            assert keep.tolist()==[0] and d["deletion_order"]==[1]
     print(f"{vectors} brute-force cardinality marginals; {games} games × three paths; strict veto witness checked")
 
 
