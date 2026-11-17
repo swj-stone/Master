@@ -6,7 +6,7 @@ from experiments.minpi_compression import benchmark as b
 from experiments.minpi_rework import wide_veto_run as run,wide_veto_data as data
 
 
-def report():
+def report(timing_only=False):
     lock=json.loads((run.OUT/"lock.json").read_bytes())
     assert len(lock["receipts"])==20 and lock["code"]==run.digest_paths()
     times=[]
@@ -17,24 +17,26 @@ def report():
         row=json.loads((folder/"selection.json").read_bytes())
         assert b.digest(folder/"forecasts.npz")==row["forecast"]
         name,seed=row["dataset"],row["seed"]
-        x,y,task,idx=data.partition(name,seed)
-        assert row["task"]==task and row["splits"]=={k:v.tolist() for k,v in idx.items()}
-        sd=max(float(np.std(y[np.r_[idx["fit"],idx["vote"],idx["width"]]])),1e-12)
-        with np.load(folder/"forecasts.npz",allow_pickle=False) as f:
-            for method,keep in row["sets"].items():
-                vals=b.metrics(y[idx["test"]],f[method],task,sd)
-                predictions.append(dict(dataset=name,seed=seed,task=task,method=method,
-                    n_test=len(idx["test"]),p=x.shape[1],k=len(keep),**vals))
+        if not timing_only:
+            x,y,task,idx=data.partition(name,seed)
+            assert row["task"]==task and row["splits"]=={k:v.tolist() for k,v in idx.items()}
+            sd=max(float(np.std(y[np.r_[idx["fit"],idx["vote"],idx["width"]]])),1e-12)
+            with np.load(folder/"forecasts.npz",allow_pickle=False) as f:
+                for method,keep in row["sets"].items():
+                    vals=b.metrics(y[idx["test"]],f[method],task,sd)
+                    predictions.append(dict(dataset=name,seed=seed,task=task,method=method,
+                        n_test=len(idx["test"]),p=row["p"],k=len(keep),**vals))
         for raw in row["rows"]:
             common=row["fit_s"]+row["prepare_s"]+row["acceptance_s"]+row["pred_s"]
-            times.append(dict(dataset=name,seed=seed,p=x.shape[1],active=row["voting_active"],
+            times.append(dict(dataset=name,seed=seed,p=row["p"],active=row["voting_active"],
                 **raw,fit_s=row["fit_s"],prepare_s=row["prepare_s"],acceptance_s=row["acceptance_s"],
                 prediction_s=row["pred_s"],total_s=common+raw["rank_s"]))
     df=pd.DataFrame(times)
     df.to_csv(run.OUT/"timings.csv",index=False)
-    pred=pd.DataFrame(predictions)
-    pred.to_csv(run.OUT/"scores.csv",index=False)
-    pred.groupby(["dataset","method"]).mean(numeric_only=True).to_csv(run.OUT/"source-scores.csv")
+    if predictions:
+        pred=pd.DataFrame(predictions)
+        pred.to_csv(run.OUT/"scores.csv",index=False)
+        pred.groupby(["dataset","method"]).mean(numeric_only=True).to_csv(run.OUT/"source-scores.csv")
     med=df.groupby(["dataset","seed","method"])[["rank_s","total_s","checks"]].median().unstack()
     wide=df[["dataset","seed","p","active"]].drop_duplicates().set_index(["dataset","seed"])
     ratio_rows=[]
@@ -66,4 +68,7 @@ def report():
 
 
 if __name__=="__main__":
-    report()
+    import argparse
+    cli=argparse.ArgumentParser()
+    cli.add_argument("--timing-only",action="store_true")
+    report(cli.parse_args().timing_only)
