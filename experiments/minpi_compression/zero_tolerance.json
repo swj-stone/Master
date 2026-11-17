@@ -1,0 +1,7 @@
+{
+  "type": "Secondary sensitivity added after the four pilot tasks, before reading any of the eight confirmation-task outer metrics; 2026-11-17",
+  "reason": "The original numerical outer accuracy conditions narrowly failed on the pilot in both domains. Assess whether dispensing entirely with the allowed validation losses changes the accuracy/compression tradeoff.",
+  "sample": "Every source, seed and method in protocol.json, including the full/no-selection reference.",
+  "widths": "Replay the sealed rankings and original inner width-validation traces. Select the smallest width for which AUC and accuracy are both at least the full inner value, or R2 is at least the full value and scaled MAE no greater than the full value. Include full width.",
+  "estimation": "Reuse the primary analysis's grouped partitions, standardized ridge estimator and outer metrics. Keep the primary results and thresholds irrespective of sensitivity outcomes. Report predictive differences and geometric retained widths against full and RFE, without new end-to-end time claims. Inner comparisons are selected on inner labels and imply no improvement on new cases. Do not repeat this tuning on confirmations."
+}
