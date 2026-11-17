@@ -1,6 +1,7 @@
 """Signed out-of-sample improvements assigned to splits in random feature coalitions."""
 import numpy as np
 from sklearn.tree import DecisionTreeRegressor
+from scipy.special import ndtr
 
 
 def sample_rows(y, task, n, rng):
@@ -63,3 +64,71 @@ def random_subspace(x,y,z,v,task,seed):
         score=total/opportunities
         scores.append(score/max(np.abs(score).sum(),1e-12))
     return np.asarray(scores),aux
+
+
+def pairwise_ballots(x,y,z,v,task,seed):
+    """Vote on feature-space comparisons of two label-ordered neighbors.
+
+    For a query and two landmarks each feature supplies d_j in [-1,1].
+    A coalition wins if its sum is positive. Empty/tied contests get half credit.
+    At intermediate sizes a finite-population Gaussian estimates contest margins.
+    """
+    rng=np.random.default_rng(seed)
+    fit=sample_rows(y,task,2048,rng)
+    query=sample_rows(v,task,384,rng)
+    # Rank features using only fitting rows; absent observations use the middle rank.
+    def quantile_scale(a,anchors):
+        scaled=np.empty_like(a,dtype=float)
+        for j in range(a.shape[1]):
+            col=anchors[:,j]
+            known=np.sort(col[np.isfinite(col)])
+            if len(known):
+                scaled[:,j]=(np.searchsorted(known,a[:,j],"left")+np.searchsorted(known,a[:,j],"right"))/(2*len(known))
+                scaled[~np.isfinite(a[:,j]),j]=.5
+            else:
+                scaled[:,j]=.5
+        return scaled
+    train=quantile_scale(x[fit],x[fit])
+    evaluate=quantile_scale(z[query],x[fit])
+    frame=[]
+    for row,label in zip(evaluate,v[query]):
+        delta=np.abs(train-row)
+        if task=="classification":
+            near=np.flatnonzero(y[fit]==label)
+            far=np.flatnonzero(y[fit]!=label)
+        else:
+            by_response=np.argsort(np.abs(y[fit]-label),kind="stable")
+            near=by_response[:max(1,len(by_response)//8)]
+            far=by_response[len(by_response)//2:]
+        if not len(near) or not len(far):
+            continue
+        # Uniform and nearby pairs are pooled, so easy points and local reversals contribute.
+        for pool in ("uniform","local"):
+            left,right=near,far
+            if pool=="local":
+                d=delta.sum(axis=1)
+                left=near[np.argsort(d[near],kind="stable")[:8]]
+                right=far[np.argsort(d[far],kind="stable")[:8]]
+            a=rng.choice(left,4)
+            b=rng.choice(right,4)
+            frame.extend(delta[b]-delta[a])
+    d=np.asarray(frame)
+    p=d.shape[1]
+    n=p-1
+    removed=d.sum(axis=1,keepdims=True)-d
+    squares=np.square(d).sum(axis=1,keepdims=True)-np.square(d)
+    avg=removed/max(1,n)
+    var=np.maximum(0,squares/max(1,n)-avg**2)
+    ties=lambda a: (a>1e-12).astype(float)+.5*(np.abs(a)<=1e-12)
+    votes=[]
+    for k in sorted({0,n//2,n}):
+        mu=k*avg
+        spread=np.sqrt(k*(n-k)*var/max(1,n-1))
+        stochastic=spread>1e-10
+        before=ties(mu)
+        after=ties(mu+d)
+        before[stochastic]=ndtr(mu[stochastic]/spread[stochastic])
+        after[stochastic]=ndtr((mu+d)[stochastic]/spread[stochastic])
+        result=(after-before).mean(axis=0)
+        votes.append(result/max(float(np.abs(result).sum()),1e-12))
+    return np.asarray(votes),0
