@@ -1,0 +1,739 @@
+{
+ "records": [
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "likelihood_min",
+   "budget": "grid",
+   "k": 4,
+   "p": 8,
+   "rank_s": 0.003823600010946393,
+   "seconds": 0.06555130006745458,
+   "fits": 4,
+   "columns": [
+    0,
+    3,
+    5,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5089063858723828,
+    "mae": 1.564694541247923,
+    "scaled_mae": 0.48566852230714064
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "likelihood_min",
+   "budget": "half",
+   "k": 4,
+   "p": 8,
+   "rank_s": 0.003823600010946393,
+   "seconds": 0.042413500137627125,
+   "fits": 2,
+   "columns": [
+    0,
+    3,
+    5,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5089063858723828,
+    "mae": 1.564694541247923,
+    "scaled_mae": 0.48566852230714064
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "landmark_single",
+   "budget": "grid",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.011719999951310456,
+   "seconds": 0.07230720005463809,
+   "fits": 4,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "landmark_single",
+   "budget": "half",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.011719999951310456,
+   "seconds": 0.049169400124810636,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "landmark_min",
+   "budget": "grid",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.011719999951310456,
+   "seconds": 0.07233850017655641,
+   "fits": 4,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "landmark_min",
+   "budget": "half",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.011719999951310456,
+   "seconds": 0.049169400124810636,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "likelihood_single",
+   "budget": "grid",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.003823600010946393,
+   "seconds": 0.06343540013767779,
+   "fits": 4,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "likelihood_single",
+   "budget": "half",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.003823600010946393,
+   "seconds": 0.040266300085932016,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "likelihood_pooled",
+   "budget": "grid",
+   "k": 4,
+   "p": 8,
+   "rank_s": 0.003823600010946393,
+   "seconds": 0.0655826001893729,
+   "fits": 4,
+   "columns": [
+    0,
+    3,
+    5,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5089063858723828,
+    "mae": 1.564694541247923,
+    "scaled_mae": 0.48566852230714064
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "likelihood_pooled",
+   "budget": "half",
+   "k": 4,
+   "p": 8,
+   "rank_s": 0.003823600010946393,
+   "seconds": 0.042413500137627125,
+   "fits": 2,
+   "columns": [
+    0,
+    3,
+    5,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5089063858723828,
+    "mae": 1.564694541247923,
+    "scaled_mae": 0.48566852230714064
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "random",
+   "budget": "grid",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.0,
+   "seconds": 0.06305750017054379,
+   "fits": 4,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "random",
+   "budget": "half",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.0,
+   "seconds": 0.040195300127379596,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "landmark_pooled",
+   "budget": "grid",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.011719999951310456,
+   "seconds": 0.07390520011540502,
+   "fits": 4,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "landmark_pooled",
+   "budget": "half",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.011719999951310456,
+   "seconds": 0.05073610006365925,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "gain",
+   "budget": "grid",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.00013339996803551912,
+   "seconds": 0.06456870015244931,
+   "fits": 4,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "gain",
+   "budget": "half",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.00013339996803551912,
+   "seconds": 0.04090280015952885,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  },
+  {
+   "panel": "prepared",
+   "dataset": "abalone",
+   "method": "full",
+   "budget": "full",
+   "k": 8,
+   "p": 8,
+   "rank_s": 0.0,
+   "seconds": 0.023486400139518082,
+   "fits": 1,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "acceptance": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "scale": 3.2217334856599944,
+   "task": "regression"
+  }
+ ],
+ "orders": {
+  "gain": [
+   7,
+   5,
+   4,
+   2,
+   0,
+   6,
+   3,
+   1
+  ],
+  "random": [
+   1,
+   5,
+   7,
+   2,
+   4,
+   0,
+   6,
+   3
+  ],
+  "likelihood_min": [
+   3,
+   7,
+   0,
+   5,
+   2,
+   6,
+   4,
+   1
+  ],
+  "likelihood_pooled": [
+   7,
+   3,
+   0,
+   5,
+   2,
+   6,
+   4,
+   1
+  ],
+  "likelihood_single": [
+   7,
+   3,
+   2,
+   4,
+   6,
+   1,
+   5,
+   0
+  ],
+  "landmark_min": [
+   7,
+   3,
+   2,
+   1,
+   6,
+   4,
+   5,
+   0
+  ],
+  "landmark_pooled": [
+   7,
+   3,
+   6,
+   2,
+   1,
+   4,
+   5,
+   0
+  ],
+  "landmark_single": [
+   3,
+   7,
+   2,
+   1,
+   4,
+   6,
+   5,
+   0
+  ]
+ },
+ "trials": [
+  {
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "accept": {
+    "r2": 0.5285077388460007,
+    "mae": 1.51402982455581,
+    "scaled_mae": 0.46994260428269113
+   },
+   "time": 0.02292800007853657,
+   "predict_s": 0.0005584000609815121
+  },
+  {
+   "cols": [
+    3
+   ],
+   "accept": {
+    "r2": 0.35054980934057456,
+    "mae": 1.8606896955575516,
+    "scaled_mae": 0.5775430226738251
+   },
+   "time": 0.010460999910719693,
+   "predict_s": 0.0009695000480860472
+  },
+  {
+   "cols": [
+    3,
+    7
+   ],
+   "accept": {
+    "r2": 0.3884793800982951,
+    "mae": 1.7965448977342293,
+    "scaled_mae": 0.5576329965624685
+   },
+   "time": 0.012676800019107759,
+   "predict_s": 0.0007973000174388289
+  },
+  {
+   "cols": [
+    0,
+    3,
+    5,
+    7
+   ],
+   "accept": {
+    "r2": 0.5089063858723828,
+    "mae": 1.564694541247923,
+    "scaled_mae": 0.48566852230714064
+   },
+   "time": 0.014993300079368055,
+   "predict_s": 0.0006685999687761068
+  },
+  {
+   "cols": [
+    1,
+    2,
+    3,
+    7
+   ],
+   "accept": {
+    "r2": 0.4680262623736925,
+    "mae": 1.639886389205705,
+    "scaled_mae": 0.5090074633748802
+   },
+   "time": 0.013963000033982098,
+   "predict_s": 0.0006755000213161111
+  },
+  {
+   "cols": [
+    7
+   ],
+   "accept": {
+    "r2": 0.3896509650404556,
+    "mae": 1.7968360480977528,
+    "scaled_mae": 0.5577233672789847
+   },
+   "time": 0.010492300032638013,
+   "predict_s": 0.0007209000177681446
+  },
+  {
+   "cols": [
+    2,
+    3,
+    4,
+    7
+   ],
+   "accept": {
+    "r2": 0.4314433735005144,
+    "mae": 1.6665820762292662,
+    "scaled_mae": 0.517293588574989
+   },
+   "time": 0.012956299935467541,
+   "predict_s": 0.0007233000360429287
+  },
+  {
+   "cols": [
+    1
+   ],
+   "accept": {
+    "r2": 0.30719134731495235,
+    "mae": 1.9208202468815134,
+    "scaled_mae": 0.5962070591596499
+   },
+   "time": 0.009812999982386827,
+   "predict_s": 0.0006288000149652362
+  },
+  {
+   "cols": [
+    1,
+    5
+   ],
+   "accept": {
+    "r2": 0.3432200953289466,
+    "mae": 1.8437289608058645,
+    "scaled_mae": 0.5722785478725482
+   },
+   "time": 0.013049200060777366,
+   "predict_s": 0.0006684999680146575
+  },
+  {
+   "cols": [
+    1,
+    2,
+    5,
+    7
+   ],
+   "accept": {
+    "r2": 0.47082123916474417,
+    "mae": 1.6369352112955122,
+    "scaled_mae": 0.5080914416358604
+   },
+   "time": 0.016708899987861514,
+   "predict_s": 0.0006470999214798212
+  },
+  {
+   "cols": [
+    2,
+    3,
+    6,
+    7
+   ],
+   "accept": {
+    "r2": 0.4416636849049881,
+    "mae": 1.6713323892052494,
+    "scaled_mae": 0.5187680472777734
+   },
+   "time": 0.015529699972830713,
+   "predict_s": 0.0006772999186068773
+  },
+  {
+   "cols": [
+    5,
+    7
+   ],
+   "accept": {
+    "r2": 0.47397500551601646,
+    "mae": 1.6324640402153356,
+    "scaled_mae": 0.5067036263183993
+   },
+   "time": 0.013173599960282445,
+   "predict_s": 0.0006772000342607498
+  },
+  {
+   "cols": [
+    2,
+    4,
+    5,
+    7
+   ],
+   "accept": {
+    "r2": 0.4819453712558305,
+    "mae": 1.6022768248373003,
+    "scaled_mae": 0.49733375897449905
+   },
+   "time": 0.01728300005197525,
+   "predict_s": 0.0006902999011799693
+  }
+ ],
+ "forecast_sha": "5e98670bc78c55ca7fb0349c589d9ab86743bcac7e38fd1c253f8104bbf41eda",
+ "input_rows": {
+  "fit": "854ac2acac1634a14dcac1f852b122f3880fdb88a65776f38f47f5b5914c5cdb",
+  "vote": "78bce0b7d6a9563af4a1eecfa312c746258cfdf5b069cde31351da55dc28736a",
+  "width": "15920d498422c95b15272123bd01779e5b95bb33618e0f3b18708408f299a05d",
+  "test": "c2d1f453a5359a6408ae12641bcf09fc315cfd44a966d9e3dab34c6ab9ef7a30"
+ }
+}

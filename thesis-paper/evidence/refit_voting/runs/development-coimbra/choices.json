@@ -1,0 +1,812 @@
+{
+ "records": [
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "likelihood_min",
+   "budget": "grid",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.0020291999680921435,
+   "seconds": 0.04168429994024336,
+   "fits": 5,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "likelihood_min",
+   "budget": "half",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.0020291999680921435,
+   "seconds": 0.019724099896848202,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "likelihood_single",
+   "budget": "grid",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.0020291999680921435,
+   "seconds": 0.04305869992822409,
+   "fits": 5,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "likelihood_single",
+   "budget": "half",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.0020291999680921435,
+   "seconds": 0.019724099896848202,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "gain",
+   "budget": "grid",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.00011999998241662979,
+   "seconds": 0.041636499925516546,
+   "fits": 5,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "gain",
+   "budget": "half",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.00011999998241662979,
+   "seconds": 0.018141499953344464,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "landmark_single",
+   "budget": "grid",
+   "k": 2,
+   "p": 9,
+   "rank_s": 0.002346299937926233,
+   "seconds": 0.04229489993304014,
+   "fits": 5,
+   "columns": [
+    2,
+    7
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "landmark_single",
+   "budget": "half",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.002346299937926233,
+   "seconds": 0.020605199853889644,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "landmark_min",
+   "budget": "grid",
+   "k": 2,
+   "p": 9,
+   "rank_s": 0.002346299937926233,
+   "seconds": 0.04155870003160089,
+   "fits": 5,
+   "columns": [
+    2,
+    7
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "landmark_min",
+   "budget": "half",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.002346299937926233,
+   "seconds": 0.018905499950051308,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "likelihood_pooled",
+   "budget": "grid",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.0020291999680921435,
+   "seconds": 0.04305869992822409,
+   "fits": 5,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "likelihood_pooled",
+   "budget": "half",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.0020291999680921435,
+   "seconds": 0.019724099896848202,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "random",
+   "budget": "grid",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.0,
+   "seconds": 0.03980969998519868,
+   "fits": 5,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "random",
+   "budget": "half",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.0,
+   "seconds": 0.016570899984799325,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "landmark_pooled",
+   "budget": "grid",
+   "k": 2,
+   "p": 9,
+   "rank_s": 0.002346299937926233,
+   "seconds": 0.040717899915762246,
+   "fits": 5,
+   "columns": [
+    2,
+    7
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "landmark_pooled",
+   "budget": "half",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.002346299937926233,
+   "seconds": 0.018905499950051308,
+   "fits": 2,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  },
+  {
+   "panel": "development",
+   "dataset": "coimbra",
+   "method": "full",
+   "budget": "full",
+   "k": 9,
+   "p": 9,
+   "rank_s": 0.0,
+   "seconds": 0.009333599940873682,
+   "fits": 1,
+   "columns": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "acceptance": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "scale": 0.49690399499995336,
+   "task": "classification"
+  }
+ ],
+ "orders": {
+  "gain": [
+   2,
+   3,
+   4,
+   7,
+   1,
+   0,
+   5,
+   8,
+   6
+  ],
+  "random": [
+   1,
+   8,
+   7,
+   5,
+   2,
+   4,
+   0,
+   6,
+   3
+  ],
+  "likelihood_min": [
+   2,
+   0,
+   6,
+   7,
+   1,
+   5,
+   8,
+   4,
+   3
+  ],
+  "likelihood_pooled": [
+   2,
+   6,
+   0,
+   7,
+   1,
+   5,
+   8,
+   3,
+   4
+  ],
+  "likelihood_single": [
+   2,
+   6,
+   0,
+   7,
+   1,
+   8,
+   5,
+   4,
+   3
+  ],
+  "landmark_min": [
+   2,
+   7,
+   5,
+   0,
+   6,
+   8,
+   1,
+   4,
+   3
+  ],
+  "landmark_pooled": [
+   2,
+   7,
+   6,
+   5,
+   0,
+   8,
+   1,
+   4,
+   3
+  ],
+  "landmark_single": [
+   2,
+   7,
+   0,
+   8,
+   6,
+   5,
+   4,
+   1,
+   3
+  ]
+ },
+ "trials": [
+  {
+   "cols": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "accept": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "time": 0.008845699951052666,
+   "predict_s": 0.0004878999898210168
+  },
+  {
+   "cols": [
+    2
+   ],
+   "accept": {
+    "auc": 0.4829545454545455,
+    "accuracy": 0.47368421052631576
+   },
+   "time": 0.007003900012932718,
+   "predict_s": 0.0005357000045478344
+  },
+  {
+   "cols": [
+    0,
+    2
+   ],
+   "accept": {
+    "auc": 0.6079545454545454,
+    "accuracy": 0.5789473684210527
+   },
+   "time": 0.0075372999999672174,
+   "predict_s": 0.0004906000103801489
+  },
+  {
+   "cols": [
+    0,
+    2,
+    6
+   ],
+   "accept": {
+    "auc": 0.5397727272727273,
+    "accuracy": 0.5789473684210527
+   },
+   "time": 0.007419000030495226,
+   "predict_s": 0.0007542999228462577
+  },
+  {
+   "cols": [
+    0,
+    1,
+    2,
+    6,
+    7
+   ],
+   "accept": {
+    "auc": 0.6136363636363636,
+    "accuracy": 0.5263157894736842
+   },
+   "time": 0.008361299987882376,
+   "predict_s": 0.0009373000357300043
+  },
+  {
+   "cols": [
+    2,
+    6
+   ],
+   "accept": {
+    "auc": 0.5340909090909091,
+    "accuracy": 0.5263157894736842
+   },
+   "time": 0.00891169998794794,
+   "predict_s": 0.0005396000342443585
+  },
+  {
+   "cols": [
+    2,
+    3
+   ],
+   "accept": {
+    "auc": 0.5056818181818181,
+    "accuracy": 0.5263157894736842
+   },
+   "time": 0.008097599959000945,
+   "predict_s": 0.000480600050650537
+  },
+  {
+   "cols": [
+    2,
+    3,
+    4
+   ],
+   "accept": {
+    "auc": 0.5625,
+    "accuracy": 0.5789473684210527
+   },
+   "time": 0.008393500000238419,
+   "predict_s": 0.0004251000937074423
+  },
+  {
+   "cols": [
+    1,
+    2,
+    3,
+    4,
+    7
+   ],
+   "accept": {
+    "auc": 0.5909090909090909,
+    "accuracy": 0.5789473684210527
+   },
+   "time": 0.008687900030054152,
+   "predict_s": 0.0006974999560043216
+  },
+  {
+   "cols": [
+    2,
+    7
+   ],
+   "accept": {
+    "auc": 0.6477272727272727,
+    "accuracy": 0.6842105263157895
+   },
+   "time": 0.007406299933791161,
+   "predict_s": 0.00045240006875246763
+  },
+  {
+   "cols": [
+    0,
+    2,
+    7
+   ],
+   "accept": {
+    "auc": 0.6590909090909091,
+    "accuracy": 0.7368421052631579
+   },
+   "time": 0.007315000053495169,
+   "predict_s": 0.00039409997407346964
+  },
+  {
+   "cols": [
+    0,
+    2,
+    6,
+    7,
+    8
+   ],
+   "accept": {
+    "auc": 0.6534090909090909,
+    "accuracy": 0.631578947368421
+   },
+   "time": 0.008925299975089729,
+   "predict_s": 0.0005422999383881688
+  },
+  {
+   "cols": [
+    2,
+    5,
+    7
+   ],
+   "accept": {
+    "auc": 0.5340909090909092,
+    "accuracy": 0.631578947368421
+   },
+   "time": 0.008278500055894256,
+   "predict_s": 0.0005092000355944037
+  },
+  {
+   "cols": [
+    0,
+    2,
+    5,
+    6,
+    7
+   ],
+   "accept": {
+    "auc": 0.5681818181818181,
+    "accuracy": 0.5789473684210527
+   },
+   "time": 0.007225600071251392,
+   "predict_s": 0.00041450001299381256
+  },
+  {
+   "cols": [
+    1
+   ],
+   "accept": {
+    "auc": 0.4147727272727273,
+    "accuracy": 0.47368421052631576
+   },
+   "time": 0.007672399980947375,
+   "predict_s": 0.0008388999849557877
+  },
+  {
+   "cols": [
+    1,
+    8
+   ],
+   "accept": {
+    "auc": 0.4204545454545454,
+    "accuracy": 0.5263157894736842
+   },
+   "time": 0.00813400000333786,
+   "predict_s": 0.0004512999439612031
+  },
+  {
+   "cols": [
+    1,
+    7,
+    8
+   ],
+   "accept": {
+    "auc": 0.48295454545454547,
+    "accuracy": 0.5789473684210527
+   },
+   "time": 0.007432400016114116,
+   "predict_s": 0.0004480000352486968
+  },
+  {
+   "cols": [
+    1,
+    2,
+    5,
+    7,
+    8
+   ],
+   "accept": {
+    "auc": 0.5568181818181819,
+    "accuracy": 0.5789473684210527
+   },
+   "time": 0.007237300043925643,
+   "predict_s": 0.0004273999948054552
+  },
+  {
+   "cols": [
+    2,
+    6,
+    7
+   ],
+   "accept": {
+    "auc": 0.5965909090909092,
+    "accuracy": 0.631578947368421
+   },
+   "time": 0.007437699940055609,
+   "predict_s": 0.0004688999615609646
+  }
+ ],
+ "forecast_sha": "a9153d6afde23fb44d30d9d4a218dc231e9409cfc987a0d0b0332ad16afa8ca9",
+ "input_rows": {
+  "fit": "a1b55040b5d54f2b5bc5d1f0def03d45210eb863750be516b5f8fc787f94030b",
+  "vote": "269093cac1d3b6762b6c3dd091c6190899105a4576e41c8db7500c6e714f0de5",
+  "width": "3d0704fcc1c9226f100af02e4d410589ead7f19c9655dd0063948240d4b453a2",
+  "test": "6297a8acf61ce2bd1259ad2f4ba19a617b5598b6e19d8851d8bbe27302328c9a"
+ }
+}
