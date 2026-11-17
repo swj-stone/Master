@@ -1,0 +1,82 @@
+\section{The first unavailable split and risk on future cases}
+\label{app:first-split}
+Fix the forest and a retained support $S$. For one labeled row $(x,y)$,
+write
+\[
+  H_s(x,y;S)=\frac{p}{s}\,\mathbb E_T
+  \bigl[\ell(f_{T\cap S}(x),y)-\ell(f_T(x),y)\bigr],
+  \qquad |T|=s ,
+\]
+where $T$ is conditionally uniform at size $s$ and independent of the row.
+The forest averages its tree outputs with nonnegative weights summing to
+one. For Brier loss set $L=2$. For regression assume that predictions and
+responses lie in an interval of width $R$ and set $L=R^2$.
+
+Follow each tree's full-input path on $x$ to its first split outside $S$.
+Let $\pi(S,x)$ be the total weight of the trees with such a split, and let
+$j$ be its feature in one of these trees. If $j\notin T$, the two traversals
+stop together at that split or at an earlier one. Thus the tree can change
+only if $j\in T$, an event of probability $s/p$. Trees without such a split
+follow identical paths. If $\theta$ is the total weight of trees whose
+outputs change, then $\mathbb E_T\theta\le(s/p)\pi(S,x)$.
+
+Two regression forest outputs differ by at most $R\theta$, and their
+squared errors differ by at most $2R^2\theta$. Two class probability vectors
+$u,v$ differ by at most $2\theta$ in $\ell_1$, since the unchanged trees
+contribute equally to both. For a one-hot $y$, the absolute Brier difference
+$|\langle u-v,u+v-2y\rangle|$ is therefore at most $4\theta$. In both cases
+the individual loss also lies in $[0,L]$, giving
+\[
+  |H_s(x,y;S)|\le L\min\{p/s,\,2\pi(S,x)\}.
+\]
+This controls the factor $p/s$ even at size one. For a nonuniform mask,
+the path argument uses the actual conditional probability of acquiring
+its first excluded feature. A uniform $s/p$ bound then needs additional
+assumptions. Averaging probabilities or bounded scalar tree outputs is
+essential to the constants above. A sigmoid applied to a sum of boosted
+margins would require bounds on the individual margin changes and the link.
+
+For a statistical consequence, condition on the forest and $K$ candidate
+supports chosen independently of $n$ independent and identically distributed
+acceptance rows. Assume future rows follow the same distribution. Put
+$X_s=H_s-\epsilon\ell(f_\varnothing(x),y)$ and
+$B_s(S)=L\min\{p/s,\,2\sup_x\pi(S,x)\}$. By the one-sided Hoeffding
+inequality~\citep{hoeffding1963probability} and a union bound, with probability
+at least $1-\delta$ every support and every positive size satisfy
+\[
+  \mathbb E X_s\ \le\ \overline X_s+
+      \bigl(2B_s(S)+\epsilon L\bigr)
+      \sqrt{\frac{\log(Kp/\delta)}{2n}} .
+\]
+Imposing nonpositivity of these upper bounds would control the population
+quota for any support selected from the family. The experiments instead
+impose the empirical quota. For $p=16$, $K=34$, $n=300$, $\delta=.05$,
+$\epsilon=.02$, Brier loss and $\sup_x\pi=1$, the added margins are
+$1.00$ at $s=1$ and $.503$ at $s=p$. A balanced binary null prediction has
+Brier loss $.5$, giving an allowed excess of only $.01$ per available
+fraction. Chronological changes in the row distribution also fall outside
+the sampling assumptions.
+
+\paragraph{Limit under unused inputs.}\label{app:padding}
+For fixed $S$, write $G(t)=\sum_{U\not\subseteq S} w_U t^{|U|-1}$.
+When each input is independently available with probability $t>0$,
+$G(t)$ is the expected excess loss divided by $t$. Conditioning on the
+available count shows that its Bernstein coefficients at degree $p-1$
+are exactly $V_1^{(p)},\ldots,V_p^{(p)}$: the coefficient of vote $s$
+in the mixture is $\binom{p-1}{s-1} t^{s-1}(1-t)^{p-s}$. Adding one
+unused input therefore performs ordinary degree elevation. For $p>1$,
+\[
+0\ \le\ \max_s V_s^{(p)}-\max_{0\le t\le1}G(t)\
+\le\ \sum_{U\not\subseteq S}|w_U|
+          \min\!\left\{1,\frac{\binom{|U|-1}{2}}{p-1}\right\}.
+\]
+The lower bound follows from the mixture. For the upper bound, put
+$t=(s-1)/(p-1)$ and $k=|U|-1$. The binomial ratio in $V_s$ is the
+probability that $k$ draws without replacement from $p-1$ objects all
+land among $s-1$ marked objects. With replacement the probability is
+$t^k$. Couple the draws until the first repeated object; its probability
+is at most $\binom{k}{2}/(p-1)$ by the union bound. Summing the resulting
+errors proves the inequality. With the forest fixed, padding can only
+decrease the maximum, and it converges to the worst independent-availability
+rate. Fixed-size and independent-availability guarantees can therefore
+differ even for exactly the same model and rows.

@@ -1,0 +1,99 @@
+\paragraph{Wider forests.}
+A second preregistered panel used UCI Internet Advertisements (51), QSAR
+oral toxicity (508), Tehran Residential Building (437), and UJIIndoorLoc
+(310). Each source had five fits. The two classifiers used grouped
+partitions; Tehran used completion-quarter blocks and UJI a later cohort
+of Wi-Fi observations. UJI and Tehran each reuse one outer test across
+seeds. The wide protocol kept the earlier MDI candidate on equal nominal
+width. Before opening test scores we also froze a structural-width
+analysis. For each arm we give the number of distinct input columns
+actually referenced after all unreachable splits are removed.
+
+\begin{table}[t]
+\centering\small
+\caption{Wide sources, five-seed means. Full, MDI and MinPI are reachable
+column counts. Score pairs are AUC / accuracy or $R^2$ / MAE on intact
+test inputs.}\label{tab:wide}
+\begin{tabular}{lrrrrrr}
+\toprule
+Source & Inputs & Full & MDI & MinPI & MDI scores & MinPI scores\\
+\midrule
+Advertisements & 1558 & 264.6 & 149.6 & 127.6 & .947 / .902 & .945 / .903\\
+Oral toxicity  & 1024 & 537.8 & 256.0 & 213.4 & .817 / .920 & .812 / .919\\
+Tehran housing & 79   &  71.2 &  30.4 &  29.0 & $-.003$ / 884.5 & $-.001$ / 883.4\\
+UJI latitude   & 520  & 132.4 &  18.6 &  18.2 & .581 / 33.18 & .580 / 33.27\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+MinPI selected fewer reachable columns than MDI in 11 of 20 fits (width
+ratio $.893$). Relative to MDI the mean differences were $-.00334$ in AUC,
+$+.00007$ in accuracy, $+.00079$ in $R^2$ and $+.00014$ in scaled MAE.
+Both regressions lost more than $.02$ mean $R^2$ against the full forest.
+Choosing feasible supports by reachable width reproduced the predictions
+obtained by choosing nominal widths on all 55 jobs in the two panels.
+Table~\ref{tab:wide} illustrates why counting the original columns as
+measurements saved would exaggerate the benefit: the full advertising
+forest itself requested only 264.6 of 1,558 columns.
+
+In a post-release comparison with the same acceptance rule, replacing the
+second path with mean-size or intact-size ranking gave virtually the same
+widths: the MinPI width ratios were $1.009$ [$ .967,1.070$] and $1.007$
+[$ .967,1.057$], respectively. MinPI and mean-size ranking each had four
+held-out quota violations. The selected columns themselves varied across
+seeds. Pairwise Jaccard similarity, averaged over ten seed pairs per source,
+was $.344$ for MinPI and $.360$ for MDI across the wide panel, compared
+with $.838$ and $.835$ on the seven narrower sources.
+
+Recomputing votes with uniform masks on the full forest's referenced
+columns instead of all declared inputs changed no acceptance or outer
+quota decision for either recorded support in the 55 jobs. Repeating the
+entire selection under the referenced-column law on the wide panel changed
+one portfolio, by four columns on oral toxicity. The resulting width ratio
+against MDI was $.892$.
+
+We compared interval rejection with scalar enumeration, native early
+rejection and one-thread BLAS, with exact batching of equivalent dormant
+candidates available to the controls. Timings used an Intel Core Ultra
+9 275HX, one native thread, warmed compiled kernels and interleaved repeats.
+Every method returned the same
+complete deletion order on all 20 fits. Against the fastest measured
+alternative per fit the production interval algorithm's geometric
+ranking-time ratio was $.466$ [$ .316,.694$]. Repeating the full fits,
+selection and prediction gave a time ratio of $.936$ [$ .853,1.003$],
+short of the registered 10\% full-workflow target. The ratios ranged
+from $.809$ for oral toxicity to $1.004$ for UJI. Against the cheaper
+MDI-only selector the full workflow took $1.293$ times as long
+[$1.035,1.617$].
+
+\paragraph{When replacing the forest is allowed.}
+We also tested importance-ranked backward elimination with retraining,
+following the subset-search idea of \citet{diaz2006gene}. We fixed
+the original MDI ranking, removed 20\% or 50\% of remaining columns
+at each step, refit on the same rows, and applied the same independent
+quota and intact-metric checks. Both learners face masks drawn from the
+original input universe. Their expected losses follow by applying the
+path expansion separately to each model, including its empty prediction.
+On the seven sources the 20\% grid used 10.1 fits on average against one
+for MinPI. The frozen workflow took $.142$ times its time to select,
+but used $1.413$ times its columns. Frozen MinPI had higher mean AUC
+($.827$ versus $.817$) and lower mean $R^2$ ($.281$ versus $.310$).
+One additional refit at the frozen width reduced worst-size violations
+from ten to six for MinPI and from nine to three for MDI. Across the four
+wider seed-42 fits both refit grids had better average regression scores
+and higher classification accuracy than frozen MinPI.
+
+\paragraph{Recorded missing measurements.}
+The original Beijing study used complete cases at one station. We next
+retained incomplete cases in the full 12-station network, using common
+time boundaries and holding out the final 292 days. To evaluate further
+random failures conditional on a row's observed measurements, zero that
+row's increments for every path requiring an absent input, then apply
+the same size-vote formula. All five selection variants chose the same
+five columns. Among the 239 incomplete station-days with observed next-day
+PM2.5, mean absolute error of the 12-input forest was 51.12 under stopping
+and 49.09 with training-median imputation. The paired difference was
+$2.03$ [$0.81,3.28$], resampling seven-day blocks synchronously across
+stations. With the common five selected inputs the difference was
+$1.81$ [$0.61,2.97$]. On these recorded outages, imputation produced
+better forecasts. The stations belong to one monitoring network.

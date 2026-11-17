@@ -21,16 +21,20 @@ number of available inputs. A deletion passes if its excess squared loss
 stays within budget at every size. We integrate these votes exactly for
 trees that stop at the first unavailable split. Products of path increments
 give a finite set of coefficients that successive deletions can reuse.
-The resulting test covers every row-independent exchangeable mask law on
-the calibration sample. Choosing a globally narrowest feasible support is
-NP-hard even for depth-two trees. Across seven prospectively selected
-datasets, exact selection took 23\% less time than a matched 128-permutation
-implementation and 2.6\% less time including training. On identical candidate
-paths, enforcing every size in place of their average reduced held-out
-budget violations from 14 to 10 of 35 runs at a mean cost of 0.23 columns.
-Adding the MinPI deletion path to impurity ranking reduced geometric mean width by 6.5\%,
-below the prespecified 10\% target, and increased selection-plus-training
-time by 25\%.
+The minimum vote tests every row-independent exchangeable mask law on the
+calibration rows. Bounding forward differences lets us skip ranges of sizes
+while preserving the greedy path. On four datasets with 79--1,558 columns,
+this cut ranking time by about half against the fastest measured
+implementation of the same deletion path.
+Forest fitting and validation accounted for most of the remaining cost.
+In a secondary width analysis, adding the MinPI path to impurity ranking
+retained 10.7\% fewer reachable columns on these sources and took 29\%
+longer than impurity selection. Mean-size ranking matched its width.
+The mean differences from impurity ranking were $-.0033$ in AUC and
+$+.0008$ in $R^2$. On seven narrower sources the width
+reduction against impurity ranking was 6.5\%, below the 10\% declared-width target. Holding candidate paths fixed,
+enforcing every size in place of their average reduced held-out budget
+violations from 14 to 10 of 35 runs, at a cost of 0.23 columns on average.
 \end{abstract}
 
 \section{Introduction}
@@ -58,11 +62,13 @@ whether a support passes. This retains voting and the least favorable
 decision in the original min-marginal power index~\citep{shi2026minpi};
 the new vote measures excess predictive loss, so the index itself changes.
 
-We derive the size votes for Brier and squared-error loss, give an example
-where an intermediate size alone rejects a support, and show why fast vote
-evaluation still leaves a hard support search. The experiments distinguish
-the cost of computing a vote, the value of requiring every size to pass,
-and the value of adding a greedy deletion path to standard impurity ranking.
+We derive the size votes for Brier and squared-error loss and give an
+example where an intermediate size alone rejects a support. A second exact
+reduction removes columns below a stopped split. Even with both reductions,
+finding a globally narrowest feasible support is NP-hard at the study's
+fixed budget. The experiments separate the computational cost of the votes,
+their use in choosing a support, and the consequences of refitting on the
+selected columns.
 
 \input{minpi-predictive-method}
 \input{minpi-predictive-study}
@@ -70,4 +76,5 @@ and the value of adding a greedy deletion path to standard impurity ranking.
 \bibliography{references,minpi-related}
 \appendix
 \input{minpi-hardness}
+\input{minpi-frontier}
 \end{document}

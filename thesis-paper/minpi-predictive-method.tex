@@ -22,13 +22,18 @@ feature occurs at several nodes on a path. Denote by $m$ the number of groups.
 
 \input{minpi-proper-quota}
 
-In particular, $V_s(S)$ is a polynomial of degree at most $2D-1$ in $s$.
+The indicators of required sets form the classical unanimity basis
+~\citep{grabisch2000representations}. Averaging its monomials at fixed size
+is polynomial symmetrization~\citep[Lemma~3.2]{beals2001symmetry}. Here
+the squared loss determines the signed union coefficients, and
+$V_s(S)$ has degree at most $2D-1$ in $s$.
 The calculation uses no frequencies estimated from sampled coalitions. The
 exchangeability condition allows any distribution on coalition size; within
 a size it assigns equal mass to the masks. For example, an installation
 that always loses the same laboratory instrument requires a different
 weighting of the masks. The result also conditions on the voting rows.
-Generalization to future cases is an empirical question.
+Appendix~\ref{app:first-split} derives a finite-sample bound under independent
+sampling. Its numerical margin exceeds the study's loss budget.
 
 An interior size can supply the only veto. On one regression row set $p=3$,
 $z=1$, $a_{\{1,2\}}=1/2$, $a_{\{1,2,3\}}=-1/2$, and all other increments
@@ -47,8 +52,10 @@ endpoints first. Equality uses the recorded input order. We also generate
 the deletion path from ascending forest impurity importance (MDI).
 On a separate acceptance sample, visit every width on both paths. Return
 the narrowest support that passes every size vote at $\epsilon=.02$ and
-the intact-prediction check described below. A tie goes to the smaller
-worst excess, followed by a fixed method order. A path may contain
+the intact-prediction check described below. In the seven-source study
+and deployment tool, a width tie goes to the smaller worst excess, then
+to a fixed method order. The wide study's primary tie rule preferred MDI.
+A path may contain
 feasible supports after an infeasible one because the weights $w_U$ are
 signed. The search attains the smallest feasible width on its two supplied
 paths. It does not exhaust all $2^p$ supports.
@@ -59,3 +66,49 @@ acceptance-sample excesses by cumulative sums. Pairing paths therefore
 reuses the forest fit, calibration predictions and Gram matrix. For shallow
 forests the degree limits the number of coefficients per candidate. Dense
 group Gram matrices can still require $O(m^2)$ memory.
+
+\paragraph{Skipping whole ranges of sizes.}
+Write the next candidate's loss as $F(s)=\sum_h c_h b_h(s)$, with $b_h$
+the binomial weight in the proposition. Store the smallest and largest
+forward difference $b_h(s+1)-b_h(s)$ on each interval of a binary partition
+of $1,\ldots,p$. For each $h$, multiplying these endpoints by $c_h$ and
+putting the smaller product first gives an interval. Their sum encloses
+$F(s+1)-F(s)$ throughout the node. If it lies strictly above or below
+zero, the largest value is at an endpoint. Otherwise bisect the interval;
+a single observed loss above the incumbent vetoes the candidate immediately.
+The code encloses differences of the stored weights with outward rounding
+and subdivides when the sign could depend on dot-product roundoff.
+Thus a flat or oscillating loss curve can still force a full grid scan.
+
+\paragraph{Reachable columns.}
+Some declared columns occur only below an excluded split. From the trained
+tree structures collect every split's required prefix set $H$, including
+the split itself. For declared support $S$ put
+$C(S)=\bigcup_{H\subseteq S}H$, taking the union over these recorded
+prefixes. A recorded prefix is contained in $S\cap T$ exactly when it
+is contained in $C(S)\cap T$. Hence both supports give the same stopped
+predictions for every row and every further mask. Any support activating
+the same prefixes must contain $C(S)$, so this is the unique smallest
+support preserving all structural activations. Numerically identical
+subtrees may permit further reductions. Along a deletion order with
+ranks $r(j)$, column $j$ remains reachable after $d$ deletions exactly when
+$d<\max_{H\ni j}\min_{i\in H} r(i)$, with maximum zero if no prefix uses
+$j$. We distinguish declared and reachable widths in the experiments.
+
+Removing an unused input from the deployed schema preserves predictions;
+removing it from the \emph{availability law} can change a vote. Let $m>0$
+be the number of columns referenced by the full forest. Given a uniform
+$s$-subset of its $p$ declared inputs, the count $J$ of referenced columns
+in that subset is hypergeometric. Conditioning on $J$ gives
+\[
+ V_s^{(p)}(S)=\mathbb E\!\left[\frac{pJ}{sm}V_J^{(m)}(S)\right],
+ \qquad V_0^{(m)}(S)=0 .
+\]
+Since $\mathbb E J=sm/p$, the declared-universe vote is a convex mixture
+of active-universe votes. Its maximum can only decrease. In the three-input
+example above, replacing $1/2$ by $.03$ in both increments gives worst
+excess $.02955$. Appending one unused input lowers it to $.01970$:
+the identical predictor now passes the $.02$ budget. The appropriate
+universe depends on which inputs actually compete for availability.
+Appendix~\ref{app:padding} gives the limiting vote if arbitrarily many
+unused columns are added.

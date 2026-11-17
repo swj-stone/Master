@@ -8,8 +8,8 @@ determined the deletion order, 16\% selected the support and 20\% measured
 performance. Source-specific splits respected declared groups, identical
 input vectors and, for Seoul and Beijing, chronology. Those two sources
 used five forest seeds on the same four time periods. The other sources
-used five seeded partitions. In both prospective experiments, forecasts were
-sealed before test labels were released to the scorers. The UCI identifiers in
+used five seeded partitions. For the seven-source selection and sampling
+comparisons, forecasts were sealed before test labels were released to the scorers. The UCI identifiers in
 table order are 105, 563, 225, 573, 560, 501 and 440. The archive contains the source records,
 row assignments, sampling caps, seeds and hashes.
 
@@ -62,7 +62,7 @@ accuracy. Regression lost $.0358$ in $R^2$ and added $.0241$ in scaled MAE.
 The five Seoul fits all exceeded the held-out loss quota. Liver patients
 lost $.014$ AUC while gaining $.007$ accuracy.
 
-\paragraph{What does the minimum change?}
+\paragraph{Effect of the minimum.}
 Holding both candidate paths fixed, switching acceptance from the mean
 to the worst size reduced test quota violations from 14 to 10 of 35,
 at a mean cost of $.229$ retained columns. The difference in violation
@@ -92,14 +92,13 @@ exceeded the test quota on the same 13 of 35 runs. Exact integration removes
 calibration integration error; this experiment gives no evidence of
 better test predictions from removing that error.
 
-To isolate early rejection, we also timed native kernels on five fits for
-each of 25 sources (the seven above and 18 previously examined). Screening
-evaluated 41.0\% of the size dot products. With allocation-free coefficient
-updates, the full ranking took $.961$ times the time of a straight native
-loop over all sizes [$ .923,.991$]. The corresponding ratios were $.867$
-above 50 inputs and $.999$ on the seven fresh sources, all of which had
-at most 16 inputs. Thus few evaluated size votes need not translate to
-large wall-clock savings. The implementations returned identical orders.
+Checking cheap size votes before computing AUC or $R^2$ also cut runtime.
+On the seven sources the fit-through-selection time ratio was $.821$ against
+exhaustive width validation and $.985$ against a narrowest-first scan that
+already screened on the intact-size vote. With both paths and this faster
+acceptance implementation, MinPI still took $1.135$ times MDI alone.
+
+\input{minpi-wide-study}
 
 \paragraph{Search and earlier benchmarks.}
 After scoring we exhaustively minimized the voting-sample worst excess
@@ -118,20 +117,22 @@ a fit-inclusive time ratio of $1.491$ against MDI. On Madelon it retained
 40.0 columns on average against 53.6, with AUC $.724$ for both. On these
 same test rows, the archived gain-ranked XGBoost retrained on a selected
 subset retained only 20.4 columns and reached $.830$ AUC. This comparator
-can use the full development set to refit its trees. Frozen-forest compression
-would be a poor choice on Madelon if retraining is available. An
+can use the full development set to refit its trees. Across all six tasks
+it retained fewer columns, improved AUC on every classifier, and reduced
+Abalone's MAE. The comparison changes both the learner and its access to
+development labels. An
 earlier boosted-tree version used margin distortion and split gain. Its
 13-source width ratio was $.894$ against gain but $.988$ against static
 ablation. Its objective and fitted models differ from the supervised
 forest comparison; we keep its results separate in the release.
 
 \section{Scope}
-The strongest observed benefit of using the minimum was fewer failed
-held-out checks at a small column cost. The alternative mean-size
-ranking matched its compression. Calibration failed under the Seoul
-time shift, and the analytic speed advantage depended on the sampling
-precision and how much training cost was included. The experiments
-treat columns as equally costly and generate masks by size. They measure
-neither field acquisition costs nor the natural frequency of joint sensor
-failures. Deeper forests can generate many overlapping path sets, and
-the Gram construction then limits the practical scope of the method.
+For a fixed shallow forest the minimum gives an exact decision across
+availability sizes and can shorten the search substantially on wide
+inputs. The observed trade against ordinary impurity selection was fewer
+columns and more computation. Mean-size ranking matched the minimum
+on the seven small sources. The all-size acceptance check still failed
+on all five Seoul fits under temporal shift. These experiments assign
+equal costs to columns. Most masks are hypothetical and the historical
+station study covers one network. Deeper forests can produce many more
+overlapping path sets and make the Gram construction impractical.
