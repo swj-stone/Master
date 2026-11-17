@@ -4,7 +4,7 @@
 
 ## 当前论文与正式实验
 
-当前 MinPI 在经过验证的 Gain 子集内，用最小投票提出更小的特征集，再用同一 XGBoost 模型重训验收。五个独立验证来源的 25 组均比穷举 Gain 快且列数达标。与同预算 Gain 的比较、失败样例和预测误差见结果表。[论文 PDF](thesis-paper/minpi-refit.pdf) · [正式实验与复现入口](thesis-paper/README.md) · [逐数据集对照](thesis-paper/evidence/anchored_vote/sources.csv) · [原六集核验](thesis-paper/evidence/anchored_vote/prepared.md)
+当前 MinPI 在经过验证的 Gain 子集内，用最小投票提出更小的特征集，再用同一 XGBoost 模型重训验收。相对穷举 Gain，原六个预处理数据集和五个新来源均达到数据集级时间与宽度标准。ISOLET 的准确率下降、相同容差与相同预算的对照单独列出。[论文 PDF](thesis-paper/minpi-refit.pdf) · [逐数据集中文对照](thesis-paper/evidence/anchored_vote/comparison-zh.md) · [正式实验与复现入口](thesis-paper/README.md)
 
 从上一级 `Paper` 目录运行以下命令，可用已保存的预测重新生成五来源表格。重新训练和逐项计时的命令在正式实验入口。
 
