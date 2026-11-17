@@ -46,3 +46,21 @@ The revised selector measures at most four ordinary Gain prefixes and freezes a 
 This guarantee is local to the measured reference prefixes. A nonmonotone curve can have a better unmeasured peak, an unmeasured narrower acceptable support, or both. A measured validation floor gives no population assurance for the refit. An empty set is never proposed. The revised algorithm changes the width search and the admissible support family as well as the place where voting is used. Differences between the rejected second iteration on four tasks and the third on five other tasks do not isolate any one of these changes.
 
 The primary hardware also changes to single-thread CPU in the third panel. Each new comparison has the same device, common warmed process, three timings per seed and a rotated order. The second and third panels are unsuitable for an across-panels speed ratio. The common-slack exhaustive time adds the independent cost of its final fit and prediction to the measured exhaustive search. This captures its standalone work with the same shared search, although the alternative fit executes second.
+
+## Third iteration after release
+
+All 375 receipts from the five prespecified tasks, five seeds, five timed arms and three repetitions passed independent checks. The verifier matched forecast hashes, raw-input row IDs, complete supports, all reference utilities and repeated forecast arrays before the first read of outer responses. All three selectors used exactly the same anchor in every task and seed. Their observed Gain reference scores agreed with the exhaustive control's scores at the same widths. The minimum selected a proper subset of its anchor in 10/25 cases. All five garment and all five shopping cases retained their entire anchor.
+
+| Control | Sources passing speed and width | Sources also passing median quality | Sources at least 5% faster with width and quality | Same-seed successes, speed/width/quality | Changed final supports |
+|---|---:|---:|---:|---:|---:|
+| Exhaustive Gain, validation maximum | 5/5 | 5/5 | 5/5 | 23/25 | 18/25 |
+| Exhaustive Gain, 0.005 allowance | 5/5 | 5/5 | 5/5 | 24/25 | 12/25 |
+| Geometric Gain | 4/5 | 4/5 | 2/5 | 18/25 | 14/25 |
+| Gain with identical anchor and two refinements | 0/5 | 0/5 | 0/5 | 2/25 | 9/25 |
+| Mean with identical anchor and two refinements | 2/5 | 2/5 | 0/5 | 10/25 | 0/25 |
+
+The predeclared engineering target is met against the named exhaustive comparator even with equal validation slack. All 25 task/seed pairs pass on time and width against both exhaustive controls. The five median time ratios against the validation-maximum control range from 0.536 to 0.745. The uniform quality claim fails at the run level. On Vowel, seed 42 lost 0.0242 AUC and 3.0 percentage points of accuracy. Seed 46 lost 0.0169 AUC and 8.0 points of accuracy. The repeated seeds reuse the same held speakers. Most prospective inputs have few columns, and this panel alone cannot validate an assertion about hundred-column performance.
+
+The minimum never changed a final support or forecast relative to the pooled mean on the 25 prospective task/seed pairs. Its empirical incremental predictive benefit on these comparisons is exactly zero. Tetouan offers a case where the voted *order* matters. Against ordinary Gain with the identical anchor, it retained six columns rather than nine, gained 0.00134 median paired R² and took 1.199 times as long. The mean vote produced the same forecasts. The mechanism that reduced runtimes against exhaustive Gain is the bounded refit budget.
+
+**Verdict.** The revised procedure meets the user's operational stopping rule on the prospective five-task panel. The evidence does not justify a broad methods claim that taking the minimum makes feature selection predictively superior, or that adding voting to this same-budget Gain procedure accelerates it. A manuscript may report the selection algorithm, its limited guarantee, the practical benchmark and the null ablation together. The tests do not establish a universal win or acceptance at a selective venue. [Verified predictions and timing ledger](../evidence/anchored_vote/receipts.csv), [paired seed scores](../evidence/anchored_vote/seeds.csv), [source comparisons](../evidence/anchored_vote/sources.csv).
