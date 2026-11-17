@@ -1,6 +1,8 @@
 """A bounded nested width search shared by the direct and vote rankings."""
 from math import ceil, log2
 
+import numpy as np
+
 
 def select_width(order, evaluate, slack=.005):
     """Probe a geometric grid, then bisect the gap below the conditionally best width.
@@ -24,3 +26,23 @@ def select_width(order, evaluate, slack=.005):
             break
         probe((k+lo)//2)
     return winner(), scores
+
+
+def coverage_width(order, increments, evaluate, slack=.005):
+    """Fit prefixes at successive halvings of residual vote mass plus the full set."""
+    p = len(order)
+    mass = np.cumsum(increments, dtype=float)
+    if len(mass) != p or not np.isfinite(mass).all() or np.any(np.asarray(increments)<0):
+        raise ValueError("Expected one nonnegative finite credit per retained feature")
+    if mass[-1] == 0:
+        mass = np.arange(1,p+1,dtype=float)
+    widths = {p, *(int(np.searchsorted(mass, mass[-1]*q))+1 for q in (.5,.75,.875,.9375))}
+    scores = {k:float(evaluate(tuple(sorted(map(int,order[:k]))))) for k in sorted(widths)}
+    def winner():
+        return min(k for k,v in scores.items() if v >= max(scores.values())-slack-1e-14)
+    hi = winner()
+    lo = max((k for k in scores if k < hi),default=0)
+    if hi-lo>1:
+        k=(hi+lo)//2
+        scores[k]=float(evaluate(tuple(sorted(map(int,order[:k])))))
+    return winner(),scores

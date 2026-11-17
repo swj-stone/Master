@@ -11,7 +11,7 @@ import numpy as np
 from threadpoolctl import threadpool_limits
 
 from experiments.minpi_compression import legacy_gain as legacy
-from experiments.split_vote.path import select_width
+from experiments.split_vote.path import coverage_width, select_width
 from minppi_mofs.modeling import make_model
 from minppi_mofs.split_vote import pivotal_order, split_voters
 from minppi_mofs.utility import compute_utility
@@ -20,7 +20,7 @@ from minppi_mofs.utility import compute_utility
 ROOT = Path(__file__).resolve().parents[2]
 RUN = ROOT / "results/split_vote"
 ORIGINAL = ("abalone","madelon","spambase","gisette","credit_card_fraud","isolet")
-METHODS = ("min","pooled","gain_grid","exhaustive")
+METHODS = ("min","pooled","gain_grid","min_mass","pooled_mass","gain_mass","exhaustive")
 
 
 def digest(path):
@@ -48,13 +48,17 @@ def run_arm(x, y, task, idx, seed, method):
     full_score = compute_utility(y[va], predict(model,va,full), metric=metric)
     gain_map = booster.get_score(importance_type="gain")
     gain = np.array([gain_map.get(f"f{j}",0.) for j in full])
-    if method == "gain_grid":
+    total_map = booster.get_score(importance_type="total_gain")
+    total = np.array([total_map.get(f"f{j}",0.) for j in full])
+    if method in {"gain_grid","gain_mass"}:
         order = np.lexsort((-np.arange(len(full)), -gain))
-    elif method in {"min","pooled"}:
-        gain_map = booster.get_score(importance_type="total_gain")
-        total = np.array([gain_map.get(f"f{j}",0.) for j in full])
+        increments = total[order]
+    elif method in {"min","pooled","min_mass","pooled_mass"}:
         voters, weights = split_voters(x[tr], y[tr], total, task=="classification", seed)
-        order = pivotal_order(voters, weights, gain, rule=method)
+        order = pivotal_order(voters, weights, gain, rule=method.removesuffix("_mass"))
+        # Each voter assigns its whole mass to the first representative in this order.
+        first = voters[:,order].argmax(axis=1)
+        increments = np.bincount(first,weights=weights,minlength=len(order))
     else:
         raise ValueError(method)
     ranking_seconds = perf_counter()-started
@@ -62,7 +66,8 @@ def run_arm(x, y, task, idx, seed, method):
         if len(cols) == len(full):
             return full_score
         return compute_utility(y[va], predict(fitted(tr,cols),va,cols), metric=metric)
-    k,scores = select_width(order,evaluate)
+    k,scores = (coverage_width(order,increments,evaluate) if method.endswith("_mass")
+                else select_width(order,evaluate))
     cols = sorted(order[:k].tolist())
     selection = perf_counter()-started
     dev = np.sort(np.r_[tr,va])
@@ -84,7 +89,8 @@ def load(name,seed):
 def execute(args):
     from minppi_mofs import split_vote
     from experiments.split_vote import path
-    version = {f.name:digest(f) for f in [Path(__file__), Path(split_vote.__file__),Path(path.__file__)]}
+    from experiments.minpi_replication import direct_gain
+    version = {f.name:digest(f) for f in [Path(__file__), Path(split_vote.__file__),Path(path.__file__),Path(direct_gain.__file__)]}
     jobs = [(name,seed) for seed in args.seeds for name in args.names]
     beginning = perf_counter()
     for i,(name,seed) in enumerate(jobs):
@@ -117,7 +123,7 @@ def execute(args):
                 temp = receipt.with_suffix(".tmp")
                 temp.write_text(json.dumps(rec, allow_nan=False),encoding="utf8")
                 temp.replace(receipt)
-                print(f"{name}/{seed} {method} finished {row.get('seconds',row.get('wall_s'))}s",flush=True)
+                print(f"{name}/{seed} {method} finished {row.get('seconds',row.get('worker_s')):.2f}s",flush=True)
             finally:
                 timer.cancel()
         elapsed = perf_counter()-beginning
