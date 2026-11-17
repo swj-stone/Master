@@ -85,3 +85,21 @@ the same number of lowest coefficients and six when targeting random columns.
 Across all splits the extra step saved 1.7\% of coefficient-selected columns
 in classification and 5.6\% in regression. Both reductions fell short of the
 registered 10\% width target. Selection time increased by 14\% and 83\%, respectively.
+
+We froze this deletion rule and tested it on six further sources. MAGIC,
+Musk and Wall-Following are classification tasks; Computer Hardware, Forest
+Fires and Real Estate are regression tasks. Musk holds out molecules,
+Hardware holds out vendors and Real Estate holds out the final three months
+with identical rows across its five seeds. Before scoring any predictions,
+the proposed subsets already limited possible further classification
+compression to 8.44\%, even if every deletion passed. Regression could
+have reached 12.67\%. Of twelve eligible splits, the witness rule accepted
+four, the coefficient-tail control seven and the uniform control six.
+Relative to the original coefficient-selected models, the witness rule
+saved 3.55\% of classification columns and 5.93\% of regression columns,
+at $1.31$ and $1.64$ times the selection cost. Mean classification
+accuracy fell by .595 percentage points and mean regression $R^2$ fell by .01005.
+Both matched alternatives retained at most as many columns geometrically
+in each domain. The held-out comparison therefore failed the 10\% target
+and gave no incremental compression advantage to the identities of the
+witnessed features.
