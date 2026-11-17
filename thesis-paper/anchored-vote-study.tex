@@ -54,28 +54,28 @@ Test AUC or $R^2$, MinPI minus Gain & .0000 & .0000 & .0000 & .0000 & +.0013\\
 After releasing the prospective scores, we ran two selectors from scikit-learn 1.9.0~\citep{pedregosa2011sklearn} on all 25 matched splits and reran MinPI. Its predictions reproduced exactly. RFECV recursively removed features~\citep{guyon2002rfe} with a 20\% step and chose the width on the same prescribed validation split. MinPI used 39--57\% of RFECV's time across dataset medians and met the width criterion on all five. Four datasets and 18 of 25 seeds also met the 0.01 predictive tolerance. Garment productivity lost 0.0247 in median $R^2$. With \texttt{SelectFromModel}, columns at or above the fitting model's mean gain survive a single threshold check. MinPI took 2.47--3.91 times as long on these datasets. On Tetouan that extra search retained six columns against two and increased median $R^2$ by 0.225. On shopping it reduced median AUC by 0.028.
 
 \paragraph{The original six development datasets.}
-We applied the revised rule to all five archived prepared splits of each original dataset (Table~\ref{tab:original}). The exhaustive rerun reproduced all 30 archived rankings, selected sets and test prediction arrays. The CUDA runs used the same GPU in successive sessions, with one timing per arm and seed. All six datasets passed against exhaustive Gain, including the median primary-score criterion. Individually, 27 of 30 pairs passed time and width and 26 passed all three. The source-level counts were five of six against geometric Gain and zero of six against Gain with the same anchor and refinement rule. The minimum and mean yielded different supports in four of 30 runs.
+We applied the revised rule to all five archived prepared splits of each original dataset (Table~\ref{tab:original}). The exhaustive rerun reproduced all 30 archived rankings, selected sets and test prediction arrays. The same GPU provided one timing per arm and seed. An earlier CUDA session measured exhaustive and geometric Gain. A later session rotated MinPI, mean voting and Gain with the same anchor. Timing started with the first model fit on prepared inputs and excluded upstream data preparation. All six datasets passed against exhaustive Gain, including the median primary-score criterion. Individually, 27 of 30 pairs passed time and width and 26 passed all three. The source-level counts were five of six against geometric Gain and zero of six against Gain with the same anchor and refinement rule. The minimum and mean yielded different supports in four of 30 runs.
 
 \begin{table}[htbp]
 \centering
 \caption{Original prepared datasets. Each entry gives the five-seed median for MinPI followed by exhaustive Gain at its validation maximum. Abalone reports $R^2$ and MAE. The other rows report AUC and accuracy. The last column counts seeds meeting both the time and width criteria.}
 \label{tab:original}
 \small
-\begin{tabular}{lrrrrr}
+\begin{tabular}{lrrrrrr}
 \toprule
-Dataset & Retained & Seconds & Primary & Companion & Count\\
+Dataset & Inputs & Retained & Seconds & Primary & Companion & Count\\
 \midrule
-Abalone & 5 / 7 & .91 / 1.33 & .5463 / .5463 & 1.545 / 1.518 & 4/5\\
-Madelon & 7 / 7 & 1.04 / 16.16 & .8720 / .8708 & .7750 / .7750 & 4/5\\
-Spambase & 17 / 45 & .98 / 8.76 & .9855 / .9864 & .9403 / .9457 & 4/5\\
-Gisette & 26 / 77 & 1.08 / 17.22 & .9860 / .9886 & .9514 / .9550 & 5/5\\
-Credit card fraud & 11 / 26 & 3.06 / 16.89 & .9743 / .9772 & .9994 / .9994 & 5/5\\
-ISOLET & 24 / 92 & 23.55 / 354.68 & .9894 / .9936 & .7737 / .8410 & 5/5\\
+Abalone & 8 & 5 / 7 & .91 / 1.33 & .5463 / .5463 & 1.545 / 1.518 & 4/5\\
+Madelon & 100 & 7 / 7 & 1.04 / 16.16 & .8720 / .8708 & .7750 / .7750 & 4/5\\
+Spambase & 56 & 17 / 45 & .98 / 8.76 & .9855 / .9864 & .9403 / .9457 & 4/5\\
+Gisette & 100 & 26 / 77 & 1.08 / 17.22 & .9860 / .9886 & .9514 / .9550 & 5/5\\
+Credit card fraud & 29 & 11 / 26 & 3.06 / 16.89 & .9743 / .9772 & .9994 / .9994 & 5/5\\
+ISOLET & 100 & 24 / 92 & 23.55 / 354.68 & .9894 / .9936 & .7737 / .8410 & 5/5\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Giving exhaustive Gain the same 0.005 allowance changes this comparison. Only three of six datasets met both the width and primary-score criteria. Credit card fraud, Spambase and ISOLET failed on width. On ISOLET the median exhaustive width fell from 92 to 24, equaling MinPI's median. The paired width excess nevertheless exceeded the allowance in three seeds. Standalone times for deploying the alternative exhaustive subset were unavailable when its width changed. Against the original maximizer, ISOLET's paired median macro-AUC change was $-0.0044$. Accuracy fell from 84.10\% to 77.37\% in the marginal medians shown in the table. Its paired median change was $-6.99$ percentage points.
+Giving exhaustive Gain the same 0.005 allowance changes this comparison. Only three of six datasets met both the width and primary-score criteria. Credit card fraud, Spambase and ISOLET failed on width. On ISOLET the median exhaustive width fell from 92 to 24, equaling MinPI's median. The paired width excess nevertheless exceeded the allowance in three seeds. When its selected width changed, the extra final fit and prediction were timed separately. Complete search-to-prediction times for this alternative were unavailable. Against the original maximizer, ISOLET's paired median macro-AUC change was $-0.0044$. Accuracy fell from 84.10\% to 77.37\% in the marginal medians shown in the table. Its paired median change was $-6.99$ percentage points.
 
 \paragraph{Earlier unanchored search.}
 Our initial rule used split coverage over the full input matrix to select four widths, followed by one local refinement and the full reference. It ran faster than exhaustive Gain on all four held-out UCI collections but met the joint width and time target on three. On Seoul temperature prediction it retained 16 columns to Gain's 14, with median $R^2$ higher by 0.0024. Only two of the four collections passed against Gain with a geometric width search. This failure motivated the anchor. The subsequent five-collection study used new endpoints and splits. Results from the earlier test do not count toward the later success rate.
