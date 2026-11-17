@@ -74,3 +74,17 @@ Two technical statements required revision. The validation floor gives a lower b
 The older ternary minimum of individual predictive marginals could have a negative harmful-feature witness. The new minimum acts on nonnegative normalized means of coverage marginals, averaged separately at three coalition sizes. Exact combinatorial counting for that change does not preserve the earlier interpretation. The manuscript should state this design change even though it cites both the original MinPI and earlier coverage work. [Original index definition](https://arxiv.org/abs/2610.33885).
 
 **Submission judgment.** I would not submit the prospective-only draft as a top-conference demonstration of a superior minimum-voting algorithm. The primary benchmark supports the bounded search as an engineering option. The direct same-budget control was faster on all five datasets and the pooled game yielded the same predictions for every seed. A narrower empirical methods paper that makes this trade-off and the scope of the exact result its subject is scientifically defensible. Any later claim for higher-dimensional data needs its own paired measurements and an explicit account of timing sessions.
+
+## Final check on the six prepared datasets
+
+I recomputed scores from all 150 saved predictions against the hashed test partitions. Each forecast and receipt matched the released seed table. Separately I verified the 30 common-slack forecast hashes and their references to the corresponding exhaustive receipts, and rescored their predictions. The original exhaustive Gain order, support and deployed predictions matched the older benchmark in all 30 cases. I then recomputed the source decisions from the seed rows. All comparisons below use paired changes except the explicitly labeled marginal medians.
+
+| Gain comparator | Datasets meeting time and width | Seeds meeting time and width | Seeds also meeting AUC/R² tolerance |
+|---|---:|---:|---:|
+| Exhaustive, validation maximum | 6/6 | 27/30 | 26/30 |
+| Geometric search | 5/6 | 19/30 | 19/30 |
+| Identical anchor and two refinement opportunities | 0/6 | 2/30 | 2/30 |
+
+The first two controls were measured on the same CUDA device in a separate session. The matched anchor control ran in the same session, with one timing per arm per seed. At a common 0.005 validation allowance the exhaustive control has complete pipeline timing for only 7/30 deployments. The width and primary-score comparison is fully observed and passes on 3/6 datasets and 18/30 seeds. Credit Card Fraud, Spambase and ISOLET exceed the width allowance. Minimum and mean change the support in four cases, three on Gisette and one on ISOLET.
+
+ISOLET shows why the primary and companion metrics matter. Against validation-maximizing Gain the median paired macro-AUC change was −0.00444, but the median paired accuracy change was −0.06987. Marginal median accuracies were 0.77372 and 0.84103, a gap of 6.73 percentage points. Against near-best exhaustive Gain both marginal median widths were 24, while the median seed-matched excess over the allowed width difference was +1.95 columns. The operational result is established against exhaustive argmax on this development panel. It does not transfer to the matched-budget control, and the accuracy loss on ISOLET rules out an across-metric performance-preservation claim. [Prepared seed rows](../evidence/anchored_vote/prepared-seeds.csv), [paired comparisons](../evidence/anchored_vote/prepared-sources.csv), [equal-slack results](../evidence/anchored_vote/prepared-common-slack.csv).
