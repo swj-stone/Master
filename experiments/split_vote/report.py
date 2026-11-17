@@ -89,6 +89,9 @@ def compare(frame, candidate, baseline):
     summary["pass_joint"]=(summary.time_delta<0)&(summary.width_over_allowance<=0)
     summary["pass_with_quality"]=summary.pass_joint&(summary.primary_delta>=-.01)
     summary["majority_joint_seeds"]=summary.paired_pass_seeds>summary.seeds/2
+    means=paired.groupby("dataset").mean(numeric_only=True)
+    summary["pass_mean_joint"]=(means.time_delta<0)&((means.k_pi-means.k_base)<=np.maximum(1.,.05*means.k_base))
+    summary["pass_mean_with_quality"]=summary.pass_mean_joint&(means.primary_delta>=-.01)
     if "near_width_base" in paired and paired.near_width_base.notna().all():
         near=paired.k_pi-paired.near_width_base-np.maximum(1.,.05*paired.near_width_base)
         summary["width_pass_at_common_slack"]=near.groupby(paired.dataset).median()<=0
