@@ -132,3 +132,52 @@ def pairwise_ballots(x,y,z,v,task,seed):
         result=(after-before).mean(axis=0)
         votes.append(result/max(float(np.abs(result).sum()),1e-12))
     return np.asarray(votes),0
+
+
+def margin_contests(model,z,v,task,seed):
+    """Estimate strata of rank-flip votes on this receiver's raw SHAP sum."""
+    from xgboost import DMatrix
+    rng=np.random.default_rng(seed)
+    rows=sample_rows(v,task,384,rng)
+    booster=model.get_booster()
+    matrix=DMatrix(z[rows],nthread=1)
+    tensor=booster.predict(matrix,pred_contribs=True,approx_contribs=True,strict_shape=True).astype(float)
+    actual=booster.predict(matrix,output_margin=True,strict_shape=True)
+    np.testing.assert_allclose(tensor.sum(axis=2),actual,rtol=1e-4,atol=1e-4)
+    if task=="regression":
+        phi=tensor[:,0,:-1]
+        residual=(v[rows]-tensor[:,0,-1])[:,None]
+        others=phi.sum(axis=1,keepdims=True)-phi
+        slices=[np.mean(phi*(2*(residual-proportion*others)-phi),axis=0) for proportion in (0.,.5,1.)]
+    else:
+        if tensor.shape[1]>1:
+            # Scores of a class are centered across labels to remove common logit shifts.
+            tensor-=tensor.mean(axis=1,keepdims=True)
+        cases=[]
+        labels=v[rows]
+        for g in range(tensor.shape[1]):
+            target=g if tensor.shape[1]>1 else 1
+            positive=np.flatnonzero(labels==target)
+            negative=np.flatnonzero(labels!=target)
+            n=max(32,2048//tensor.shape[1])
+            a=rng.choice(positive,size=n)
+            b=rng.choice(negative,size=n)
+            cases.append(tensor[a,g,:-1]-tensor[b,g,:-1])
+        d=np.concatenate(cases)
+        p=d.shape[1]
+        n=p-1
+        other=d.sum(axis=1,keepdims=True)-d
+        avg=other/max(1,n)
+        var=np.maximum(0.,(np.square(d).sum(axis=1,keepdims=True)-d**2)/max(1,n)-avg**2)
+        slices=[]
+        for k in sorted({max(1,n//8),n//2,max(1,7*n//8)}):
+            center=k*avg
+            sd=np.sqrt(k*(n-k)*var/max(1,n-1))
+            stochastic=sd>1e-8
+            before=np.sign(center)*.5+.5
+            after=np.sign(center+d)*.5+.5
+            before[stochastic]=ndtr(center[stochastic]/sd[stochastic])
+            after[stochastic]=ndtr((center+d)[stochastic]/sd[stochastic])
+            slices.append((after-before).mean(axis=0))
+    rates=np.asarray(slices)
+    return rates/np.maximum(np.abs(rates).sum(axis=1,keepdims=True),1e-12),0

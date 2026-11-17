@@ -31,7 +31,10 @@ def arm(x,y,task,idx,seed,method,family):
     if method=="gain":
         values=gain
     else:
-        bank,aux=getattr(games,family)(x[fit],y[fit],x[idx["vote"]],y[idx["vote"]],task,seed)
+        if family=="margin_contests":
+            bank,aux=games.margin_contests(full,x[idx["vote"]],y[idx["vote"]],task,seed)
+        else:
+            bank,aux=getattr(games,family)(x[fit],y[fit],x[idx["vote"]],y[idx["vote"]],task,seed)
         values=bank.min(axis=0) if method=="min" else bank.mean(axis=0)
     order=np.lexsort((-np.arange(p),-gain,-values))
     mass=np.cumsum(np.maximum(values[order],0))
@@ -40,7 +43,11 @@ def arm(x,y,task,idx,seed,method,family):
         mass=np.cumsum(gain[order])
         if mass[-1]<=0:
             mass=np.arange(1,p+1,dtype=float)
-    widths=sorted({p,*(1+int(np.searchsorted(mass,mass[-1]*q)) for q in (.5,.75,.9))})
+    if family=="margin_contests":
+        first=1+int(np.searchsorted(mass,.75*mass[-1]))
+        widths=sorted({p,first,int(np.ceil(np.sqrt(p*first))),(p+first+1)//2})
+    else:
+        widths=sorted({p,*(1+int(np.searchsorted(mass,mass[-1]*q)) for q in (.5,.75,.9))})
     rank_seconds=perf_counter()-start
     reference=validation_utility(y[valid],predict_native(full,x[valid],task),task)
     fits=1
@@ -79,9 +86,28 @@ def metrics(y,pred):
 def run(args):
     out=DEST/args.tag
     out.mkdir(parents=True,exist_ok=True)
+    code={f.name:digest(f) for f in (HERE/"games.py",HERE/"run.py")}
+    jobs=legacy.jobs()
+    sources={name:{part:jobs[name,args.seed][1][part+"_file_sha256"] for part in ("train","val","test")}
+             for name in ORIGINAL}
+    lock=dict(seed=args.seed,family=args.family,code=code,sources=sources)
+    file=out/"identity.json"
+    if file.exists():
+        if json.loads(file.read_bytes())!=lock:
+            raise ValueError(f"Rejected changed inputs or source code for {out}")
+    elif any(out.glob("*/*/record.json")):
+        raise ValueError(f"Historical evidence without identity file. Start a new run tag: {out}")
+    else:
+        file.write_text(json.dumps(lock,sort_keys=True),encoding="utf8")
+    rng=np.random.default_rng(913)
+    warm_x=rng.normal(size=(128,4)).astype(np.float32)
+    warm=fit_native(warm_x,np.arange(128)%2,"classification",42,"cpu")
+    predict_native(warm,warm_x,"classification")
     t=perf_counter()
+    expected_ids={}
     for i,name in enumerate(ORIGINAL):
         x,y,task,idx=load(name,args.seed)
+        expected_ids[name]=idx["test"]
         for method in np.roll(ARM,i%len(ARM)):
             d=out/name/method
             d.mkdir(parents=True,exist_ok=True)
@@ -102,9 +128,11 @@ def run(args):
         for method in ARM:
             d=out/name/method
             r=json.loads((d/"record.json").read_bytes())
-            if digest(d/"predictions.npz")!=r["forecast_sha256"] or r["family"]!=args.family:
+            if (digest(d/"predictions.npz")!=r["forecast_sha256"] or r["family"]!=args.family
+                    or r["seed"]!=args.seed or r["name"]!=name or r["method"]!=method):
                 raise ValueError(f"Invalid receipt {d}")
             with np.load(d/"predictions.npz") as arr:
+                np.testing.assert_array_equal(arr["ids"],expected_ids[name])
                 primary,second=metrics(labels,arr["values"])
             rows.append(dict(dataset=name,seed=args.seed,method=method,k=r["k"],time=r["time"],
                              primary=primary,secondary=second,fits=r["fits"],aux=r["aux"],rank_s=r["rank_seconds"]))
