@@ -26,6 +26,11 @@ NAMES = ["PM10", "SO2", "NO2", "CO", "O3", "TEMP", "PRES", "DEWP", "RAIN", "WSPM
 SEED = 42
 
 
+def protocol_digest():
+    text = Path(__file__).with_suffix(".md").read_text(encoding="utf8")
+    return sha256(text.encode("utf8")).hexdigest()
+
+
 def data():
     source = primary.SOURCES["beijing"]
     raw = (primary.DATA / source["filename"]).read_bytes()
@@ -118,7 +123,7 @@ def collect():
     assert np.isnan(target[test]).all()
     model = rf.fit(x[fit], target[fit], "regression", SEED)
     receipt.update(seed=SEED, features=NAMES, blocks={}, checks=exact_check(model, x[vote], target[vote]),
-                   protocol_sha256=b.digest(Path(__file__).with_suffix(".md")), arms={})
+                   protocol_sha256=protocol_digest(), arms={})
     for name, rows in parts.items():
         receipt["blocks"][name] = dict(n=len(rows), incomplete=int(np.isnan(x[rows]).any(axis=1).sum()),
             dates=int(frame.date.iloc[rows].nunique()), stations=int(frame.station.iloc[rows].nunique()),
@@ -165,7 +170,7 @@ def collect():
 def score():
     receipt = json.loads((OUT / "lock.json").read_bytes())
     assert receipt["forecast_sha256"] == b.digest(OUT / "forecasts.csv")
-    assert receipt["protocol_sha256"] == b.digest(Path(__file__).with_suffix(".md"))
+    assert receipt["protocol_sha256"] == protocol_digest()
     forecasts = pd.read_csv(OUT / "forecasts.csv", parse_dates=["date"])
     frame, _ = data()
     joined = forecasts.merge(frame.loc[frame.block.eq("test"), ["date", "station", "target"]], on=["date", "station"],
