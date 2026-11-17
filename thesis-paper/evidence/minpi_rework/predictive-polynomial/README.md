@@ -13,6 +13,21 @@ Seconds are source medians of per-split median wall-clock times from three inter
 
 ## Why an interval can be skipped
 
+### Cost against the single impurity path
+
+The MDI-only selector fits the identical forest and uses its own calibrated path. It omits the voting-sample path dictionary and union-rank calculation. Across 20 signed comparisons, fitting the two-path portfolio and forecasting took 1.293 times as long (source bootstrap 1.035–1.616). The portfolio retained .883 as many nominal columns. Native traversal of its truncated trees used .893 as many distinct, reachable input columns (.826–.965). Both methods reproduced their original forecast arrays. On oral toxicity the two paths took 0.823 s, against 0.489 s for MDI alone, and used .802 times as many reachable inputs. On the two regression tasks the differences in both runtime and reachable inputs were smaller.
+
+| Source | Two-path / MDI time, s | Time ratio | Reachable width ratio |
+|---|---:|---:|---:|
+| Residential Building, Tehran | .096 / .093 | 1.044 | .956 |
+| UJIIndoorLoc | .728 / .703 | 1.025 | .974 |
+| QSAR oral toxicity | .823 / .489 | 1.760 | .802 |
+| Internet Advertisements | .539 / .366 | 1.485 | .851 |
+
+The timing and support counts are in `mdi-repeats.csv` and `mdi-paired.csv`. Forecast quality by source is reported in the sibling `wide-veto/source-scores.csv`. The fit-to-forecast times can be reproduced with the pipeline module's `--mdi` flag.
+
+### Interval certificate
+
 Let the fixed number of input variables be `p`, and let `c_h` be the current candidate's signed excess-loss coefficient at degree `h`. The all-size score after rate normalization is
 
 `F(s) = Σ c_h binom(s−1,h−1)/binom(p−1,h−1)`, for integers `1 ≤ s ≤ p`.

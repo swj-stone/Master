@@ -111,6 +111,10 @@ def summarize(prefix):
         paired["rank_ratio"] = left.rank_s/right.rank_s
     else:
         paired["k_portfolio"],paired["k_mdi"] = left.k,right.k
+        audit = pd.read_csv(wide.OUT/"native-audit.csv").pivot(index=["dataset","seed"],columns="arm")
+        for arm in ("portfolio","mdi"):
+            np.testing.assert_array_equal(paired["k_"+arm],audit["k",arm].reindex(paired.index))
+            paired["reachable_"+arm] = audit["reachable_columns",arm].reindex(paired.index)
     paired.to_csv(OUT/(prefix+"-paired.csv"))
     means = np.log(paired.ratio).groupby("dataset").mean()
     boot = np.array([means.to_numpy()[list(ix)].mean() for ix in product(range(len(means)),repeat=len(means))])
