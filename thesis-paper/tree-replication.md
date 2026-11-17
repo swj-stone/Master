@@ -1,6 +1,6 @@
 # MinPI with incomplete feature availability
 
-The manuscript is in `thesis-paper/minpi-tree.pdf`. Its LaTeX entry point is `thesis-paper/main.tex`. The standalone manuscript archive places the entry point and its bibliography, table and style alongside `main.pdf`. Build with pdfLaTeX, BibTeX, pdfLaTeX and pdfLaTeX in that directory.
+The forest manuscript is in `thesis-paper/minpi-tree.pdf`. Its workspace entry point is `thesis-paper/minpi-forest.tex`. The archived source calls this same file `main.tex` and places its bibliography, tables and style alongside `main.pdf`. Build with pdfLaTeX, BibTeX, pdfLaTeX and pdfLaTeX in that directory.
 
 The supervised MinPI study uses seven held-out UCI sources, each with seeds 42–46. The learner is a depth-limited random forest. For each nonempty acquisition size the selector computes the expected excess Brier loss (classification) or squared loss (regression) under a uniform mask of that size. A worst-size guard and intact validation metrics determine the accepted width. The registered portfolio includes an MDI path and a MinPI path. The analytic versus Monte Carlo comparison uses the same 35 source–seed splits and its own locked searches and forecasts. These are two experiments on seven study populations. [Data provenance and split units](../experiments/minpi_rework/validation_predictive.md) · [Supervised protocol](../experiments/minpi_rework/predictive_confirmation.md) · [Monte Carlo protocol](../experiments/minpi_rework/predictive_mc_confirmation.md)
 

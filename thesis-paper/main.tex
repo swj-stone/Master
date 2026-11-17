@@ -3,78 +3,31 @@
 \usepackage[preprint]{neurips_2026}
 \makeatletter
 \renewcommand{\@noticestring}{Anonymous research manuscript.}
-\let\tableinput\@@input
 \makeatother
 \usepackage[T1]{fontenc}
-\usepackage{amsmath,amssymb,amsthm,booktabs,microtype}
+\usepackage{amsmath,amssymb,booktabs,microtype}
 \usepackage[hidelinks]{hyperref}
-\newtheorem{proposition}{Proposition}
-
-\begin{document}
-\title{MinPI for Forest Input Compression under Partial Availability}
+\newcommand{\anchoredMinPI}{}
+\title{MinPI for Feature Selection under a Refit Budget}
 \author{Anonymous Author(s)}
+\begin{document}
 \maketitle
 \begin{abstract}
-Removing a column from a fitted forest can have a different cost when another
-measurement is already missing. MinPI assigns one vote to each possible
-number of available inputs. Any size whose excess squared loss exceeds
-the budget vetoes the deletion. We integrate these votes exactly for
-trees that stop at the first unavailable split. Products of path increments
-give a finite set of coefficients that successive deletions can reuse.
-The minimum vote tests every row-independent exchangeable mask law on the
-calibration rows. Bounding forward differences lets us skip ranges of sizes
-while preserving the greedy path. On four datasets with 79--1,558 columns,
-this cut ranking time by about half against the fastest measured
-implementation of the same deletion path.
-Forest fitting and validation accounted for most of the remaining cost.
-In a secondary width analysis, adding the MinPI path to impurity ranking
-retained 10.7\% fewer reachable columns on these sources and took 29\%
-longer than impurity selection. Mean-size ranking matched its width.
-The mean differences from impurity ranking were $-.0033$ in AUC and
-$+.0008$ in $R^2$. On seven narrower sources the width
-reduction against impurity ranking was 6.5\%, below the 10\% declared-width target. Holding candidate paths fixed,
-enforcing every size in place of their average reduced held-out budget
-violations from 14 to 10 of 35 runs, at a cost of 0.23 columns on average.
+Refitting a boosted tree ensemble on every prefix of a feature ranking requires one training run per input column. We first evaluate a small number of widths along the split-gain ranking and keep the narrowest near its best validation score. Inside this subset, MinPI ranks columns by the smallest share of pivotal votes they receive at three coalition sizes. The votes measure which training thresholds a column can represent for others. At most two further refits attempt to remove columns while preserving the measured validation floor. On five new datasets with seven to eleven inputs, the selector ran faster than an exhaustive gain search and retained comparable or fewer columns on every dataset. Two of 25 paired runs lost more than 0.01 in test AUC. Against a geometric gain search, the same width and timing target was met on four datasets. Gain with the same initial subset and two refinement steps was faster on all five. Replacing the minimum by the mean changed none of the 25 selected sets. The bounded search accounts for the practical gain over exhaustive refitting on this panel.
 \end{abstract}
 
 \section{Introduction}
-In the Beijing air-quality records examined below, 239 held-out station-days
-were missing at least one input for predicting the next day's PM2.5.
-Permanently dropping an instrument changes the forecast even on days when
-it works. The cost of that decision also depends on which other instruments
-are available. We study one global set of retained columns. On each case a tree follows
-its original splits until it encounters an unavailable input. Prediction
-then uses the mean training response at that node. Both the original and
-compressed forests face the same available measurements.
+A training split credits its gain to a single column. A second column that separates nearly the same observations can receive little credit, although it may serve equally well in a smaller model. Checking which inputs to keep by refitting every candidate prefix can cost much more than fitting the final model. We study whether accounting for substitutes helps when only a few refits are affordable.
 
-Feature deletion has been used to model test-time failures
-~\citep{globerson2006nightmare}. Expected losses under corrupted features can
-also be integrated analytically during training~\citep{vandermaaten2013mcf}.
-Post-training pruning can trade prediction error against the expected cost
-of features visited by a forest~\citep{nan2016pruning}. A probabilistic tree
-predictor can integrate missing values under a learned feature density
-~\citep{khosravi2020missing}; early stopping needs only the stored node value.
-Our cost is the
-number of distinct columns the deployed model may ever request. Our loss
-compares the two forests' squared errors against the same observed responses
-at each availability size. Each size votes on this loss. The minimum vote determines
-whether a support passes. This retains voting and the least favorable
-decision in the original min-marginal power index~\citep{shi2026minpi};
-the new vote measures excess predictive loss, so the index itself changes.
+Our selector begins with a reference subset on the ordinary XGBoost gain order. It compares feature thresholds within that subset and records which columns can reproduce each threshold partition. When a coalition already contains such a column, its substitutes receive no further credit for that partition. We compute each column's expected additional coverage at three coalition sizes. The smallest of its three relative shares determines where it ranks. Only validation scores from actual refits determine whether a smaller set replaces the reference.
 
-We derive the size votes for Brier and squared-error loss and give an
-example where an intermediate size alone rejects a support. A second exact
-reduction removes columns below a stopped split. Even with both reductions,
-finding a globally narrowest feasible support is NP-hard at the study's
-fixed budget. The experiments separate the computational cost of the votes,
-their use in choosing a support, and the consequences of refitting on the
-selected columns.
+This construction combines earlier ideas. Adjusted agreement between surrogate splits has been used to assess variable importance in random forests~\citep{seifert2019surrogate}. Weighted coverage and facility-location objectives have been used to choose representative features~\citep{liu2013coverage}. Game-theoretic feature selectors have estimated contributions on a sample of observations~\citep{zhaoStrategicInputs}. We adapt the voting and minimum operations of the min-marginal power index~\citep{shi2026minpi} to a game where fixed-size marginal votes admit an exact count. The original index takes the lowest signed marginal vote over individual coalitions and can identify one harmful coalition. Here the minimum is over nonnegative relative shares after averaging within each size. The count is about coverage of threshold partitions on observed rows. Performance after retraining remains an empirical quantity.
 
-\input{minpi-predictive-method}
-\input{minpi-predictive-study}
+An earlier selector ranked all inputs before choosing a width from cumulative covered weight. It was faster than exhaustive Gain on four external datasets, but retained too many columns on one. Fixing a validated Gain subset before voting bounds the returned width by this measured anchor. The exhaustive Gain maximizer can be narrower. Our experiments compare this revised procedure against exhaustive Gain, against a geometric search and against Gain with exactly the same refinement opportunities.
+
+\input{split-vote-method}
+\input{anchored-vote-study}
+
 \bibliographystyle{plainnat}
-\bibliography{references,minpi-related}
-\appendix
-\input{minpi-hardness}
-\input{minpi-frontier}
+\bibliography{references,split-vote}
 \end{document}

@@ -1,6 +1,28 @@
-# MinPI for Forest Input Compression under Partial Availability
+# MinPI for Feature Selection under a Refit Budget
 
-[论文 PDF](minpi-tree.pdf) · [LaTeX 源码](main.tex) · [复现步骤](tree-replication.md) · [随机森林训练和部署](../experiments/minpi_rework/predictive_rf_deploy.md)
+[论文 PDF](minpi-refit.pdf) · [主稿](main.tex) · [算法与实验协议](../experiments/anchored_vote/protocol.md) · [逐数据集](evidence/anchored_vote/sources.csv) · [逐 seed](evidence/anchored_vote/seeds.csv)
+
+先在 Gain 排序上验证一个参考特征集，再用最小投票排序提出最多两个更小的子集。每次实际重训达到事先固定的验证分数下限，才接受这一子集。五个新数据集均比穷举 Gain 快且满足列数条件。与相同参考集、相同搜索机会的 Gain 相比，五个数据集均更慢。将最小票换为均值票，25 组均选出相同列。先前四数据集的方案在三个上达标，保留了独立的[论文稿](split-vote.tex)和[结果](evidence/split_vote/external-sources.csv)。
+
+在 `MastersThesis` 下运行。第一条命令校验数据并补齐缺少的公开文件。三次交错计时写入独立目录，屏幕逐项显示耗时和预计剩余时间。
+
+```powershell
+.\thesis-python.ps1 -m experiments.minpi_replication.second_panel.data --fetch
+foreach ($rep in 0..2) {
+    .\thesis-python.ps1 -m experiments.anchored_vote.run --tag "prospective-r$rep" --device cpu --cpu-mask 256 --offset $rep
+    if ($LASTEXITCODE -ne 0) { throw "Run $rep failed" }
+}
+.\thesis-python.ps1 -m experiments.anchored_vote.audit
+Push-Location thesis-paper
+latexmk -pdf -interaction=nonstopmode -halt-on-error '-outdir=build-refit' main.tex
+Pop-Location
+```
+
+[原六个预处理集的 CUDA 方案](evidence/anchored_vote/prepared.md) · [五个新数据源和分区](../experiments/minpi_replication/second_panel/protocol.md) · [投票的形式化计数](formal/SplitVote.lean)
+
+## 此前的冻结森林论文
+
+[论文 PDF](minpi-tree.pdf) · [原版 LaTeX 源码](minpi-forest.tex) · [复现步骤](tree-replication.md) · [随机森林训练和部署](../experiments/minpi_rework/predictive_rf_deploy.md)
 
 论文中每个联盟规模对候选子集投一票，最差规模可以否决删除。搜索使用树路径的损失展开，计算时可以跳过整段联盟规模。下面各行采用不同的对照和计时边界。
 

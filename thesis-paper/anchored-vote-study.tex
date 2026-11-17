@@ -1,0 +1,40 @@
+\section{Predictive evaluation}
+
+\paragraph{Controls and decision rule.}
+Every method fits the same 100-round, depth-four XGBoost model with learning rate 0.1. The exhaustive control refits all prefixes of the ordinary Gain ranking, breaking validation ties toward fewer columns. A second exhaustive control selects the narrowest prefix within 0.005 of its maximum and refits that support for deployment. Geometric Gain tries widths $1,2,4,\ldots,p$ (capped at $p$) and at most two refinements below its observed near-best prefix. The two closest controls use the same anchor and midpoint rule as MinPI. One replaces the minimum with the mean vote, the other retains the Gain order within the anchor. All bounded searches use the same validation allowance.
+
+We preregistered a dataset-level criterion. At each of five matched seeds, measure the time difference and the excess width after allowing the larger of one column and 5\% of comparator width. The median paired time difference must be negative and the median adjusted width excess nonpositive. We required at least four of five prospective datasets to meet both conditions. We also count simultaneous seed-level successes and examine an additional 0.01 tolerance on median paired test AUC or $R^2$. Binary and macro one-vs-rest AUC determine classification widths. Validation truncates negative $R^2$ at zero in every arm. Reported test $R^2$ uses the usual untruncated score. Accuracy and raw MAE describe changes in predicted labels and responses.
+
+\paragraph{Prospective panel.}
+We fixed five public collections before fitting the revised selector. The \href{https://doi.org/10.24432/C58P4S}{vowel} experiment uses the official seven test speakers, the same 462 utterances for every seed. The fit and validation speakers change by seed. For \href{https://doi.org/10.24432/C5D612}{HCV}, each seed resamples groups of identical input profiles. The binary label distinguishes blood donors from patients with confirmed liver disease and excludes ambiguous suspected donors. Three tasks use fixed chronological partitions. \href{https://doi.org/10.24432/C5F88Q}{Online shopping} predicts end-of-session revenue in December from page counts, durations and calendar information. Transaction-dependent page values are excluded. \href{https://doi.org/10.24432/C51S6D}{Garment productivity} holds out entire work dates, retaining information about the shift and planned output. \href{https://doi.org/10.24432/C5B034}{Tetouan electricity demand} holds out consecutive days, using weather and time to predict contemporaneous consumption in one zone. Only HCV changes its test population across seeds. These are five purposively chosen datasets with seven to eleven numeric model inputs.
+
+On this panel we used one warmed thread pinned to logical processor 8 of an Intel Core Ultra 9 275HX and rotated method order. For each seed we took the median of three runs from the initial fit through final prediction. Input loading and writing forecasts were excluded. Original row identities, supports and test predictions were checked across all three repetitions before scoring. The study ran on a shared host. Results aggregated over these five datasets describe the tasks measured.
+
+\begin{table}[htbp]
+\centering
+\caption{Prospective test performance and complete elapsed time. Each cell lists anchored MinPI followed by exhaustive Gain. Marginal medians across five seeds are shown. The primary and companion metrics are AUC and accuracy for classification, $R^2$ and MAE for regression.}
+\label{tab:anchor-main}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Dataset & Inputs & Retained & Seconds & Primary & Companion\\
+\midrule
+Vowel      & 10 & 3 / 6 & .720 / 1.344 & .870 / .868 & .481 / .494\\
+HCV        & 11 & 3 / 7 & .105 / .208 & .998 / 1.000 & .975 / .975\\
+Shopping   & 8  & 3 / 3 & .225 / .340 & .665 / .665 & .874 / .874\\
+Garment    & 7  & 4 / 5 & .078 / .111 & .215 / .221 & .1049 / .1047\\
+Tetouan    & 9  & 6 / 8 & .240 / .321 & .676 / .677 & 2,885 / 2,865\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Performance across datasets.}
+All five passed the time and width criterion relative to exhaustive Gain, both at its validation maximum and with the common 0.005 allowance. All 25 individual pairs passed the operational criterion. With a further 0.01 test-score requirement the counts were 23/25 and 24/25, respectively. On vowels, seeds 42 and 46 lost 0.0242 and 0.0169 AUC against the validation maximizer. Seed 46 retained two columns in place of seven and correctly classified 43.3\% of the test utterances, compared with 51.3\% for Gain. The source-level median in Table~\ref{tab:anchor-main} conceals these losses.
+
+\paragraph{What the votes changed.}
+The two refinement probes reduced the anchor on ten of 25 runs. Against geometric Gain, MinPI met the joint criterion on four datasets. Requiring a 5\% time saving as well as the width and score criteria leaves two, Tetouan and vowels. Against Gain with the same anchor and the same refinement opportunities, MinPI was slower on all five. The rankings produced different supports on nine of 25 pairs, including all five Tetouan runs. On Tetouan, MinPI retained six columns to the matched Gain control's nine and gained 0.0013 in median $R^2$, at 1.20 times its paired running time. The minimum and mean votes gave identical final supports and predictions in all 25 pairs. The large timing advantage over the exhaustive control therefore concerns the search budget. The results give no predictive advantage to taking the minimum on these tasks.
+
+\paragraph{Earlier unanchored search.}
+Our initial rule used split coverage over the full input matrix to select four widths, followed by one local refinement and the full reference. It ran faster than exhaustive Gain on all four held-out UCI collections but met the joint width and time target on three. On Seoul temperature prediction it retained 16 columns to Gain's 14, with median $R^2$ higher by 0.0024. Only two of the four collections passed against Gain with a geometric width search. This failure motivated the anchor. The subsequent five-collection study used new endpoints and splits. Results from the earlier test do not count toward the later success rate.
+
+We revisited these four collections to check the cost of computing the votes. For seed 42, packing the binary thresholds and evaluating the same pivotal order reduced ranking time from 92 to 18\,ms on Bankruptcy, the largest anchor (76 columns). Most of the saving came from constructing the agreement matrix faster. End-to-end paired median times improved on all four relative to the initial implementation. Only temperature simultaneously ran faster than Gain with the same anchor search and retained as few columns. This implementation check reused previously opened data and held the selected sets and predictions fixed.

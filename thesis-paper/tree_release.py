@@ -109,7 +109,9 @@ def archive(path, members, manifest_name="SHA256SUMS.json"):
 
 def tex_files():
     """Follow braced inputs, the paper's plain table-input alias and local styles."""
-    pending = [PAPER/"main.tex"]
+    # Keep the same archive entry point when packaging the older forest paper.
+    forest = PAPER/"minpi-forest.tex"
+    pending = [forest if forest.is_file() else PAPER/"main.tex"]
     seen = set()
     while pending:
         path = pending.pop()
@@ -313,7 +315,8 @@ def build(with_prepared, with_wearable_raw=False):
     (ROOT/"tmp").mkdir(exist_ok=True)
     with TemporaryDirectory(dir=ROOT/"tmp",prefix="tree-manuscript-") as tmp:
         folder = Path(tmp)
-        manuscript = {p.relative_to(PAPER).as_posix():p for p in tex_files()}
+        manuscript = {("main.tex" if p.name == "minpi-forest.tex" else p.relative_to(PAPER).as_posix()):p
+                      for p in tex_files()}
         for name, p in manuscript.items():
             target = folder/name
             target.parent.mkdir(parents=True,exist_ok=True)
