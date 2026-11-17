@@ -13,6 +13,7 @@ from sklearn.metrics import accuracy_score,mean_absolute_error,r2_score,roc_auc_
 from experiments.minpi_replication.direct_gain import fit_native,predict_native,validation_utility
 from experiments.split_vote.run import ROOT,ORIGINAL,load,legacy,digest
 from . import games
+from . import conditional
 
 ARM=("min","mean","gain")
 HERE=Path(__file__).resolve().parent
@@ -28,10 +29,11 @@ def arm(x,y,task,idx,seed,method,family):
     gain=np.array([raw.get(f"f{i}",0.) for i in range(p)])
     start=perf_counter()
     aux=0
-    if method=="gain":
+    if method in {"gain","gain_transfer"}:
         values=gain
+        bank=(gain/max(gain.sum(),1e-12))[None,:]
     else:
-        if family=="margin_contests":
+        if family in {"margin_contests","conditional"}:
             bank,aux=games.margin_contests(full,x[idx["vote"]],y[idx["vote"]],task,seed)
         else:
             bank,aux=getattr(games,family)(x[fit],y[fit],x[idx["vote"]],y[idx["vote"]],task,seed)
@@ -43,7 +45,13 @@ def arm(x,y,task,idx,seed,method,family):
         mass=np.cumsum(gain[order])
         if mass[-1]<=0:
             mass=np.arange(1,p+1,dtype=float)
-    if family=="margin_contests":
+    if family=="conditional":
+        if method=="gain":
+            frontier=p
+        else:
+            order,frontier=conditional.retire(bank,gain,conditional.redundancy(x[fit],seed),method)
+        widths=conditional.candidate_widths(order,frontier,gain)
+    elif family=="margin_contests":
         first=1+int(np.searchsorted(mass,.75*mass[-1]))
         widths=sorted({p,first,int(np.ceil(np.sqrt(p*first))),(p+first+1)//2})
     else:
@@ -86,7 +94,7 @@ def metrics(y,pred):
 def run(args):
     out=DEST/args.tag
     out.mkdir(parents=True,exist_ok=True)
-    code={f.name:digest(f) for f in (HERE/"games.py",HERE/"run.py")}
+    code={f.name:digest(f) for f in (HERE/"games.py",HERE/"run.py",HERE/"conditional.py")}
     jobs=legacy.jobs()
     sources={name:{part:jobs[name,args.seed][1][part+"_file_sha256"] for part in ("train","val","test")}
              for name in ORIGINAL}
@@ -105,10 +113,11 @@ def run(args):
     predict_native(warm,warm_x,"classification")
     t=perf_counter()
     expected_ids={}
+    arms=(*ARM,"gain_transfer") if args.family=="conditional" else ARM
     for i,name in enumerate(ORIGINAL):
         x,y,task,idx=load(name,args.seed)
         expected_ids[name]=idx["test"]
-        for method in np.roll(ARM,i%len(ARM)):
+        for method in np.roll(arms,i%len(arms)):
             d=out/name/method
             d.mkdir(parents=True,exist_ok=True)
             if (d/"record.json").exists():
@@ -125,7 +134,7 @@ def run(args):
     rows=[]
     for name in ORIGINAL:
         labels=outcome(name,args.seed)
-        for method in ARM:
+        for method in arms:
             d=out/name/method
             r=json.loads((d/"record.json").read_bytes())
             if (digest(d/"predictions.npz")!=r["forecast_sha256"] or r["family"]!=args.family
