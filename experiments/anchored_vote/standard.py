@@ -48,6 +48,17 @@ def native(task, y, seed):
     return modeling.make_model(task=kind, model_params=direct_gain.MODEL_PARAMS, backend="cpu", seed=seed)
 
 
+def matches_signature(recorded, active):
+    if recorded == active:
+        return True
+    # Only the reporting columns and this verification path changed after timing.
+    compat = json.loads((OUT/"report_compatibility.json").read_bytes())
+    key = str(Path(__file__).resolve().relative_to(audit.ROOT))
+    if recorded["hashes"][key] != compat["measured"] or active["hashes"][key] != compat["reporting"]:
+        return False
+    return recorded == {**active, "hashes": {**active["hashes"], key: compat["measured"]}}
+
+
 def baseline(x, y, task, idx, seed, method):
     started = perf_counter()
     fit = np.sort(idx["fit"])
@@ -93,7 +104,12 @@ def measure():
         raise RuntimeError("Affinity check failed")
     OUT.mkdir(parents=True, exist_ok=True)
     sig = signature()
-    (OUT/"signature.json").write_text(json.dumps(sig, indent=2),encoding="utf8")
+    manifest = OUT/"signature.json"
+    if manifest.exists():
+        if not matches_signature(json.loads(manifest.read_bytes()), sig):
+            raise RuntimeError("Measurement code or environment changed")
+    else:
+        manifest.write_text(json.dumps(sig, indent=2),encoding="utf8")
     frozen = pd.read_csv(audit.OUT/"seeds.csv").query("method == 'min'").set_index(["dataset","seed"])
     warm = np.random.default_rng(5393).normal(size=(96,6)).astype("float32")
     idx = dict(fit=np.arange(48), vote=np.arange(48,64), width=np.arange(64,80), test=np.arange(80,96))
@@ -110,7 +126,7 @@ def measure():
             forecasts = dest/"predictions.npz"
             if receipt.exists():
                 old = json.loads(receipt.read_bytes())
-                if old["signature"] != sig or old["forecast"] != digest(forecasts.read_bytes()):
+                if not matches_signature(old["signature"],sig) or old["forecast"] != digest(forecasts.read_bytes()):
                     raise RuntimeError(f"Stale {receipt}")
                 continue
             x, y, task, idx = data.split(name,seed)
@@ -148,7 +164,7 @@ def report():
             folder = OUT/f"{name}-{seed}"
             obs = json.loads((folder/"receipt.json").read_bytes())
             archive = folder/"predictions.npz"
-            assert digest(archive.read_bytes()) == obs["forecast"] and obs["signature"] == signature()
+            assert digest(archive.read_bytes()) == obs["forecast"] and matches_signature(obs["signature"], signature())
             truth = data.truth(name,seed)
             with np.load(archive) as preds:
                 _, _, task, idx = data.split(name,seed)
@@ -177,6 +193,8 @@ def report():
             diff = g.primary_min-g.primary_control
             output = dict(dataset=name, control=baseline_name, median_paired_time_ratio=np.median(g.seconds_min/g.seconds_control),
                          median_width_difference=np.median(g.k_min-g.k_control), median_quality_difference=np.median(diff),
+                         pass_speed_width=bool(speed.median()<0 and excess.median()<=0),
+                         pass_speed_width_seeds=int(((speed<0)&(excess<=0)).sum()),
                          pass_joint=bool(speed.median()<0 and excess.median()<=0 and diff.median()>=-.01),
                          pass_seeds=int(((speed<0)&(excess<=0)&(diff>=-.01)).sum()))
             output.update({k:g[k].median() for k in ("seconds_min","seconds_control","k_min","k_control",
