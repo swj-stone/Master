@@ -60,7 +60,8 @@ def _projection(j, s, sizes, weights, anchors, length, projected, delta, offsets
     return score
 
 @njit(cache=True)
-def _native(n, offsets, rows, values, incidence_ptr, features, order, sizes, weights, rho, rebuild_norms):
+def _native(n, offsets, rows, values, incidence_ptr, features, order, sizes, weights, rho, rebuild_norms,
+            geometry=None, state=None, residual_vote=False):
     p = len(order)
     strata = len(weights)
     ng = len(offsets)-1
@@ -96,12 +97,14 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, sizes, wei
     known = np.ones(p,np.bool_)
     active = np.ones(ng,np.bool_)
     surviving_groups = np.diff(member_ptr)
+    revision = np.zeros(p if geometry is not None else 0,np.int64)
     length = np.full((p,strata),-1.)
     projected = np.full((p,strata),-1.)
     anchors = np.empty((strata,p,n))
     original_saved = np.zeros(p,np.bool_)
     residual = np.zeros(n)
     fixed = np.zeros(p)
+    residual_bound = np.empty(p if residual_vote else 0)
     lower = np.empty(p)
     full_lower = np.empty(p)
     stale = np.empty(p,np.bool_)
@@ -114,12 +117,16 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, sizes, wei
         contenders += p-count
         best = budget
         win = -1
+        rlength = np.sqrt(rr)
         for j in reverse:
             stale[j] = keep[j] and not known[j]
             if keep[j]:
                 # The unprojected cross term is shared by every size vote.
                 cross = np.dot(residual,delta[j]) if rr and surviving_groups[j] else 0.
                 fixed[j] = rr + 2.*cross
+                if residual_vote:
+                    ratio = cross/rlength if rlength else 0.
+                    residual_bound[j] = ratio*ratio
                 if known[j]:
                     cost = fixed[j]+squared[j]
                     if cost < best or (cost == best and win < 0):
@@ -137,6 +144,10 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, sizes, wei
                         full_lower[j] = fixed[j]+bound
                     if fixed[j]+bound > best+cushion:
                         break
+                if residual_vote:
+                    bound = max(bound,residual_bound[j])
+                if geometry is not None and fixed[j]+bound <= best+cushion:
+                    bound = max(bound,geometry(j,delta[j],revision[j],state))
                 lower[j] = fixed[j]+bound
         # Stable sorting of reverse gain priority matches ties in equal lower bounds.
         for pos in np.argsort(lower[reverse], kind='mergesort'):
@@ -169,6 +180,8 @@ def _native(n, offsets, rows, values, incidence_ptr, features, order, sizes, wei
                 j = features[ptr]
                 if not keep[j]:
                     continue
+                if geometry is not None:
+                    revision[j] += 1
                 if strata and sizes[-1] == p-1 and not original_saved[j]:
                     anchors[-1,j] = delta[j]
                     original_saved[j] = True
@@ -203,6 +216,10 @@ def greedy_path(a, incidence, gain_order, rho=.2, *, sizes=None, mode="all"):
     0/1 incidence matrix is (groups × inputs). Gain order breaks exact ties.
     mode='last' uses only the largest requested size; 'cache' uses no votes.
     """
+    return _run(a,incidence,gain_order,rho,sizes,mode)
+
+
+def _run(a, incidence, gain_order, rho, sizes, mode, extension=None, residual_vote=False):
     a = a.tocsc(copy=False).astype(np.float64,copy=False)
     inc = incidence.tocsr(copy=False)
     p = inc.shape[1]
@@ -236,8 +253,16 @@ def greedy_path(a, incidence, gain_order, rho=.2, *, sizes=None, mode="all"):
             weights[s,1] = 1.
         for k in range(2,weights.shape[1]):
             weights[s,k] = weights[s,k-1] * (max(0,size-k+2)/(p-k+1))
-    path,keep,checked,extra,contenders = _native(a.shape[0],a.indptr,a.indices,a.data,inc.indptr,
-                                                inc.indices,order,np.asarray(sizes,dtype=np.int64),
-                                                weights,float(rho),rebuild_norms)
+    args = (a.shape[0],a.indptr,a.indices,a.data,inc.indptr,inc.indices,order,
+            np.asarray(sizes,dtype=np.int64),weights,float(rho),rebuild_norms)
+    geometry_info = {}
+    if extension is None and not residual_vote:
+        path,keep,checked,extra,contenders = _native(*args)
+    elif extension is None:
+        path,keep,checked,extra,contenders = _native(*args,None,None,True)
+    else:
+        evaluate,state,counts = extension(a,inc)
+        path,keep,checked,extra,contenders = _native(*args,evaluate,state,residual_vote)
+        geometry_info = dict(zip(("size_zero","size_middle","size_other","size_full","other_improves"),counts.tolist()))
     return np.flatnonzero(keep),dict(deletion_order=path.tolist(),initial=p,refreshed=checked,
-                                     contenders=contenders,extra_stratum_vetoes=extra)
+                                     contenders=contenders,extra_stratum_vetoes=extra,**geometry_info)
