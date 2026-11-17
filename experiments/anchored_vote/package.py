@@ -21,7 +21,8 @@ def collect():
     paths.update(audit.OUT/f for f in ("receipts.csv","seeds.csv","sources.csv"))
     paths.update([root/"src/minppi_mofs/split_vote.py",root/"experiments/split_vote/path.py",
                   root/"experiments/minpi_replication/direct_gain.py",root/"thesis-paper/formal/SplitVote.lean",
-                  root/"thesis-paper/formal/SplitVote.wl"])
+                  root/"thesis-paper/formal/AnchoredGuard.lean",root/"thesis-paper/formal/SplitVote.wl",
+                  root/"thesis-paper/formal/split-vote-mathics.json"])
     for repeat in audit.REPEATS:
         direct=audit.RUN/f"prospective-r{repeat}"
         for s in audit.SEEDS:

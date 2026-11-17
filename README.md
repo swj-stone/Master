@@ -2,9 +2,19 @@
 
 硕士研究在 `MastersThesis/` 的 `thesis/masters` 分支进行，与 `../Master/` 共享 Git 仓库及 Python 环境。会议最终版在 `../Master/` 的 `main` 分支，供只读参考。工作树中的 `data/`、`results/` 和 `packages/` 是独立的本地文件，受 Git 忽略规则管理。
 
-## 当前论文：特征可用性不确定时的 MinPI 筛选
+## 当前论文与正式实验
 
-当前方法针对已训练的随机森林，在每个非空联盟规模上计算少采集若干特征带来的平均损失变化。分类使用 Brier 损失，回归使用平方损失。最不利的联盟规模决定候选子集能否通过删列检查。主实验在七个外部数据集上各跑五个种子；精确计算与 Monte Carlo 的对照使用同一批划分，分别封存预测和计算耗时。[当前论文 PDF](thesis-paper/minpi-tree.pdf) · [独立 LaTeX 源码](packages/minpi-tree-source.zip) · [复现包](packages/minpi-tree-replication.zip) · [复现指引](thesis-paper/tree-replication.md)
+当前 MinPI 在经过验证的 Gain 子集内，用最小投票提出更小的特征集，再用同一 XGBoost 模型重训验收。五个独立验证来源的 25 组均比穷举 Gain 快且列数达标。与同预算 Gain 的比较、失败样例和预测误差见结果表。[论文 PDF](thesis-paper/minpi-refit.pdf) · [正式实验与复现入口](thesis-paper/README.md) · [逐数据集对照](thesis-paper/evidence/anchored_vote/sources.csv) · [原六集核验](thesis-paper/evidence/anchored_vote/prepared.md)
+
+从上一级 `Paper` 目录运行以下命令，可用已保存的预测重新生成五来源表格。重新训练和逐项计时的命令在正式实验入口。
+
+```powershell
+.\MastersThesis\thesis-python.ps1 -m experiments.anchored_vote.audit
+```
+
+## 历史森林版本的 MinPI 筛选
+
+该版本针对已训练的随机森林，在每个非空联盟规模上计算少采集若干特征带来的平均损失变化。分类使用 Brier 损失，回归使用平方损失。最不利的联盟规模决定候选子集能否通过删列检查。主实验在七个外部数据集上各跑五个种子，精确计算与 Monte Carlo 的对照使用同一批划分，分别封存预测和计算耗时。[森林论文 PDF](thesis-paper/minpi-tree.pdf) · [独立 LaTeX 源码](packages/minpi-tree-source.zip) · [复现包](packages/minpi-tree-replication.zip) · [复现指引](thesis-paper/tree-replication.md)
 
 另有四个较宽数据集的计时、与保留特征重新拟合的对照，以及北京十二个监测站出现实际缺测时的检验。原来的六个预处理任务用于开发对照，同一张表包含保留原森林和按 Gain 重新拟合 XGBoost 的结果。复现包保留了此前 13 来源的提升树保真度实验与独立的五来源校准实验，这些来源在设计当前方法时已经使用过。[当前随机森林训练与部署](experiments/minpi_rework/predictive_rf_deploy.md) · [原六个任务](thesis-paper/evidence/minpi_rework/predictive-prepared/comparison.md) · [实际缺测结果](thesis-paper/evidence/minpi_rework/observed-availability/README.md) · [历史提升树部署](experiments/minpi_rework/README.md)
 

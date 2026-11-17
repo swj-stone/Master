@@ -1,0 +1,14 @@
+{
+  "file": "SplitVote.wl",
+  "sha256": "6d62dfb2704ba3334921b5c6b9e87892b4f063d48e9f23981988942418a48907",
+  "engine": "Mathics3 10.0.1, open-source Wolfram Language interpreter",
+  "arguments": ["-q", "--no-readline", "--no-completion", "--file", "thesis-paper/formal/SplitVote.wl"],
+  "exit_code": 0,
+  "exact_shares": [
+    ["10/47", "33/94", "33/94", "2/47", "2/47"],
+    ["5/18", "11/36", "11/36", "1/18", "1/18"],
+    ["2/5", "11/50", "11/50", "2/25", "2/25"]
+  ],
+  "symbolic_checks": [true, true, true, true, true],
+  "official_wolfram_service": "MCP -32603, no Wolfram-kernel result for this file"
+}
