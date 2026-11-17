@@ -119,6 +119,13 @@ def sealed(directory, name, seed):
     with np.load(base/"forecasts.npz", allow_pickle=False) as forecasts:
         np.testing.assert_allclose(model.predict(x[np.ix_(idx["test"], rec["support"])]), forecasts[ARM],
                                    atol=1e-14, rtol=0)
+        compact_file = directory/"registered-reachable.npz"
+        cli.main(["fit", "--dataset", name, "--seed", str(seed), "--reachable-only", "--model", str(compact_file)])
+        compact = RestrictedRF.load(compact_file)
+        assert compact.names == model.reachable_schema().names and compact.metadata["winner"] == rec["winner"]
+        cols = [int(feature[1:]) for feature in compact.names]
+        np.testing.assert_allclose(compact.predict(x[np.ix_(idx["test"], cols)]), forecasts[ARM],
+                                   atol=1e-14, rtol=0)
     print(f"{name}/{seed} sealed path, k={rec['k']}, {len(idx['test'])} archived forecasts reproduced")
 
 

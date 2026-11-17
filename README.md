@@ -6,7 +6,7 @@
 
 当前方法针对已训练的随机森林，在每个非空联盟规模上计算少采集若干特征带来的平均损失变化。分类使用 Brier 损失，回归使用平方损失。最不利的联盟规模决定候选子集能否通过删列检查。主实验在七个外部数据集上各跑五个种子；精确计算与 Monte Carlo 的对照使用同一批划分，分别封存预测和计算耗时。[当前论文 PDF](thesis-paper/minpi-tree.pdf) · [独立 LaTeX 源码](packages/minpi-tree-source.zip) · [复现包](packages/minpi-tree-replication.zip) · [复现指引](thesis-paper/tree-replication.md)
 
-原来的六个预处理任务用于开发对照。复现包另含此前 13 来源的提升树保真度实验与独立的五来源校准实验；这些来源在设计当前方法时已经使用过。保留列预测命令对应提升树版本。[提升树训练与部署](experiments/minpi_rework/README.md)
+另有四个较宽数据集的计时、与保留特征重新拟合的对照，以及北京十二个监测站出现实际缺测时的检验。原来的六个预处理任务用于开发对照，同一张表包含保留原森林和按 Gain 重新拟合 XGBoost 的结果。复现包保留了此前 13 来源的提升树保真度实验与独立的五来源校准实验，这些来源在设计当前方法时已经使用过。[当前随机森林训练与部署](experiments/minpi_rework/predictive_rf_deploy.md) · [原六个任务](thesis-paper/evidence/minpi_rework/predictive-prepared/comparison.md) · [实际缺测结果](thesis-paper/evidence/minpi_rework/observed-availability/README.md) · [历史提升树部署](experiments/minpi_rework/README.md)
 
 ## 历史 Ridge 版本的 MinPI 特征压缩
 

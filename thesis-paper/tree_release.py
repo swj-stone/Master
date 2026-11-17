@@ -39,6 +39,8 @@ COHORTS = (
     Cohort("minpi-predictive-seven-forecasts.zip","predictive-confirmation",35,artifacts="files"),
     Cohort("minpi-predictive-mc-seven-forecasts.zip","predictive-mc-confirmation",35,
            archive_hash="archive-sha256.txt",artifacts="hashes"),
+    Cohort("minpi-wide-veto-forecasts.zip","wide-veto",20,archive_hash="archive-sha256.txt"),
+    Cohort("minpi-reachable-forecasts.zip","predictive-reachable",55,archive_hash="archive-sha256.txt"),
 )
 TABLES = {
     "quota-tree-confirmation": ("scores.csv","rank-control-scores.csv","source-means.csv","source-contrasts.csv"),
@@ -46,8 +48,17 @@ TABLES = {
     "stratified-tree": ("contrasts.csv","source-results.csv","subject-scores.csv"),
     "predictive-confirmation": ("scores.csv","paper-contrasts.csv","source-means.csv","independent-mask-audit.csv"),
     "predictive-mc-confirmation": ("repeats.csv","jobs.csv","contrasts.csv","released-scores.csv","released-contrasts.csv"),
-    "predictive-prepared": ("source-means.csv","paper-contrasts.csv"),
+    "predictive-prepared": ("source-means.csv","paper-contrasts.csv","refit-comparison.csv"),
     "predictive-lattice": ("scores.csv",),
+    "observed-availability": ("scores.csv","paired.csv"),
+    "wide-veto": ("timings.csv","scores.csv","source-scores.csv","paired-jobs.csv","contrasts.csv","native-audit.csv"),
+    "predictive-refit": ("scores.csv","source-means.csv","contrasts.csv"),
+    "predictive-polynomial": ("paired.csv","contrasts.csv","sources.csv","pipeline-paired.csv",
+                              "production-paired.csv","mdi-paired.csv"),
+    "predictive-reachable": ("scores.csv","source-means.csv","contrasts.csv","stability.csv"),
+    "predictive-width": ("contrasts.csv",),
+    "wide-veto-ablation": ("scores.csv","source-means.csv","contrasts.csv","width-ratios.csv"),
+    "predictive-universe": ("scores.csv","source-means.csv","fixed-summary.csv","reselection.csv"),
     "predictive-veto-timing": (
         "contrasts.csv","source-contrasts.csv","split-medians.csv",
         "native-contrasts.csv","native-source-contrasts.csv","native-split-medians.csv",
@@ -143,8 +154,9 @@ def raw_sources():
     pins.update({f"wide-{k}.zip":v[1] for k,v in read("validation_wide_sources.json").items()})
     for manifest in ("validation_exchange_sources.json","validation_predictive_sources.json"):
         pins.update({v["filename"]:v["sha256"] for v in read(manifest).values()})
-    if len(pins)!=25:
-        raise ValueError("Expected 25 independent provider inputs")
+    pins.update({f"veto-{v[0]}.zip":v[2] for v in read("wide_veto_sources.json").values()})
+    if len(pins)!=29:
+        raise ValueError("Expected 29 independent provider inputs")
     for name, pin in pins.items():
         path = base/name
         if digest(path)!=pin:
@@ -198,7 +210,8 @@ def release_files():
     roots = []
     for pattern in ("quota_compress_tree*.py","quota_compress_scale*.py","tree_*py","stratified_tree*.py",
                     "span_*.py","scalar_tree*.py","compress_model*.py","validation*.py",
-                    "predictive*.py","quota_coalition_rf_check.py","availability_checks.py"):
+                    "predictive*.py","wide_veto*.py","observed_availability.py","prepared_forest_comparison.py",
+                    "quota_coalition_rf_check.py","availability_checks.py"):
         roots.extend(EXPERIMENT.glob(pattern))
     roots.append(EXPERIMENT/"quota_compress_rescue_check.py")
     roots.append(ROOT/"src/minppi_mofs/__init__.py")
@@ -206,6 +219,8 @@ def release_files():
     files.update(modules)
     files.update(p.with_suffix(".md") for p in modules if p.with_suffix(".md").exists())
     files.update(EXPERIMENT.glob("validation*.json"))
+    files.update(EXPERIMENT.glob("predictive*.md"))
+    files.update((EXPERIMENT/"wide_veto_sources.json",EXPERIMENT/"wide_veto_protocol.md"))
     files.update((EXPERIMENT/"README.md",EXPERIMENT/"span_findings.md",EXPERIMENT/"stratified_tree_protocol.md",
                   EXPERIMENT/"validation_protocol.md",ROOT/"experiments/minpi_compression/protocol.json",
                   ROOT/"experiments/minpi_compression/legacy_gain_protocol.md",
@@ -216,12 +231,22 @@ def release_files():
     files.add(EVIDENCE/"availability/two-sample-five.csv")
     for folder in ("quota-tree","quota-tree-confirmation","quota-scale-confirmation","stratified-tree","exchange-validation",
                    "predictive-confirmation","predictive-mc-confirmation","predictive-prepared","predictive-validation",
-                   "predictive-lattice","predictive-veto-timing"):
+                   "predictive-lattice","predictive-veto-timing","observed-availability","wide-veto",
+                   "predictive-refit","predictive-polynomial","predictive-reachable","predictive-width",
+                   "predictive-universe","wide-veto-ablation"):
         files.update(p for p in (EVIDENCE/folder).rglob("*") if p.is_file())
     files.update(EVIDENCE/group/name for group,names in TABLES.items() for name in names)
     for folder in ("tree-ranking-controls","quota-tree"):
         files.update(p for p in (ROOT/"results/minpi_rework"/folder).rglob("*")
                      if p.suffix in {".npz",".json"})
+    wide_controls = json.loads((EVIDENCE/"wide-veto-ablation/lock.json").read_bytes())
+    if len(wide_controls)!=20:
+        raise ValueError("Incomplete wide ranking control lock")
+    for key,pin in wide_controls.items():
+        path = ROOT/"results/minpi_rework/wide-veto-ablation"/(key+".json")
+        if digest(path)!=pin:
+            raise ValueError(f"Wide ranking control receipt mismatch: {key}")
+        files.add(path)
     for pattern in ("Tree*.lean","Tree*.wl","tree-*-receipt.json","lean-toolchain"):
         files.update((PAPER/"formal").glob(pattern))
     return files
@@ -280,7 +305,8 @@ def build(with_prepared):
         members.update({"thesis-paper/"+name:source for name,source in staged.items()})
         guide = PAPER/"tree-replication.md"
         entry = folder/"README.md"
-        entry.write_text(guide.read_text(encoding="utf8").replace("](../experiments/","](experiments/"),encoding="utf8")
+        guide_text = guide.read_text(encoding="utf8").replace("](../experiments/","](experiments/")
+        entry.write_text(guide_text.replace("](evidence/","](thesis-paper/evidence/"),encoding="utf8")
         members.update({"README.md":entry,"thesis-paper/minpi-tree.pdf":folder/"main.pdf"})
         archive(PACKAGES/"minpi-tree-replication.zip",members)
     if with_prepared:
@@ -399,9 +425,20 @@ def verify(check_tex, prepared):
                  ("predictive_mask_audit","packages/minpi-predictive-seven-forecasts.zip",
                   "thesis-paper/evidence/minpi_rework/predictive-confirmation"),
                  ("predictive_lattice","--check"),("predictive_lattice",),
-                 ("predictive_veto_report",),("predictive_veto_report","--native")])
+                 ("predictive_veto_report",),("predictive_veto_report","--native"),
+                 ("predictive_rf_deploy_check","--sealed"),("observed_availability","score"),
+                 ("wide_veto_score",),("wide_veto_verify",),
+                 ("predictive_refit","check"),("predictive_refit","score"),("predictive_refit_report",),
+                 ("predictive_polynomial_check",),("predictive_polynomial_report",),("predictive_reachable_score",),
+                 ("prepared_forest_comparison",),("predictive_width_timing","--summarize"),
+                 ("wide_veto_ablation","score"),("predictive_universe","score"),("predictive_universe_report",),
+                 ("predictive_stability",)])
     try:
         checked([sys.executable,"-B",str(Path(__file__).resolve()),"replay-mc-costs"],ROOT,env=env,capture=True)
+        for series in ("pipeline","production","mdi"):
+            checked([sys.executable,"-B","-c",
+                     f"from experiments.minpi_rework.predictive_polynomial_pipeline import summarize; summarize('{series}')"],
+                    ROOT,env=env,capture=True)
         for name,*arguments in jobs:
             print("Replaying",name,*arguments,flush=True)
             checked([sys.executable,"-B","-m","experiments.minpi_rework."+name,*arguments],ROOT,env=env,capture=True)
@@ -412,7 +449,8 @@ def verify(check_tex, prepared):
                 if not actual["lattice_s"].gt(0).all():
                     raise ValueError("Incomplete fresh lattice clocks")
                 actual,frame = actual.drop(columns="lattice_s"),frame.drop(columns="lattice_s")
-            assert_frame_equal(actual,frame,check_dtype=False,rtol=1e-12,atol=1e-12)
+            assert_frame_equal(actual,frame,check_dtype=False,rtol=1e-12,atol=1e-12,
+                               obj=str(path.relative_to(ROOT)))
         for path,table in tables_before.items():
             if path.read_text(encoding="utf8")!=table:
                 raise ValueError(f"Regenerated LaTeX source table changed: {path.name}")
@@ -424,6 +462,39 @@ def verify(check_tex, prepared):
     if check_tex:
         compile_paper(PAPER)
     print(f"Recomputed {len(expected)} archived CSV tables and {len(tables_before)} typeset numerical tables.",flush=True)
+
+
+def verify_printed_scores(pdf_text, evidence):
+    """Check the displayed precision of both primary tables after PDF layout."""
+    import pandas as pd
+
+    lines = [s.strip().replace("−","-") for s in pdf_text.decode("utf8").splitlines()]
+    primary = pd.read_csv(evidence/"predictive-confirmation/source-means.csv").set_index(["dataset","method"])
+    reach = pd.read_csv(evidence/"predictive-reachable/source-means.csv").set_index(["dataset","arm"])
+    labels = {"votes":"House voting","churn":"Iranian churn","liver":"Liver patients","german":"German credit",
+              "seoul":"Seoul bicycles","beijing":"Beijing PM2.5","sgemm":"SGEMM runtime",
+              "adverts":"Advertisements","oraltox":"Oral toxicity","tehran":"Tehran housing","uji":"UJI latitude"}
+    for name,label in labels.items():
+        if name in primary.index.get_level_values("dataset"):
+            f,mdi,v = (primary.loc[(name,arm)] for arm in ("full","mdi_min","mdi_plus_min_min"))
+            expected = [f.p,mdi.k,v.k]
+            first_score = f
+        else:
+            f,mdi,v = (reach.loc[(name,arm)] for arm in ("full","mdi_original","portfolio_min_original"))
+            expected = [f.p,f.reachable,mdi.reachable,v.reachable]
+            first_score = mdi
+        metrics = ("auc","accuracy") if pd.notna(v.auc) else ("r2","mae")
+        expected.extend(row[m] for row in (first_score,v) for m in metrics)
+        row = next(line[len(label):].strip() for line in lines
+                   if line.startswith(label+" ") and re.match(r"\s+\d",line[len(label):]))
+        tokens = row.replace("/"," ").split()
+        if len(tokens)!=len(expected):
+            raise ValueError(f"Incomplete printed score table row: {label}")
+        for token,value in zip(tokens,expected):
+            decimals = len(token.partition(".")[2])
+            if abs(float(token)-value)>0.5*10**(-decimals)+1e-10:
+                raise ValueError(f"Printed score differs for {label}: {token} versus {value}")
+    print(f"Verified widths and scores in all {len(labels)} PDF table rows.",flush=True)
 
 
 def verify_archives(prepared):
@@ -453,6 +524,7 @@ def verify_archives(prepared):
                     for pdf in (included,manuscript/"main.pdf",dest/"thesis-paper/main.pdf")]
         if not contents[0].strip() or len(set(contents))!=1:
             raise ValueError("Independently compiled documents differ in page text")
+        verify_printed_scores(contents[0],dest/"thesis-paper/evidence/minpi_rework")
         print("Standalone and replication manuscripts reproduce the complete included PDF text.",flush=True)
 
 
