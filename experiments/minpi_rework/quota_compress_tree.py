@@ -113,6 +113,27 @@ class Forest:
         k=int(np.flatnonzero(squared<=rho*rho*squared[0]+1e-12*max(1.,squared[0]))[0])
         return np.sort(order[:k]),dict(checks=len(order)+1)
 
+    def direct_sweep(self,x,order,rho):
+        allcols=np.arange(self.p)
+        full=self.predict(x,allcols)
+        scale=np.linalg.norm(full-self.empty)
+        limit=rho*scale+1e-12*max(1.,scale)
+        keep=np.ones(self.p,bool)
+        checks=0
+        for _ in range(self.p):
+            before=keep.sum()
+            for j in order[::-1]:
+                if keep[j]:
+                    keep[j]=False
+                    trial=allcols[keep]
+                    raw=self.predict(x[:,trial],trial)
+                    checks+=1
+                    if np.linalg.norm(full-raw)>limit:
+                        keep[j]=True
+            if keep.sum()==before:
+                break
+        return allcols[keep],dict(checks=checks)
+
 
 def extract(model,row):
     from xgboost import DMatrix
@@ -200,6 +221,7 @@ class Game:
         rejected=0
         n_ballots=0
         comparisons=0
+        deletion_order=[]
         if method=="gain_sweep":
             for _ in range(self.p):
                 before=keep.sum()
@@ -210,6 +232,7 @@ class Game:
                     n_checks+=1
                     candidate=residual+delta
                     if np.linalg.norm(candidate)<=limit:
+                        deletion_order.append(int(j))
                         keep[j]=False
                         active[ids]=False
                         residual=candidate
@@ -225,13 +248,14 @@ class Game:
                 n_checks+=int(keep.sum())
                 if costs[j]>limit**2:
                     break
+                deletion_order.append(j)
                 ids=self.groups[j]
                 ids=ids[active[ids]]
                 residual+=delta[:,j]
                 delta-=(self.a[:,ids]@self.incidence[ids]).toarray()
                 keep[j]=False
                 active[ids]=False
-        elif method=="votes":
+        elif method in ("votes","one_vote"):
             weights=np.asarray(self.a.T@(self.full/max(self.norm,1e-100)))[None,:]
             projected=np.zeros(1)
             marginals=np.asarray(self.incidence.T@weights.T).T.copy()
@@ -249,6 +273,7 @@ class Game:
                 n_checks+=1
                 norm=np.linalg.norm(candidate)
                 if norm<=limit:
+                    deletion_order.append(j)
                     projected+=marginals[:,j]
                     marginals-=np.asarray(self.incidence[ids].T@weights[:,ids].T).T
                     residual=candidate
@@ -257,6 +282,9 @@ class Game:
                     checked[:]=False
                 else:
                     checked[j]=True
+                    rejected+=1
+                    if method=="one_vote":
+                        continue
                     direction=candidate/norm
                     w=np.asarray(self.a.T@direction).ravel()
                     weights=np.vstack((weights,w))
@@ -266,9 +294,8 @@ class Game:
                         raise ArithmeticError("Rejected residual failed to separate its support")
                     marginals=np.vstack((marginals,marginal))
                     n_ballots+=1
-                    rejected+=1
         else:
             raise ValueError(method)
         assert np.linalg.norm(residual)<=limit+1e-10*max(1.,self.norm)
         return np.flatnonzero(keep),dict(checks=n_checks,cut_rejections=rejected,ballots=n_ballots,
-            directional_comparisons=comparisons)
+            directional_comparisons=comparisons,deletion_order=deletion_order)

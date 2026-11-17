@@ -18,6 +18,7 @@ from minppi_mofs.modeling import make_model
 OUT=b.ROOT/"results/minpi_rework/quota-tree"
 DEST=b.ROOT/"thesis-paper/evidence/minpi_rework/quota-tree"
 ARMS=("gain_prefix","gain_sweep","votes","exact_greedy","full")
+CONTROLS=("one_vote","direct_sweep")
 RHO=.20
 
 
@@ -60,7 +61,7 @@ def cached_margin(f,g,x,cols):
     return f.empty+np.asarray(g.a[:,active].sum(axis=1)).reshape(len(x),f.c)
 
 
-def select(name,seed,job):
+def select(name,seed,job,controls=False):
     directory,row=job
     x,y,task,idx=legacy.read_split(directory,row,seed)
     pool=np.sort(np.r_[idx["fit"],idx["vote"]])
@@ -90,10 +91,15 @@ def select(name,seed,job):
     cache_s=perf_counter()-time
     np.testing.assert_allclose(raw-f.empty,g.full.reshape(raw.shape),atol=4e-8,rtol=1e-6)
     info,forecasts={},{}
-    for method in np.random.default_rng(seed).permutation(ARMS):
+    key=f"{name}-{seed}"
+    for method in np.random.default_rng(seed).permutation(CONTROLS if controls else ARMS):
         t=perf_counter()
         if method=="gain_prefix":
             cols,diag=f.gain_prefix(xval,order,RHO)
+        elif method=="direct_sweep":
+            cols,diag=f.direct_sweep(xval,order,RHO)
+            original=json.loads((OUT/key/"selection.json").read_bytes())
+            np.testing.assert_array_equal(original["records"]["gain_sweep"]["support"],cols)
         elif method=="full":
             cols,diag=fullcols,{}
         else:
@@ -107,14 +113,14 @@ def select(name,seed,job):
         forecasts[method]=trees.as_scores(f.predict(x[np.ix_(idx["test"],cols)],cols),task)
         pred_s=perf_counter()-t
         pipeline=fit_s+parse_s+rank_s+search_s+pred_s
-        if method not in ("full","gain_prefix"):
+        cache_used=method not in ("full","gain_prefix","direct_sweep")
+        if cache_used:
             pipeline+=cache_s
         info[method]=dict(p=p,k=len(cols),support=cols.tolist(),relative_error=float(error),fit_s=fit_s,
-            parse_s=parse_s,rank_s=rank_s,cache_s=cache_s if method not in ("full","gain_prefix") else 0.,
+            parse_s=parse_s,rank_s=rank_s,cache_s=cache_s if cache_used else 0.,
             search_s=search_s,pred_s=pred_s,pipeline_s=pipeline,**diag)
         print(name,seed,method,len(cols),f"error={error:.4f}, {pipeline:.3f}s",flush=True)
-    key=f"{name}-{seed}"
-    sub=OUT/key
+    sub=(OUT/"controls" if controls else OUT)/key
     sub.mkdir(parents=True,exist_ok=True)
     scale=max(float(np.std(y[pool])),1e-12)
     archived=json.loads((receiver.OUT/key/"selection.json").read_bytes())["records"]["guard_gain"]
@@ -122,9 +128,10 @@ def select(name,seed,job):
     observed=b.metrics(y[idx["width"]],scores,task,scale)
     for m in reference:
         np.testing.assert_allclose(observed[m],reference[m],atol=8e-5)
-    with np.load(receiver.OUT/key/"predictions.npz") as saved:
-        forecasts["refit_gain"]=saved["guard_gain"]
-    info["refit_gain"]=dict(p=p,k=archived["k"],support=archived["selected"],pipeline_s=archived["deployment_s"])
+    if not controls:
+        with np.load(receiver.OUT/key/"predictions.npz") as saved:
+            forecasts["refit_gain"]=saved["guard_gain"]
+        info["refit_gain"]=dict(p=p,k=archived["k"],support=archived["selected"],pipeline_s=archived["deployment_s"])
     np.savez_compressed(sub/"predictions.npz",**forecasts)
     receipt=dict(task=task,seed=seed,p=p,scale=scale,groups=g.a.shape[1],calibration=len(xval),
         native_margin_max_abs=float(np.max(np.abs(raw-native))),records=info,
@@ -132,24 +139,25 @@ def select(name,seed,job):
     (sub/"selection.json").write_text(json.dumps(receipt),encoding="utf8")
 
 
-def score(jobs,seeds):
+def score(jobs,seeds,controls=False):
+    output=OUT/"controls" if controls else OUT
     keys=[(n,s) for n in legacy.CONFIG["datasets"] for s in seeds]
     lock={}
     for n,s in keys:
         key=f"{n}-{s}"
-        sub=OUT/key
+        sub=output/key
         receipt=sub/"selection.json"
         rec=json.loads(receipt.read_bytes())
         assert rec["forecast_hash"]==b.digest(sub/"predictions.npz")
         lock[key]=b.digest(receipt)
     DEST.mkdir(parents=True,exist_ok=True)
-    suffix="-".join(map(str,seeds))
+    suffix=("controls-" if controls else "")+"-".join(map(str,seeds))
     (DEST/f"lock-{suffix}.json").write_text(json.dumps(lock,indent=2),encoding="utf8")
     rows=[]
     with ZipFile(DEST/f"receipts-{suffix}.zip","w",ZIP_DEFLATED) as archive:
         for n,s in keys:
             key=f"{n}-{s}"
-            sub=OUT/key
+            sub=output/key
             receipt=sub/"selection.json"
             assert b.digest(receipt)==lock[key]
             archive.write(receipt,key+"/selection.json")
@@ -176,6 +184,7 @@ def main():
     parser.add_argument("action",choices=["check","select","score"])
     parser.add_argument("--seeds",type=int,nargs="+",default=[42])
     parser.add_argument("--datasets",nargs="+",default=legacy.CONFIG["datasets"])
+    parser.add_argument("--controls",action="store_true")
     args=parser.parse_args()
     with threadpool_limits(1):
         if args.action in ("check","select"):
@@ -185,9 +194,9 @@ def main():
             jobs=legacy.jobs()
             for seed in args.seeds:
                 for name in args.datasets:
-                    select(name,seed,jobs[name,seed])
+                    select(name,seed,jobs[name,seed],args.controls)
         if args.action=="score":
-            score(legacy.jobs(),args.seeds)
+            score(legacy.jobs(),args.seeds,args.controls)
 
 
 if __name__=="__main__":
