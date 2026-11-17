@@ -13,6 +13,16 @@
       "source_commit": "ab733a0",
       "source_sha256": "c34ffc0b1fd1794c3949069b102c055ed4de16fc2930dcb8a2749e5bc668d097",
       "output": [true, true, true, true, true, true]
+    },
+    {
+      "file": "TreeSizeSpan.wl",
+      "source_sha256": "b0e5c18546adeb9fa29e791c6ccffeba47a06f4ad919d65bfd71dde303d60ec8",
+      "output": [true, true, true, true, true, true, true]
+    },
+    {
+      "file": "TreeMaskQuota.wl",
+      "source_sha256": "5651b34babf37344816d58438647146ed5b281bd4d66fe0c33073d062b56ccc6",
+      "output": [true, true, true, true, true]
     }
   ]
 }
