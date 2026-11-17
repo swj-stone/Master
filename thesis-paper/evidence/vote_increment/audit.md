@@ -21,3 +21,9 @@ A partial minimum is a monotone upper bound on the completed minimum. Once that 
 ## Replay of the rejected version
 
 The paired checker `experiments.vote_increment.audit` applied to the original R3 seed tables gives **0/6** original source passes (**1/30** simultaneous seed passes) and **0/5** prospective source passes (**0/25** simultaneous seed passes). Only an ISOLET seed passed against both controls. Apply the same gate to subsequent versions.
+
+## First signed-game development audit
+
+The restricted-subspace tree votes (seed 42, signed/subspace-s42/scores.csv) pass **0/6** original datasets against both controls. Each voting arm uses 52 auxiliary tree fits beyond its reported native XGBoost fits. Count both for a saved-fit claim and show the two components separately. Madelon retained three fewer columns than mean voting but lost 0.05425 AUC relative to it. On ISOLET the minimum retained 72 extra columns against mean voting and 55 against direct Gain. These measurements rule out promoting this candidate on the registered criterion.
+
+A separate threshold-selection hypothesis uses size votes normalized to mean one, followed by the same quota cutoff in all arms. Minima of normalized shares typically sum to less than the corresponding means. Run a matched-scale or exact-width replay under mean ranking when reporting a gain from this hypothesis. Its result distinguishes a more informative ranking from a more aggressive width proposal.
