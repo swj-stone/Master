@@ -1,6 +1,6 @@
 # Dataset attribution
 
-The UCI Machine Learning Repository lists the datasets below under [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/). Each title links to the provider's citation and licensing record. The eight confirmation archives and the four chain-validation archives are distributed as downloaded. Their split indices, selected columns and forecasts were produced for this study.
+The UCI Machine Learning Repository lists the datasets below under [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/). Each title links to the provider's citation and licensing record. The eight confirmation, four chain-validation and six witness-transfer archives are distributed as downloaded. Their split indices, selected columns and forecasts were produced for this study.
 
 | Panel | Dataset | Creator(s) in the provider citation |
 |---|---|---|
@@ -16,6 +16,12 @@ The UCI Machine Learning Repository lists the datasets below under [Creative Com
 | Chain validation | [QSAR Biodegradation](https://doi.org/10.24432/C5H60M) | K. Mansouri, T. Ringsted, D. Ballabio, R. Todeschini and V. Consonni (2013) |
 | Chain validation | [QSAR Aquatic Toxicity](https://doi.org/10.24432/C5SG7H) | D. Ballabio, M. Cassotti, V. Consonni and R. Todeschini (2014) |
 | Chain validation | [Combined Cycle Power Plant](https://doi.org/10.24432/C5002N) | P. Tüfekci and H. Kaya (2014) |
+| Witness transfer | [MAGIC Gamma Telescope](https://doi.org/10.24432/C52C8B) | R. Bock (2004) |
+| Witness transfer | [Musk (Version 1)](https://doi.org/10.24432/C5ZK5B) | D. Chapman and A. Jain (1994) |
+| Witness transfer | [Wall-Following Robot Navigation Data](https://doi.org/10.24432/C57C8W) | A. Freire, M. Veloso and G. Barreto (2009) |
+| Witness transfer | [Real Estate Valuation](https://doi.org/10.24432/C5J30W) | I. Yeh (2018) |
+| Witness transfer | [Computer Hardware](https://doi.org/10.24432/C5830D) | J. Feldmesser (1987) |
+| Witness transfer | [Forest Fires](https://doi.org/10.24432/C5D88D) | P. Cortez and A. Morais (2007) |
 | Wider folds | [CNAE-9](https://doi.org/10.24432/C51G7P) | P. Ciarelli and E. Oliveira (2009) |
 | Wider folds | [Ozone Level Detection](https://doi.org/10.24432/C5NG6W) | K. Zhang, W. Fan and X. Yuan (2008) |
 | Wider folds | [Parkinson's Disease Classification](https://doi.org/10.24432/C5MS4X) | C. Sakar, G. Serbes, A. Gunduz, H. Nizam and B. Sakar (2018) |

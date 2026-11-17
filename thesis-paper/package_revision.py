@@ -482,7 +482,8 @@ def compression_members(pdf, source):
                   "test_minpi_greedy_rls.py"])
     files.update(ROOT / "data/minpi_compression" / (name + ".zip") for name in
                  ["glass", "raisin", "wifi", "leaves", "airfoil", "yacht", "slump", "energy",
-                  "landsat", "biodeg", "aquatic", "power"])
+                  "landsat", "biodeg", "aquatic", "power", "magic", "musk1", "wall", "estate",
+                  "hardware", "fires"])
     for name in ["ionosphere", "vehicle", "sonar"]:
         files.update(p for p in (ROOT / "data/context_study/pmlb" / name).iterdir() if p.is_file())
     layouts = sorted((RUNS / "wide-uci").glob("*/fold-*/layout.json"))
@@ -502,7 +503,7 @@ def compression_members(pdf, source):
                 raise ValueError(f"Changed sensitivity forecasts for {key}")
             files.update([receipt, forecast])
     for panel in ["pilot", "confirmation", "wide-transfer", "chain-validation", "legacy-gain",
-                  "legacy-gain/xgb-receiver"]:
+                  "legacy-gain/xgb-receiver", "witness-guard", "witness-transfer"]:
         files.update(evidence / panel / p for p in ["forecasts.zip", "scores.csv"])
     include_imports(files)
     files.add(Path(__file__).resolve())

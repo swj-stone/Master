@@ -6,6 +6,8 @@ The [shared-ridge sampler](../src/minppi_mofs/sampled_linear_minpi.py) evaluates
 
 The [eight-source audit](audit/minpi-compression-audit.md) checks the first predictive panel and exhaustive small games. The [four-source validation](evidence/minpi_compression/chain-validation/README.md), [matched Gain comparison](evidence/minpi_compression/legacy-gain/README.md) and [wider source transfer](evidence/minpi_compression/wide-transfer/sources.csv) give separate results. The archive includes the observed clocks and predictions, the [ridge identities](formal/SampledMarginal.lean), and proofs about [positive indices](formal/Dictator.lean) and the [sharp upper bound](formal/PartialUpper.lean).
 
+On six further sources, the frozen witness-deletion rule makes one proposal from a common coefficient-ranked prefix. Its matched controls remove the same number of low-coefficient or random columns and face the same acceptance guard. The [prospective study](evidence/minpi_compression/witness-transfer/README.md) reports the eligible columns before outer scoring, source-level predictions and complete selection times.
+
 To rebuild the current paper and replication package from the thesis checkout:
 
 ```powershell

@@ -8,6 +8,8 @@
 
 新八集、原六集及额外四集使用各自登记的比较规则。原六集同时比较直接 Gain 排名、系数排名及下游预测器；每次运行分别记录筛选时间与完成预测的时间。[原六集对照表（含未删列基线和实际秒数）](thesis-paper/evidence/minpi_compression/legacy-gain/comparison-zh.md) · [四个新增数据集](thesis-paper/evidence/minpi_compression/chain-validation/README.md) · [八集独立核验](thesis-paper/audit/minpi-compression-audit.md)
 
+在最后六个新数据集上，固定规则从同一系数前缀中提议删除已有负票见证的列，并与删除同样数量的低系数列、随机列和保留原前缀逐组比较。结果附有外测前计算的压缩上限、逐数据集精度与耗时，以及 Musk 分子级和 Forest Fires 公顷尺度的预测得分。[预先确定的方案](experiments/minpi_compression/witness_transfer.md) · [六集迁移结果](thesis-paper/evidence/minpi_compression/witness-transfer/README.md)
+
 ## 历史 R14：最低票数特征筛选的最佳优先搜索
 
 [R14 短篇论文](thesis-paper/supplement/minimum-vote-study.pdf) · [R14 独立 LaTeX 源码](thesis-paper/supplement/minimum-vote-study-source.zip) · [R14 结果包](packages/thesis-minimum-vote-paper.zip)

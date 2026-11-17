@@ -11,6 +11,7 @@ from threadpoolctl import threadpool_limits
 from experiments.minpi_compression import benchmark as b
 from experiments.minpi_compression import chain_validation as chain
 from experiments.minpi_compression import legacy_gain_receiver_audit, legacy_gain_replay, result_audit, witness_guard
+from experiments.minpi_compression import witness_transfer_sources
 
 
 def verified_payload(archive, key, expected, prediction_key):
@@ -78,6 +79,61 @@ def replay_chain():
             compare(metrics, control.loc[name, seed])
 
 
+def replay_witness_transfer():
+    folder = b.EVIDENCE / "witness-transfer"
+    lock = replay_ridge_panel(folder, witness_guard.METHODS, witness_transfer_sources.split, 30)
+    opportunities = pd.read_csv(folder / "opportunity.csv").set_index(["dataset", "seed"])
+    summary = pd.read_csv(folder / "opportunity-summary.csv").set_index(["task", "dataset"])
+    table = pd.read_csv(folder / "scores.csv").set_index(["dataset", "seed", "method"])
+    bounds = []
+    with ZipFile(folder / "forecasts.zip") as archive:
+        for key, receipt in lock.items():
+            state, payload = verified_payload(archive, key, receipt, "predictions")
+            name, seed, domain = state["dataset"], state["seed"], state["task"]
+            records = {r["method"]: r for r in state["rows"] if r["repeat"] == 0}
+            witness = records["witness"]
+            prefix = set(records["coefficient"]["order"][:records["coefficient"]["k"]])
+            assert prefix == set(witness["prefix"]) and set(witness["negative"]) <= prefix
+            h, k = len(set(witness["negative"])), len(prefix)
+            eligible = 0 < h < k
+            floor = (k - h) / k if eligible else 1.
+            compare(dict(inside_negatives=h, prefix_width=k, best_ratio=floor, eligible=int(eligible)),
+                    opportunities.loc[name, seed])
+            assert records["witness"]["k"] / k >= floor
+            bounds.append(dict(dataset=name, task=domain, floor=floor, eligible=eligible, h=h))
+            if name not in ("musk1", "fires"):
+                continue
+            _, y, _, idx = witness_transfer_sources.split(name, seed)
+            test = idx["test"]
+            with np.load(payload) as predictions:
+                for method in witness_guard.METHODS:
+                    pred = predictions[method]
+                    if name == "musk1":
+                        groups = witness_transfer_sources.load(name)[3][test]
+                        scores, labels = [], []
+                        for group in np.unique(groups):
+                            mask = groups == group
+                            assert len(np.unique(y[test][mask])) == 1
+                            labels.append(y[test][mask][0])
+                            scores.append(np.max(pred[mask, 1] - pred[mask, 0]))
+                        score = np.array(scores, dtype=float)
+                        metrics = result_audit.outcomes(np.asarray(labels), np.column_stack([-score, score]),
+                                                        "classification", 1.)
+                        check = dict(molecule_auc=metrics["auc"], molecule_accuracy=metrics["accuracy"])
+                    else:
+                        metrics = result_audit.outcomes(np.expm1(y[test]), np.maximum(np.expm1(pred), 0),
+                                                        "regression", 1.)
+                        check = dict(hectares_mae=metrics["mae"], hectares_r2=metrics["r2"])
+                    compare(check, table.loc[name, seed, method])
+    frame = pd.DataFrame(bounds)
+    for (task, name), row in summary.iterrows():
+        relevant = frame[frame.task == task] if name == "ALL" else frame[frame.dataset == name]
+        per_source = relevant.groupby("dataset")["floor"].apply(lambda r: np.log(r).mean())
+        floor = np.exp(per_source.mean())
+        compare(dict(best_width_ratio=floor, max_saving=1-floor, splits=len(relevant),
+                     eligible_splits=relevant.eligible.sum(), inside_negatives=relevant.h.sum()), row)
+
+
 def replay_wide():
     folder = b.EVIDENCE / "wide-transfer"
     table = pd.read_csv(folder / "scores.csv").set_index(["dataset", "fold", "method"])
@@ -133,11 +189,13 @@ if __name__ == "__main__":
             assert len(frame) == len(strict) == 240
         replay_chain()
         replay_ridge_panel(witness_guard.EVIDENCE, witness_guard.METHODS, witness_guard.split, 60)
+        replay_witness_transfer()
         replay_wide()
         legacy_gain_replay.verify()
         replay_receivers()
         historic = b.ROOT / "packages/piv1-original-forecasts.zip"
         legacy_gain_receiver_audit.check(historic if historic.is_file() else None)
     print("Replayed 480 primary and sensitivity outcomes, 140 independent chain outcomes, "
-          "300 guarded-deletion outcomes, 96 wider outcomes and 120 original ridge outcomes. Checked predictions for all eight "
+          "300 retrospective and 150 fresh guarded-deletion outcomes, 96 wider outcomes and "
+          "120 original ridge outcomes. Checked predictions for all eight "
           "boosted receiver arms on the 30 original splits and their unseen-input subsets.")
