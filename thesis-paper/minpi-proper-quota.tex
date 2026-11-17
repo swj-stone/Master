@@ -1,0 +1,54 @@
+\paragraph{Voting on predictive loss.}
+On voting rows held out from tree fitting, let $y$ contain the scalar outcomes
+for regression or the one-hot outcomes for classification. Let $f_T$ collect
+the stopped forest's predictions with the inputs in $T$ available. A
+classification forest averages probability vectors at its leaves and stopped
+nodes. Then squared Euclidean loss, divided by the number of rows, gives the
+multiclass Brier score~\citep{gneiting2007proper}. For regression it gives
+mean squared error. We score each prediction before averaging over masks.
+Scoring the average prediction would omit the variation between masks.
+
+Write $z=y-f_\varnothing$ and $f_T-f_\varnothing=\sum_{H\subseteq T}a_H$.
+For a set $U$ of input columns define
+\[
+ w_U=2\langle z,a_U\rangle-
+       \sum_{G\cup H=U}\langle a_G,a_H\rangle ,
+\]
+where a missing $a_U$ is zero and pairs in the sum are ordered. For a
+deployed support $S$, let $E_s(S)$ be the expected excess squared loss
+$\|y-f_{S\cap T}\|^2-\|y-f_T\|^2$ under a uniform mask of size $s$.
+
+\begin{proposition}
+For each $s=1,\ldots,p$ the excess loss per available fraction is
+\[
+ V_s(S)=\frac{p}{s}E_s(S)=
+ \sum_{U\not\subseteq S}
+   \frac{\binom{s-1}{|U|-1}}{\binom{p-1}{|U|-1}}\,w_U .
+\]
+Every size votes to accept $S$ when
+$\min_{1\le s\le p}\{\epsilon\|z\|^2-V_s(S)\}\ge0$.
+This is equivalent to bounding expected excess loss under every exchangeable
+availability law by $\epsilon\,\mathbb E[|T|]\,\|z\|^2/p$.
+\end{proposition}
+\begin{proof}
+Expanding the two squares cancels $\|z\|^2$. A linear term disappears when
+its required set is omitted from $S$. A pair disappears when $G\cup H$
+is omitted. In each case the term enters the comparison only when its entire
+required set $U$ is present in $T$, an event with probability
+$\binom{s}{|U|}/\binom{p}{|U|}$. Multiplying by $p/s$ gives the displayed
+coefficient. Under an exchangeable law, the conditional mask is uniform at
+each size of positive mass. Average the conditional bounds over sizes, using
+$E_0(S)=0$. Conversely, the law concentrated on any one size tests that size.
+\end{proof}
+
+To price the deletion of $j$, add the coefficients of all still-live unions
+$U\subseteq S$ containing $j$, grouped by $|U|$. The resulting increment in
+$V_s$ uses the same binomial factors. When $j$ is removed, each such union
+becomes inactive once and its weight is subtracted from the candidate
+coefficients of its remaining members. If $D$ bounds path-group size, the
+coefficient updates along a whole deletion path cost
+$O(\sum_{U:w_U\ne0}|U|)$ after the unions are formed, with $|U|\le2D$.
+Keeping $m$ linear terms and $e$ nonzero Gram entries separately gives the
+bound $O(D(m+e))$. Forming the Gram matrix and testing candidates at the
+requested sizes incur separate costs. The vote bounds labeled loss on the
+voting rows for a uniform mask conditional on size.
