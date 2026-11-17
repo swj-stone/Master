@@ -15,7 +15,7 @@ from experiments.anchored_vote.audit import score
 from experiments.minpi_replication import direct_gain as native
 from experiments.minpi_design.study import load
 from experiments.split_vote.run import ORIGINAL, ROOT
-from experiments.vote_increment.adaptive import game
+from experiments.vote_increment.adaptive import game,veto
 
 
 DEST=ROOT/"thesis-paper/evidence/vote_increment/adaptive"
@@ -81,7 +81,7 @@ def analyze(frame):
     keys=["dataset","seed"]
     minrows=frame[frame.arm=="min"]
     pairs=[]
-    for ctrl in ("gain","mean","mean_scale"):
+    for ctrl in (method for method in frame.arm.unique() if method!="min"):
         base=frame[frame.arm==ctrl]
         joined=minrows.merge(base,on=keys,suffixes=("_min","_base"),validate="one_to_one")
         width=joined.k_min-joined.k_base
@@ -100,12 +100,13 @@ def analyze(frame):
 def run(args):
     sub=RUN/args.tag
     sub.mkdir(parents=True,exist_ok=True)
-    source_sha=hashlib.sha256(Path(__file__).read_bytes()+Path(game.__file__).read_bytes()).hexdigest()
+    source_sha=hashlib.sha256(Path(__file__).read_bytes()+Path(game.__file__).read_bytes()+Path(veto.__file__).read_bytes()).hexdigest()
+    arms=veto.ARMS if args.design=="veto" else ARMS
     for i,name in enumerate(args.names):
         for j,seed in enumerate(args.seeds):
             x,y,task,idx,read_labels=load(name,seed)
             x=np.asarray(x,dtype=np.float32)
-            for arm in np.roll(ARMS,i+j):
+            for arm in np.roll(arms,i+j):
                 folder=sub/f"{name}-{seed}"/arm
                 folder.mkdir(parents=True,exist_ok=True)
                 receipt=folder/"record.json"
@@ -113,7 +114,10 @@ def run(args):
                     if json.loads(receipt.read_bytes())["source"]!=source_sha:
                         raise ValueError(f"Stale selector at {receipt}")
                     continue
-                rec,pred=select(x,y,task,idx,seed,arm,args.design)
+                if args.design=="veto":
+                    rec,pred=veto.fit_policy(x,y,task,idx,seed,arm)
+                else:
+                    rec,pred=select(x,y,task,idx,seed,arm,args.design)
                 np.savez_compressed(folder/"pred.npz",pred=pred,indices=idx["test"])
                 rec.update(dataset=name,seed=seed,arm=str(arm),design=args.design,source=source_sha,
                            task=task,forecast=hashlib.sha256((folder/"pred.npz").read_bytes()).hexdigest())
@@ -126,7 +130,7 @@ def run(args):
         for seed in args.seeds:
             _,_,task,idx,read_labels=load(name,seed)
             y=read_labels()
-            for arm in ARMS:
+            for arm in arms:
                 folder=sub/f"{name}-{seed}"/arm
                 rec=json.loads((folder/"record.json").read_bytes())
                 assert rec["forecast"]==hashlib.sha256((folder/"pred.npz").read_bytes()).hexdigest()
