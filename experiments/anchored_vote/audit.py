@@ -175,8 +175,11 @@ def contrasts(rows):
             passes = g.delta_seconds.median()<0 and g.width_excess.median()<=0
             result=dict(dataset=name,control=method,task=g.task_min.iloc[0],source_pass=passes,
                         source_pass_quality=passes and g.delta_primary.median()>=-.01,
+                        source_pass_5pct=bool((g.seconds_min/g.seconds_control).median()<=.95
+                                              and g.width_excess.median()<=0 and g.delta_primary.median()>=-.01),
                         simultaneous_seeds=int((speed[ix]&width[ix]).sum()),
                         simultaneous_quality_seeds=int((speed[ix]&width[ix]&qual[ix]).sum()),
+                        anchor_reductions=int((g.k_min<g.anchor_k_min).sum()),
                         changed_supports=int((g.columns_min!=g.columns_control).sum()),
                         changed_forecasts=int((g.predictions_sha256_min!=g.predictions_sha256_control).sum()),
                         median_paired_time_ratio=(g.seconds_min/g.seconds_control).median(),
