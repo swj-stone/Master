@@ -18,7 +18,7 @@ latexmk -pdf -interaction=nonstopmode -halt-on-error '-outdir=build-refit' main.
 Pop-Location
 ```
 
-[原六个预处理集的 CUDA 方案](evidence/anchored_vote/prepared.md) · [五个新数据源和分区](../experiments/minpi_replication/second_panel/protocol.md) · [投票的形式化计数](formal/SplitVote.lean)
+[11 个数据集的中文对照表](evidence/anchored_vote/comparison-zh.md) · [原六集逐 seed](evidence/anchored_vote/prepared-seeds.csv) · [相同 0.005 容差](evidence/anchored_vote/prepared-common-slack.csv) · [原六集 CUDA 方案](evidence/anchored_vote/prepared.md) · [五个新数据源与分区](../experiments/minpi_replication/second_panel/protocol.md) · [投票的形式化计数](formal/SplitVote.lean) · [两次候选验收的形式化证明](formal/AnchoredGuard.lean)
 
 在同一批 25 组实验上，MinPI 相对 scikit-learn 的 RFECV 在五个数据集均更快且保留列数达标，加入预测分数要求后有四个达标。直接按模型平均重要性截断的 SelectFromModel 在五个数据集均更快。[两种标准方法的配置与实测](evidence/anchored_vote/standard/README.md) · [预测归档与独立复算](evidence/anchored_vote/replication.md)
 
