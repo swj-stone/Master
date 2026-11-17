@@ -71,10 +71,46 @@ def _histogram(ptr, ids, ranks, mass):
 
 
 @njit(cache=True)
-def _scatter(u, direction, ptr, ids, degree, mass, hist, target):
+def _paired_sparse_histogram(ptr, ids, ranks, mass):
+    """Compute forward/reverse activation ranks in one traversal and store occupied bins."""
+    p = ranks.shape[1]
+    capacity = len(mass)*min(p,len(ranks))
+    offsets = np.zeros(len(mass)+1,np.int32)
+    sizes = np.empty(capacity,np.int32)
+    effects = np.empty(capacity)
+    counts = np.zeros(p+1,np.int32)
+    touched = np.empty(p+1,np.int32)
+    cursor=0
+    for u in range(len(mass)):
+        n=0
+        for m in range(0,len(ranks),2):
+            lo,hi=p,0
+            for pos in range(ptr[u],ptr[u+1]):
+                rank=ranks[m,ids[pos]]
+                lo,hi=min(lo,rank),max(hi,rank)
+            for rank in (hi,p+1-lo):
+                if counts[rank]==0:
+                    touched[n]=rank
+                    n+=1
+                counts[rank]+=1
+        for i in range(n):
+            rank=touched[i]
+            sizes[cursor]=rank
+            effects[cursor]=mass[u]*counts[rank]/len(ranks)
+            cursor+=1
+            counts[rank]=0
+        offsets[u+1]=cursor
+    return offsets,sizes[:cursor],effects[:cursor]
+
+
+@njit(cache=True)
+def _scatter(u, direction, ptr, ids, degree, mass, hist, hp, hi, hv, target):
     for pos in range(ptr[u],ptr[u+1]):
         j = ids[pos]
-        if hist.shape[1]:
+        if len(hp):
+            for q in range(hp[u],hp[u+1]):
+                target[j,hi[q]] += direction*hv[q]
+        elif hist.shape[1]:
             for size in range(1,hist.shape[1]):
                 target[j,size] += direction*hist[u,size]
         else:
@@ -82,33 +118,48 @@ def _scatter(u, direction, ptr, ids, degree, mass, hist, target):
 
 
 @njit(cache=True)
-def _initialize(active, ptr, ids, degree, mass, hist, delta):
+def _initialize(active, ptr, ids, degree, mass, hist, hp, hi, hv, delta):
     delta[:] = 0.
     for u in range(len(mass)):
         if active[u]:
-            _scatter(u,1.,ptr,ids,degree,mass,hist,delta)
+            _scatter(u,1.,ptr,ids,degree,mass,hist,hp,hi,hv,delta)
 
 
 @njit(cache=True)
-def _remove(j, update, active, ptr, ids, fp, terms, degree, mass, hist, delta):
+def _remove(j, update, active, ptr, ids, fp, terms, degree, mass, hist, hp, hi, hv, delta):
     for i in range(fp[j],fp[j+1]):
         u = terms[i]
         if active[u]:
             active[u] = False
             if update:
-                _scatter(u,-1.,ptr,ids,degree,mass,hist,delta)
+                _scatter(u,-1.,ptr,ids,degree,mass,hist,hp,hi,hv,delta)
 
 
 class MatchedSearch:
-    def __init__(self, terms, ranks=None):
+    def __init__(self, terms, ranks=None, *, sparse_mc=False):
         self.terms = terms
         inc = terms.incidence
         self.degree = np.diff(inc.indptr)
         self.sampled = ranks is not None
         self.normalizer = terms.p/np.arange(1,terms.p+1)
         self.weights = probabilities(terms.p, int(self.degree.max(initial=0)))[1:].T
-        self.hist = (_histogram(inc.indptr,inc.indices,ranks,terms.mass)
-                     if self.sampled else np.empty((0,0)))
+        self.hist = np.empty((0,0))
+        self.hptr = self.hindex = np.empty(0,np.int32)
+        self.hval = np.empty(0)
+        self.sparse_hist = None
+        if self.sampled and sparse_mc:
+            if len(ranks)%2 or not np.array_equal(ranks[::2],1+terms.p-ranks[1::2]):
+                raise ValueError("Sparse estimator requires antithetic paired ranks")
+            self.hptr,self.hindex,self.hval=_paired_sparse_histogram(
+                inc.indptr,inc.indices,ranks,terms.mass)
+            self.sparse_hist=sparse.csr_matrix((self.hval,self.hindex,self.hptr),
+                                               shape=(len(terms.mass),terms.p+1))
+        elif self.sampled:
+            self.hist=_histogram(inc.indptr,inc.indices,ranks,terms.mass)
+
+    def _threshold_totals(self,lost):
+        hist=self.sparse_hist if self.sparse_hist is not None else self.hist
+        return np.asarray(hist[lost].sum(axis=0)).ravel()
 
     def curve(self, cols):
         """Physical excess over the uncompressed masked teacher, per size and null response."""
@@ -117,7 +168,7 @@ class MatchedSearch:
         missing[cols] = 0
         lost = np.ravel(t.incidence@missing)>0
         if self.sampled:
-            raw = np.cumsum(self.hist[lost].sum(axis=0))[1:]
+            raw = np.cumsum(self._threshold_totals(lost))[1:]
         else:
             by_degree = np.bincount(self.degree[lost], weights=t.mass[lost],
                                     minlength=self.weights.shape[0])
@@ -127,7 +178,7 @@ class MatchedSearch:
     def run(self, epsilon=.02, recount=False):
         t = self.terms
         inc, by = t.incidence,t.by_feature
-        args = inc.indptr, inc.indices, self.degree, t.mass, self.hist
+        args = inc.indptr, inc.indices, self.degree, t.mass, self.hist, self.hptr,self.hindex,self.hval
         keep = np.ones(t.p,bool)
         active = np.ones(len(t.mass),bool)
         width = t.p+1 if self.sampled else self.weights.shape[0]
@@ -139,7 +190,7 @@ class MatchedSearch:
             if recount and path:
                 _initialize(active,*args,delta)
                 lost = ~active
-                current = (self.hist[lost].sum(axis=0) if self.sampled else
+                current = (self._threshold_totals(lost) if self.sampled else
                            np.bincount(self.degree[lost],weights=t.mass[lost],
                                        minlength=width).astype(float,copy=False))
             candidates = np.flatnonzero(keep)
@@ -154,7 +205,7 @@ class MatchedSearch:
             current += delta[j]
             keep[j] = False
             _remove(j,not recount,active,inc.indptr,inc.indices,by.indptr,by.indices,
-                    self.degree,t.mass,self.hist,delta)
+                    self.degree,t.mass,self.hist,self.hptr,self.hindex,self.hval,delta)
         return np.flatnonzero(keep),path
 
 
