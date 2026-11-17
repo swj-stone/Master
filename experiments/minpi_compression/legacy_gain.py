@@ -108,7 +108,12 @@ def select():
             receipt = sub / "selection.json"
             if receipt.exists():
                 info = json.loads(receipt.read_bytes())
-                if signature() != info["signature"] or bench.digest(sub / "predictions.npz") != info["forecast"]:
+                current = signature()
+                accepted = [current]
+                versions = json.loads(Path(__file__).with_name("legacy_gain_primary_compat.json").read_bytes())
+                if current["legacy_gain"] == versions["revised"]:
+                    accepted.append({**current, "legacy_gain":versions["original"]})
+                if info["signature"] not in accepted or bench.digest(sub / "predictions.npz") != info["forecast"]:
                     raise ValueError(f"Stale evidence at {sub}")
                 lock[sub.name] = bench.digest(receipt)
                 continue
@@ -158,7 +163,9 @@ def independent_metrics(y, pred, task, scale):
         for c, column in enumerate(pred.T):
             positive = y == c
             n = positive.sum()
-            scores.append((rankdata(column)[positive].sum() - n*(n+1)/2) / (n*(len(y)-n)))
+            # Rank midpoints can sum above 1e9 on a large negative class.
+            total_rank = rankdata(np.asarray(column,dtype=np.float64))[positive].sum(dtype=np.float64)
+            scores.append((total_rank - n*(n+1)/2) / (n*(len(y)-n)))
         return dict(auc=np.mean(scores), accuracy=np.mean(y == pred.argmax(axis=1)))
     mae = np.mean(np.abs(y-pred))
     return dict(r2=1-np.sum((y-pred)**2)/np.sum((y-y.mean())**2), mae=mae, scaled_mae=mae/scale)

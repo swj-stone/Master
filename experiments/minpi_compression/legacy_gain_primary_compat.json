@@ -1,0 +1,5 @@
+{
+  "original": "fac23d3047cb3b0496994d39d7ee19fa03bc16ccf8331caa65468607f0b3080d",
+  "revised": "f4231c64450870124e3c1e56e7246435aa01b230337a118f03a7134a46ac4964",
+  "scope": "The two exact versions select the same features and make the same predictions. Revision 90a26d0 generated the original receipts. The later scorer sums ranks in float64 for nonlinear float32 forecasts and recognizes original receipts during resume."
+}

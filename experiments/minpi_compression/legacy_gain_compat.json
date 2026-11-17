@@ -1,0 +1,5 @@
+{
+  "original": "7ede5871cd13dfbd2b1bca00f3460ef359f84f5494067b1e068828578db3c8cb",
+  "revised": "9768839f43c4fe20181c4d324d5ebfc4fef27be5f27062bad151542461b28878",
+  "scope": "Both exact generator revisions use identical ranking, guard, fit, timing and sealing code. Revision 90a26d0 ran the control. The later reader handles the two historical frozen.json schemas and recognizes its predecessor when resuming. All other source and protocol hashes retain exact comparisons."
+}

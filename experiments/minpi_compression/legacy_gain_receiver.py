@@ -70,7 +70,12 @@ def select():
         receipt = dest / "selection.json"
         if receipt.exists():
             stored = json.loads(receipt.read_bytes())
-            assert (stored["signature"] == signature and stored["parent"] == parent[key]
+            accepted = [signature]
+            filename = Path(__file__).name
+            compatibility = json.loads(Path(__file__).with_name("legacy_gain_compat.json").read_bytes())
+            if signature[filename] == compatibility["revised"]:
+                accepted.append({**signature, filename:compatibility["original"]})
+            assert (stored["signature"] in accepted and stored["parent"] == parent[key]
                     and stored["forecast"] == bench.digest(dest / "predictions.npz"))
             lock[key] = bench.digest(receipt)
             continue
@@ -151,8 +156,9 @@ def score():
                     member, = [f for f in old.namelist() if "PIv1-all-seeds-" in f and f.endswith(suffix)]
                     with np.load(BytesIO(old.read(member))) as a:
                         np.testing.assert_array_equal(y,a["y"])
-                        previous = json.loads(old.read(member.replace("predictions.npz","result.json")))
-                        preds["old_"+arm] = as_score_matrix(a["selected"],task),dict(k=previous["retained"])
+                        frozen = json.loads(old.read(member.replace("predictions.npz","frozen.json")))
+                        choice = frozen["choices"]["vote"] if arm == "PIv1" else frozen
+                        preds["old_"+arm] = as_score_matrix(a["selected"],task),dict(k=choice["retained"])
                 for method,(pred,entry) in preds.items():
                     common = dict(dataset=n,seed=s,method=method,task=task,k=entry["k"],p=len(base["rows"][0]["order"]))
                     for part,mask in (("primary",slice(None)),("novel",masks[key])):
