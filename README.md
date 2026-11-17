@@ -6,7 +6,7 @@
 
 当前论文研究单个特征的最小边际票。给联盟重拟合 Ridge 并在独立验证行上投票；加入某一列使赢票变成输票，即得到该列的负票见证。论文比较了共用矩阵分解检验多个单列、复用已观测票值、在嵌套联盟间二分定位负票三种计算策略。[论文 PDF](thesis-paper/minpi.pdf) · [独立 LaTeX 源码](thesis-paper/minpi-source.zip) · [实验指令与逐数据集结果](experiments/minpi_compression/README.md) · [复现包](packages/thesis-minpi-compression.zip)
 
-新八集、原六集及额外四集使用各自登记的比较规则。原六集同时比较直接 Gain 排名、系数排名及下游预测器；每次运行分别记录筛选时间与完成预测的时间。[原六集对照](thesis-paper/evidence/minpi_compression/legacy-gain/README.md) · [四个新增数据集](thesis-paper/evidence/minpi_compression/chain-validation/README.md) · [八集独立核验](thesis-paper/audit/minpi-compression-audit.md)
+新八集、原六集及额外四集使用各自登记的比较规则。原六集同时比较直接 Gain 排名、系数排名及下游预测器；每次运行分别记录筛选时间与完成预测的时间。[原六集对照表（含未删列基线和实际秒数）](thesis-paper/evidence/minpi_compression/legacy-gain/comparison-zh.md) · [四个新增数据集](thesis-paper/evidence/minpi_compression/chain-validation/README.md) · [八集独立核验](thesis-paper/audit/minpi-compression-audit.md)
 
 ## 历史 R14：最低票数特征筛选的最佳优先搜索
 
