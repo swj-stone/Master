@@ -2,9 +2,15 @@
 
 硕士研究在 `MastersThesis/` 的 `thesis/masters` 分支进行，与 `../Master/` 共享 Git 仓库及 Python 环境。会议最终版在 `../Master/` 的 `main` 分支，供只读参考。工作树中的 `data/`、`results/` 和 `packages/` 是独立的本地文件，受 Git 忽略规则管理。
 
-## MinPI 特征压缩
+## 当前论文：提升树的 MinPI 输入压缩
 
-当前论文研究单个特征的最小边际票。给联盟重拟合 Ridge 并在独立验证行上投票；加入某一列使赢票变成输票，即得到该列的负票见证。论文比较了共用矩阵分解检验多个单列、复用已观测票值、在嵌套联盟间二分定位负票三种计算策略。[论文 PDF](thesis-paper/minpi.pdf) · [独立 LaTeX 源码](thesis-paper/minpi-source.zip) · [实验指令与逐数据集结果](experiments/minpi_compression/README.md) · [复现包](packages/thesis-minpi-compression.zip)
+当前方法在已训练的 XGBoost 树上逐步删除输入列。预测走到已删除列的分裂时，在该节点返回加权后代值；部署端可以仅采集保留列。论文比较了联盟规模投票、直接精确扫描和 Gain 顺序删除。[当前论文 PDF](thesis-paper/minpi-tree.pdf) · [独立 LaTeX 源码](packages/minpi-tree-source.zip) · [复现包](packages/minpi-tree-replication.zip) · [复现指引](thesis-paper/tree-replication.md) · [训练和部署](experiments/minpi_rework/README.md)
+
+13 个公开来源各使用五个种子。另有一项独立的五来源校准实验，原来的六个预处理任务用于开发对照。各组使用的目标、预测文件和访问方式均在复现指引中逐项列出。
+
+## 历史 Ridge 版本的 MinPI 特征压缩
+
+该历史版本研究单个特征的最小边际票。给联盟重拟合 Ridge 并在独立验证行上投票；加入某一列使赢票变成输票，即得到该列的负票见证。论文比较了共用矩阵分解检验多个单列、复用已观测票值、在嵌套联盟间二分定位负票三种计算策略。[论文 PDF](thesis-paper/minpi.pdf) · [独立 LaTeX 源码](thesis-paper/minpi-source.zip) · [实验指令与逐数据集结果](experiments/minpi_compression/README.md) · [复现包](packages/thesis-minpi-compression.zip)
 
 新八集、原六集及额外四集使用各自登记的比较规则。原六集同时比较直接 Gain 排名、系数排名及下游预测器；每次运行分别记录筛选时间与完成预测的时间。[原六集对照表（含未删列基线和实际秒数）](thesis-paper/evidence/minpi_compression/legacy-gain/comparison-zh.md) · [四个新增数据集](thesis-paper/evidence/minpi_compression/chain-validation/README.md) · [八集独立核验](thesis-paper/audit/minpi-compression-audit.md)
 
