@@ -5,8 +5,8 @@ from experiments.anchored_vote.audit import OUT
 
 
 def section(title,df,new):
-    lines=[f"## {title}","","| 数据集 | 指标 | 保留列数 | 完整耗时（秒） | 测试分数 | 准确率或 MAE | 同时通过的 seed |",
-           "|---|---|---:|---:|---:|---:|---:|"]
+    lines=[f"## {title}","","| 数据集 | 输入列数 | 指标 | 保留列数 | 完整耗时（秒） | 测试分数 | 准确率或 MAE | 同时通过的 seed |",
+           "|---|---:|---|---:|---:|---:|---:|---:|"]
     for _,row in df.iterrows():
         pi,base=("min","control") if new else ("pi","base")
         is_cls=pd.notna(row.get(f"auc_{pi}"))
@@ -14,7 +14,7 @@ def section(title,df,new):
         def pair(name,precision):
             return f"{row[f'{name}_{pi}']:.{precision}f} / {row[f'{name}_{base}']:.{precision}f}"
         passed=int(row["simultaneous_seeds" if new else "paired_pass_seeds"])
-        lines.append(f"| {row.dataset} | {'AUC' if is_cls else 'R²'} | {pair('k',0)} | {pair('seconds',3)} | "
+        lines.append(f"| {row.dataset} | {int(row.input_width)} | {'AUC' if is_cls else 'R²'} | {pair('k',0)} | {pair('seconds',3)} | "
                      f"{pair(primary,4)} | {pair(secondary,4)} | {passed}/5 |")
     return lines
 
@@ -22,6 +22,9 @@ def section(title,df,new):
 def main():
     prepared=pd.read_csv(OUT/"prepared-sources.csv").query("baseline=='exhaustive'")
     prospect=pd.read_csv(OUT/"sources.csv").query("control=='exhaustive'")
+    prepared["input_width"]=prepared.p_pi
+    from experiments.minpi_replication.second_panel import data
+    prospect["input_width"]=prospect.dataset.map(lambda name:len(data.feature_names(name)))
     if len(prepared)!=6 or len(prospect)!=5:
         raise RuntimeError("Both panels must be complete")
     lines=["# MinPI 和直接 Gain 的逐数据集对照","",
