@@ -101,38 +101,31 @@ acceptance implementation, MinPI still took $1.135$ times MDI alone.
 \input{minpi-wide-study}
 
 \paragraph{Search and earlier benchmarks.}
-After scoring we exhaustively minimized the voting-sample worst excess
-at each width on the seven small sources. Greedy search missed the optimum
-by more than $10^{-8}$ of the null loss at 13 widths across 12 fits. The
-largest gap was $.00750$. Substituting one optimal support per width for
-the greedy path, then applying exactly the same independent acceptance
-rules alongside MDI, reproduced all 35 selected supports. This diagnostic
-does not optimize the joint acceptance checks over all supports.
-The corresponding unrestricted empirical quota problem is already
-NP-hard for a fixed budget (Appendix~\ref{app:hardness}).
+The unrestricted empirical quota problem is NP-hard
+(Appendix~\ref{app:hardness}). After release we enumerated the
+voting-sample optimum at each width on the seven small sources. The
+largest greedy excess above this optimum was $.00750$ of the null loss.
+Replacing the greedy path with one such optimum per width, retaining
+MDI and the same independent acceptance rules, reproduced all 35 supports.
 
-On the six previously studied preprocessed datasets (30 fits, up to 100
-columns), the same forest procedure gave a width ratio of $.932$ and
-a fit-inclusive time ratio of $1.491$ against MDI. On Madelon it retained
-40.0 columns on average against 53.6, with AUC $.724$ for both. On these
-same test rows, the archived gain-ranked XGBoost retrained on a selected
-subset retained only 20.4 columns and reached $.830$ AUC. This comparator
-can use the full development set to refit its trees. Across all six tasks
-it retained fewer columns, improved AUC on every classifier, and reduced
-Abalone's MAE. The comparison changes both the learner and its access to
-development labels. An
-earlier boosted-tree version used margin distortion and split gain. Its
-13-source width ratio was $.894$ against gain but $.988$ against static
-ablation. Its objective and fitted models differ from the supervised
-forest comparison; we keep its results separate in the release.
+On six previously studied preprocessed datasets (30 fits, up to 100
+columns), MinPI's width ratio against MDI was $.932$. On Madelon the
+methods retained 40.0 and 53.6 columns, both at AUC $.724$. The archived
+gain-ranked XGBoost refit retained 20.4 columns at AUC $.830$ on the same
+test rows. It had smaller widths on all six tasks, higher AUC on all five
+classifiers and lower MAE on Abalone. That comparison changes both the
+learner and the labels available for fitting; its final XGBoost uses the
+full development sample. The release contains the earlier boosted-tree
+study and its separate margin-distortion objective.
 
 \section{Scope}
 For a fixed shallow forest the minimum gives an exact decision across
 availability sizes and can shorten the search substantially on wide
 inputs. The observed trade against ordinary impurity selection was fewer
-columns and more computation. Mean-size ranking matched the minimum
-on the seven small sources. The all-size acceptance check still failed
-on all five Seoul fits under temporal shift. These experiments assign
-equal costs to columns. Most masks are hypothetical and the historical
-station study covers one network. Deeper forests can produce many more
-overlapping path sets and make the Gram construction impractical.
+columns and more computation. Mean-size ranking matched the minimum in
+both panels. The all-size acceptance check still failed on all five
+Seoul fits under temporal shift. Whole-device and historical-fee
+comparisons gave smaller practical gains than column counts suggested.
+Most outage masks were hypothetical and the recorded outage study covers
+one network. Deeper forests can produce many more overlapping path sets
+and make the Gram construction impractical.

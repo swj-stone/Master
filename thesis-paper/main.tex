@@ -17,8 +17,8 @@
 \begin{abstract}
 Removing a column from a fitted forest can have a different cost when another
 measurement is already missing. MinPI assigns one vote to each possible
-number of available inputs. A deletion passes if its excess squared loss
-stays within budget at every size. We integrate these votes exactly for
+number of available inputs. Any size whose excess squared loss exceeds
+the budget vetoes the deletion. We integrate these votes exactly for
 trees that stop at the first unavailable split. Products of path increments
 give a finite set of coefficients that successive deletions can reuse.
 The minimum vote tests every row-independent exchangeable mask law on the
@@ -38,11 +38,11 @@ violations from 14 to 10 of 35 runs, at a cost of 0.23 columns on average.
 \end{abstract}
 
 \section{Introduction}
-A measurement omitted from a deployed model cannot be used even on days
-when it is available. Consider a forest trained with a temperature sensor
-and a pressure sensor. If some pressure readings are lost, the cost of
-permanently dropping temperature depends on which paths remain reachable.
-We study one global set of retained columns. On each case a tree follows
+In the Beijing air-quality records examined below, 239 held-out station-days
+were missing at least one input for predicting the next day's PM2.5.
+Permanently dropping an instrument changes the forecast even on days when
+it works. The cost of that decision also depends on which other instruments
+are available. We study one global set of retained columns. On each case a tree follows
 its original splits until it encounters an unavailable input. Prediction
 then uses the mean training response at that node. Both the original and
 compressed forests face the same available measurements.

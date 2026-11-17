@@ -1,4 +1,10 @@
-# Export and use a MinPI-compressed XGBoost ensemble
+# MinPI forest experiments
+
+The current paper fits a supervised random forest with separate fitting, voting, acceptance and test rows. To train a model on three labeled CSVs and predict on the retained columns, use [the deployment CLI](predictive_rf_deploy.md). The same interface accepts a map from input channels to physical acquisition units. Use the [paper index](../../thesis-paper/README.md) to locate paired score tables and the [replication guide](../../thesis-paper/tree-replication.md) to rebuild them.
+
+The [seven-source design](predictive_confirmation.md) compares ranking and acceptance rules. The [wider-source design](wide_veto_protocol.md) compares exact implementations on identical paths. The [wearable protocol](wearable_protocol.md) evaluates subject-disjoint device retirement, while the [historical fees protocol](field_cost_protocol.md) prices an entire feature bundle.
+
+## Export and use the earlier MinPI-compressed XGBoost ensemble
 
 The `compress_model` command takes a numeric training CSV with a target and a separate calibration CSV with the same feature names. Calibration uses predictors alone. It fits the teacher, runs the three-stratum MinPI greedy deletion path and saves a compressed tree ensemble. When a tree first encounters a removed split, the exporter turns that node into a leaf with its cover-weighted descendant value and omits its descendants. Every surviving split uses the retained column's position in the new input schema. NaN follows the teacher's default branch. The deployed Python predictor requires NumPy; the CSV command also uses pandas.
 

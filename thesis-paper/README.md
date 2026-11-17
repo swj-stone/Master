@@ -1,4 +1,18 @@
-# Finding Negative Min-Marginal Votes for Feature Selection
+# MinPI for Forest Input Compression under Partial Availability
+
+[论文 PDF](minpi-tree.pdf) · [LaTeX 源码](main.tex) · [复现步骤](tree-replication.md) · [随机森林训练和部署](../experiments/minpi_rework/predictive_rf_deploy.md)
+
+论文中每个联盟规模对候选子集投一票，最差规模可以否决删除。搜索使用树路径的损失展开，计算时可以跳过整段联盟规模。下面各行采用不同的对照和计时边界。
+
+| 研究问题 | 结果 | 数据 |
+|---|---|---|
+| 较宽的冻结森林能否再少用几列？ | 四来源、五 seed。相对使用相同验收规则的 MDI，实际可访问的列少 10.7%，训练至预测多花 29.3%。相对均值投票双路径，保留宽度比为 1.009。 | [实际列数](evidence/minpi_rework/predictive-reachable/README.md) · [替代投票](evidence/minpi_rework/wide-veto-ablation/README.md) |
+| 同一删除顺序能否算得更快？ | 在这 20 组上，整段跳过投票使排序时间减少 53.4%。包含森林训练、验收和预测后，时间减少 6.4%，区间包含持平。 | [实测、对照和复现命令](evidence/minpi_rework/predictive-polynomial/README.md) |
+| 最差规模验收有什么用？ | 固定候选路径后，七个较窄来源的测试超限从 14/35 减至 10/35，平均多保留 0.23 列。 | [外部验证](evidence/minpi_rework/predictive-confirmation/independent-review.md) |
+| 可以重训时应怎样比较？ | 原六个预处理任务上，历史 XGBoost Gain 重训保留列数都更少。另有同一随机森林、相同训练行的配对重训对照。 | [原六个数据集](evidence/minpi_rework/predictive-prepared/comparison.md) · [配对重训](evidence/minpi_rework/predictive-refit/README.md) |
+| 实际缺测、检查费用和整台设备会怎样？ | 北京站网的实际缺测更适合用中位数填补。按 Cleveland 的历史收费表，MinPI 比 MDI 节省 CAD 1.85。两个活动识别数据集的冻结森林在 18 个受试者折中均需保留全部设备。 | [北京缺测](evidence/minpi_rework/observed-availability/README.md) · [历史费用](evidence/minpi_rework/field-cost/README.md) · [设备结果](evidence/minpi_rework/wearable-groups/summary.csv) |
+
+## Earlier manuscript on negative min-marginal votes
 
 [Manuscript](minpi.pdf) · [Standalone LaTeX source](minpi-source.zip) · [Replication package](../packages/thesis-minpi-compression.zip) · [Protocols and commands](../experiments/minpi_compression/README.md)
 
