@@ -1,0 +1,11 @@
+# Equal-budget random supports on the three transfer tasks
+
+This follow-up was specified after inspecting the primary-seed table and before drawing the additional supports. It asks how often a uniformly drawn support exceeds the recorded primary minPI predictive score on each fixed transfer task. The original primary draw remains identifiable.
+
+Draw 256 supports per source. Each draw samples uniformly without replacement within its support; draws are independent across repetitions and have separate streams across sources. In gas, materials and MHEALTH order, use the three children of NumPy SeedSequence(20261116), one generator per source. Sort feature indices before fitting, as in the original experiments. Fixing 256 draws gives the empirical exceedance fraction a maximum Monte Carlo standard error of 0.03125. The percentile range describes support draws on the observed split.
+
+Use the original budgets (13/128, 9/81, 4/40), the original partitions, training and test observations, labels, downstream learner and its hyperparameters. Refit the learner for each new support. Gas uses mean balanced accuracy across the three held-out batches, with equal weights on classes present within each batch. Materials uses pooled row-wise test R². MHEALTH uses the original archived training-device assignment, then averages the lower of wrist and ankle balanced accuracy equally over the five held-out participants. No estimator setting or split is selected from these results.
+
+Recover the original random scores from the archived test predictions and reproduce them by refitting their stored supports. Report the random-draw mean, median, 5th and 95th percentiles (linear interpolation), strict exceedances and equality counts relative to the primary minPI score. Save support identities, unit outcomes and predictions for every draw. The counts quantify random-support variation conditional on these cohorts and primary minPI supports. They do not estimate a new-source win probability.
+
+Reproduce with `./thesis-python.ps1 -m experiments.minpi_study_predictive_controls` in a fresh output directory (override with `--output`). Original sources and control specifications are in [the transfer protocol](new-cohorts-protocol.md) and [the MHEALTH protocol](device-protocol.md).

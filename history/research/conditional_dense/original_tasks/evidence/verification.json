@@ -1,0 +1,10 @@
+{
+  "sources": 7,
+  "configurations": 45,
+  "distinct_train_test": 17,
+  "total_timings": 2250,
+  "cross_process_arrays": 510,
+  "scored_predictions": 225,
+  "exact_F_sets": 45,
+  "max_F_boundary_violation": 0.0
+}

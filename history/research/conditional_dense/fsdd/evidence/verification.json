@@ -1,0 +1,14 @@
+{
+  "pipelines": 600,
+  "cross_process_arrays": 345,
+  "disjoint_outer_folds": 3,
+  "source_count": 1,
+  "official_archive": "c680098f5d2355ba7cc4bd8b0ca9e0a24c00ebe3b4c552208889a4d28d4fbc2b",
+  "matrix": "c232bf3b0a1286359264032695dd3b266e4b14d719a6eb4c8002aaaf144ee108",
+  "matching_F_supports": 15,
+  "f_supports_checked": 15,
+  "preparation_ms": [
+    680.9659,
+    683.0003
+  ]
+}

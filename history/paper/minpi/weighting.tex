@@ -1,0 +1,38 @@
+\subsection{When peer counts preserve the vote ordering}
+Let $D_{rkj}$ denote the mean increment in~\eqref{eq:identity}. Define $\widetilde D_{rkj}$ as the expected increment when the $k$ indices are drawn independently from all $p$ columns, including $j$.
+
+\begin{theorem}\label{thm:agreement}
+For any ternary matrix and feasible $k$,
+\begin{equation}
+ |D_{rkj}-\widetilde D_{rkj}|
+ \le 1-\prod_{s=1}^{k}\left(1-\frac{s}{p}\right)
+ \le \min\left\{1,\frac{k(k+1)}{2p}\right\}.\label{eq:coupling}
+\end{equation}
+On a row without abstentions, let $q_r$ be the positive fraction. For even $k$,
+\begin{equation}
+ \widetilde D_{rkj}=v_{rj}\binom{k}{k/2}[q_r(1-q_r)]^{k/2}.\label{eq:kernel}
+\end{equation}
+The multiplier is one at $k=0$.
+\end{theorem}
+\begin{proof}
+Conditioning on distinct draws that avoid $j$ gives a uniform peer subset. For fixed focal sign the increment ranges over an interval of length at most one, so conditioning changes its expectation by at most the probability of a focal hit or repeat. Counting valid ordered draws gives the product. A union bound over $k$ hits and $\binom{k}{2}$ pairs gives the second inequality. Without abstentions an even number of peers is pivotal only in a tie, which requires exactly $k/2$ positive draws.
+\end{proof}
+Without abstentions the exact tie probability at $k=2m$ is $\binom{a}{m}\binom{b}{m}/\binom{a+b}{2m}$. In the replacement approximation~\eqref{eq:kernel}, a 75\% positive row receives $0.5625$ times the balanced-row weight at $k=4$ and about $0.100$ at $k=16$. With abstentions, a sole positive voter among otherwise silent columns has marginal one at every size.
+
+\begin{proposition}\label{prop:commonorder}
+Suppose there are no abstentions. Set $a_{rk}=(A_{rk}+B_{rk})/2$ as in~\eqref{eq:weights}. For any $a_k>0$ write $e_k=w^{-1}\sum_r |a_{rk}-a_k|$. If
+$G_{0j}-G_{0\ell}>2\max_{k\in K}(e_k/a_k)$, every specified layer and their minimum rank $j$ above $\ell$.
+\end{proposition}
+\begin{proof}
+The row offsets in~\eqref{eq:weights} cancel upon subtraction. Thus
+$G_{kj}-G_{k\ell}=a_k(G_{0j}-G_{0\ell})+
+ w^{-1}\sum_r(a_{rk}-a_k)(v_{rj}-v_{r\ell})$.
+The remainder has magnitude at most $2e_k$. Strict ordering at each of finitely many sizes gives strict ordering of the minima.
+\end{proof}
+For $h<p$, if the signed-mean gap at ranks $h,h+1$ exceeds this bound, all supports coincide. If the positive count is constant across rows and $A_k+B_k>0$ at each layer, all layers are strictly increasing affine functions of $G_0$ and preserve its ties.
+
+For ternary ballots, write $D_{rk}(v)$ for the row increment of sign $v$. Take the range over signs present on that row. For $t_k>0$ define
+\[
+ B=\max_k w^{-1}\sum_r\operatorname{range}_{v}\{t_k D_{rk}(v)-v\}.
+\]
+The difference between any two row residuals is at most their range. Thus $G_{0j}-G_{0\ell}>B$ guarantees strict order in every layer and its minimum. If the $h$th signed mean exceeds an outsider's by more than $B$, that outsider can be discarded.

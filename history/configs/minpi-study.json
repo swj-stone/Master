@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "formal_seeds": [
+    1129,
+    2027,
+    3301,
+    4003,
+    5009
+  ],
+  "pilot_seed": 17,
+  "datasets": [
+    "breast_cancer",
+    "digits",
+    "diabetes",
+    "madelon",
+    "spambase",
+    "crimedata",
+    "isolet",
+    "gisette",
+    "sparse_signal",
+    "xor",
+    "null"
+  ],
+  "primary_sources": [
+    "breast_cancer",
+    "digits",
+    "diabetes",
+    "madelon",
+    "spambase",
+    "crimedata",
+    "isolet",
+    "gisette"
+  ],
+  "test_fraction": 0.25,
+  "selection_fraction": 0.1,
+  "prefilter_fraction": 0.4,
+  "tiers": [
+    0,
+    4,
+    16
+  ],
+  "witness_row_limit": 256,
+  "column_permutation": 391,
+  "arms": [
+    "full",
+    "random",
+    "f",
+    "forest",
+    "legacy_compact_rank",
+    "margin",
+    "vote",
+    "mean",
+    "k16",
+    "mc32",
+    "exact",
+    "exact_forest"
+  ],
+  "learners": [
+    "ridge",
+    "trees"
+  ],
+  "forest_trees": 48,
+  "forest_max_features": "sqrt",
+  "linear_alpha": 1,
+  "linear_solver": "lsqr",
+  "ridge_max_iter": 250,
+  "ridge_tol": 0.001,
+  "data_simulation_seed": 19261,
+  "timeout_per_case_seconds": 3600,
+  "threads": 1,
+  "quality_margins": {
+    "auc": 0.02,
+    "accuracy": 0.03,
+    "r2": 0.03
+  },
+  "paired_time_ratio_for_speed_claim": 0.8,
+  "preference": "Same-budget comparisons of test quality and observed time; retain every prespecified source and learner, including nulls and losses. A comparison of equal-budget selectors implies no difference in retained width.",
+  "source_policy": "Five archived numeric CSVs checked against configs; sklearn datasets as distributed; diabetes unscaled. Crime uses only columns population through LemasPctOfficDrugUn. No feature selection or fitting using held-out rows. ISOLET sample splits are not speaker-blocked.",
+  "timing": "Elapsed selection including witness construction plus backend train preprocessing/fit/predict. Data loading/splitting and evaluation excluded. Each selector measured independently; reuse its frozen support and measured selection time across the two learners. Single thread, randomized arm and backend order per split. No shared fitted estimators."
+}

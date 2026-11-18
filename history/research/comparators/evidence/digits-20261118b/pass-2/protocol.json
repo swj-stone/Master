@@ -1,0 +1,47 @@
+{
+  "inputs": {
+    "X": "a14d12e61c84e3d36e8c47510db6a81f33b413f77eeb1ed70f9b2a27153be354",
+    "y": "a3c91c262eddcf7ba8f0e37507c30284493c9b20412ffe4af30d536401f7ba21",
+    "source": "sklearn-1.9.0",
+    "groups": null
+  },
+  "split_hashes": [
+    "8980e005661f7b882125d035fa4f37046c2b6da1f3e95b56dd6ca604396efa80",
+    "4a50da1842af4ad334e5c6f2784acb637066ec111eb5bf3f20f58dc91a51f6a5",
+    "478b1a98f1e70a9d5b62875785704bd0e070afb53d7aa2008007d2fd8ea7ef56"
+  ],
+  "numpy": "2.4.6",
+  "sklearn": "1.9.0",
+  "seed": 1129,
+  "methods": [
+    "full",
+    "F50",
+    "random50",
+    "grouped50",
+    "witness_exchange",
+    "mrmr_mid"
+  ],
+  "paper": "10.1109/TPAMI.2005.159 Eq. (7), discrete",
+  "threads": 1,
+  "repeats": 6,
+  "pass_id": 2,
+  "solver": "cholesky",
+  "alpha": 1.0,
+  "pipeline": "fresh train-only selection + slicing + scaling, Ridge fit + test prediction",
+  "source_sha256": {
+    "research/comparators/digits_comparison.py": "790dcb4fc793b3048bcfd8dda850e9b2bdbbea053453d21caede8e141fcdebc6",
+    "research/comparators/mrmr_mid.py": "83c4cbb67ebb294d12933255b73aa40dfa0b38f61efef419a08b2dfd465b7713",
+    "research/algorithms/witness_exchange.py": "1cf5557f3083756a89a521f96c96afbb0590ba5ec24d35edc31b77be1c4d90b5",
+    "experiments/grouped_solver_cost_audit.py": "2ebecad3fd5753577ddaa0a840f1b8bd9fef4d7551a3f542939c9568d99c8896",
+    "experiments/compare_predictive_minpi.py": "3b0940b3aa4ba98fcb5499207824b36ec7e0be320417e1f58460258dc14ea806",
+    "src/minppi_mofs/grouped_minpi.py": "981701b80c447c8c205bb4592bdebfb6c02f3f51d27eba7a33f628393c8854ba",
+    "src/minppi_mofs/word_minpi.py": "a4c3039a4aac5744e624499ee8ec3a153c6a35ba6dd11b1363a5898025c0d7c7",
+    "src/minppi_mofs/exact_minpi.py": "71a5e1c7c03cc97b6f723c475e3740e435666347c166f58d6e6306c914071c82",
+    "src/minppi_mofs/certified_minpi.py": "bba474098d2b17911faf72d010964e4ac20bc0c5da9e59d302bf9879643069c0",
+    "src/minppi_mofs/integer_minpi.py": "7f64f6d9ec5267f35c99741990132ec59358230770f7b651d202a6b94f15a9d4",
+    "src/minppi_mofs/piv2.py": "6c2fc2db6ba66e31f559fb7775f951cab8a437d35e597705bcb8f263c78fef2e",
+    "experiments/stable_minpi_stress.py": "3def7591f0efb2f7b64b9225db502b18599c74eeaa1e6fcd6cddcd1bb2c976f5",
+    "experiments/minpi_study.py": "b9430b1ff434484a88651e50db29be555c26739ba9e4d550a8f673154e2303d3",
+    "configs/minpi-study.json": "2e3b6c0811ed285e319887dadc08b9d0c0eb6805d2797fe9a71a1dbe9f94848d"
+  }
+}

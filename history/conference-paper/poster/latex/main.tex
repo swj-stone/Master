@@ -1,0 +1,31 @@
+\documentclass{article}
+\usepackage[paperwidth=1200mm,paperheight=900mm,margin=0pt]{geometry}
+\usepackage{fontspec}
+\setmainfont{Arial}
+\usepackage{amsmath}
+\usepackage{unicode-math}
+\setmathfont{latinmodern-math.otf}[Path=fonts/]
+\usepackage{xcolor,graphicx,tikz}
+\usepackage{hyperref}
+\hypersetup{pdftitle={ASCOMP 2026 Poster - Min-Marginal Power Indices for Multi-Objective Feature Selection},pdfauthor={Wenjie Shi; Chi Zhao},pdfsubject={120 x 90 cm; three columns; standard LaTeX mathematics}}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\definecolor{Navy}{HTML}{142F46}
+\definecolor{Ink}{HTML}{243F50}
+\definecolor{Teal}{HTML}{087E83}
+\definecolor{Muted}{HTML}{4D6472}
+\newcommand{\MinPI}{\operatorname{MinPI}}
+\newcommand{\MinSS}{\operatorname{MinSS}}
+\newcommand{\MinBz}{\operatorname{MinBz}}
+\newcommand{\Uval}{U_{\mathrm{val}}}
+\newcommand{\Utest}{U_{\mathrm{test}}}
+\newsavebox{\posterbox}
+\begin{document}
+\noindent\mbox{}
+\begin{tikzpicture}[remember picture,overlay]
+\node[anchor=north west,inner sep=0pt] at (current page.north west)
+  {\includegraphics[width=\paperwidth,height=\paperheight]{poster-background.pdf}};
+\end{tikzpicture}
+\input{poster-content.tex}
+\end{document}

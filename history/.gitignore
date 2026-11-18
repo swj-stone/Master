@@ -1,0 +1,67 @@
+# Experiment inputs and outputs
+data/
+results/
+
+# Local Python environments and caches
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.pytest-tmp/
+.t*/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Python build products
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Local agent/work files
+.superpowers/
+.implementation-plan.md
+
+# QA/scratch outputs
+tmp/
+
+# Historical submission/review bundles and duplicated experiment data (local only)
+/packages/
+
+# LaTeX build products; keep the source, bibliography, styles, and final PDF
+conference-paper/build/
+conference-paper/*.zip
+conference-paper/paper/*.aux
+conference-paper/paper/*.blg
+conference-paper/paper/*.fdb_latexmk
+conference-paper/paper/*.fls
+conference-paper/paper/*.log
+conference-paper/paper/*.out
+conference-paper/paper/*.synctex.gz
+paper/minpi/*.aux
+paper/minpi/*.blg
+paper/minpi/*.fdb_latexmk
+paper/minpi/*.fls
+paper/minpi/*.log
+paper/minpi/*.out
+paper/minpi/*.spl
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating systems
+.DS_Store
+._*
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/

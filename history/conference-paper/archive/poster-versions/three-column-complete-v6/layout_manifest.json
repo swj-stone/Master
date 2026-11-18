@@ -1,0 +1,1546 @@
+{
+  "page": {
+    "width_pt": 3401.574803149607,
+    "height_pt": 2551.181102362205,
+    "width_mm": 1200,
+    "height_mm": 900
+  },
+  "layout": {
+    "columns": 3,
+    "revision": "complete-method-toolkit-v6",
+    "column_width_pt": 1024.5249343832022
+  },
+  "text": [
+    {
+      "text": "ASCOMP 2026 POSTER",
+      "x": 100,
+      "y": 58,
+      "width": 3201.574803149607,
+      "height": 116,
+      "font_size": 96,
+      "alignment": "center"
+    },
+    {
+      "text": "Min-Marginal Power Indices",
+      "x": 100,
+      "y": 207,
+      "width": 3201.574803149607,
+      "height": 138,
+      "font_size": 124,
+      "alignment": "center"
+    },
+    {
+      "text": "for Multi-Objective Feature Selection",
+      "x": 100,
+      "y": 352,
+      "width": 3201.574803149607,
+      "height": 138,
+      "font_size": 124,
+      "alignment": "center"
+    },
+    {
+      "text": "Wenjie Shi  &amp;  Chi Zhao*",
+      "x": 100,
+      "y": 535,
+      "width": 1548.7874015748034,
+      "height": 93.48,
+      "font_size": 76,
+      "alignment": "left"
+    },
+    {
+      "text": "Saint Petersburg State University",
+      "x": 100,
+      "y": 637,
+      "width": 1548.7874015748034,
+      "height": 63.96,
+      "font_size": 52,
+      "alignment": "left"
+    },
+    {
+      "text": "7/9 Universitetskaya nab., Saint Petersburg, 199034, Russia",
+      "x": 1752.7874015748034,
+      "y": 535,
+      "width": 1548.7874015748034,
+      "height": 51.66,
+      "font_size": 42,
+      "alignment": "right"
+    },
+    {
+      "text": "st147487@student.spbu.ru",
+      "x": 1752.7874015748034,
+      "y": 597,
+      "width": 1548.7874015748034,
+      "height": 49.2,
+      "font_size": 40,
+      "alignment": "right"
+    },
+    {
+      "text": "* Corresponding author: chi.zhao@spbu.ru",
+      "x": 1752.7874015748034,
+      "y": 654,
+      "width": 1548.7874015748034,
+      "height": 49.2,
+      "font_size": 40,
+      "alignment": "right"
+    },
+    {
+      "text": "Contact author",
+      "x": 3034.4566929133866,
+      "y": 304,
+      "width": 279.1181102362205,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "center"
+    },
+    {
+      "text": "Telegram",
+      "x": 3034.4566929133866,
+      "y": 344,
+      "width": 279.1181102362205,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "01  PRINCIPLE &amp; TOOLKIT",
+      "x": 100.0,
+      "y": 775,
+      "width": 1024.5249343832022,
+      "height": 56.58,
+      "font_size": 46,
+      "alignment": "left"
+    },
+    {
+      "text": "A coalition witness reveals harmful additions:<br/>acceptable utility becomes unacceptable.",
+      "x": 100.0,
+      "y": 875,
+      "width": 1024.5249343832022,
+      "height": 98,
+      "font_size": 39,
+      "alignment": "left"
+    },
+    {
+      "text": "N: analyzed features; U<sub>val</sub>(N) &gt; 0; 0 &lt; α ≤ 1",
+      "x": 124.0,
+      "y": 1020,
+      "width": 976.5249343832022,
+      "height": 39.36,
+      "font_size": 32,
+      "alignment": "left"
+    },
+    {
+      "text": "v<sub>α</sub>(S) = 1[U<sub>val</sub>(S) ≥ α U<sub>val</sub>(N)]",
+      "x": 124.0,
+      "y": 1074,
+      "width": 976.5249343832022,
+      "height": 54,
+      "font_size": 42,
+      "alignment": "left"
+    },
+    {
+      "text": "Δ<sub>i</sub>(S) = v<sub>α</sub>(S <font name=\"PosterMath\">∪</font> {i}) - v<sub>α</sub>(S)",
+      "x": 124.0,
+      "y": 1144,
+      "width": 976.5249343832022,
+      "height": 53,
+      "font_size": 41,
+      "alignment": "left"
+    },
+    {
+      "text": "MinPI<sub>i</sub> = MinSS<sub>i</sub> = MinBz<sub>i</sub> = min Δ<sub>i</sub>(S)",
+      "x": 124.0,
+      "y": 1214,
+      "width": 976.5249343832022,
+      "height": 50,
+      "font_size": 38,
+      "alignment": "left"
+    },
+    {
+      "text": "Minimum over S <font name=\"PosterMath\">⊆</font> N <font name=\"PosterMath\">∖</font> {i}; exact labels:",
+      "x": 124.0,
+      "y": 1279,
+      "width": 976.5249343832022,
+      "height": 39.36,
+      "font_size": 32,
+      "alignment": "left"
+    },
+    {
+      "text": "<b>-1 harmful:</b> some coalition flips 1 → 0.<br/><b>0 neutral:</b> the minimum marginal is 0.<br/><b>+1 decisive:</b> every coalition flips 0 → 1.",
+      "x": 124.0,
+      "y": 1330,
+      "width": 976.5249343832022,
+      "height": 129,
+      "font_size": 33,
+      "alignment": "left"
+    },
+    {
+      "text": "MinSS / MinBz: minimum Shapley-Shubik / Banzhaf.<br/>Same support; exact enumeration uses ≤2<super>n</super> utilities.",
+      "x": 100.0,
+      "y": 1490,
+      "width": 1024.5249343832022,
+      "height": 80,
+      "font_size": 32,
+      "alignment": "left"
+    },
+    {
+      "text": "CORE TOOLS",
+      "x": 100.0,
+      "y": 1592,
+      "width": 1024.5249343832022,
+      "height": 49.2,
+      "font_size": 40,
+      "alignment": "left"
+    },
+    {
+      "text": "<b>MI (mutual information)</b> ranks feature-target dependence.<br/>A <b>maximum-weight absolute-correlation tree</b><br/>represents pairwise association and guides Algorithm B.",
+      "x": 100.0,
+      "y": 1658,
+      "width": 1024.5249343832022,
+      "height": 129,
+      "font_size": 34,
+      "alignment": "left"
+    },
+    {
+      "text": "<b>XGBoost:</b> 100 rounds, depth 4, learning rate 0.1;<br/>CUDA trees. Fit coalition models on training data.",
+      "x": 100.0,
+      "y": 1812,
+      "width": 1024.5249343832022,
+      "height": 86,
+      "font_size": 34,
+      "alignment": "left"
+    },
+    {
+      "text": "<b>Training-only preprocessing:</b> variance filtering →<br/>MI selection (≤100 features) → standardization.",
+      "x": 100.0,
+      "y": 1923,
+      "width": 1024.5249343832022,
+      "height": 86,
+      "font_size": 34,
+      "alignment": "left"
+    },
+    {
+      "text": "<b>Utility:</b> ROC AUC / one-vs-rest AUC / R².<br/>Empty coalition: training class priors / response mean.",
+      "x": 100.0,
+      "y": 2034,
+      "width": 1024.5249343832022,
+      "height": 84,
+      "font_size": 33,
+      "alignment": "left"
+    },
+    {
+      "text": "MATCHED-COUNT CONTROLS",
+      "x": 100.0,
+      "y": 2160,
+      "width": 1024.5249343832022,
+      "height": 46.74,
+      "font_size": 38,
+      "alignment": "left"
+    },
+    {
+      "text": "All controls delete the accepted MinPI count k.<br/><b>SHAP-bottom:</b> lowest mean |TreeSHAP| on train.<br/><b>MinShap / Banzhaf-bottom:</b> lowest minimum / mean<br/>continuous utility marginal from shared coalitions.<br/><b>Random:</b> 30 matched-count trials per seed.",
+      "x": 100.0,
+      "y": 2227,
+      "width": 1024.5249343832022,
+      "height": 205,
+      "font_size": 32,
+      "alignment": "left"
+    },
+    {
+      "text": "α = 0.95; quota sweep: 0.85, 0.90, 0.95, 0.99.",
+      "x": 100.0,
+      "y": 2464,
+      "width": 1024.5249343832022,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "02  ALGORITHM FLOW",
+      "x": 1188.5249343832022,
+      "y": 775,
+      "width": 1024.5249343832022,
+      "height": 56.58,
+      "font_size": 46,
+      "alignment": "left"
+    },
+    {
+      "text": "<b>Train 64% → validation 16% → test 20%</b><br/>Fit on train; compute the threshold game on validation.",
+      "x": 1188.5249343832022,
+      "y": 875,
+      "width": 1024.5249343832022,
+      "height": 86,
+      "font_size": 33,
+      "alignment": "left"
+    },
+    {
+      "text": "Algorithm A: size-uniform sampling",
+      "x": 1212.5249343832022,
+      "y": 1015,
+      "width": 976.5249343832022,
+      "height": 45.51,
+      "font_size": 37,
+      "alignment": "left"
+    },
+    {
+      "text": "Draw s uniformly from {0, ..., n-1}; then draw<br/>an s-feature subset uniformly from N <font name=\"PosterMath\">∖</font> {i}.",
+      "x": 1212.5249343832022,
+      "y": 1065,
+      "width": 976.5249343832022,
+      "height": 84,
+      "font_size": 33,
+      "alignment": "left"
+    },
+    {
+      "text": "Algorithm B: MI-correlation guidance",
+      "x": 1212.5249343832022,
+      "y": 1215,
+      "width": 976.5249343832022,
+      "height": 45.51,
+      "font_size": 37,
+      "alignment": "left"
+    },
+    {
+      "text": "B<sub>i</sub>: top ≤10 tree neighbors by absolute correlation;<br/>pad from the top-MI half of N <font name=\"PosterMath\">∖</font> {i} toward min(20, floor(n/3)).<br/>Each draw: reset to B<sub>i</sub>; drop each independently (p = 0.3).<br/>Draw a uniformly from 0, ..., min(5, n-1);<br/>add <i>a</i> absent features from N <font name=\"PosterMath\">∖</font> {i} in random order.",
+      "x": 1212.5249343832022,
+      "y": 1265,
+      "width": 976.5249343832022,
+      "height": 210,
+      "font_size": 33,
+      "alignment": "left"
+    },
+    {
+      "text": "Both: m ← min(m, Δ<sub>i</sub>(S)), initialized at +1.<br/><b>Stop at -1</b> with a witness; else return m after K draws.<br/><b>K = {2, 5, 10, 25}</b> per feature; ISOLET up to 10.<br/>Removal uses the largest K.",
+      "x": 1188.5249343832022,
+      "y": 1525,
+      "width": 1024.5249343832022,
+      "height": 168,
+      "font_size": 33,
+      "alignment": "left"
+    },
+    {
+      "text": "HYBRID DISPATCH",
+      "x": 1212.5249343832022,
+      "y": 1732,
+      "width": 976.5249343832022,
+      "height": 39.36,
+      "font_size": 32,
+      "alignment": "left"
+    },
+    {
+      "text": "n ≤ 20: exact  |  20 &lt; n ≤ 75: B*  |  n &gt; 75: min(A, B)",
+      "x": 1212.5249343832022,
+      "y": 1780,
+      "width": 976.5249343832022,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "*A fallback without correlation guidance; minimum is featurewise.",
+      "x": 1212.5249343832022,
+      "y": 1822,
+      "width": 976.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "left"
+    },
+    {
+      "text": "Validate joint removal",
+      "x": 1212.5249343832022,
+      "y": 1895,
+      "width": 976.5249343832022,
+      "height": 45.51,
+      "font_size": 37,
+      "alignment": "left"
+    },
+    {
+      "text": "H = {i: estimated MinPI<sub>i</sub> = -1}",
+      "x": 1212.5249343832022,
+      "y": 1940,
+      "width": 976.5249343832022,
+      "height": 41.82,
+      "font_size": 34,
+      "alignment": "left"
+    },
+    {
+      "text": "U<sub>val</sub>(N <font name=\"PosterMath\">∖</font> H) ≥ U<sub>val</sub>(N) - ε",
+      "x": 1212.5249343832022,
+      "y": 1994,
+      "width": 976.5249343832022,
+      "height": 54,
+      "font_size": 42,
+      "alignment": "left"
+    },
+    {
+      "text": "ε = 0.005 (classification); 0.01 (regression).<br/><b>PASS:</b> remove all H.  <b>FAIL:</b> keep all N.<br/>Output retained features; evaluate on held-out test data.",
+      "x": 1212.5249343832022,
+      "y": 2055,
+      "width": 976.5249343832022,
+      "height": 102,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "Optional MinPI-prefiltered NSGA-II",
+      "x": 1212.5249343832022,
+      "y": 2205,
+      "width": 976.5249343832022,
+      "height": 45.51,
+      "font_size": 37,
+      "alignment": "left"
+    },
+    {
+      "text": "Non-dominated sorting genetic algorithm II; minimize:",
+      "x": 1212.5249343832022,
+      "y": 2247,
+      "width": 976.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "left"
+    },
+    {
+      "text": "(|S|/n, 1 - clip(U<sub>val</sub>(S), 0, 1))",
+      "x": 1212.5249343832022,
+      "y": 2292,
+      "width": 976.5249343832022,
+      "height": 51,
+      "font_size": 40,
+      "alignment": "left"
+    },
+    {
+      "text": "n is shared: analyzed dimension before prefiltering.<br/>population 40; 800 evaluations per variant.<br/>HV reference (1.1, 1.1); select fronts on validation.<br/><b>Evaluate</b> the selected fronts on held-out test data.",
+      "x": 1212.5249343832022,
+      "y": 2356,
+      "width": 976.5249343832022,
+      "height": 140,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "03  EXPERIMENTAL EVIDENCE",
+      "x": 2277.0498687664044,
+      "y": 775,
+      "width": 1024.5249343832022,
+      "height": 56.58,
+      "font_size": 46,
+      "alignment": "left"
+    },
+    {
+      "text": "6 datasets × 5 seeds",
+      "x": 2277.0498687664044,
+      "y": 875,
+      "width": 1024.5249343832022,
+      "height": 54.12,
+      "font_size": 44,
+      "alignment": "left"
+    },
+    {
+      "text": "Seeds: 42, 123, 456, 789, 1024  |  default α = 0.95",
+      "x": 2277.0498687664044,
+      "y": 936,
+      "width": 1024.5249343832022,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "12.53%",
+      "x": 2293.0498687664044,
+      "y": 1009,
+      "width": 488.2624671916011,
+      "height": 70,
+      "font_size": 60,
+      "alignment": "center"
+    },
+    {
+      "text": "mean feature removal",
+      "x": 2293.0498687664044,
+      "y": 1091,
+      "width": 488.2624671916011,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "-0.000313",
+      "x": 2797.3123359580054,
+      "y": 1009,
+      "width": 488.2624671916011,
+      "height": 70,
+      "font_size": 60,
+      "alignment": "center"
+    },
+    {
+      "text": "mean held-out ΔU",
+      "x": 2797.3123359580054,
+      "y": 1091,
+      "width": 488.2624671916011,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "Five-seed mean ± SD. ΔU = retained - full utility.<br/>Removal of analyzed features; bars use a 0-80% scale.",
+      "x": 2277.0498687664044,
+      "y": 1170,
+      "width": 1024.5249343832022,
+      "height": 78,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "DATASET",
+      "x": 2277.0498687664044,
+      "y": 1270,
+      "width": 310,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "left"
+    },
+    {
+      "text": "REMOVED (%)",
+      "x": 2607.0498687664044,
+      "y": 1270,
+      "width": 340,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "HELD-OUT ΔU",
+      "x": 2987.0498687664044,
+      "y": 1270,
+      "width": 314.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "right"
+    },
+    {
+      "text": "Madelon",
+      "x": 2277.0498687664044,
+      "y": 1334,
+      "width": 310,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "43.60 ± 31.96",
+      "x": 2607.0498687664044,
+      "y": 1330,
+      "width": 340,
+      "height": 39.36,
+      "font_size": 32,
+      "alignment": "center"
+    },
+    {
+      "text": "+0.00469",
+      "x": 2987.0498687664044,
+      "y": 1328,
+      "width": 314.5249343832022,
+      "height": 41.82,
+      "font_size": 34,
+      "alignment": "right"
+    },
+    {
+      "text": "± 0.00497",
+      "x": 2987.0498687664044,
+      "y": 1370,
+      "width": 314.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "right"
+    },
+    {
+      "text": "Abalone",
+      "x": 2277.0498687664044,
+      "y": 1421,
+      "width": 310,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "27.50 ± 25.62",
+      "x": 2607.0498687664044,
+      "y": 1417,
+      "width": 340,
+      "height": 39.36,
+      "font_size": 32,
+      "alignment": "center"
+    },
+    {
+      "text": "-0.00565",
+      "x": 2987.0498687664044,
+      "y": 1415,
+      "width": 314.5249343832022,
+      "height": 41.82,
+      "font_size": 34,
+      "alignment": "right"
+    },
+    {
+      "text": "± 0.01077",
+      "x": 2987.0498687664044,
+      "y": 1457,
+      "width": 314.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "right"
+    },
+    {
+      "text": "Credit-Card-Fraud",
+      "x": 2277.0498687664044,
+      "y": 1508,
+      "width": 310,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "2.76 ± 2.89",
+      "x": 2607.0498687664044,
+      "y": 1504,
+      "width": 340,
+      "height": 39.36,
+      "font_size": 32,
+      "alignment": "center"
+    },
+    {
+      "text": "-0.00078",
+      "x": 2987.0498687664044,
+      "y": 1502,
+      "width": 314.5249343832022,
+      "height": 41.82,
+      "font_size": 34,
+      "alignment": "right"
+    },
+    {
+      "text": "± 0.00335",
+      "x": 2987.0498687664044,
+      "y": 1544,
+      "width": 314.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "right"
+    },
+    {
+      "text": "Spambase",
+      "x": 2277.0498687664044,
+      "y": 1595,
+      "width": 310,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "0.72 ± 0.99",
+      "x": 2607.0498687664044,
+      "y": 1591,
+      "width": 340,
+      "height": 39.36,
+      "font_size": 32,
+      "alignment": "center"
+    },
+    {
+      "text": "-0.00003",
+      "x": 2987.0498687664044,
+      "y": 1589,
+      "width": 314.5249343832022,
+      "height": 41.82,
+      "font_size": 34,
+      "alignment": "right"
+    },
+    {
+      "text": "± 0.00007",
+      "x": 2987.0498687664044,
+      "y": 1631,
+      "width": 314.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "right"
+    },
+    {
+      "text": "Gisette",
+      "x": 2277.0498687664044,
+      "y": 1682,
+      "width": 310,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "0.60 ± 0.89",
+      "x": 2607.0498687664044,
+      "y": 1678,
+      "width": 340,
+      "height": 39.36,
+      "font_size": 32,
+      "alignment": "center"
+    },
+    {
+      "text": "-0.00011",
+      "x": 2987.0498687664044,
+      "y": 1676,
+      "width": 314.5249343832022,
+      "height": 41.82,
+      "font_size": 34,
+      "alignment": "right"
+    },
+    {
+      "text": "± 0.00016",
+      "x": 2987.0498687664044,
+      "y": 1718,
+      "width": 314.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "right"
+    },
+    {
+      "text": "ISOLET",
+      "x": 2277.0498687664044,
+      "y": 1769,
+      "width": 310,
+      "height": 38.13,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "0.00 ± 0.00",
+      "x": 2607.0498687664044,
+      "y": 1765,
+      "width": 340,
+      "height": 39.36,
+      "font_size": 32,
+      "alignment": "center"
+    },
+    {
+      "text": "0.00000",
+      "x": 2987.0498687664044,
+      "y": 1763,
+      "width": 314.5249343832022,
+      "height": 41.82,
+      "font_size": 34,
+      "alignment": "right"
+    },
+    {
+      "text": "± 0.00000",
+      "x": 2987.0498687664044,
+      "y": 1805,
+      "width": 314.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "right"
+    },
+    {
+      "text": "MATCHED-COUNT REMOVAL: MinPI vs random",
+      "x": 2297.0498687664044,
+      "y": 1883,
+      "width": 984.5249343832022,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "left"
+    },
+    {
+      "text": "Madelon: ΔU +0.0047 vs -0.0732<br/>Abalone: ΔU -0.0056 vs -0.0370",
+      "x": 2297.0498687664044,
+      "y": 1928,
+      "width": 984.5249343832022,
+      "height": 78,
+      "font_size": 33,
+      "alignment": "left"
+    },
+    {
+      "text": "NSGA-II: held-out hypervolume",
+      "x": 2277.0498687664044,
+      "y": 2040,
+      "width": 1024.5249343832022,
+      "height": 45.51,
+      "font_size": 37,
+      "alignment": "left"
+    },
+    {
+      "text": "ΔHV = MinPI-prefiltered - full-space search.<br/><b>Mean +0.01584</b>; Madelon +0.09515; Holm p = 0.4375.<br/>Positive dataset-averaged change in all five seeds.",
+      "x": 2277.0498687664044,
+      "y": 2100,
+      "width": 1024.5249343832022,
+      "height": 117,
+      "font_size": 31,
+      "alignment": "left"
+    },
+    {
+      "text": "ESTIMATOR ACCURACY",
+      "x": 2277.0498687664044,
+      "y": 2250,
+      "width": 1024.5249343832022,
+      "height": 45.51,
+      "font_size": 37,
+      "alignment": "left"
+    },
+    {
+      "text": "Abalone (8 features): harmful-set F1 vs exact MinPI.<br/>Five-seed mean; hybrid / exact F1 = 1 at every K.",
+      "x": 2277.0498687664044,
+      "y": 2303,
+      "width": 1024.5249343832022,
+      "height": 72,
+      "font_size": 30,
+      "alignment": "left"
+    },
+    {
+      "text": "K",
+      "x": 2277.0498687664044,
+      "y": 2390,
+      "width": 330,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "left"
+    },
+    {
+      "text": "2",
+      "x": 2627.0498687664044,
+      "y": 2390,
+      "width": 150,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "5",
+      "x": 2797.0498687664044,
+      "y": 2390,
+      "width": 150,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "10",
+      "x": 2967.0498687664044,
+      "y": 2390,
+      "width": 150,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "25",
+      "x": 3137.0498687664044,
+      "y": 2390,
+      "width": 164,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "A",
+      "x": 2277.0498687664044,
+      "y": 2428,
+      "width": 330,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "left"
+    },
+    {
+      "text": "0.100",
+      "x": 2627.0498687664044,
+      "y": 2428,
+      "width": 150,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "0.150",
+      "x": 2797.0498687664044,
+      "y": 2428,
+      "width": 150,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "0.230",
+      "x": 2967.0498687664044,
+      "y": 2428,
+      "width": 150,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "0.443",
+      "x": 3137.0498687664044,
+      "y": 2428,
+      "width": 164,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "B",
+      "x": 2277.0498687664044,
+      "y": 2466,
+      "width": 330,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "left"
+    },
+    {
+      "text": "0.000",
+      "x": 2627.0498687664044,
+      "y": 2466,
+      "width": 150,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "0.080",
+      "x": 2797.0498687664044,
+      "y": 2466,
+      "width": 150,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "0.133",
+      "x": 2967.0498687664044,
+      "y": 2466,
+      "width": 150,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    },
+    {
+      "text": "0.313",
+      "x": 3137.0498687664044,
+      "y": 2466,
+      "width": 164,
+      "height": 36.9,
+      "font_size": 30,
+      "alignment": "center"
+    }
+  ],
+  "fit_checks": [
+    {
+      "label": "ASCOMP 2026 POSTER",
+      "used_height": 116,
+      "available_height": 120
+    },
+    {
+      "label": "Min-Marginal Power Indices",
+      "used_height": 138,
+      "available_height": 142
+    },
+    {
+      "label": "for Multi-Objective Feature Selection",
+      "used_height": 138,
+      "available_height": 142
+    },
+    {
+      "label": "Wenjie Shi  &amp;  Chi Zhao*",
+      "used_height": 93.48,
+      "available_height": 96
+    },
+    {
+      "label": "Saint Petersburg State University",
+      "used_height": 63.96,
+      "available_height": 67
+    },
+    {
+      "label": "7/9 Universitetskaya nab., Saint Petersburg, 199034, Russia",
+      "used_height": 51.66,
+      "available_height": 55
+    },
+    {
+      "label": "st147487@student.spbu.ru",
+      "used_height": 49.2,
+      "available_height": 52
+    },
+    {
+      "label": "* Corresponding author: chi.zhao@spbu.ru",
+      "used_height": 49.2,
+      "available_height": 52
+    },
+    {
+      "label": "Contact author",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "Telegram",
+      "used_height": 36.9,
+      "available_height": 39
+    },
+    {
+      "label": "01  PRINCIPLE &amp; TOOLKIT",
+      "used_height": 56.58,
+      "available_height": 59
+    },
+    {
+      "label": "A coalition witness reveals harmful additions:<br/>acceptabl",
+      "used_height": 98,
+      "available_height": 100
+    },
+    {
+      "label": "N: analyzed features; U<sub>val</sub>(N) &gt; 0; 0 &lt; α ≤ ",
+      "used_height": 39.36,
+      "available_height": 42
+    },
+    {
+      "label": "v<sub>α</sub>(S) = 1[U<sub>val</sub>(S) ≥ α U<sub>val</sub>(",
+      "used_height": 54,
+      "available_height": 57
+    },
+    {
+      "label": "Δ<sub>i</sub>(S) = v<sub>α</sub>(S <font name=\"PosterMath\">∪",
+      "used_height": 53,
+      "available_height": 56
+    },
+    {
+      "label": "MinPI<sub>i</sub> = MinSS<sub>i</sub> = MinBz<sub>i</sub> = ",
+      "used_height": 50,
+      "available_height": 53
+    },
+    {
+      "label": "Minimum over S <font name=\"PosterMath\">⊆</font> N <font name",
+      "used_height": 39.36,
+      "available_height": 41
+    },
+    {
+      "label": "<b>-1 harmful:</b> some coalition flips 1 → 0.<br/><b>0 neut",
+      "used_height": 129,
+      "available_height": 132
+    },
+    {
+      "label": "MinSS / MinBz: minimum Shapley-Shubik / Banzhaf.<br/>Same su",
+      "used_height": 80,
+      "available_height": 82
+    },
+    {
+      "label": "CORE TOOLS",
+      "used_height": 49.2,
+      "available_height": 51
+    },
+    {
+      "label": "<b>MI (mutual information)</b> ranks feature-target dependen",
+      "used_height": 129,
+      "available_height": 132
+    },
+    {
+      "label": "<b>XGBoost:</b> 100 rounds, depth 4, learning rate 0.1;<br/>",
+      "used_height": 86,
+      "available_height": 89
+    },
+    {
+      "label": "<b>Training-only preprocessing:</b> variance filtering →<br/",
+      "used_height": 86,
+      "available_height": 89
+    },
+    {
+      "label": "<b>Utility:</b> ROC AUC / one-vs-rest AUC / R².<br/>Empty co",
+      "used_height": 84,
+      "available_height": 87
+    },
+    {
+      "label": "MATCHED-COUNT CONTROLS",
+      "used_height": 46.74,
+      "available_height": 49
+    },
+    {
+      "label": "All controls delete the accepted MinPI count k.<br/><b>SHAP-",
+      "used_height": 205,
+      "available_height": 208
+    },
+    {
+      "label": "α = 0.95; quota sweep: 0.85, 0.90, 0.95, 0.99.",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "02  ALGORITHM FLOW",
+      "used_height": 56.58,
+      "available_height": 59
+    },
+    {
+      "label": "<b>Train 64% → validation 16% → test 20%</b><br/>Fit on trai",
+      "used_height": 86,
+      "available_height": 89
+    },
+    {
+      "label": "Algorithm A: size-uniform sampling",
+      "used_height": 45.51,
+      "available_height": 48
+    },
+    {
+      "label": "Draw s uniformly from {0, ..., n-1}; then draw<br/>an s-feat",
+      "used_height": 84,
+      "available_height": 87
+    },
+    {
+      "label": "Algorithm B: MI-correlation guidance",
+      "used_height": 45.51,
+      "available_height": 48
+    },
+    {
+      "label": "B<sub>i</sub>: top ≤10 tree neighbors by absolute correlatio",
+      "used_height": 210,
+      "available_height": 213
+    },
+    {
+      "label": "Both: m ← min(m, Δ<sub>i</sub>(S)), initialized at +1.<br/><",
+      "used_height": 168,
+      "available_height": 171
+    },
+    {
+      "label": "HYBRID DISPATCH",
+      "used_height": 39.36,
+      "available_height": 41
+    },
+    {
+      "label": "n ≤ 20: exact  |  20 &lt; n ≤ 75: B*  |  n &gt; 75: min(A, B",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "*A fallback without correlation guidance; minimum is feature",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "Validate joint removal",
+      "used_height": 45.51,
+      "available_height": 48
+    },
+    {
+      "label": "H = {i: estimated MinPI<sub>i</sub> = -1}",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "U<sub>val</sub>(N <font name=\"PosterMath\">∖</font> H) ≥ U<su",
+      "used_height": 54,
+      "available_height": 57
+    },
+    {
+      "label": "ε = 0.005 (classification); 0.01 (regression).<br/><b>PASS:<",
+      "used_height": 102,
+      "available_height": 105
+    },
+    {
+      "label": "Optional MinPI-prefiltered NSGA-II",
+      "used_height": 45.51,
+      "available_height": 48
+    },
+    {
+      "label": "Non-dominated sorting genetic algorithm II; minimize:",
+      "used_height": 36.9,
+      "available_height": 41
+    },
+    {
+      "label": "(|S|/n, 1 - clip(U<sub>val</sub>(S), 0, 1))",
+      "used_height": 51,
+      "available_height": 54
+    },
+    {
+      "label": "n is shared: analyzed dimension before prefiltering.<br/>pop",
+      "used_height": 140,
+      "available_height": 143
+    },
+    {
+      "label": "03  EXPERIMENTAL EVIDENCE",
+      "used_height": 56.58,
+      "available_height": 59
+    },
+    {
+      "label": "6 datasets × 5 seeds",
+      "used_height": 54.12,
+      "available_height": 56
+    },
+    {
+      "label": "Seeds: 42, 123, 456, 789, 1024  |  default α = 0.95",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "12.53%",
+      "used_height": 70,
+      "available_height": 73
+    },
+    {
+      "label": "mean feature removal",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "-0.000313",
+      "used_height": 70,
+      "available_height": 73
+    },
+    {
+      "label": "mean held-out ΔU",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "Five-seed mean ± SD. ΔU = retained - full utility.<br/>Remov",
+      "used_height": 78,
+      "available_height": 81
+    },
+    {
+      "label": "DATASET",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "REMOVED (%)",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "HELD-OUT ΔU",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "Madelon",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "43.60 ± 31.96",
+      "used_height": 39.36,
+      "available_height": 41
+    },
+    {
+      "label": "+0.00469",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "± 0.00497",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "Abalone",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "27.50 ± 25.62",
+      "used_height": 39.36,
+      "available_height": 41
+    },
+    {
+      "label": "-0.00565",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "± 0.01077",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "Credit-Card-Fraud",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "2.76 ± 2.89",
+      "used_height": 39.36,
+      "available_height": 41
+    },
+    {
+      "label": "-0.00078",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "± 0.00335",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "Spambase",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "0.72 ± 0.99",
+      "used_height": 39.36,
+      "available_height": 41
+    },
+    {
+      "label": "-0.00003",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "± 0.00007",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "Gisette",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "0.60 ± 0.89",
+      "used_height": 39.36,
+      "available_height": 41
+    },
+    {
+      "label": "-0.00011",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "± 0.00016",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "ISOLET",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "0.00 ± 0.00",
+      "used_height": 39.36,
+      "available_height": 41
+    },
+    {
+      "label": "0.00000",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "± 0.00000",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "MATCHED-COUNT REMOVAL: MinPI vs random",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "Madelon: ΔU +0.0047 vs -0.0732<br/>Abalone: ΔU -0.0056 vs -0",
+      "used_height": 78,
+      "available_height": 81
+    },
+    {
+      "label": "NSGA-II: held-out hypervolume",
+      "used_height": 45.51,
+      "available_height": 48
+    },
+    {
+      "label": "ΔHV = MinPI-prefiltered - full-space search.<br/><b>Mean +0.",
+      "used_height": 117,
+      "available_height": 120
+    },
+    {
+      "label": "ESTIMATOR ACCURACY",
+      "used_height": 45.51,
+      "available_height": 48
+    },
+    {
+      "label": "Abalone (8 features): harmful-set F1 vs exact MinPI.<br/>Fiv",
+      "used_height": 72,
+      "available_height": 75
+    },
+    {
+      "label": "K",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "2",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "5",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "10",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "25",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "A",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "0.100",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "0.150",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "0.230",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "0.443",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "B",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "0.000",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "0.080",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "0.133",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "0.313",
+      "used_height": 36.9,
+      "available_height": 38
+    }
+  ],
+  "data": [
+    {
+      "dataset": "Madelon",
+      "compression": 43.6,
+      "sd": 31.96,
+      "du": 0.00469,
+      "du_sd": 0.00497
+    },
+    {
+      "dataset": "Abalone",
+      "compression": 27.5,
+      "sd": 25.62,
+      "du": -0.00565,
+      "du_sd": 0.01077
+    },
+    {
+      "dataset": "Credit-Card-Fraud",
+      "compression": 2.76,
+      "sd": 2.89,
+      "du": -0.00078,
+      "du_sd": 0.00335
+    },
+    {
+      "dataset": "Spambase",
+      "compression": 0.72,
+      "sd": 0.99,
+      "du": -3e-05,
+      "du_sd": 7e-05
+    },
+    {
+      "dataset": "Gisette",
+      "compression": 0.6,
+      "sd": 0.89,
+      "du": -0.00011,
+      "du_sd": 0.00016
+    },
+    {
+      "dataset": "ISOLET",
+      "compression": 0.0,
+      "sd": 0.0,
+      "du": 0.0,
+      "du_sd": 0.0
+    }
+  ],
+  "glyph_audit": {
+    "checked_characters": 3333,
+    "missing": []
+  },
+  "provenance": {
+    "paper": "output/pdf/MinPI_arXiv_final.pdf",
+    "compression_data": "Table 2: five-seed means and sample SD",
+    "aggregate_removal": "Section 4.1: all 30 dataset-seed units",
+    "nsga_ii": "Section 4.3: held-out hypervolume, not Figure 3 validation curves",
+    "random_comparison": "Section 4.1: Madelon and Abalone mean held-out delta utility, matched deletion counts",
+    "algorithm": "Section 2, Section 3, Appendix A: game, A/B/hybrid, all-or-none gate, optional NSGA-II",
+    "estimator_F1": "Section 4.4: Abalone five-seed mean harmful-set F1 at K=2,5,10,25",
+    "tools": "Sections 2-3 and Appendix A: MI, maximum-weight absolute-correlation tree, XGBoost CUDA, TreeSHAP, NSGA-II",
+    "reference_layout": "User-supplied poster.pdf used for section/flow organization only",
+    "graphics": "Vector redraw from reported paper values"
+  },
+  "source_hashes": {
+    "output/pdf/MinPI_arXiv_final.pdf": "2c7cc05471252f1e464230d3a01cd5d1e8d4fb8852fb46f37162a6ca5fc26424",
+    "output/QRcode.png": "3b007243b94c94bcc09a92cc86a5c0900ace9d4a4c103e565a84a07e2245435d",
+    "MinPI_arXiv_source(1).zip": "5e09469bd8731d4158b16921b737e5c99b56a46e0e95163c2ea93e03d09e4cf6",
+    "tmp/pdfs/tele_code.png": "f9ac461d4908cecd45fc29d684eb90c68798e8ab771661c5b0a60bcf70538d63"
+  },
+  "qrs": [
+    {
+      "x_pt": 2755.338582677166,
+      "y_top_pt": 36,
+      "width_mm": 90,
+      "height_mm": 108,
+      "effective_dpi": 310.4444444444444,
+      "format": "original raster",
+      "payload": "https://hlnks.co/63671101"
+    },
+    {
+      "x_pt": 3046.4566929133866,
+      "y_top_pt": 36,
+      "width_mm": 90,
+      "height_mm": 90,
+      "format": "vector",
+      "quiet_zone_modules": 4,
+      "error_correction": "M",
+      "payload": "https://t.me/+79516564253"
+    }
+  ],
+  "estimator_f1": {
+    "dataset": "Abalone",
+    "seeds": 5,
+    "budgets": [
+      2,
+      5,
+      10,
+      25
+    ],
+    "A": [
+      0.1,
+      0.15,
+      0.23,
+      0.443
+    ],
+    "B": [
+      0.0,
+      0.08,
+      0.133,
+      0.313
+    ],
+    "hybrid": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  }
+}

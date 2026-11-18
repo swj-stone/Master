@@ -1,0 +1,11 @@
+{
+  "active_hcc_count": 30,
+  "tau": 0.5,
+  "rho": 0.5,
+  "k_policy": 25,
+  "k_star": 20,
+  "full_mse_alpha1": 0.3263285095691014,
+  "ours_mse_alpha1": 0.19567172989922654,
+  "ours_gain_percent": 40.03842013141906,
+  "oracle_mse_alpha1": 0.17845067832913897
+}

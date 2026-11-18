@@ -1,0 +1,22 @@
+# Matched prefilters before an ExtraTrees selector
+
+## Question and timing of the design
+
+The main comparison found that a 40% minPI screen sometimes shortened a tree-based selection pipeline. This follow-up asks which gains also arise with a cheaper supervised screen or a uniformly random screen of the same width. The eight primary datasets and their results had already been examined. This comparison on them is retrospective. CNAE-9 and SECOM were selected before fitting any of the four pipelines on either dataset in this study. No method, parameter, dataset or outcome will be removed or retuned in response to these results.
+
+## Data, splits and outcomes
+
+- Reuse the eight primary datasets, five seeds (1129, 2027, 3301, 4003, 5009), training/test row indices, column permutation and outcomes of the main experiment. Assert equality of the prior and new indices on every unit. Five splits of one source share observations.
+- CNAE-9 contains 1,080 documents, 856 word-frequency features, nine classes and no missing values. Use a stratified 75/25 random split for each of the five seeds. The first archive column gives the label. Use all other columns and the fixed column permutation from the main study. Archive SHA-256 is `458957518ec4339e0fc456837a96d44419ef81ae61425a6cdf2451112f18fbaa`. [Ciarelli and Oliveira](https://doi.org/10.24432/C51G7P)
+- SECOM provides a sensor matrix with 1,567 rows and 590 measured columns in the distributed text. The timestamp in the label file is used only for the split. Parse day/month/year and hour:minute:second, stable-sort in chronological order, use the first floor(0.75n) rows for training and the remaining 392 for testing; assert strictly separated boundary times. Encode +1 (process failure) as the positive class. Use per-training-column medians for missing entries in both partitions, with zero for all-missing training columns. Five seeds change selectors and models while keeping the same temporal test cohort. Archive SHA-256 is `eea568baf3c2229096d7d294cf0b096b5502bd96d92c0b80a65b84714059be8e`. [McCann and Johnston](https://doi.org/10.24432/C54305)
+- Report the main study's ROC AUC (macro one-versus-rest when multiclass), accuracy, balanced accuracy and, for regression, R² and MAE. For SECOM also report average precision (AP), held-out failure prevalence and the two chronological boundary times. AUROC and AP use the continuous classifier output. Average paired score differences within dataset. Report time ratios as medians of five paired ratios. Describe seed ranges for SECOM without implying five independent test populations.
+
+## Pipeline
+
+Four fixed arms differ exclusively in the 40% screen: bypass, ExactMinPI, univariate F, or uniformly random permutation. Apply each reduced screen to ceil(0.4p) columns, with ties in permuted input order. The bypass retains all p. Fit an independently estimated 48-tree ExtraTrees classifier or regressor (`max_features="sqrt"`, default growth, seed = split seed) to the screening survivors. Rank by impurity decrease, retain ceil(0.1p) original columns in every arm, then fit independent ridge and 48-tree downstream learners with main-study settings. Store both screening and final source-column indices, split indices, predictions, and scores for both learners. Charging the initial screen is essential when measuring total work.
+
+Run seed–dataset units serially in a single numerical-library thread with deterministic randomized arm order and backend order. Time fresh fits per arm. Record the common SECOM imputation performed anew under each timer, screen, forest selector and downstream extraction/fit/prediction. Add all applicable stages for each end-to-end time. Exclude source loading, generating the common split, writing results and computing test metrics. Cap each seed–dataset unit at 3,600 seconds; any timeout is reported. Use the main study's quality and time margins for descriptive comparison to bypass. Also report minPI versus F and random screening across all datasets even when unfavorable.
+
+## Reproduction
+
+Run `.\thesis-python.ps1 -m experiments.minpi_study_chain --check-inputs` to validate partition and input metadata. Omit that option to fit all units and write paired summaries. The reference archive should be available at `data/chain/cnae.zip` and `data/chain/secom.zip`, obtainable from the UCI records cited above. The prior eight-source split files come from the main study.

@@ -1,0 +1,12 @@
+{
+  "timed_pipelines": 1568,
+  "sources": 6,
+  "panels": 16,
+  "processes": 2,
+  "repeats_per_arm": 7,
+  "arrays_compared": 374,
+  "all_predictions_rescored": true,
+  "all_widths_and_sorted_supports_verified": true,
+  "balanced_schedule": true,
+  "max_F_boundary_gap": 0.0
+}

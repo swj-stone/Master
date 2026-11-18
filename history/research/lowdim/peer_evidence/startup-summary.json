@@ -1,0 +1,8 @@
+{
+  "processes": 5,
+  "warm_observations": 1860,
+  "native_load_median_ms": 0.8497,
+  "native_load_min_ms": 0.8238,
+  "native_load_max_ms": 2.0293,
+  "library_sha256": "b2927fce583234dca8f7e2a1420702ebf7e877a9902901ee12424c261742dad7"
+}

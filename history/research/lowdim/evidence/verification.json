@@ -1,0 +1,10 @@
+{
+  "configurations": 387,
+  "source_protocol_metric_rows": 101,
+  "actual_supports_checked": 1935,
+  "unchanged_wide_cols_predictions": 331,
+  "exact_F_sets_diabetes_abalone": 23,
+  "distinct_inputs": 301,
+  "distinct_input_seed_metric": 377,
+  "pareto_both_full_speed_within_002": 0
+}

@@ -1,0 +1,143 @@
+\begin{thebibliography}{18}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Ba{\~n}os et~al.(2014)Ba{\~n}os, Garcia, and Saez]{banos2014mhealth}
+Oresti Ba{\~n}os, Rafael Garcia, and Alejandro Saez.
+\newblock {MHEALTH}.
+\newblock UCI Machine Learning Repository, 2014.
+\newblock URL \url{https://doi.org/10.24432/C5TW22}.
+
+\bibitem[Bilbao et~al.(2000)Bilbao, Fern{\'a}ndez, Jim{\'e}nez~Losada, and
+  L{\'o}pez]{bilbao2000power}
+J.~M. Bilbao, J.~R. Fern{\'a}ndez, A.~Jim{\'e}nez~Losada, and J.~J. L{\'o}pez.
+\newblock Generating functions for computing power indices efficiently.
+\newblock \emph{TOP}, 8\penalty0 (2):\penalty0 191--213, 2000.
+\newblock \doi{10.1007/BF02628555}.
+
+\bibitem[Bilbao et~al.(2010)Bilbao, Fern{\'a}ndez, Jim{\'e}nez, and
+  L{\'o}pez]{bilbao2010ternary}
+J.~M. Bilbao, J.~R. Fern{\'a}ndez, N.~Jim{\'e}nez, and J.~J. L{\'o}pez.
+\newblock The {Banzhaf} power index for ternary bicooperative games.
+\newblock \emph{Discrete Applied Mathematics}, 158\penalty0 (9):\penalty0
+  967--980, 2010.
+\newblock \doi{10.1016/j.dam.2010.02.007}.
+
+\bibitem[Cohen et~al.(2007)Cohen, Dror, and Ruppin]{cohen2007feature}
+Shay Cohen, Gideon Dror, and Eytan Ruppin.
+\newblock Feature selection via coalitional game theory.
+\newblock \emph{Neural Computation}, 19\penalty0 (7):\penalty0 1939--1961,
+  2007.
+\newblock \doi{10.1162/neco.2007.19.7.1939}.
+
+\bibitem[Dubey et~al.(1981)Dubey, Neyman, and Weber]{dubey1981semivalues}
+Pradeep Dubey, Abraham Neyman, and Robert~James Weber.
+\newblock Value theory without efficiency.
+\newblock \emph{Mathematics of Operations Research}, 6\penalty0 (1):\penalty0
+  122--128, 1981.
+\newblock \doi{10.1287/moor.6.1.122}.
+
+\bibitem[Fagin et~al.(2003)Fagin, Lotem, and Naor]{fagin2003topk}
+Ronald Fagin, Amnon Lotem, and Moni Naor.
+\newblock Optimal aggregation algorithms for middleware.
+\newblock \emph{Journal of Computer and System Sciences}, 66\penalty0
+  (4):\penalty0 614--656, 2003.
+\newblock \doi{10.1016/S0022-0000(03)00026-6}.
+
+\bibitem[Guyon et~al.(2004)Guyon, Gunn, Ben-Hur, and Dror]{guyon2004challenge}
+Isabelle Guyon, Steve Gunn, Asa Ben-Hur, and Gideon Dror.
+\newblock Result analysis of the {NIPS} 2003 feature selection challenge.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~17, 2004.
+\newblock URL
+  \url{https://papers.nips.cc/paper/2004/hash/5e751896e527c862bf67251a474b3819-Abstract.html}.
+
+\bibitem[Hamidieh(2018)]{hamidieh2018}
+Kamran Hamidieh.
+\newblock Superconductivty data.
+\newblock UCI Machine Learning Repository, 2018.
+\newblock URL \url{https://doi.org/10.24432/C53P47}.
+
+\bibitem[Hoeffding(1963)]{hoeffding1963}
+Wassily Hoeffding.
+\newblock Probability inequalities for sums of bounded random variables.
+\newblock \emph{Journal of the American Statistical Association}, 58\penalty0
+  (301):\penalty0 13--30, 1963.
+\newblock \doi{10.1080/01621459.1963.10500830}.
+
+\bibitem[Kira \& Rendell(1992)Kira and Rendell]{kira1992relief}
+Kenji Kira and Larry~A. Rendell.
+\newblock The feature selection problem: Traditional methods and a new
+  algorithm.
+\newblock In \emph{Proceedings of the Tenth National Conference on Artificial
+  Intelligence}, pp.\  129--134, 1992.
+\newblock URL \url{https://cdn.aaai.org/AAAI/1992/AAAI92-020.pdf}.
+
+\bibitem[Pedregosa et~al.(2011)Pedregosa, Varoquaux, Gramfort, Michel, Thirion,
+  Grisel, Blondel, Prettenhofer, Weiss, Dubourg, Vanderplas, Passos,
+  Cournapeau, Brucher, Perrot, and Duchesnay]{pedregosa2011sklearn}
+Fabian Pedregosa, Ga{\"e}l Varoquaux, Alexandre Gramfort, Vincent Michel,
+  Bertrand Thirion, Olivier Grisel, Mathieu Blondel, Peter Prettenhofer, Ron
+  Weiss, Vincent Dubourg, Jake Vanderplas, Alexandre Passos, David Cournapeau,
+  Matthieu Brucher, Matthieu Perrot, and {\'E}douard Duchesnay.
+\newblock Scikit-learn: Machine learning in {Python}.
+\newblock \emph{Journal of Machine Learning Research}, 12\penalty0
+  (85):\penalty0 2825--2830, 2011.
+\newblock URL \url{https://jmlr.org/papers/v12/pedregosa11a.html}.
+
+\bibitem[Robnik-{\v S}ikonja \& Kononenko(2003)Robnik-{\v S}ikonja and
+  Kononenko]{robnik2003relieff}
+Marko Robnik-{\v S}ikonja and Igor Kononenko.
+\newblock Theoretical and empirical analysis of {ReliefF} and {RReliefF}.
+\newblock \emph{Machine Learning}, 53:\penalty0 23--69, 2003.
+\newblock \doi{10.1023/A:1025667309714}.
+
+\bibitem[Shewchuk(1997)]{shewchuk1997adaptive}
+Jonathan~Richard Shewchuk.
+\newblock Adaptive precision floating-point arithmetic and fast robust
+  geometric predicates.
+\newblock \emph{Discrete \& Computational Geometry}, 18:\penalty0 305--363,
+  1997.
+\newblock \doi{10.1007/PL00009321}.
+
+\bibitem[Shi \& Zhao(2026)Shi and Zhao]{shi2026minpi}
+Wenjie Shi and Chi Zhao.
+\newblock Min-marginal power indices for multi-objective feature selection.
+\newblock arXiv:2610.33885, 2026.
+\newblock URL \url{https://arxiv.org/abs/2610.33885}.
+
+\bibitem[Staudacher et~al.(2021)Staudacher, K{\'o}czy, Stach, Filipp, Kramer,
+  Noffke, Olsson, Pichler, and Singer]{staudacher2021power}
+Jochen Staudacher, L{\'a}szl{\'o}~{\'A}. K{\'o}czy, Izabella Stach, Jan Filipp,
+  Marcus Kramer, Till Noffke, Linuss Olsson, Jonas Pichler, and Tobias Singer.
+\newblock Computing power indices for weighted voting games via dynamic
+  programming.
+\newblock \emph{Operations Research and Decisions}, 31\penalty0 (2):\penalty0
+  123--145, 2021.
+\newblock \doi{10.37190/ord210206}.
+
+\bibitem[Sun et~al.(2010)Sun, Todorovic, and Goodison]{sun2010local}
+Yijun Sun, Sinisa Todorovic, and Steve Goodison.
+\newblock Local-learning-based feature selection for high-dimensional data
+  analysis.
+\newblock \emph{IEEE Transactions on Pattern Analysis and Machine
+  Intelligence}, 32\penalty0 (9):\penalty0 1610--1626, 2010.
+\newblock \doi{10.1109/TPAMI.2009.190}.
+
+\bibitem[Vergara(2012)]{vergara2012gas}
+Alexander Vergara.
+\newblock Gas sensor array drift dataset.
+\newblock UCI Machine Learning Repository, 2012.
+\newblock URL \url{https://doi.org/10.24432/C5RP6W}.
+
+\bibitem[Zhao et~al.(2025)Zhao, Liu, and Parilina]{zhao2025shapg}
+Chi Zhao, Jing Liu, and Elena Parilina.
+\newblock {ShapG}: New feature importance method based on the {Shapley} value.
+\newblock \emph{Engineering Applications of Artificial Intelligence},
+  148:\penalty0 110409, 2025.
+\newblock \doi{10.1016/j.engappai.2025.110409}.
+
+\end{thebibliography}

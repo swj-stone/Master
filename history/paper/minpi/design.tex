@@ -1,0 +1,35 @@
+\subsection{Repeated-split comparison}
+Eight numerical datasets cover small clinical tables, handwritten and spoken characters, spam detection, two feature-selection challenge problems and two continuous outcomes (Table~\ref{tab:data}). A fixed column permutation precedes selection so synthetic planted variables and ties do not benefit from source order. Within each source, five fixed random splits reserve 25\% of the rows for evaluation. Splits are stratified for classification. The breast cancer, digits and unscaled diabetes arrays come from scikit-learn~\citep{pedregosa2011sklearn}; Madelon, Gisette, ISOLET, Spambase and Communities and Crime use archived numerical files. Madelon is a published artificial challenge dataset. For the processed ShapG Communities and Crime data~\citep{zhao2025shapg} we predict the nonviolent crime rate and remove identifiers and other crime outcomes before splitting. ISOLET is split by recording; the test subjects can also contribute training recordings. The challenge CSVs in this comparison are resplit locally. Section~\ref{sec:official} uses the organizers' partitions for two other datasets.
+
+\begin{table}[tb]
+\centering
+\caption{Observed dimensions of the repeated-split study. The final column is the common compressed width $\lceil0.1p\rceil$. The simulations share dimensions and split rules.}
+\label{tab:data}
+\begin{tabular}{lrrrr}
+\toprule
+Source & Outcome & Rows & $p$ & Retained \\
+\midrule
+Breast cancer & Binary & 569 & 30 & 3\\
+Digits & 10 classes & 1,797 & 64 & 7\\
+Madelon & Binary & 2,600 & 500 & 50\\
+Spambase & Binary & 4,601 & 57 & 6\\
+ISOLET & 26 classes & 7,797 & 617 & 62\\
+Gisette & Binary & 7,000 & 5,000 & 500\\
+Diabetes & Continuous & 442 & 10 & 1\\
+Communities and Crime & Continuous & 2,215 & 102 & 11\\
+Each simulation & Binary & 1,200 & 128 & 13\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Selectors and learners}
+At each split the reference methods use all columns, uniformly selected columns, univariate $F$ ranking or impurity ranking from 48 extremely randomized trees~\citep{geurts2006trees}. All reduced methods receive the same width. An additional arm screens to 40\% with \method{} and ranks the survivors with the same forest selector. Because the forest draws $\sqrt d$ candidate features at each split for input dimension $d$, screening also changes its candidate pool. The two downstream fits are a standardized ridge model ($\alpha=1$, LSQR tolerance $10^{-3}$, at most 250 iterations) and a separately fitted 48-tree ensemble. Each selector is timed once per split. To that time we add the time to extract selected columns, fit and score each downstream learner. Loading the common arrays, constructing the split and computing metrics are excluded. The methods and learners run in randomized order with a single numerical-library thread.
+
+\paragraph{Matched controls}
+Two rankings on the same triplets average either signed votes or raw distance differences. Two others take the mean layer score or just the score at the largest of the designated sizes. A fifth approximates each nonempty layer with 32 independent random permutations. From each permutation take its first $k$ entries; for an included focal feature substitute the $(k+1)$st entry in its place. Every focal feature thus has a uniform $k$-subset of its peers on every draw, although different features share much of the same draw. The zero layer is computed directly. A historical triplet ranking samples coalitions, averages votes on comparisons whose coalition distance margin is below its median, and reranks its leading features for coverage and diversity. Here it uses the same witnesses and final width as the new method. This isolates those ranking rules; the historical procedure's adaptive choice of width belongs to a different experiment.
+
+\paragraph{Outcomes}
+Classification uses ROC AUC (one-versus-rest macro average for multiclass tasks), accuracy and balanced accuracy. Regression uses unadjusted $R^2$ and mean absolute error. We summarize the five within-source pairs and give per-source results. Overlapping splits share observations, and the eight sources form a convenience sample. No across-source $p$-value treats the individual seeds as independent datasets. For a descriptive timing comparison we prespecified a 20\% reduction in end-to-end time, together with a loss of at most 0.02 AUC and 0.03 accuracy for classification, or 0.03 $R^2$ for regression. Table~\ref{tab:prefilter} counts splits meeting these criteria against the named selector and separately counts those also meeting both applicable quality requirements against the full-width learner. These counts describe prespecified operating points.
+
+\paragraph{Known support}
+Three separate 128-variable simulations distinguish signal recovery from downstream performance. The first uses eight informative coordinates, one cluster per class, class separation 1.5, and 2\% random label reassignment. It has no designated redundant or repeated coordinates. The second labels independent Gaussian inputs by the exclusive-or of the signs of the first two coordinates. In the third, binary labels are independent of all Gaussian coordinates. Each simulation is generated once, followed by the same repeated splits as the benchmark sources. The ground-truth support is known for the first two; the null case tests performance in the absence of signal.

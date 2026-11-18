@@ -1,0 +1,7 @@
+{
+  "datasets": 8,
+  "cases": 40,
+  "score_vectors": 200,
+  "timed_pipelines": 2000,
+  "cross_process_arrays": 670
+}

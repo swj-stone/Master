@@ -1,0 +1,13 @@
+{
+  "archive": "results/minpi-study/digits-paper-baseline-dispatch-v1-20261118",
+  "equal_arrays_per_pass": [
+    69,
+    69
+  ],
+  "only_changed_measured_source": [
+    "research/comparators/digits_comparison.py"
+  ],
+  "old_runner_sha256": "c41877f91a3ab78c880f3094a7f73f185cb8860bbc77e6435c4fce7a7128ad1c",
+  "active_runner_sha256": "790dcb4fc793b3048bcfd8dda850e9b2bdbbea053453d21caede8e141fcdebc6",
+  "old_new_protocols_equal_apart_from_runner_digest": true
+}

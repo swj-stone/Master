@@ -1,0 +1,68 @@
+{
+  "source": "Released notebooks, figure numbers from arXiv:2606.18867v1",
+  "figure_7_8_scope": "Replayed plotting and verified archived synthetic results, not a new fit.",
+  "figure_4_scope": "Recomputed HCC risk, support search, ridge grid and support frontier from supplied inputs.",
+  "synthetic": {
+    "benchmark_instances": 30,
+    "method_summary": {
+      "Best subset (no reg.)": {
+        "oracle_hits": 0,
+        "median_ratio": 1.3388396333300048,
+        "max_ratio": 1.8152906008875647
+      },
+      "Greedy + local refinement": {
+        "oracle_hits": 29,
+        "median_ratio": 1.0,
+        "max_ratio": 1.017201637524985
+      },
+      "Weighted rounding only": {
+        "oracle_hits": 18,
+        "median_ratio": 1.0,
+        "max_ratio": 1.124954667103881
+      },
+      "Weighted screen-and-refit (proposed)": {
+        "oracle_hits": 30,
+        "median_ratio": 1.0,
+        "max_ratio": 1.0
+      }
+    },
+    "heatmap_cells_verified": 24,
+    "local_search": {
+      "weighted": {
+        "improved_cases": 12,
+        "max_normalized_gain": 0.12495466710388112
+      },
+      "greedy": {
+        "improved_cases": 2,
+        "max_normalized_gain": 0.010154638233411863
+      }
+    }
+  },
+  "replay": {
+    "computed_figures": [
+      "lowdim_algorithm_design.pdf",
+      "lowdim_algorithm_design_heatmap.pdf",
+      "top10_three_panel.pdf"
+    ],
+    "healthcare_summary_verified": {
+      "active_hcc_count": 30,
+      "tau": 0.5,
+      "rho": 0.5,
+      "k_policy": 25,
+      "k_star": 20,
+      "full_mse_alpha1": 0.32632850956910026,
+      "ours_mse_alpha1": 0.19567172989922602,
+      "ours_gain_percent": 40.038420131419,
+      "oracle_mse_alpha1": 0.17845067832913863
+    },
+    "healthcare_method_risks_alpha_1": {
+      "Oracle": 0.1784506783291386,
+      "Proposed subset-ridge": 0.195671729899226,
+      "Subset only": 0.2484640310850063,
+      "Cost-only ridge": 0.3238504449419208,
+      "Prediction-only ridge": 0.3264417629113577,
+      "Top-10 exclusion": 0.3417260703767828,
+      "Full ridge": 0.3263285099551429
+    }
+  }
+}

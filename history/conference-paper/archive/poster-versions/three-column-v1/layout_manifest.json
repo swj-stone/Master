@@ -1,0 +1,1238 @@
+{
+  "page": {
+    "width_pt": 3401.574803149607,
+    "height_pt": 2551.181102362205,
+    "width_mm": 1200,
+    "height_mm": 900
+  },
+  "text": [
+    {
+      "text": "ASCOMP 2026 POSTER",
+      "x": 96,
+      "y": 62,
+      "width": 1700,
+      "height": 51.66,
+      "font_size": 42
+    },
+    {
+      "text": "COOPERATIVE GAMES  /  FEATURE SELECTION",
+      "x": 1705.5748031496069,
+      "y": 68,
+      "width": 1600,
+      "height": 38.13,
+      "font_size": 31
+    },
+    {
+      "text": "Min-Marginal Power Indices",
+      "x": 96,
+      "y": 139,
+      "width": 3209.574803149607,
+      "height": 122,
+      "font_size": 112
+    },
+    {
+      "text": "for Multi-Objective Feature Selection",
+      "x": 96,
+      "y": 265,
+      "width": 3209.574803149607,
+      "height": 122,
+      "font_size": 112
+    },
+    {
+      "text": "Wenjie Shi  &amp;  Chi Zhao*",
+      "x": 96,
+      "y": 411,
+      "width": 3209.574803149607,
+      "height": 62.73,
+      "font_size": 51
+    },
+    {
+      "text": "Saint Petersburg State University",
+      "x": 96,
+      "y": 485,
+      "width": 1550,
+      "height": 45.51,
+      "font_size": 37
+    },
+    {
+      "text": "7/9 Universitetskaya nab., Saint Petersburg, 199034, Russia",
+      "x": 96,
+      "y": 536,
+      "width": 1900,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "st147487@student.spbu.ru",
+      "x": 2055.574803149607,
+      "y": 486,
+      "width": 1250,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "* Corresponding author: chi.zhao@spbu.ru",
+      "x": 1905.5748031496069,
+      "y": 536,
+      "width": 1400,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "Find when a feature can hurt.<br/>Verify removal before filtering.",
+      "x": 134,
+      "y": 651,
+      "width": 1480,
+      "height": 102,
+      "font_size": 43
+    },
+    {
+      "text": "12.53%",
+      "x": 1750,
+      "y": 637,
+      "width": 640,
+      "height": 78,
+      "font_size": 72
+    },
+    {
+      "text": "mean analyzed-feature removal",
+      "x": 1750,
+      "y": 725,
+      "width": 670,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "-0.000313",
+      "x": 2480,
+      "y": 637,
+      "width": 775,
+      "height": 78,
+      "font_size": 72
+    },
+    {
+      "text": "mean held-out utility change",
+      "x": 2480,
+      "y": 725,
+      "width": 775,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "01",
+      "x": 96,
+      "y": 826,
+      "width": 106,
+      "height": 61.5,
+      "font_size": 50
+    },
+    {
+      "text": "THE PROBLEM",
+      "x": 211,
+      "y": 826,
+      "width": 921.5249343832022,
+      "height": 61.5,
+      "font_size": 50
+    },
+    {
+      "text": "Averages can hide<br/>a harmful context.",
+      "x": 96,
+      "y": 939,
+      "width": 1036.5249343832022,
+      "height": 110,
+      "font_size": 47
+    },
+    {
+      "text": "Adding a feature can turn an acceptable model into an unacceptable one in a particular coalition.",
+      "x": 96,
+      "y": 1075,
+      "width": 1036.5249343832022,
+      "height": 98,
+      "font_size": 39
+    },
+    {
+      "text": "ONE COALITION, ONE HARMFUL WITNESS",
+      "x": 126,
+      "y": 1272,
+      "width": 976.5249343832022,
+      "height": 38.13,
+      "font_size": 31
+    },
+    {
+      "text": "Acceptable",
+      "x": 126,
+      "y": 1355,
+      "width": 325,
+      "height": 41.82,
+      "font_size": 34
+    },
+    {
+      "text": "v(S) = 1",
+      "x": 126,
+      "y": 1404,
+      "width": 325,
+      "height": 49.2,
+      "font_size": 40
+    },
+    {
+      "text": "Unacceptable",
+      "x": 777.5249343832022,
+      "y": 1355,
+      "width": 325,
+      "height": 41.82,
+      "font_size": 34
+    },
+    {
+      "text": "v(S <font name=\"PosterMath\">∪</font> {i}) = 0",
+      "x": 777.5249343832022,
+      "y": 1404,
+      "width": 325,
+      "height": 43.05,
+      "font_size": 35
+    },
+    {
+      "text": "+ feature i",
+      "x": 452,
+      "y": 1357,
+      "width": 324.5249343832022,
+      "height": 39.36,
+      "font_size": 32
+    },
+    {
+      "text": "Δ = -1",
+      "x": 452,
+      "y": 1440,
+      "width": 324.5249343832022,
+      "height": 39.36,
+      "font_size": 32
+    },
+    {
+      "text": "A worst-case marginal",
+      "x": 96,
+      "y": 1558,
+      "width": 1036.5249343832022,
+      "height": 52.89,
+      "font_size": 43
+    },
+    {
+      "text": "v<sub>α</sub>(S) = 1[U(M<sub>S</sub>) ≥ α U<sub>full</sub>]",
+      "x": 111,
+      "y": 1640,
+      "width": 1006.5249343832022,
+      "height": 63,
+      "font_size": 48
+    },
+    {
+      "text": "Δ<sub>i</sub>(S) = v<sub>α</sub>(S <font name=\"PosterMath\">∪</font> {i}) - v<sub>α</sub>(S)",
+      "x": 111,
+      "y": 1728,
+      "width": 1006.5249343832022,
+      "height": 59,
+      "font_size": 45
+    },
+    {
+      "text": "MinPI<sub>i</sub> = min Δ<sub>i</sub>(S)",
+      "x": 111,
+      "y": 1817,
+      "width": 1006.5249343832022,
+      "height": 69,
+      "font_size": 55
+    },
+    {
+      "text": "over all S <font name=\"PosterMath\">⊆</font> N <font name=\"PosterMath\">∖</font> {i}; N is the analyzed feature set",
+      "x": 111,
+      "y": 1893,
+      "width": 1006.5249343832022,
+      "height": 38.13,
+      "font_size": 31
+    },
+    {
+      "text": "-1 harmful",
+      "x": 96.0,
+      "y": 1976,
+      "width": 345.5083114610674,
+      "height": 41.82,
+      "font_size": 34
+    },
+    {
+      "text": "0 neutral*",
+      "x": 441.5083114610674,
+      "y": 1976,
+      "width": 345.5083114610674,
+      "height": 41.82,
+      "font_size": 34
+    },
+    {
+      "text": "+1 decisive",
+      "x": 787.0166229221348,
+      "y": 1976,
+      "width": 345.5083114610674,
+      "height": 41.82,
+      "font_size": 34
+    },
+    {
+      "text": "*Exact values. A sampled 0 or +1 is not a certificate; sampling can miss witnesses.",
+      "x": 96,
+      "y": 2054,
+      "width": 1036.5249343832022,
+      "height": 80,
+      "font_size": 32
+    },
+    {
+      "text": "Scan to read<br/>the full paper",
+      "x": 406,
+      "y": 2203,
+      "width": 726.5249343832022,
+      "height": 108,
+      "font_size": 45
+    },
+    {
+      "text": "Theory, experiments<br/>and complete results",
+      "x": 406,
+      "y": 2336,
+      "width": 726.5249343832022,
+      "height": 86,
+      "font_size": 34
+    },
+    {
+      "text": "hlnks.co/63671101",
+      "x": 406,
+      "y": 2440,
+      "width": 726.5249343832022,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "02",
+      "x": 1182.5249343832022,
+      "y": 826,
+      "width": 106,
+      "height": 61.5,
+      "font_size": 50
+    },
+    {
+      "text": "THE METHOD",
+      "x": 1297.5249343832022,
+      "y": 826,
+      "width": 921.5249343832022,
+      "height": 61.5,
+      "font_size": 50
+    },
+    {
+      "text": "1  Discover candidates",
+      "x": 1212.5249343832022,
+      "y": 961,
+      "width": 976.5249343832022,
+      "height": 54.12,
+      "font_size": 44
+    },
+    {
+      "text": "Fit coalition models on training data.<br/>Evaluate threshold crossings on validation data.",
+      "x": 1212.5249343832022,
+      "y": 1034,
+      "width": 976.5249343832022,
+      "height": 94,
+      "font_size": 38
+    },
+    {
+      "text": "Exact enumeration or sampled search",
+      "x": 1212.5249343832022,
+      "y": 1164,
+      "width": 976.5249343832022,
+      "height": 39.36,
+      "font_size": 32
+    },
+    {
+      "text": "2  Gate proposed removals",
+      "x": 1212.5249343832022,
+      "y": 1310,
+      "width": 976.5249343832022,
+      "height": 54.12,
+      "font_size": 44
+    },
+    {
+      "text": "Let H be the candidate harmful set.<br/>Accept its removal only if:",
+      "x": 1212.5249343832022,
+      "y": 1383,
+      "width": 976.5249343832022,
+      "height": 94,
+      "font_size": 38
+    },
+    {
+      "text": "U<sub>val</sub>(N <font name=\"PosterMath\">∖</font> H) ≥ U<sub>val</sub>(N) - ε",
+      "x": 1212.5249343832022,
+      "y": 1505,
+      "width": 976.5249343832022,
+      "height": 58,
+      "font_size": 44
+    },
+    {
+      "text": "ε = 0.005 (classification); 0.01 (regression)",
+      "x": 1212.5249343832022,
+      "y": 1577,
+      "width": 976.5249343832022,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "PASS: remove H  |  FAIL: remove nothing",
+      "x": 1212.5249343832022,
+      "y": 1630,
+      "width": 976.5249343832022,
+      "height": 39.36,
+      "font_size": 32
+    },
+    {
+      "text": "3  Evaluate &amp; optimize",
+      "x": 1212.5249343832022,
+      "y": 1769,
+      "width": 976.5249343832022,
+      "height": 54.12,
+      "font_size": 44
+    },
+    {
+      "text": "Use held-out test data for final reporting.<br/>Accepted subsets may prefilter NSGA-II.",
+      "x": 1212.5249343832022,
+      "y": 1844,
+      "width": 976.5249343832022,
+      "height": 94,
+      "font_size": 38
+    },
+    {
+      "text": "EXPERIMENTAL PROTOCOL",
+      "x": 1182.5249343832022,
+      "y": 2041,
+      "width": 1036.5249343832022,
+      "height": 43.05,
+      "font_size": 35
+    },
+    {
+      "text": "6 datasets × 5 seeds",
+      "x": 1182.5249343832022,
+      "y": 2106,
+      "width": 1036.5249343832022,
+      "height": 60.269999999999996,
+      "font_size": 49
+    },
+    {
+      "text": "64% train  /  16% validation  /  20% test",
+      "x": 1182.5249343832022,
+      "y": 2181,
+      "width": 1036.5249343832022,
+      "height": 44.28,
+      "font_size": 36
+    },
+    {
+      "text": "XGBoost; α = 0.95; at most 100 analyzed features after training-only preprocessing.",
+      "x": 1182.5249343832022,
+      "y": 2253,
+      "width": 1036.5249343832022,
+      "height": 92,
+      "font_size": 37
+    },
+    {
+      "text": "ROC AUC, OVR AUC or R².<br/>Controls delete the same accepted count.",
+      "x": 1182.5249343832022,
+      "y": 2400,
+      "width": 1036.5249343832022,
+      "height": 80,
+      "font_size": 32
+    },
+    {
+      "text": "03",
+      "x": 2269.0498687664044,
+      "y": 826,
+      "width": 106,
+      "height": 61.5,
+      "font_size": 50
+    },
+    {
+      "text": "THE EVIDENCE",
+      "x": 2384.0498687664044,
+      "y": 826,
+      "width": 921.5249343832022,
+      "height": 61.5,
+      "font_size": 50
+    },
+    {
+      "text": "Compression is<br/>dataset-dependent.",
+      "x": 2269.0498687664044,
+      "y": 939,
+      "width": 1036.5249343832022,
+      "height": 110,
+      "font_size": 47
+    },
+    {
+      "text": "Five-seed mean ± SD. Bars: analyzed features removed.<br/>ΔU: held-out utility minus the full model.",
+      "x": 2269.0498687664044,
+      "y": 1075,
+      "width": 1036.5249343832022,
+      "height": 80,
+      "font_size": 32
+    },
+    {
+      "text": "COMPRESSION (%)",
+      "x": 2269.0498687664044,
+      "y": 1191,
+      "width": 650,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "HELD-OUT ΔU",
+      "x": 2999.0498687664044,
+      "y": 1191,
+      "width": 306.5249343832022,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "Madelon",
+      "x": 2269.0498687664044,
+      "y": 1263,
+      "width": 415,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "43.60 ± 31.96",
+      "x": 2683.0498687664044,
+      "y": 1263,
+      "width": 280,
+      "height": 38.13,
+      "font_size": 31
+    },
+    {
+      "text": "+0.00469",
+      "x": 3007.0498687664044,
+      "y": 1262,
+      "width": 298.5249343832022,
+      "height": 44.28,
+      "font_size": 36
+    },
+    {
+      "text": "± 0.00497",
+      "x": 3007.0498687664044,
+      "y": 1306,
+      "width": 298.5249343832022,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "Abalone",
+      "x": 2269.0498687664044,
+      "y": 1365,
+      "width": 415,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "27.50 ± 25.62",
+      "x": 2683.0498687664044,
+      "y": 1365,
+      "width": 280,
+      "height": 38.13,
+      "font_size": 31
+    },
+    {
+      "text": "-0.00565",
+      "x": 3007.0498687664044,
+      "y": 1364,
+      "width": 298.5249343832022,
+      "height": 44.28,
+      "font_size": 36
+    },
+    {
+      "text": "± 0.01077",
+      "x": 3007.0498687664044,
+      "y": 1408,
+      "width": 298.5249343832022,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "Credit-Card-Fraud",
+      "x": 2269.0498687664044,
+      "y": 1467,
+      "width": 415,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "2.76 ± 2.89",
+      "x": 2683.0498687664044,
+      "y": 1467,
+      "width": 280,
+      "height": 38.13,
+      "font_size": 31
+    },
+    {
+      "text": "-0.00078",
+      "x": 3007.0498687664044,
+      "y": 1466,
+      "width": 298.5249343832022,
+      "height": 44.28,
+      "font_size": 36
+    },
+    {
+      "text": "± 0.00335",
+      "x": 3007.0498687664044,
+      "y": 1510,
+      "width": 298.5249343832022,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "Spambase",
+      "x": 2269.0498687664044,
+      "y": 1569,
+      "width": 415,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "0.72 ± 0.99",
+      "x": 2683.0498687664044,
+      "y": 1569,
+      "width": 280,
+      "height": 38.13,
+      "font_size": 31
+    },
+    {
+      "text": "-0.00003",
+      "x": 3007.0498687664044,
+      "y": 1568,
+      "width": 298.5249343832022,
+      "height": 44.28,
+      "font_size": 36
+    },
+    {
+      "text": "± 0.00007",
+      "x": 3007.0498687664044,
+      "y": 1612,
+      "width": 298.5249343832022,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "Gisette",
+      "x": 2269.0498687664044,
+      "y": 1671,
+      "width": 415,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "0.60 ± 0.89",
+      "x": 2683.0498687664044,
+      "y": 1671,
+      "width": 280,
+      "height": 38.13,
+      "font_size": 31
+    },
+    {
+      "text": "-0.00011",
+      "x": 3007.0498687664044,
+      "y": 1670,
+      "width": 298.5249343832022,
+      "height": 44.28,
+      "font_size": 36
+    },
+    {
+      "text": "± 0.00016",
+      "x": 3007.0498687664044,
+      "y": 1714,
+      "width": 298.5249343832022,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "ISOLET",
+      "x": 2269.0498687664044,
+      "y": 1773,
+      "width": 415,
+      "height": 40.589999999999996,
+      "font_size": 33
+    },
+    {
+      "text": "0.00 ± 0.00",
+      "x": 2683.0498687664044,
+      "y": 1773,
+      "width": 280,
+      "height": 38.13,
+      "font_size": 31
+    },
+    {
+      "text": "0.00000",
+      "x": 3007.0498687664044,
+      "y": 1772,
+      "width": 298.5249343832022,
+      "height": 44.28,
+      "font_size": 36
+    },
+    {
+      "text": "± 0.00000",
+      "x": 3007.0498687664044,
+      "y": 1816,
+      "width": 298.5249343832022,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "0",
+      "x": 2269.0498687664044,
+      "y": 1879,
+      "width": 75,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "40",
+      "x": 2573.0498687664044,
+      "y": 1879,
+      "width": 75,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "80",
+      "x": 2902.0498687664044,
+      "y": 1879,
+      "width": 75,
+      "height": 36.9,
+      "font_size": 30
+    },
+    {
+      "text": "14/30 units had nonzero removal; 3/17 nonempty candidate sets were vetoed by the gate.",
+      "x": 2269.0498687664044,
+      "y": 1936,
+      "width": 1036.5249343832022,
+      "height": 80,
+      "font_size": 32
+    },
+    {
+      "text": "NSGA-II: equal search budgets",
+      "x": 2297.0498687664044,
+      "y": 2074,
+      "width": 980.5249343832022,
+      "height": 46.74,
+      "font_size": 38
+    },
+    {
+      "text": "+0.01584",
+      "x": 2297.0498687664044,
+      "y": 2140,
+      "width": 470,
+      "height": 70,
+      "font_size": 62
+    },
+    {
+      "text": "mean held-out ΔHV<br/>800 evaluations per variant",
+      "x": 2761.0498687664044,
+      "y": 2141,
+      "width": 516.5249343832022,
+      "height": 78,
+      "font_size": 31
+    },
+    {
+      "text": "Holm p = 0.4375; not significant. Madelon drives most of the gain.",
+      "x": 2297.0498687664044,
+      "y": 2236,
+      "width": 980.5249343832022,
+      "height": 39,
+      "font_size": 31
+    },
+    {
+      "text": "WHAT THIS DOES NOT ESTABLISH",
+      "x": 2269.0498687664044,
+      "y": 2337,
+      "width": 1036.5249343832022,
+      "height": 39.36,
+      "font_size": 32
+    },
+    {
+      "text": "No overall superiority or speedup. The validation gate does not guarantee held-out non-inferiority.",
+      "x": 2269.0498687664044,
+      "y": 2397,
+      "width": 1036.5249343832022,
+      "height": 88,
+      "font_size": 35
+    }
+  ],
+  "fit_checks": [
+    {
+      "label": "Min-Marginal Power Indices",
+      "used_height": 122,
+      "available_height": 125
+    },
+    {
+      "label": "for Multi-Objective Feature Selection",
+      "used_height": 122,
+      "available_height": 125
+    },
+    {
+      "label": "Wenjie Shi  &amp;  Chi Zhao*",
+      "used_height": 62.73,
+      "available_height": 66
+    },
+    {
+      "label": "Saint Petersburg State University",
+      "used_height": 45.51,
+      "available_height": 48
+    },
+    {
+      "label": "7/9 Universitetskaya nab., Saint Petersburg, 19903",
+      "used_height": 40.589999999999996,
+      "available_height": 44
+    },
+    {
+      "label": "st147487@student.spbu.ru",
+      "used_height": 40.589999999999996,
+      "available_height": 44
+    },
+    {
+      "label": "* Corresponding author: chi.zhao@spbu.ru",
+      "used_height": 40.589999999999996,
+      "available_height": 44
+    },
+    {
+      "label": "Find when a feature can hurt.<br/>Verify removal b",
+      "used_height": 102,
+      "available_height": 108
+    },
+    {
+      "label": "mean analyzed-feature removal",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "mean held-out utility change",
+      "used_height": 36.9,
+      "available_height": 38
+    },
+    {
+      "label": "01",
+      "used_height": 61.5,
+      "available_height": 65
+    },
+    {
+      "label": "THE PROBLEM",
+      "used_height": 61.5,
+      "available_height": 65
+    },
+    {
+      "label": "Averages can hide<br/>a harmful context.",
+      "used_height": 110,
+      "available_height": 112
+    },
+    {
+      "label": "Adding a feature can turn an acceptable model into",
+      "used_height": 98,
+      "available_height": 149
+    },
+    {
+      "label": "ONE COALITION, ONE HARMFUL WITNESS",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "A worst-case marginal",
+      "used_height": 52.89,
+      "available_height": 56
+    },
+    {
+      "label": "v<sub>α</sub>(S) = 1[U(M<sub>S</sub>) ≥ α U<sub>fu",
+      "used_height": 63,
+      "available_height": 66
+    },
+    {
+      "label": "Δ<sub>i</sub>(S) = v<sub>α</sub>(S <font name=\"Pos",
+      "used_height": 59,
+      "available_height": 63
+    },
+    {
+      "label": "MinPI<sub>i</sub> = min Δ<sub>i</sub>(S)",
+      "used_height": 69,
+      "available_height": 73
+    },
+    {
+      "label": "over all S <font name=\"PosterMath\">⊆</font> N <fon",
+      "used_height": 38.13,
+      "available_height": 41
+    },
+    {
+      "label": "-1 harmful",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "0 neutral*",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "+1 decisive",
+      "used_height": 41.82,
+      "available_height": 44
+    },
+    {
+      "label": "*Exact values. A sampled 0 or +1 is not a certific",
+      "used_height": 80,
+      "available_height": 85
+    },
+    {
+      "label": "Scan to read<br/>the full paper",
+      "used_height": 108,
+      "available_height": 112
+    },
+    {
+      "label": "Theory, experiments<br/>and complete results",
+      "used_height": 86,
+      "available_height": 90
+    },
+    {
+      "label": "hlnks.co/63671101",
+      "used_height": 36.9,
+      "available_height": 40
+    },
+    {
+      "label": "02",
+      "used_height": 61.5,
+      "available_height": 65
+    },
+    {
+      "label": "THE METHOD",
+      "used_height": 61.5,
+      "available_height": 65
+    },
+    {
+      "label": "1  Discover candidates",
+      "used_height": 54.12,
+      "available_height": 56
+    },
+    {
+      "label": "Fit coalition models on training data.<br/>Evaluat",
+      "used_height": 94,
+      "available_height": 146
+    },
+    {
+      "label": "Exact enumeration or sampled search",
+      "used_height": 39.36,
+      "available_height": 43
+    },
+    {
+      "label": "2  Gate proposed removals",
+      "used_height": 54.12,
+      "available_height": 56
+    },
+    {
+      "label": "Let H be the candidate harmful set.<br/>Accept its",
+      "used_height": 94,
+      "available_height": 98
+    },
+    {
+      "label": "U<sub>val</sub>(N <font name=\"PosterMath\">∖</font>",
+      "used_height": 58,
+      "available_height": 61
+    },
+    {
+      "label": "ε = 0.005 (classification); 0.01 (regression)",
+      "used_height": 40.589999999999996,
+      "available_height": 46
+    },
+    {
+      "label": "PASS: remove H  |  FAIL: remove nothing",
+      "used_height": 39.36,
+      "available_height": 41
+    },
+    {
+      "label": "3  Evaluate &amp; optimize",
+      "used_height": 54.12,
+      "available_height": 56
+    },
+    {
+      "label": "Use held-out test data for final reporting.<br/>Ac",
+      "used_height": 94,
+      "available_height": 143
+    },
+    {
+      "label": "EXPERIMENTAL PROTOCOL",
+      "used_height": 43.05,
+      "available_height": 46
+    },
+    {
+      "label": "6 datasets × 5 seeds",
+      "used_height": 60.269999999999996,
+      "available_height": 63
+    },
+    {
+      "label": "64% train  /  16% validation  /  20% test",
+      "used_height": 44.28,
+      "available_height": 48
+    },
+    {
+      "label": "XGBoost; α = 0.95; at most 100 analyzed features a",
+      "used_height": 92,
+      "available_height": 141
+    },
+    {
+      "label": "ROC AUC, OVR AUC or R².<br/>Controls delete the sa",
+      "used_height": 80,
+      "available_height": 85
+    },
+    {
+      "label": "03",
+      "used_height": 61.5,
+      "available_height": 65
+    },
+    {
+      "label": "THE EVIDENCE",
+      "used_height": 61.5,
+      "available_height": 65
+    },
+    {
+      "label": "Compression is<br/>dataset-dependent.",
+      "used_height": 110,
+      "available_height": 112
+    },
+    {
+      "label": "Five-seed mean ± SD. Bars: analyzed features remov",
+      "used_height": 80,
+      "available_height": 85
+    },
+    {
+      "label": "COMPRESSION (%)",
+      "used_height": 36.9,
+      "available_height": 39
+    },
+    {
+      "label": "HELD-OUT ΔU",
+      "used_height": 36.9,
+      "available_height": 39
+    },
+    {
+      "label": "Madelon",
+      "used_height": 40.589999999999996,
+      "available_height": 43
+    },
+    {
+      "label": "43.60 ± 31.96",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "+0.00469",
+      "used_height": 44.28,
+      "available_height": 46
+    },
+    {
+      "label": "± 0.00497",
+      "used_height": 36.9,
+      "available_height": 39
+    },
+    {
+      "label": "Abalone",
+      "used_height": 40.589999999999996,
+      "available_height": 43
+    },
+    {
+      "label": "27.50 ± 25.62",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "-0.00565",
+      "used_height": 44.28,
+      "available_height": 46
+    },
+    {
+      "label": "± 0.01077",
+      "used_height": 36.9,
+      "available_height": 39
+    },
+    {
+      "label": "Credit-Card-Fraud",
+      "used_height": 40.589999999999996,
+      "available_height": 43
+    },
+    {
+      "label": "2.76 ± 2.89",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "-0.00078",
+      "used_height": 44.28,
+      "available_height": 46
+    },
+    {
+      "label": "± 0.00335",
+      "used_height": 36.9,
+      "available_height": 39
+    },
+    {
+      "label": "Spambase",
+      "used_height": 40.589999999999996,
+      "available_height": 43
+    },
+    {
+      "label": "0.72 ± 0.99",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "-0.00003",
+      "used_height": 44.28,
+      "available_height": 46
+    },
+    {
+      "label": "± 0.00007",
+      "used_height": 36.9,
+      "available_height": 39
+    },
+    {
+      "label": "Gisette",
+      "used_height": 40.589999999999996,
+      "available_height": 43
+    },
+    {
+      "label": "0.60 ± 0.89",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "-0.00011",
+      "used_height": 44.28,
+      "available_height": 46
+    },
+    {
+      "label": "± 0.00016",
+      "used_height": 36.9,
+      "available_height": 39
+    },
+    {
+      "label": "ISOLET",
+      "used_height": 40.589999999999996,
+      "available_height": 43
+    },
+    {
+      "label": "0.00 ± 0.00",
+      "used_height": 38.13,
+      "available_height": 40
+    },
+    {
+      "label": "0.00000",
+      "used_height": 44.28,
+      "available_height": 46
+    },
+    {
+      "label": "± 0.00000",
+      "used_height": 36.9,
+      "available_height": 39
+    },
+    {
+      "label": "14/30 units had nonzero removal; 3/17 nonempty can",
+      "used_height": 80,
+      "available_height": 86
+    },
+    {
+      "label": "NSGA-II: equal search budgets",
+      "used_height": 46.74,
+      "available_height": 50
+    },
+    {
+      "label": "+0.01584",
+      "used_height": 70,
+      "available_height": 74
+    },
+    {
+      "label": "mean held-out ΔHV<br/>800 evaluations per variant",
+      "used_height": 78,
+      "available_height": 82
+    },
+    {
+      "label": "Holm p = 0.4375; not significant. Madelon drives m",
+      "used_height": 39,
+      "available_height": 82
+    },
+    {
+      "label": "WHAT THIS DOES NOT ESTABLISH",
+      "used_height": 39.36,
+      "available_height": 43
+    },
+    {
+      "label": "No overall superiority or speedup. The validation ",
+      "used_height": 88,
+      "available_height": 134
+    }
+  ],
+  "data": [
+    {
+      "dataset": "Madelon",
+      "compression": 43.6,
+      "sd": 31.96,
+      "du": 0.00469,
+      "du_sd": 0.00497
+    },
+    {
+      "dataset": "Abalone",
+      "compression": 27.5,
+      "sd": 25.62,
+      "du": -0.00565,
+      "du_sd": 0.01077
+    },
+    {
+      "dataset": "Credit-Card-Fraud",
+      "compression": 2.76,
+      "sd": 2.89,
+      "du": -0.00078,
+      "du_sd": 0.00335
+    },
+    {
+      "dataset": "Spambase",
+      "compression": 0.72,
+      "sd": 0.99,
+      "du": -3e-05,
+      "du_sd": 7e-05
+    },
+    {
+      "dataset": "Gisette",
+      "compression": 0.6,
+      "sd": 0.89,
+      "du": -0.00011,
+      "du_sd": 0.00016
+    },
+    {
+      "dataset": "ISOLET",
+      "compression": 0.0,
+      "sd": 0.0,
+      "du": 0.0,
+      "du_sd": 0.0
+    }
+  ],
+  "glyph_audit": {
+    "checked_characters": 2135,
+    "missing": []
+  },
+  "provenance": {
+    "paper": "output/pdf/MinPI_arXiv_final.pdf",
+    "compression_data": "Table 2: MinPI feature removal summary, five-seed means and sample SD",
+    "aggregate_removal": "Section 4.1: all 30 dataset-seed units",
+    "nsga_ii": "Section 4.3: held-out hypervolume, not the validation curves of Figure 3",
+    "diagram": "Conceptual illustration of an evaluated -1 marginal; not simulated data",
+    "graphics": "Original vector redraw from paper values; no rasterized paper panels"
+  },
+  "source_hashes": {
+    "output/pdf/MinPI_arXiv_final.pdf": "2c7cc05471252f1e464230d3a01cd5d1e8d4fb8852fb46f37162a6ca5fc26424",
+    "output/QRcode.png": "3b007243b94c94bcc09a92cc86a5c0900ace9d4a4c103e565a84a07e2245435d",
+    "MinPI_arXiv_source(1).zip": "5e09469bd8731d4158b16921b737e5c99b56a46e0e95163c2ea93e03d09e4cf6"
+  },
+  "qr": {
+    "x_pt": 108,
+    "y_top_pt": 2180,
+    "width_mm": 90,
+    "height_mm": 108,
+    "effective_dpi": 310.4444444444444,
+    "payload": "https://hlnks.co/63671101"
+  }
+}

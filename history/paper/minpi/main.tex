@@ -1,0 +1,128 @@
+\documentclass{article}
+\usepackage{icomp2026_conference,times}
+\icompfinalcopy
+\bibliographystyle{icomp2026_conference}
+\usepackage[T1]{fontenc}
+\usepackage{microtype,amsmath,amssymb,amsthm,booktabs,graphicx}
+\usepackage[hidelinks]{hyperref}
+\hypersetup{pdftitle={Exact Top-h Selection from Pivotal Votes: Integer Certification and Its Limits},pdfauthor={Anonymous authors}}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\DeclareMathOperator{\sgn}{sgn}
+\newcommand{\EE}{\mathbb E}
+\newcommand{\PP}{\mathbb P}
+\newcommand{\method}{pivotal minPI}
+\title{Exact Top-$h$ Selection from Pivotal Votes:\\Integer Certification and Its Limits}
+\author{Anonymous authors}
+\begin{document}
+\maketitle
+\lhead{}
+\renewcommand{\headrulewidth}{0pt}
+\begin{abstract}
+Pivotal minPI ranks features by the smallest mean signed contribution they make to a majority vote over specified peer counts. At a budget of $h$ features, a rounding error at the cutoff can change which columns are returned. On a gas-sensor matrix, two floating-point implementations selected the wrong member of a three-way tie. On a constructed matrix double precision missed the unique winner with a lead of $2.20\times10^{-21}$. We compute the prescribed top $h$ with two signed counts per row and peer count. Our direct selector prunes with one layer. When a common scale is safe, we compare signed machine-word sums directly. Otherwise we enclose the scores on a binary grid and resolve the cutoff with integer comparisons. Across 42 panels the median paired time ratios to unchecked floating-point pruning were 1.52, 1.51 and 1.59 at 2\%, 10\% and 50\% budgets, including ballot construction. On the 21 panels beyond the common-scale word bound, the ratios were 0.64, 0.57 and 0.56 to exact anchor pruning and 0.90, 0.91 and 0.90 to generating a floating-point proposal and checking its score and index bounds. On materials, doubling the sample used to construct the votes replaced all nine selected features even under exact scoring.
+
+\end{abstract}
+\noindent\textbf{Keywords}\quad voting games, exact arithmetic, feature selection, top-$h$ queries
+
+\section{Introduction}
+A sensor casts a positive vote when its reading is closer to a same-class reference than to a different-class one. Sensors on the same observation can disagree. Pivotal minPI credits each sensor with its signed change to the majority, averaged over peers at each specified group size. Its score is the smallest of these averages.
+
+Votes of the same sign share a pivot count on each comparison. Since every layer bounds the minimum from above, a column whose bound falls below the cutoff needs no further layers. Rounding can replace a tied feature, as on the gas-sensor data, or erase a strict lead, as in our three-row example.
+
+\paragraph{Related work}
+Relief and its extensions score features from distances to same-class and different-class neighbours~\citep{kira1992relief,robnik2003relieff,sun2010local}. Model-utility games credit features for changes in prediction~\citep{cohen2007feature}. Earlier MinPI takes the minimum marginal contribution over individual coalitions in a thresholded utility game~\citep{shi2026minpi}. ShapG uses a feature-correlation graph to approximate Shapley values~\citep{zhao2025shapg}. In \method{}, the payoff is a majority on a single comparison, and each peer count defines a size-specific semivalue~\citep{dubey1981semivalues}.
+
+Ternary bicooperative games allow players to join a supporting or opposing coalition~\citep{bilbao2010ternary}. In our game each row fixes the signs, and the participating subset varies. EPIC chooses among machine words, multiprecision integers and modular representations for weighted-game indices~\citep{staudacher2021power}. Threshold algorithms can retrieve a monotone aggregate from accessible attribute scores~\citep{fagin2003topk}. Here each such score requires a sum of signed counts. Their common layer denominator supplies the bounds for an interval filter with exact fallback~\citep{shewchuk1997adaptive}.
+
+\section{The finite selection problem}
+Let $V\in\{-1,0,1\}^{w\times p}$, with $w,p\ge1$. One row is one comparison, and a zero is an abstention. The payoff to an index set $S$ is
+\begin{equation}
+ U_r(S)=\sgn\!\left(\sum_{i\in S}v_{ri}\right), \qquad \sgn(0)=0 .\label{eq:game}
+\end{equation}
+For any nonempty $K\subseteq\{0,\ldots,p-1\}$ let $S_{jk}$ be a uniform $k$-subset of the peers of column $j$. Define
+\begin{align}
+ G_{kj}&=\frac1w\sum_{r=1}^{w}\EE\!\left[U_r(S_{jk}\cup\{j\})-U_r(S_{jk})\right],
+ & T_j&=\min_{k\in K}G_{kj} .\label{eq:score}
+\end{align}
+Given $1\le h\le p$, return the $h$ columns with largest $T_j$, resolving ties in favour of the smaller original index. We return the selected indices in input order. The empty coalition gives $G_{0j}=w^{-1}\sum_r v_{rj}$, which we also use for comparisons when $0\notin K$.
+
+If each retained feature has its own adverse peer count, the guaranteed total credit for a set $S$ is $\min_{(k_j)\in K^S}\sum_{j\in S}G_{k_j,j}=\sum_{j\in S}T_j$. The top $h$ maximize this sum. Under a single common adverse size the guarantee is $\min_{k\in K}\sum_{j\in S}G_{kj}$, which can be larger. Coalition payoff can differ from both guarantees. With all-positive votes a singleton wins every row, yet including a positive peer count in $K$ makes every $T_j$ zero.
+
+\paragraph{Scope and choice of arithmetic}
+The guarantee begins with $V$, its column order, $K$ and $h$. Sampling and floating-point neighbour search can change $V$. For layer denominators $D_k=\binom{p-1}{k}$, the direct selector computes $D=\mathrm{lcm}_{k\in K}D_k$ in arbitrary precision. If $wD\le 2^{63}-1$, signed machine words suffice on this common scale. Otherwise the direct selector bounds scores by integer intervals and resolves the boundary exactly. A second variant sums layers in machine words if $w\max_k D_k\le 2^{63}-1$, using arbitrary-precision cross products to compare fractions. Otherwise it uses the same interval path.
+
+\section{Exact counting}
+Remove the focal column from one row, leaving $a$ positive, $b$ negative and $c$ abstaining peers. Let $H_k(t)$ be the probability that a uniform $k$-subset has margin $t$. Cantor's generating function counts coalitions by size and weight after removing a player~\citep[Prop.~1]{bilbao2000power}. Here the number of subsets of size $k$ and margin $t$ is the coefficient of $x^kz^t$ in $(1+xz)^a(1+xz^{-1})^b(1+x)^c$. The sampled counts $(n_+,n_-,n_0)$ jointly follow a multivariate hypergeometric distribution. Columns of the same sign share a pivot count. This reduces each row to at most two counts per layer for certifying membership at the budget cutoff.
+
+\begin{theorem}\label{thm:pivotal}
+For $a+b+c=p-1$, $0\le k\le p-1$ and integer $t$, let $\mathcal C_{k,t}$ contain the nonnegative triples $(n_+,n_-,n_0)$ with sum $k$ and difference $n_+-n_-=t$. Then
+\begin{equation}
+ H_k(t)=\frac{1}{D_k}
+ \sum_{(n_+,n_-,n_0)\in\mathcal C_{k,t}}
+ \binom{a}{n_+}\binom{b}{n_-}\binom{c}{n_0}\,.\label{eq:mass}
+\end{equation}
+Assign each binomial coefficient the value zero outside its feasible range. The mean increment contributed by the focal coordinate on this row is
+\begin{equation}
+ \begin{cases}
+  H_k(-1)+H_k(0), &v_{rj}=+1,\\
+  -H_k(0)-H_k(1), &v_{rj}=-1,\\
+  0, &v_{rj}=0.
+ \end{cases}\label{eq:identity}
+\end{equation}
+\end{theorem}
+\begin{proof}
+Expanding the product counts each indexed subset of margin $t$ once, giving~\eqref{eq:mass} after normalization. A positive vote raises the payoff by one at margins $-1,0$, and a negative vote lowers it by one at margins $0,1$. At every other margin the focal sign leaves the payoff unchanged. An abstention always contributes zero.
+\end{proof}
+
+\paragraph{Sharing the counts}
+All positive focal votes share $A_{rk}=H_k(-1)+H_k(0)$ computed after removing one positive vote. All negative focal votes share the magnitude $B_{rk}=H_k(0)+H_k(1)$ after removing one negative vote. Assign zero weight to an absent sign. Then
+\begin{equation}
+ G_{kj}=\frac1w\sum_r\bigl(A_{rk}\mathbf 1_{\{v_{rj}=1\}}-B_{rk}\mathbf 1_{\{v_{rj}=-1\}}\bigr)\,.\label{eq:weights}
+\end{equation}
+When a row contains no abstentions, the summand is $(A_{rk}+B_{rk})v_{rj}/2+(A_{rk}-B_{rk})/2$. The second term shifts all columns equally. On an abstention-free matrix, a weighted sum of the signed votes therefore determines the order at each $k$. Identical vote vectors tie.
+
+Fixing $n_+-n_-=t$ leaves at most $\lfloor k/2\rfloor+1$ terms. Full floating-point scoring tabulates log binomials up to $k_{\max}=\max K$ and costs $O(p(k_{\max}+1)+w\sum_k(k+1)+|K|wp)$ before sorting. Lean~4 checks the subset counts, normalization and pointwise increments. Enumeration up to five peers matched all 1,358 margin counts and 798 signed numerators.
+
+\input{prefix}
+
+\section{Algorithmic validation}
+We fix the ballots, peer counts, budget and tie rule within each timing comparison. The default $h=\lceil p/10\rceil$ retains one feature in ten. The default layers compare an unaided vote with four and sixteen peers, capped at $p-1$ with duplicates removed. Grid precision affects the cost of certifying this target.
+
+\subsection{Reproducing budget-boundary decisions}\label{sec:boundary}
+\input{cost-figure}
+\input{gas-replay}
+
+\input{strict-winner}
+
+\input{frontier-revision}
+\input{raw-cost}
+\input{word-design}
+\input{arithmetic-price}
+\input{budget-comparison}
+\input{arithmetic-choice}
+\input{precision-design}
+
+\section{Witness construction, support stability and prediction}
+\input{witness-construction}
+\input{witness-design}
+\input{weighting}
+\input{order-diagnostics}
+\input{reliability}
+
+\section{Discussion}
+The certificate returns the prescribed support, including at a tied cutoff. Separated intervals can eliminate full-precision scoring. When $c=m=p$ the implementation pays for both screening and full scoring, even at $h=1$. The opposite rows cancel in this example. Reducing its fractions gives $wD'=632{,}667{,}422{,}750$ (40 bits), which permits machine-word sums directly. At $h=1$ the reduced selector took 0.189\,ms versus 0.316\,ms for the direct selector (32 paired calls on fixed votes). For the strict winner in Figure~\ref{fig:work}d the reduced bound still takes 119 bits. Identical columns there can share a computation if peer counts retain their multiplicities.
+
+If every row has absolute margin at least two, removing one vote preserves the majority. Including size $p-1$ then gives $T_j\le0$ for every column. Proposition~\ref{prop:commonorder} can certify the support from the raw vote order. Its gap condition failed on all three eligible matrices, which still admit exact selection by~\eqref{eq:score}. Even under exact scoring, doubling the materials sample displaced all nine selected features.
+
+In the biased simulation, size 16 gave cross-instrument comparisons almost no weight and favoured strong within-instrument features even when their polarity reversed. Raw signs favoured background features because hits often shared the query background. Each block scored poorly in one layer. Wrist and ankle comparisons had similar within- and cross-location pivotal weights. All four features selected at size 16 had positive cross-location covariance of their class means. Gas and materials lacked paired instruments for this comparison. With the same model fit and random seed, identical supports give identical predictions. The minimum and largest layer differed on six of 42 panels at the original budget and agreed on all three primary real-data panels. Estimating an average gain on new sources requires both the frequency of changed supports and their mean paired gain on independent observations.
+
+\paragraph{Data and code availability}
+The package contains data or reconstruction instructions, splits, supports, predictions, timings, proofs and code. We used NumPy, SciPy and scikit-learn~\citep{pedregosa2011sklearn}, with one numerical-library thread on an Intel Core Ultra~9 275HX under Windows~11.
+
+\paragraph{Declaration of generative AI use}
+OpenAI Codex assisted with research design, selector and experiment implementation, Lean formalization, data analysis, and manuscript drafting and revision.
+
+\begingroup\raggedright
+\bibliography{references}
+\endgroup
+\end{document}

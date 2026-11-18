@@ -1,0 +1,251 @@
+{
+  "version": "arXiv:2606.18867v1 figure numbers",
+  "figures": {
+    "1": {
+      "notebook": "figure1_joint_predictability_manipulability.ipynb",
+      "pdfs_regenerated": [
+        "plots/joint_predictability_manipulability.pdf"
+      ],
+      "matched_upstream_csvs": [],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 0,
+          "line": "%load_ext autoreload"
+        },
+        {
+          "cell": 0,
+          "line": "%autoreload 2"
+        }
+      ]
+    },
+    "2": {
+      "notebook": "figure2_homogeneous_costs_phase.ipynb",
+      "pdfs_regenerated": [
+        "plots/homogeneous_costs_phase.pdf"
+      ],
+      "matched_upstream_csvs": [],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 0,
+          "line": "%load_ext autoreload"
+        },
+        {
+          "cell": 0,
+          "line": "%autoreload 2"
+        }
+      ]
+    },
+    "3": {
+      "notebook": "figure3_safer_correlated_proxy.ipynb",
+      "pdfs_regenerated": [
+        "plots/safer_correlated_proxy.pdf"
+      ],
+      "matched_upstream_csvs": [],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 0,
+          "line": "%load_ext autoreload"
+        },
+        {
+          "cell": 0,
+          "line": "%autoreload 2"
+        },
+        {
+          "cell": 0,
+          "line": "from IPython.display import Image, display"
+        }
+      ]
+    },
+    "5": {
+      "notebook": "figure5_selection_panels.ipynb",
+      "pdfs_regenerated": [
+        "outputs/selection_panels_outputs/figures/hcc_retention_panel_a.pdf",
+        "outputs/selection_panels_outputs/figures/signal_vs_manipulability_panel_b.pdf"
+      ],
+      "matched_upstream_csvs": [
+        "outputs/selection_panels_outputs/data/active_feature_signal_manipulability_selection.csv",
+        "outputs/selection_panels_outputs/data/coding_sensitive_active_hccs.csv",
+        "outputs/selection_panels_outputs/data/coding_sensitive_retention_main_matrix.csv",
+        "outputs/selection_panels_outputs/data/exact_k_supports_needed_for_selection_panels.csv"
+      ],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 5,
+          "line": "from IPython.display import Image, display"
+        },
+        {
+          "cell": 5,
+          "line": "display(Image(filename=fig_path))"
+        }
+      ]
+    },
+    "6": {
+      "notebook": "figure6_signal_manip.ipynb",
+      "pdfs_regenerated": [
+        "plots/supp_signal_manip.pdf"
+      ],
+      "matched_upstream_csvs": [
+        "outputs/figure6_signal_manip_outputs/signal_manip_data.csv"
+      ],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 0,
+          "line": "%load_ext autoreload"
+        },
+        {
+          "cell": 0,
+          "line": "%autoreload 2"
+        },
+        {
+          "cell": 0,
+          "line": "from IPython.display import Image, display"
+        },
+        {
+          "cell": 2,
+          "line": "display(Image(filename=os.path.join(plots_dir, 'supp_signal_manip.png')))"
+        }
+      ]
+    },
+    "9": {
+      "notebook": "figure9_row_sum_distributions.ipynb",
+      "pdfs_regenerated": [
+        "outputs/row_sum_distributions_outputs/figures/row_sum_distributions.pdf"
+      ],
+      "matched_upstream_csvs": [
+        "outputs/row_sum_distributions_outputs/data/row_sum_distribution.csv",
+        "outputs/row_sum_distributions_outputs/data/row_sum_summary.csv"
+      ],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 1,
+          "line": "from IPython.display import display, Image"
+        },
+        {
+          "cell": 6,
+          "line": "display(row_summary)"
+        },
+        {
+          "cell": 6,
+          "line": "display(Image(filename=str(FIG / 'row_sum_distributions.png')))"
+        }
+      ]
+    },
+    "10": {
+      "notebook": "figure10_target_prevalence_scenarios.ipynb",
+      "pdfs_regenerated": [
+        "outputs/target_prevalence_scenarios/figures/target_shift_heatmap.pdf",
+        "outputs/target_prevalence_scenarios/figures/target_vs_achieved_prevalence.pdf"
+      ],
+      "matched_upstream_csvs": [
+        "outputs/target_prevalence_scenarios/data/target_prevalence_diagnostics.csv",
+        "outputs/target_prevalence_scenarios/data/target_prevalence_error_summary.csv"
+      ],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 0,
+          "line": "from IPython.display import display, Image"
+        },
+        {
+          "cell": 4,
+          "line": "display(error_summary)"
+        },
+        {
+          "cell": 4,
+          "line": "display(Image(filename=str(path_prevalence)))"
+        },
+        {
+          "cell": 4,
+          "line": "display(Image(filename=str(path_heatmap)))"
+        }
+      ]
+    },
+    "11": {
+      "notebook": "figure11_cost_matrix_construction_diagnostics.ipynb",
+      "pdfs_regenerated": [
+        "outputs/cost_matrix_construction_diagnostics_outputs/figures/cost_matrix_construction_diagnostics.pdf"
+      ],
+      "matched_upstream_csvs": [
+        "outputs/cost_matrix_construction_diagnostics_outputs/data/block_component_B_active.csv",
+        "outputs/cost_matrix_construction_diagnostics_outputs/data/block_family_membership_active_matrix.csv",
+        "outputs/cost_matrix_construction_diagnostics_outputs/data/block_family_membership_long.csv",
+        "outputs/cost_matrix_construction_diagnostics_outputs/data/constructed_H_active.csv",
+        "outputs/cost_matrix_construction_diagnostics_outputs/data/constructed_Hinv_active.csv",
+        "outputs/cost_matrix_construction_diagnostics_outputs/data/cost_component_active_hccs.csv"
+      ],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 0,
+          "line": "from IPython.display import Image, display"
+        },
+        {
+          "cell": 4,
+          "line": "display(Image(filename=str(FIG / f'cost_matrix_construction_diagnostics.png')))"
+        }
+      ]
+    },
+    "12": {
+      "notebook": "figure12_full_alpha_curves.ipynb",
+      "pdfs_regenerated": [
+        "outputs/full_alpha_curves_outputs/figures/full_alpha_curves.pdf",
+        "outputs/full_alpha_curves_outputs/figures/full_alpha_curves_normalized.pdf"
+      ],
+      "matched_upstream_csvs": [
+        "outputs/full_alpha_curves_outputs/data/alpha_curves_tau05_k25_with_ols.csv",
+        "outputs/full_alpha_curves_outputs/data/full_alpha_curves_normalized_plotted_values.csv",
+        "outputs/full_alpha_curves_outputs/data/full_alpha_curves_plotted_values.csv"
+      ],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 0,
+          "line": "from IPython.display import display, Image"
+        },
+        {
+          "cell": 4,
+          "line": "display(Image(filename=str(out_png)))"
+        }
+      ]
+    },
+    "13": {
+      "notebook": "figure13_supp_support_path.ipynb",
+      "pdfs_regenerated": [
+        "outputs/supp_support_path_outputs/figures/supp_coding_sensitive_retention_support_path.pdf"
+      ],
+      "matched_upstream_csvs": [
+        "outputs/supp_support_path_outputs/data/active_hcc_support_path_metadata.csv",
+        "outputs/supp_support_path_outputs/data/exact_k_supports_for_support_path.csv",
+        "outputs/supp_support_path_outputs/data/supp_coding_sensitive_retention_support_path_matrix.csv",
+        "outputs/supp_support_path_outputs/data/top_ten_active_hccs_for_support_path.csv"
+      ],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 5,
+          "line": "from IPython.display import Image, display"
+        },
+        {
+          "cell": 5,
+          "line": "display(Image(filename=img_path))"
+        }
+      ]
+    },
+    "14": {
+      "notebook": "figure14_supp_signal_vs_manipulability.ipynb",
+      "pdfs_regenerated": [
+        "outputs/supp_signal_vs_manipulability_outputs/figures/supp_signal_vs_manipulability.pdf"
+      ],
+      "matched_upstream_csvs": [
+        "outputs/supp_signal_vs_manipulability_outputs/data/active_feature_signal_manipulability_selection_for_detailed_map.csv",
+        "outputs/supp_signal_vs_manipulability_outputs/data/exact_k25_support_for_detailed_selection_map.csv"
+      ],
+      "notebook_ui_lines_skipped": [
+        {
+          "cell": 5,
+          "line": "from IPython.display import Image, display"
+        },
+        {
+          "cell": 5,
+          "line": "display(Image(filename=img_path))"
+        }
+      ]
+    }
+  }
+}

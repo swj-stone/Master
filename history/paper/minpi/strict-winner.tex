@@ -1,0 +1,8 @@
+For a strict winner take $p=4096$, $K=\{0,4,16\}$ and $h=1$. Number columns from zero. The first row votes positively on 0--2047 and the second on $\{0,1\}\cup\{2048,\ldots,4093\}$, with all other votes negative. They share two positives (0, 1) and two negatives (4094, 4095). The third row votes negatively on 0 and 4089--4095 and positively elsewhere. A size-16 peer tie for column 1 takes all eight negatives and eight positives. Column 0 has only seven negative peers. The resulting lead is
+\[
+ \Delta=\frac{\binom{4087}{8}}{3\binom{4095}{16}}
+       =\frac{2}{908054843662451242401}\simeq 2.20\times10^{-21}.
+\]
+At size 16 the balanced rows give every other column a nonpositive sum by sign symmetry. The third row adds at most $\Delta$ to its mean. For columns 0 and 1,~\eqref{eq:mass} gives size-16 scores between 0.13117 and 0.13118. Their size-4 scores exceed 0.25 and their size-0 scores are $1/3$ and 1. Size 16 binds for both, so column 1 is the unique winner. The two exact minima lie approximately 0.484296 and 0.484375 ulp above the same binary64 value. Even a single final rounding to nearest therefore makes the index rule select column 0.
+
+Over 32 paired calls on fixed ballots, median scoring times for direct certification and for the floating-point proposal with verification were 5.10 and 5.82\,ms on gas, and 0.273 and 0.633\,ms on the strict winner. Both methods rescored three gas columns and two constructed columns at full precision. Verification replaced 115 with 45 on gas and 0 with 1 on the construction.

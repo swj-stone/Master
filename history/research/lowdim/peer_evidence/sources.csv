@@ -1,0 +1,8 @@
+cohort,dataset,task,metric,n,changed,mean_gap,min_gap,max_gap,wins,losses,different_from_F,different_from_random,above_random_median,equal_random_median,mean_gap_random_median
+extra,breast_cancer,classification,BA,3,2,0.0,0.0,0.0,0,0,2,3,1,0,-0.004221406872608191
+extra,us_macro_gdp,regression,R2,3,1,-0.015538657515913693,-0.04661597254774108,0.0,0,1,1,3,1,0,-0.41055582817962555
+extra,wine,classification,BA,3,2,0.0,0.0,0.0,0,0,2,3,3,0,0.023148148148148178
+formal,breast_cancer,classification,auc,5,2,0.00037735849056601544,0.0,0.0010482180293500676,2,0,2,5,4,0,-4.192872117396718e-05
+formal,diabetes,regression,r2,5,0,0.0,0.0,0.0,0,0,0,5,5,0,0.05266341276799641
+original,abalone,regression,R2,9,0,0.0,0.0,0.0,0,0,0,9,9,0,0.011639118058347398
+original,diabetes,regression,R2,3,0,0.0,0.0,0.0,0,0,0,3,3,0,0.05801586689999901

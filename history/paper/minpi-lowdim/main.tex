@@ -1,0 +1,231 @@
+% !TeX program = xelatex
+% Data: research/lowdim/evidence/all-cases.csv and research/lowdim/peer_evidence/cases.csv.
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=25mm,top=21mm,bottom=21mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{Latin Modern Roman}
+\usepackage{amsmath,amssymb,booktabs,array,tabularx,microtype}
+\usepackage{graphicx,placeins}
+\usepackage[hidelinks]{hyperref}
+\newcommand{\papertitle}{Conditional ridge gains for low-dimensional feature selection}
+\hypersetup{pdftitle={\papertitle},pdflang={en},pdfauthor={}}
+\setlength{\emergencystretch}{1em}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.12}
+\renewcommand{\topfraction}{.88}
+\renewcommand{\floatpagefraction}{.75}
+\renewcommand{\textfraction}{.10}
+\setlength{\textfloatsep}{12pt plus 2pt minus 2pt}
+\setlength{\intextsep}{10pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{5pt}
+\setlength{\belowcaptionskip}{6pt}
+\newcommand{\gain}{g}
+\newcommand{\Full}{\textnormal{Full}}
+\newcommand{\Ftest}{\textnormal{F}}
+\newcommand{\tabnote}[1]{\par\smallskip\begin{minipage}{.96\linewidth}\footnotesize #1\end{minipage}}
+\begin{document}
+\begin{center}
+\parbox{.76\linewidth}{\centering\LARGE\bfseries \papertitle\par}
+\end{center}
+\begin{abstract}
+Choosing a subset of features can take longer than fitting a ridge model on all columns. We study a selection rule for matrices with at most 32 columns. From a single set of cross-products, it scores each feature twice, first by its reduction in penalized training loss when used alone, then by its mean reduction when added to each possible single peer. The smaller score determines its rank, and the concentration of the scores determines how many columns to retain. Compared with an internal rule that uses nested groups of peers, the single-peer rule reduced selection time in all 56 low-dimensional configurations and total time through prediction in 52. At matched width it finished sooner than a univariate F filter with an equal test score in 49 configurations and a higher score in three. With the training sample and width fixed, including the peer gains changed seven of 31 selected sets, raising two test scores and lowering one. We also evaluated the full procedure, using the nested-peer rule on 331 wider configurations. Across all 387 configurations it always removed columns, ran faster than full-feature ridge in 256, and did so with a score loss of at most 0.02 or a score gain in 122.
+\end{abstract}
+\noindent\textbf{Keywords}\quad feature selection, ridge regression, conditional marginal contribution, runtime
+
+\section{Introduction}
+Abalone and Diabetes both have ten columns in our experiments. An Abalone training split contains about 2,800 observations, compared with about 300 for Diabetes. Dropping a column therefore saves a different amount of work in the two regressions. On Diabetes, even a selector that identifies useful predictors has little time to pay for itself. Fitting and predicting with all ten columns takes about a millisecond. We measure elapsed time from receiving the feature matrices to producing test predictions. To assess which columns the selector finds, we also compare methods that retain exactly the same number.
+
+Two correlated measurements can each predict a response well on their own. How much does one still contribute after fitting the other? Cohen et al.~\cite{cohen} measured feature contributions by the change in classification performance when a feature joins a coalition. We ask a narrower question for ridge models. We measure the decrease in penalized training loss when a candidate enters alone and when it joins a model containing one other feature. Taking the smaller of the gain in isolation and the mean gain with a peer discounts features whose contribution falls in the presence of other predictors.
+
+For up to 32 columns we can examine every possible single peer. Cross-products give all the conditional gains without fitting a separate model for each pair. We call this the \emph{single-peer rule}. For an internal comparison, we use an earlier implementation from this project that draws nested groups of peers. A univariate F filter and uniform random selection provide reference sets at the same width. To test whether the peer gains themselves improve the choice of columns, we also hold the sampled observations and width fixed and rank features by their gain in isolation.
+
+Two related approaches illustrate how the choice of utility affects feature selection. Zhao, Liu and Parilina~\cite{zhao} estimate feature contributions using a fitted model and a graph of feature relationships, then train the final predictor on the retained columns. Kaur et al.~\cite{kaur} evaluate candidate subsets under a strategic loss when individuals can respond to the deployed predictor. Our observations are fixed. We score candidate features by an in-sample reduction in penalized loss, then evaluate the selected columns by held-out predictive performance and elapsed time.
+
+\section{Ridge gains by peer count}\label{sec:method}
+Let the training matrix have $n$ rows and $p$ columns. A \emph{peer} is a feature already included when evaluating the gain from adding candidate $j$. Write $S$ for the set of peers, with $j\notin S$. The low-dimensional selector uses a sample of $m=\min(n,768)$ training rows. If $n>m$, it divides the row indices, in their existing order, into $m$ consecutive intervals of approximately equal length and draws one row uniformly from each interval using a fixed seed. It uses every row otherwise. This sampling rule uses row order alone. Within the sampled rows, we center each feature and divide by its population standard deviation, mapping constant columns to zero. Denote the resulting matrix by $Z$. The response $Y$ is standardized in the same way for regression. For classification, its columns are centered one-hot class indicators.
+
+\subsection{Gains with zero or one peer}
+With penalty $\lambda=\sqrt m$, let $L(S)$ be the minimum ridge objective~\cite{ridge} on the sampled rows. The gain from adding feature $j$ is the drop in this objective after refitting the coefficients of all included columns,
+\begin{equation}
+ L(S)=\min_W\bigl\{\|Y-Z_SW\|_F^2+\lambda\|W\|_F^2\bigr\},
+ \qquad \gain_j(S)=L(S)-L(S\cup\{j\}).\label{eq:loss}
+\end{equation}
+Set $A=Z^\top Z+\lambda I$ and $B=Z^\top Y$, and write $B_j$ for row $j$ of $B$. The gains with an empty peer set and with a single peer $k$ are
+\begin{align}
+ \gain_j(\varnothing)&=\frac{\|B_j\|_2^2}{A_{jj}},\label{eq:empty}\\
+ \gain_j(\{k\})&=
+ \frac{\|B_j-(A_{jk}/A_{kk})B_k\|_2^2}
+ {A_{jj}-A_{jk}^2/A_{kk}},\qquad k\ne j.\label{eq:peer}
+\end{align}
+Equation~\eqref{eq:empty} is the scalar ridge solution. Equation~\eqref{eq:peer} uses the standard Schur complement. Eliminating the coefficient of $k$ leaves curvature $A_{jj}-A_{jk}^2/A_{kk}>0$ for $j$, and completing the square gives its gain. Pahikkala et al.~\cite[Eq.~(8)]{pahikkala} used a related rank-one inverse update to score candidate features by leave-one-out error in greedy ridge selection, implemented in RLScore~\cite{rlscore}. Here each conditional gain measures the decrease in the penalized training objective for a particular peer.
+
+For $c$ response columns, the cross-products and pairwise scores cost $O(mp^2+cp^2)$. With $p\le32$, $mp^2\le1{,}024m$. At $m=768$ and $p=32$ this term is $786{,}432$. The kernel accumulates just one triangle of the Gram matrix in a single double-precision pass, giving $768\times528=405{,}504$ product accumulations. It then scores $32\times31=992$ ordered candidate--peer pairs over $c$ response components. Classification also requires reading and encoding the training labels.
+
+\subsection{Ranking features and choosing the width}
+For $2\le p\le32$, the score for candidate $j$ is the smaller of its empty-set gain and its mean gain across the $p-1$ possible single peers,
+\begin{equation}
+ s_j=\min\left\{\gain_j(\varnothing),\;
+           \frac{1}{p-1}\sum_{k\ne j}\gain_j(\{k\})\right\}.
+ \label{eq:score}
+\end{equation}
+For $p=1$, only the empty-set gain is used. If at least one score is positive, the selector retains
+\begin{equation}
+ K=\left\lceil\frac{(\sum_j s_j)^2}{\sum_j s_j^2}\right\rceil
+ \label{eq:width}
+\end{equation}
+features. This width reflects the concentration of the scores. For example, if exactly $r$ features have equal positive scores and all remaining scores are zero, then $K=r$. We take the $K$ highest-scoring columns, breaking ties by the smaller original column index. All-zero scores return all features and count as a failure to reduce width. Both the ranking and the width are determined from training data alone.
+
+For a nonconstant regression target and nonconstant feature, let $r_j$ be their correlation on the sampled rows. Standardization gives $\gain_j(\varnothing)=m^2r_j^2/(m+\sqrt m)$. For $m>2$ and finite F statistics, ranking by this gain gives the same ordering as univariate regression F on those rows. The conditional gains can discount the marginal gain, but averaging limits the effect of any one peer. Suppose that $p>1$ and feature $j$ has a nonzero sample inner product with at most $d_j$ other columns. Then
+\begin{equation}
+ \left(1-\frac{d_j}{p-1}\right)\gain_j(\varnothing)
+ \ \le\ s_j\ \le\ \gain_j(\varnothing).\label{eq:bound}
+\end{equation}
+Each orthogonal peer contributes exactly $\gain_j(\varnothing)$ in~\eqref{eq:peer}. The other gains are nonnegative, which gives the lower bound after averaging. The upper bound follows from~\eqref{eq:score}. In particular, if $B_j=0$, candidate $j$ scores zero even when a specific peer gives it a positive conditional gain. The bound concerns exact sample orthogonality. We examine changes in the selected columns empirically in Section~\ref{sec:res}.
+
+\subsection{The nested-peer comparator and the wide-matrix rule}
+Our internal comparator uses a \emph{nested-peer rule}. It evaluates the same ridge objective~\eqref{eq:loss} on two nested sets of peers. It draws one random ordering of the columns and sets $h=\min\{p-1,\max(1,\lfloor p/4\rfloor),4\lfloor\sqrt m\rfloor\}$. For each candidate, it skips that candidate in the ordering and evaluates two peer sets, the first $\lfloor h/2\rfloor$ and the first $h$ remaining columns. A shared Cholesky factorization gives both gains, and the smaller gain determines the score. When sampling training rows for classification, this rule first includes one row per class, then draws the remaining rows uniformly without replacement. For regression it uses a simple random sample without replacement.
+
+The nested-peer rule caps the width in~\eqref{eq:width} using residual feature variation. Let $H$ contain the first $h$ columns of the common ordering. For $j\notin H$, let $u_j$ be the minimum penalized objective for regressing the standardized column $z_j$ on $Z_H$, divided by $m$, with penalty $\lambda$. The cap is
+\[
+ \min\left\{p,\ h+\left\lceil\sum_{j\notin H}\sqrt{\min(1,\max(0,u_j))}\right\rceil\right\}.
+\]
+If all scores are zero, the nested-peer rule returns this cap as its width. The procedure evaluated across datasets uses the single-peer rule in~\eqref{eq:score} for $p\le32$, with at most 31 peers per candidate. For $p>32$ it uses the nested-peer rule with the sampling and width choices above. Both rules cap the training sample at 768 rows. For sparse text matrices only the sampled rows are converted to dense form for scoring. The final estimator uses sparse inputs.
+
+\section{Experimental design}\label{sec:exp}
+\subsection{Data, splits and predictors}
+We compared the five methods on 52 named data sources or prediction tasks and 25 simulation settings. A configuration specifies a task, a train--test split, a seed and a modeling protocol. The 387 configurations comprised 178 binary classification, 62 multiclass classification and 147 regression comparisons. Training sets ranged from 100 to 182\,276 rows and input matrices from 4 to 54\,877 columns. Table~\ref{tab:cohorts} gives the splits and replications for each benchmark group. Some named tasks share a source. For example, the near-infrared spectroscopy tasks include measurements of the same type of sample in different harvest seasons. Madelon is an artificial feature-selection challenge. Matching the training matrix, training labels, test matrix and test labels by their four fingerprints yielded 301 distinct sets of inputs.
+
+\begin{table}[htbp]\centering\small
+\caption{Benchmark composition. Each count is a number of five-method comparisons. Several seeds can share a test set.}\label{tab:cohorts}
+\begin{tabularx}{\linewidth}{@{}l r >{\raggedright\arraybackslash}X@{}}
+\toprule
+Benchmark group & Count & Sampling or replication scheme \\
+\midrule
+Tabular and sensor data & 69 & Archived train--test splits from 13 sources, including Abalone, Diabetes, HAR and SECOM.\\
+Additional data and simulations & 57 & Three configurations each for five named sources and 14 simulation settings.\\
+Repeated holdouts & 40 & Five seeded 75/25 splits for each of four binary, two multiclass and two regression tasks.\\
+Ten-source tabular study & 30 & Three splits per source, using the ordinary ridge model from the four-stage study.\\
+Dense features and speech & 19 & Handwritten digits, acoustic features and sensor data, using the original held-out observations or speakers.\\
+Near-infrared spectroscopy & 36 & Twelve regression tasks, each with a fixed train--test split and three feature-selection seeds.\\
+Redundant and diffuse signals & 64 & Two signal mechanisms, two task types and two widths, with eight independent draws per combination.\\
+Surveys, ads and simulations & 33 & Twelve survey configurations with original or augmented columns, six with nested advertising training sets, and 15 simulations.\\
+Sparse text and Farm Ads & 38 & Thirty document splits, two 20 Newsgroups tasks and six Farm Ads configurations.\\
+Credit card fraud & 1 & One prespecified split with 98 fraudulent transactions in the test set.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Within each configuration, all five methods used the same training and test rows, feature encoding, preprocessing rules and downstream solver. The final estimator was ridge regression or a ridge classifier on standardized inputs, with penalty 1. Equation~\eqref{eq:loss} uses a separate penalty of $\sqrt m$ during selection. The data protocol determined the solver, Cholesky or LSQR. The predictor retained sparse inputs in sparse form. Where numeric entries required imputation, each training column supplied its own mean. Feature selection used training data throughout.
+
+The primary regression score was test $R^2$. The eight-source repeated-holdout study used the area under the receiver operating characteristic curve (ROC AUC) for classification, averaging one-versus-rest AUCs equally across classes in multiclass tasks. Most other classification protocols used balanced accuracy (BA), the mean class recall. Grouped evaluations aggregated scores by participant, batch or speaker as specified by the protocol. For credit card fraud, we also report average precision (AP) and the number of fraudulent transactions detected at the fixed decision threshold.
+
+\subsection{Comparators and timing}
+We compared the selector that switches rules at 32 columns with our nested-peer implementation run at every input width. Each chose its own number of columns. The other three comparators were a full-feature model (Full), a univariate F filter and uniform random selection. The F filter used all training rows to rank columns by the one-way ANOVA F statistic for classification or the single-predictor linear regression F statistic for regression~\cite{skf}. The random selector took the first $K$ indices of a uniformly sampled column permutation generated from a fixed seed. The F and random selectors received the width $K$ chosen by the rule used for that input matrix. Their timings thus include their own selection, fitting and prediction costs. Full measures the cost of fitting and predicting with the entire matrix.
+
+Timing began with the training and test feature matrices in memory and ended when predictions for the test batch were available. Each run repeated feature selection, column slicing, preprocessing, fitting and prediction. Data loading, shared audio or text feature extraction, warm-up and test scoring took place outside the timed interval. We used one Windows 11 x86-64 machine with an Intel Core Ultra 9 275HX processor, Python 3.13.9, NumPy 2.4.6 and scikit-learn 1.9.0. Numerical libraries ran on a single thread. We replayed each configuration in two independent processes. In each process, every method ran once to warm up and then five times in rotating order, or three timed runs for sparse text and Farm Ads. We checked selected columns and predictions across runs.
+
+Let $t_{a,b}$ be the median end-to-end runtime of method $a$ in process $b$, and let $q_a$ denote its primary test score. Write $\star$ for the selector that uses single peers for $p\le32$ and nested peer sets for $p>32$. For each comparator $a$, we used the larger of the two paired time ratios and the signed score difference
+\begin{equation}
+ \rho_a=\max_{b=1,2}\frac{t_{\star,b}}{t_{a,b}},\qquad
+ \Delta_a=q_{\star}-q_a .\label{eq:pair}
+\end{equation}
+Thus $\rho_a<1$ requires the selector to run faster in both processes. A strict win over a width-matched comparator additionally requires $\Delta_a>10^{-12}$. We counted every configuration with $K<p$ and $\rho_{\Full}<1$, regardless of score change. We separately counted those with $\Delta_{\Full}\ge-0.02$, the absolute tolerance used in the earlier experiments. Counts span task types. We averaged scores only within the same task and metric.
+
+\section{Results}\label{sec:res}
+\subsection{Selection cost and predictive performance on low-dimensional data}
+The single-peer rule applied to 56 configurations from ten data sources. Median selection time across these configurations fell from 0.452~ms with nested peer sets to 0.071~ms with single peers. Median end-to-end time fell from 1.926 to 1.521~ms. Selection was faster in both timing processes in all 56 cases, and the complete pipeline was faster in 52. Test scores increased in 34 cases. The single-peer rule retained more columns in 45 cases, the same number in ten, and fewer in one. The score comparison with the nested-peer rule therefore includes the effect of changing the feature budget.
+
+The width-matched F filter and the single-peer rule selected identical columns in 43 of the 56 configurations. In 42 of those 43, the pipeline using the single-peer rule finished sooner. Across all 56 configurations, it finished sooner with an equal or higher test score in 52. Three of these were strict score gains. In the 331 configurations above the 32-column cutoff, both procedures used nested peers and returned identical columns and predictions.
+
+Figure~\ref{fig:runtime} shows how much of the saving in selection carried through to prediction. Against the F filter, the median paired saving was 84.2\% in selection and 17.1\% over the full pipeline.
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{figures/lowdim-runtime.pdf}
+\caption{Time saved by the single-peer rule against two supervised selectors on the 56 low-dimensional configurations. Each dot is one configuration. For each stage, its position gives the smaller percentage saving across the two timing processes. A point to the right of zero indicates a saving in both processes. Labeled vertical marks give the medians.}\label{fig:runtime}
+\end{figure}
+
+Table~\ref{tab:cases} gives the five-method comparison for the two ten-column regression tasks. Abalone has seven numerical measurements and three indicator columns encoding sex~\cite{abalone}. On all 12 configurations, the single-peer rule kept all seven measurements and the same sex indicator. This reduced the encoded width while requiring all eight original attributes at collection time. On the three original test splits, each evaluated with three selection seeds, all nine configurations ran faster than Full. Their median paired time ratio was 0.947, and their mean loss in $R^2$ was 0.0000024. Two of the three additional splits also ran faster. Diabetes had just 294 to 331 training rows per split. Only five of its 11 configurations ran faster than Full in both processes, and mean $R^2$ fell by 0.01673. On all 23 Abalone and Diabetes configurations, the single-peer rule and the width-matched F filter selected exactly the same columns.
+
+\begin{table}[htbp]\centering\small
+\caption{Feature count $K$, mean test $R^2$, and median end-to-end time on the two ten-column regression tasks. Ranges give the smallest and largest $K$ across configurations.}\label{tab:cases}
+\begin{tabular}{@{}lrrr@{\hspace{1.6em}}rrr@{}}
+\toprule
+ & \multicolumn{3}{c}{Abalone, 12 configurations} & \multicolumn{3}{c}{Diabetes, 11 configurations}\\
+\cmidrule(lr){2-4}\cmidrule(l){5-7}
+Method & $K$ & $R^2$ & Time (ms) & $K$ & $R^2$ & Time (ms)\\
+\midrule
+Single-peer rule & 8 & 0.52886 & 1.337 & 5--7 & 0.46770 & 1.317\\
+Nested-peer rule & 3--7 & 0.47738 & 1.734 & 3--6 & 0.46543 & 1.671\\
+Full & 10 & 0.52870 & 1.411 & 10 & 0.48443 & 1.232\\
+Width-matched F & 8 & 0.52886 & 1.752 & 5--7 & 0.46770 & 1.522\\
+Width-matched random & 8 & 0.51086 & 1.316 & 5--7 & 0.40045 & 1.383\\
+\bottomrule
+\end{tabular}
+\tabnote{For each method and configuration, we averaged the two within-process median times. The table gives the median of these averages for each dataset. Equation~\eqref{eq:pair} compares the methods within each process before any aggregation across configurations.}
+\end{table}
+
+\subsection{Effect of the single-peer layer at fixed width}
+We tested the peer layer on all 31 low-dimensional configurations in the original, supplementary, and eight-source repeated-holdout groups. We fixed the training-row sample and the width chosen by the single-peer rule. We then ranked columns using either the empty-peer gain in~\eqref{eq:empty} or the combined score in~\eqref{eq:score}. Including the peer layer changed seven selected sets. Test scores rose in two cases, tied in 28, and fell in one (Figure~\ref{fig:subsets}a). Both improvements occurred on Wisconsin Breast Cancer holdouts, with AUC gains of 0.00105 and 0.00084. The decrease occurred on a US macroeconomic split, where test $R^2$ for GDP fell by 0.04662.
+
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\linewidth]{figures/subset-quality.pdf}
+\caption{Test scores at matched width. (a) The 31 ablation configurations compare the single-peer rule with the median score of 32 uniform random subsets and with ranking by the empty-peer gain alone. (b) Each dot gives the test $R^2$ of one of the 45 eight-column subsets on an original Abalone split. Diamonds mark the subset selected by both the single-peer and empty-peer rules. All three seeds agreed within each split.}\label{fig:subsets}
+\end{figure}
+
+For each configuration we also drew 32 uniform random subsets at the same width. The single-peer rule scored above the median of those draws in 26 of 31 configurations. On Abalone we could enumerate all $\binom{10}{8}=45$ eight-column subsets. Ranking the refitted models by test $R^2$ placed the selected subset fourth, first, and eleventh on the three original test splits (Figure~\ref{fig:subsets}b). We used these rankings only for retrospective comparison. The empty-peer rule selected the same subset on each split, so the performance relative to random selection was already attainable from the marginal scores alone.
+
+\FloatBarrier
+\subsection{Score and runtime across all configurations}
+Across all 387 configurations, the selector dropped at least one column in every case and ran faster than Full in both processes in 256 (Table~\ref{tab:tasks}). Among the 110 of 147 regression configurations that ran faster, the median $\rho_{\Full}$ was 0.696 and the median difference in $R^2$ was $-0.072$. In 35 of those 110 cases the loss was at most 0.02. Across all tasks, allowing score losses of 0, 0.01, 0.02, 0.05, and 0.10 yielded 75, 112, 122, 156, and 184 configurations, respectively, that reduced both width and runtime. When we counted each combination of inputs, seed, and primary metric once, 248 of the remaining 377 configurations ran faster, including 118 within the 0.02 tolerance.
+
+\begin{table}[htbp]\centering\small
+\caption{Paired outcomes by prediction task, using single peers up to 32 columns and nested peer sets above 32. Every configuration retained fewer columns than Full. The last two columns each count a strictly higher test score and a shorter end-to-end runtime against the named width-matched baseline.}\label{tab:tasks}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+ & & \multicolumn{2}{c}{Faster than Full} & \multicolumn{2}{c}{Higher score and faster}\\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Task & Cases & All & Loss $\le 0.02$ & vs.\ F & vs.\ random\\
+\midrule
+Binary classification & 178 & 106 & 56 & 59 & 1\\
+Multiclass classification & 62 & 40 & 31 & 28 & 1\\
+Regression & 147 & 110 & 35 & 48 & 6\\
+\midrule
+Total & 387 & 256 & 122 & 135 & 8\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On test score alone, the selector outperformed the F filter in 194 of 387 configurations and the fixed-seed random subset in 284. Requiring a shorter runtime reduced the counts to 135 and eight, respectively. No configuration met both comparisons. When tied scores were allowed, six configurations were faster than both width-matched baselines and scored at least as well as each. Two of those six also ran faster than Full, both on Diabetes holdouts. Their $R^2$ losses relative to Full were 0.02527 and 0.03658.
+
+At a score-loss tolerance of 0.02, the selector reduced width and total runtime relative to Full in 24 of the 56 low-dimensional configurations and 98 of the 331 wider ones (Figure~\ref{fig:tradeoff}). In the wider group, uniform random selection finished at least as quickly as the nested-peer rule in at least one timing process in every configuration.
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{figures/score-runtime.pdf}
+\caption{Share of configurations that retained fewer than $p$ columns, finished sooner in both timing processes, and stayed within the specified score loss relative to each comparator. F and random selection retained the same number of columns as the evaluated rule. Each configuration uses its own primary metric. Dots give the share when no loss is allowed and labels give the counts at a loss of 0.10. Panel (a) uses single peers and panel (b) uses nested peer sets.}\label{fig:tradeoff}
+\end{figure}
+
+Across the 38 sparse text and advertising configurations, the median fraction of columns retained was 9.35\%. The nested-peer rule achieved higher balanced accuracy than random selection in all 38, by an average of 14.20 percentage points. It averaged 0.24 points below the F filter. Its median paired time ratios were 5.85 relative to Full, 6.04 relative to F, and 12.40 relative to random selection. The wide-matrix voting stage densifies the sampled text rows and computes cross-products on the resulting matrix. On near-infrared spectra, the same rule ran faster than Full in 27 of 36 configurations, but only seven of those 27 kept the $R^2$ loss within 0.02.
+
+\FloatBarrier
+\section{Discussion and conclusions}
+The single-peer rule reduced selection time relative to the nested-peer rule in every configuration where it applied. On Abalone, fitting and predicting with eight columns usually saved enough time to pay for selection. Even when the single-peer rule and F returned the same columns, their selection costs differed. On Diabetes, the single-peer rule took about 0.05~ms to choose its columns, yet six of 11 configurations failed to run faster than Full in both processes. Across the 56 low-dimensional configurations, 30 ran faster than Full in both processes. Requiring at least a 5\% reduction in each process left 16 cases, and requiring 10\% left four. Loading the precompiled kernel added a median of 0.850~ms across five fresh processes. At the conservative saving of 0.075~ms per run on the original Abalone splits, about 12 runs in the same process would repay that loading cost.
+
+With rare outcomes, the metric also affects the comparison. The credit-card test set contained 98 fraudulent transactions among 56\,962 records. The single-peer rule kept eight of 29 columns and cut end-to-end time by at least 61.8\% relative to Full. ROC AUC fell from 0.97164 to 0.94218, and AP fell from 0.71707 to 0.69041. At the same default decision threshold, detections fell from 38 to 33. The width-matched F filter achieved an AUC of 0.91525 and an AP of 0.69186. On this single holdout, AUC favored the single-peer rule and AP favored F.
+
+The single-peer rule uses a dedicated C kernel, while the nested-peer comparator uses array operations and a Cholesky factorization. The differences in peer groups, retained width, and implementation preclude attributing the entire runtime change to any one of them. We fixed the 32-column cutoff and the 768-row cap before the comparison and did not tune them for optimality. The measurements cover ridge models on one machine with one numerical thread. Several seeds or protocols reuse test records. Some of the earlier Spambase holdouts also contain identical feature vectors on both sides of the train--test split. The paired counts describe this benchmark, whose 387 configurations include repeated observations from the same sources.
+
+On Abalone and Diabetes, the univariate F filter and the single-peer rule returned the same features throughout. Equation~\eqref{eq:bound} gives one circumstance in which the rankings can remain close. If only a few peers can reduce a column's marginal gain, averaging over all peers limits the discount. In the fixed-width ablation, the predictive gains attributable to the peer layer were confined to two small increases in breast-cancer AUC. The more consistent benefit on low-dimensional data was the reduction in the cost of supervised selection.
+
+\begin{thebibliography}{9}\small\raggedright
+\enlargethispage{\baselineskip}
+\setlength{\itemsep}{0pt}
+\bibitem{cohen} S. Cohen, G. Dror, and E. Ruppin. Feature selection via coalitional game theory. \emph{Neural Computation}, 19(7), 1939--1961, 2007. \href{https://doi.org/10.1162/neco.2007.19.7.1939}{doi:10.1162/neco.2007.19.7.1939}.
+\bibitem{zhao} C. Zhao, J. Liu, and E. Parilina. Strategic inputs: feature selection from game-theoretic perspective. \emph{arXiv:2510.24982v2}, 2025. \url{https://arxiv.org/abs/2510.24982v2}.
+\bibitem{kaur} J. N. Kaur, P. Patil, D. Shanmugam, E. Pierson, M. I. Jordan, N. Haghtalab, M. Jagadeesan, A. Alaa, and S. Wang. Strategic feature selection. \emph{arXiv:2606.18867v1}, 2026. \url{https://arxiv.org/abs/2606.18867v1}.
+\bibitem{ridge} A. E. Hoerl and R. W. Kennard. Ridge regression: biased estimation for nonorthogonal problems. \emph{Technometrics}, 12(1), 55--67, 1970. \href{https://doi.org/10.1080/00401706.1970.10488634}{doi:10.1080/00401706.1970.10488634}.
+\bibitem{pahikkala} T. Pahikkala, A. Airola, and T. Salakoski. Speeding up greedy forward selection for regularized least-squares. In \emph{Ninth International Conference on Machine Learning and Applications}, 325--330, 2010. \href{https://doi.org/10.1109/ICMLA.2010.55}{doi:10.1109/ICMLA.2010.55}.
+\bibitem{rlscore} T. Pahikkala and A. Airola. RLScore: Regularized least-squares learners. \emph{Journal of Machine Learning Research}, 17(220), 1--5, 2016. \url{https://www.jmlr.org/papers/v17/16-470.html}.
+\bibitem{skf} Scikit-learn developers. Univariate feature selection. \emph{Scikit-learn User Guide}, sec.~1.13.2. \href{https://scikit-learn.org/stable/modules/feature_selection.html}{scikit-learn.org, Feature selection}.
+\bibitem{abalone} W. Nash, T. Sellers, S. Talbot, A. Cawthorn, and W. Ford. Abalone. \emph{UCI Machine Learning Repository}, 1995. \href{https://doi.org/10.24432/C55C7W}{doi:10.24432/C55C7W}.
+\end{thebibliography}
+\end{document}

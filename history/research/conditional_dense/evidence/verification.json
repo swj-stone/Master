@@ -1,0 +1,11 @@
+{
+  "trials": 636,
+  "panels": 13,
+  "arrays_per_process": 331,
+  "quality_and_timed_outputs_identical": true,
+  "kept_full_success": false,
+  "accepted_domain_sources": [
+    "har",
+    "isolet"
+  ]
+}

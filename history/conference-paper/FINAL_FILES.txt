@@ -1,0 +1,65 @@
+FINAL ARTICLE AND POSTER - CONSOLIDATED 2026-10-25
+================================================
+
+Paths below are relative to Master/conference-paper/.
+
+CURRENT ARTICLE
+  PDF: paper/icomp2026_conference.pdf
+  LaTeX: paper/icomp2026_conference.tex
+  Bibliography/styles: paper/*.bib, paper/*.bst, paper/*.sty,
+                       paper/math_commands.tex
+  Figures: figures/fig1_overview.pdf, figures/fig2_cd_heatmap.pdf,
+           figures/fig3_prefilter.pdf
+
+The existing filename is retained. The content is the user-approved final
+arXiv article from MinPI_arXiv_source(1).zip, not the earlier ICOMP layout.
+The PDF is an exact copy of the previously approved final article PDF.
+Only the three figure paths in the copied TeX source were changed from
+figures/... to ../figures/... to retain the original repository structure.
+Article text, mathematics, bibliography and figures were not rewritten.
+
+CURRENT ASCOMP POSTER
+  PDF: poster/ASCOMP_MinPPI_Poster_Wenjie_SHI.pdf
+  LaTeX entry point: poster/latex/main.tex
+  Generated text/formulas: poster/latex/poster-content.tex
+  Vector background and QR assets: poster/latex/poster-background.pdf
+  Math font/license: poster/latex/fonts/
+  Original QR images: poster/assets/
+  Preview: poster/ASCOMP2026_MinPI_Poster_preview.png
+  Generator: poster/build_poster.py
+  Checks: poster/check_poster.py
+  Print instructions: poster/PRINT_README.txt
+
+The legacy PDF filename is retained. The poster itself uses MinPI throughout,
+with the final 1200 x 900 mm three-column layout and two upper-right QR codes.
+There is no newly generated PowerPoint version. The old PPTX is historical.
+
+REBUILD (from Master/)
+  python conference-paper/poster/build_poster.py
+  pdftoppm -scale-to 3600 -singlefile -png conference-paper/poster/ASCOMP_MinPPI_Poster_Wenjie_SHI.pdf conference-paper/poster/ASCOMP2026_MinPI_Poster_preview
+  python conference-paper/poster/check_poster.py
+
+Requirements: Python with reportlab, Pillow, pypdf; XeLaTeX and Poppler on
+PATH; Windows Arial. The math font is included. QR validation uses the
+existing task-local zxing-cpp installation in tmp/pdfs/ascomp-poster/deps/.
+Persistent poster content/layout edits belong in build_poster.py; the next
+run regenerates poster-content.tex. main.tex controls overall typography.
+
+For the article, run from conference-paper/paper/:
+  latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=../../tmp/pdfs/article-final-build icomp2026_conference.tex
+The output is a verification build under Master/tmp, leaving the approved
+article PDF untouched. Copy a rebuilt PDF over the approved one only when
+intentionally issuing a new article version.
+
+ARCHIVES AND TEMPORARY FILES
+  archive/pre-final-20261025/paper/   previous article and all dependencies
+  archive/pre-final-20261025/figures/ previous shared article figures
+  archive/pre-final-20261025/poster/  previous poster PDF, PPTX and inspection
+  archive/poster-versions/           all intermediate poster revisions
+  ../packages/                      historical ZIPs and review bundles
+  ../tmp/pdfs/                      compilation and visual QA files
+  ../tmp/consolidation-20261025/     move/copy inventory and verification
+  ../docs/superpowers/              design and revision history
+
+Protected original: ../../MinPI_arXiv_source(1).zip, unchanged and not moved.
+No experimental code, configurations, data or result records were changed.

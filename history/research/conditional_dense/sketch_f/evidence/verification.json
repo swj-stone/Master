@@ -1,0 +1,11 @@
+{
+  "timed_pipelines": 256,
+  "panels": 8,
+  "arrays_compared": 115,
+  "processes": 2,
+  "repeats_per_arm": 4,
+  "paired_position_balanced": true,
+  "same_sketch_verified": true,
+  "independent_F_exact_supports": 8,
+  "max_F_boundary_gap": 0.0
+}

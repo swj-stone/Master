@@ -1,0 +1,25 @@
+\subsection{Two high-dimensional challenge splits}
+\label{sec:official}
+We trained on the official Arcene and Dexter training files and evaluated on their published validation files~\citep{guyon2004challenge}. Arcene has 100 training and 100 validation observations in 10,000 dimensions. Dexter has 300 in each partition and 20,000 dimensions. Both are binary classification tasks. We permuted feature columns once before all methods and held the order fixed for tie-breaking. Each selector retained 10\% of the columns, followed by variance scaling and an $\ell_2$ logistic fit with $C=1$. All-column logistic regression provided a second reference. The binary ReliefF comparator used every training query and the ten nearest hits and misses in range-normalized Manhattan distance. The $\ell_1$ selector ranked absolute logistic coefficients. Timing included screening, downstream preprocessing, fitting and scoring, with a single numerical-library thread. All methods used the same partitions under three algorithm seeds.
+
+\begin{table}[tb]
+\centering
+\caption{Official validation splits. Mean ROC AUC, balanced accuracy (BA) and wall time in seconds over three algorithm seeds on the same rows. Full uses all coordinates. All other methods use 1,000 on Arcene and 2,000 on Dexter.}
+\label{tab:external}
+\begin{tabular}{lrrrrrr}
+\toprule
+&\multicolumn{3}{c}{Arcene}&\multicolumn{3}{c}{Dexter}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Selector&AUC&BA&Time&AUC&BA&Time\\
+\midrule
+Full                    &.918&.820&.055&.920&.850&.134\\
+Uniform                 &.905&.799&.006&.768&.720&.016\\
+Univariate $F$          &.861&.739&.042&.958&.887&.050\\
+$\ell_1$ logistic       &.868&.804&.036&.949&.887&.083\\
+ReliefF                 &.885&.797&.064&.930&.853&1.092\\
+Pivotal minPI           &.906&.815&.059&.939&.879&.228\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Against the univariate $F$ filter, the paired difference in AUC was $+0.0448$ on Arcene and $-0.0188$ on Dexter (Table~\ref{tab:external}). A class-stratified bootstrap with 2,000 resamples applied the same sampled validation observations to each predictor and seed. Its 95\% percentile intervals for these differences were $[0.0009,0.0954]$ and $[-0.0367,-0.0003]$. These intervals condition on the fitted models and do not include training-sample uncertainty. On Arcene, uniformly chosen columns reached an AUC of 0.905, close to the voting filter's 0.906. On Dexter, voting completed in 0.228\,s against 1.092\,s for the full-query ReliefF implementation, but $F$ selection was faster and had higher AUC. The ReliefF comparison changes the neighbour sample and distance calculation as well as the voting rule.
