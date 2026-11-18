@@ -1,0 +1,74 @@
+{
+  "low_dimensional_inputs": 36,
+  "direct_augmented_lstsq_candidate_refits": 2853,
+  "post_pair_conditional_steps_checked": 114,
+  "wide_fallback_cases": 2,
+  "invalid_inputs": 3,
+  "duplicate_diagnostic": {
+    "width": 3,
+    "paths": {
+      "old": [
+        0,
+        1,
+        2
+      ],
+      "pair_old_fill": [
+        0,
+        2,
+        1
+      ],
+      "anchor_forward": [
+        0,
+        2,
+        3
+      ],
+      "pair_forward": [
+        0,
+        2,
+        3
+      ]
+    },
+    "train_ridge_gain": {
+      "old": 229.06266942822515,
+      "pair_old_fill": 229.06266942822515,
+      "anchor_forward": 240.9411764705886,
+      "pair_forward": 240.9411764705886
+    }
+  },
+  "posthoc_suppressor_diagnostic": {
+    "width": 4,
+    "rho": 0.96,
+    "paths": {
+      "old": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "pair_old_fill": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "anchor_forward": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "pair_forward": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "train_ridge_gain": {
+      "old": 71.17711818672421,
+      "pair_old_fill": 118.80072376893717,
+      "anchor_forward": 71.17711818672421,
+      "pair_forward": 118.80072376893717
+    }
+  }
+}
