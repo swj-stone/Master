@@ -1,6 +1,6 @@
 # pivotal minPI 的理论问题与组合选择
 
-本课题的对象是按同伴数分层的近邻投票选择器 pivotal minPI。固定票表上的理论问题是，哪些等宽换列能严格改善所选组合的多数收益。部署问题是，这些换列是否能让最终重拟合模型在同样的列数下取得更高精度，以及筛列的成本能否由后续训练、预测的节省抵消。两个问题有不同的观测量。[原投票定义与定理](../../paper/minpi/main.tex) · [整数实现](../../src/minppi_mofs/word_minpi.py) · [既有预测与成本实验](../../docs/minpi-study/combination-exploration-results.md)
+本课题的对象是按同伴数分层的近邻投票选择器 pivotal minPI。固定票表上的理论问题是，哪些等宽换列能严格改善所选组合的多数收益。部署问题是，这些换列是否能让最终重拟合模型在同样的列数下取得更高精度，以及筛列的成本能否由后续训练、预测的节省抵消。两个问题有不同的观测量。[整数实现](../../src/minppi_mofs/word_minpi.py) · [既有预测与成本实验](../../docs/minpi-study/combination-exploration-results.md)
 
 ## 从两篇参考文章借鉴什么
 

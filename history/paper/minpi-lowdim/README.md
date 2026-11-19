@@ -12,7 +12,7 @@
 | [Figure 3. Runtime and score-loss tolerance by input width](figures/score-runtime.pdf) | [Generator](plot_tradeoff.py) · [Scores, widths and paired timings](../../research/lowdim/evidence/all-cases.csv) |
 | Peer-layer ablation and 32 random subsets per configuration | [Selected-set and score comparisons for 31 configurations](../../research/lowdim/peer_evidence/cases.csv) · [Exhaustive comparison of the 45 eight-column Abalone subsets](../../research/lowdim/peer_evidence/abalone-all-subsets.csv) |
 | Low-dimensional implementation and wide-matrix rule | [Selector entry point](../../research/lowdim/method.py) · [Cross-products and conditional ridge gains](../../research/lowdim/native_votes.c) · [Wide-matrix voting](../../research/conditional_dense/shared_method.py) · [Archive verification](../../research/lowdim/evidence/verification.json) |
-| Internal development history | [Unpublished prototype draft](../minpi/main.pdf) · [Notes on the two reference papers](../../research/theory/README.md) |
+| Background reading | [Notes on the two reference papers](../../research/theory/README.md) |
 
 The method labels describe the implementations measured in each run. In the archived results, `new` uses the single-peer rule up to 32 columns and the nested-peer rule above 32. The internal comparator `previous` uses the nested-peer rule at every width. The fixed-width ablation compares the single-peer rule with ranking by the gain of each feature in isolation.
 

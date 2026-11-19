@@ -8,7 +8,7 @@
 
 [自适应投票选列及独立随机支持对照](signal-vote-results.md) · [上一轮自选宽度与稀疏实验](adaptive-transfer.md) · [固定 50% 和 75% 的联合达标结果](compression-speed.md)
 
-[英文稿 PDF（polish1 的 ICOMP 版式）](../../paper/minpi/main.pdf) · [LaTeX 源稿](../../paper/minpi/main.tex) · [Python 筛选器 PivotalSupportSelector](../../src/minppi_mofs/support_selector.py) · [Lean 证明](../../paper/minpi/formal/Pivotal.lean)
+[Python 筛选器 PivotalSupportSelector](../../src/minppi_mofs/support_selector.py)。下文历史记录中的 `paper/minpi/` 路径对应复现包内的目录。工作区版本可在 Git 提交 `3167108` 中查阅。
 
 [本地复现包](../../packages/pivotal-minpi-study.zip)附有本研究使用的输入、程序、分区、预测、论文和逐文件 SHA-256 摘要。验证压缩文件本身可比对[整包 SHA-256](../../packages/pivotal-minpi-study.zip.sha256)。
 

@@ -4,7 +4,7 @@
 
 | 对象 | 所在位置与用途 |
 | --- | --- |
-| 近邻 pivotal minPI 原始定义与精确求解 | [稿件](../../paper/minpi/main.tex)、[形式化证明](../../paper/minpi/formal/README.md)、[整数选择器](../../src/minppi_mofs/word_minpi.py)、[对外筛选接口](../../src/minppi_mofs/support_selector.py) |
+| 近邻 pivotal minPI 原始定义与精确求解 | [整数选择器](../../src/minppi_mofs/word_minpi.py)、[对外筛选接口](../../src/minppi_mofs/support_selector.py)。原稿和形式化证明收录在下方的固定预算研究复现包中。 |
 | 当前改进的起点 | [按相关性分组并建立投票](../../src/minppi_mofs/grouped_minpi.py)、[最后一轮组合与成本实验](../../docs/minpi-study/combination-exploration-results.md) |
 | 累积的数值表、光谱与文本实验 | [按研究问题索引](../../docs/minpi-study/README.md)、[跨数据源比较](../../docs/minpi-study/next-vote-results.md)、[文本种子和迁移复核](../../docs/minpi-study/reliability-document-results.md) |
 | PIv0–PIv3、会议材料 | [PIv0 历史对照](../../docs/thesis/experiments/piv0-method-comparison.md)、[PIv1 冻结标签和归档](../../docs/thesis/archives/piv1/README.md)、[后续预筛试验](../../experiments/test/README.md)、[会议资料副本](../../conference-paper/) |
