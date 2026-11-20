@@ -9,7 +9,7 @@
 | Table 3. Paired comparisons for binary classification, multiclass classification, and regression | [All 387 paired comparisons](../../research/lowdim/evidence/all-cases.csv) · [Results by task and metric](../../research/lowdim/evidence/by-task-and-metric.csv) |
 | [Figure 1. Selection and end-to-end time saved on 56 low-dimensional configurations](figures/lowdim-runtime.pdf) | [Generator](plot_runtime.py) · [Paired timings](../../research/lowdim/evidence/all-cases.csv) |
 | [Figure 2. Fixed-width comparisons and exhaustive Abalone subset scores](figures/subset-quality.pdf) | [Generator](plot_subsets.py) · [31 ablation configurations](../../research/lowdim/peer_evidence/cases.csv) · [45 subset scores per split](../../research/lowdim/peer_evidence/abalone-subset-scores.csv) |
-| [Figure 3. Runtime and score-loss tolerance by input width](figures/score-runtime.pdf) | [Generator](plot_tradeoff.py) · [Scores, widths and paired timings](../../research/lowdim/evidence/all-cases.csv) |
+| [Figure 3. Single-peer rule, F and random selection against the same full model](figures/matched-curves.pdf) | [Generator](plot_matched_curves.py) · [56 low-dimensional configurations with matched widths and two-process timings](../../research/lowdim/evidence/all-cases.csv) |
 | Peer-layer ablation and 32 random subsets per configuration | [Selected-set and score comparisons for 31 configurations](../../research/lowdim/peer_evidence/cases.csv) · [Exhaustive comparison of the 45 eight-column Abalone subsets](../../research/lowdim/peer_evidence/abalone-all-subsets.csv) |
 | Low-dimensional implementation and wide-matrix rule | [Selector entry point](../../research/lowdim/method.py) · [Cross-products and conditional ridge gains](../../research/lowdim/native_votes.c) · [Wide-matrix voting](../../research/conditional_dense/shared_method.py) · [Archive verification](../../research/lowdim/evidence/verification.json) |
 | Background reading | [Notes on the two reference papers](../../research/theory/README.md) |
@@ -27,7 +27,7 @@ From the `history` directory, run the following commands to regenerate the vecto
 ```powershell
 .\thesis-python.ps1 paper/minpi-lowdim/plot_runtime.py
 .\thesis-python.ps1 paper/minpi-lowdim/plot_subsets.py
-.\thesis-python.ps1 paper/minpi-lowdim/plot_tradeoff.py
+.\thesis-python.ps1 paper/minpi-lowdim/plot_matched_curves.py
 ```
 
 ## Build the PDF

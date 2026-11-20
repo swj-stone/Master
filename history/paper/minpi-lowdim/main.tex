@@ -197,12 +197,14 @@ Total & 387 & 256 & 122 & 135 & 8\\
 
 On test score alone, the selector outperformed the F filter in 194 of 387 configurations and the fixed-seed random subset in 284. Requiring a shorter runtime reduced the counts to 135 and eight, respectively. No configuration met both comparisons. When tied scores were allowed, six configurations were faster than both width-matched baselines and scored at least as well as each. Two of those six also ran faster than Full, both on Diabetes holdouts. Their $R^2$ losses relative to Full were 0.02527 and 0.03658.
 
-At a score-loss tolerance of 0.02, the selector reduced width and total runtime relative to Full in 24 of the 56 low-dimensional configurations and 98 of the 331 wider ones (Figure~\ref{fig:tradeoff}). In the wider group, uniform random selection finished at least as quickly as the nested-peer rule in at least one timing process in every configuration.
+Figure~\ref{fig:matchedcurves} compares all three width-matched selectors against Full on the 56 low-dimensional configurations. With a score-loss allowance of 0.02, both the single-peer rule and F retained fewer features and met the score criterion in 41 configurations, compared with 33 for random selection. Requiring a shorter total runtime as well reduced these counts to 24, one and 23, respectively.
 
 \begin{figure}[htbp]\centering
-\includegraphics[width=\linewidth]{figures/score-runtime.pdf}
-\caption{Share of configurations that retained fewer than $p$ columns, finished sooner in both timing processes, and stayed within the specified score loss relative to each comparator. F and random selection retained the same number of columns as the evaluated rule. Each configuration uses its own primary metric. Dots give the share when no loss is allowed and labels give the counts at a loss of 0.10. Panel (a) uses single peers and panel (b) uses nested peer sets.}\label{fig:tradeoff}
+\includegraphics[width=\linewidth]{figures/matched-curves.pdf}
+\caption{Fraction of the 56 low-dimensional configurations in which each selector retained fewer features and stayed within the indicated loss relative to the full-feature model. Panel (b) additionally requires a shorter time from selection through prediction in both timing processes. F and random selection use the width chosen by the single-peer rule in each configuration. Loss is measured in the original test metric (balanced accuracy, ROC AUC or $R^2$). The vertical guide marks a loss of 0.02.}\label{fig:matchedcurves}
 \end{figure}
+
+On the 331 wider configurations, the nested-peer rule reduced width and total runtime relative to Full in 98 cases with a score-loss allowance of 0.02. In every wider configuration, uniform random selection finished at least as quickly as the nested-peer rule in at least one timing process.
 
 Across the 38 sparse text and advertising configurations, the median fraction of columns retained was 9.35\%. The nested-peer rule achieved higher balanced accuracy than random selection in all 38, by an average of 14.20 percentage points. It averaged 0.24 points below the F filter. Its median paired time ratios were 5.85 relative to Full, 6.04 relative to F, and 12.40 relative to random selection. The wide-matrix voting stage densifies the sampled text rows and computes cross-products on the resulting matrix. On near-infrared spectra, the same rule ran faster than Full in 27 of 36 configurations, but only seven of those 27 kept the $R^2$ loss within 0.02.
 
