@@ -10,7 +10,7 @@
 | 出处论文定义的离散 mRMR–MID 怎样实现、复核和比较？ | [论文基线实现与配对实验](research/comparators/README.md) |
 | 怎样判定一个配置达标，怎样解释原 69 组和额外 57 组？ | [评价协议与证据入口](research/evaluation/README.md) |
 | 在 387 组配置上，Single-peer 与全特征、同宽 F、随机和 Nested-peer 相比，用多少得分换了多少时间？ | [配对实验汇总](research/peer_crossover/evidence/summary.md) · [按数据集查看](research/peer_crossover/evidence/by-dataset.csv) |
-| 全部特征维度都使用 Single-peer 的论文、算法和图表在哪里？ | [论文 PDF](paper/minpi-lowdim/main.pdf) · [源稿与配套数据](paper/minpi-lowdim/README.md) · [算法入口](research/peer_crossover/single.py) |
+| 采样 Single-peer 在 405 组上的论文、算法和图表在哪里？ | [论文 PDF](paper/minpi-lowdim/main.pdf) · [源稿与配套数据](paper/minpi-lowdim/README.md) · [算法入口](research/fast_single/selector.py) |
 | 原固定预算稿、历史版本、数据和复现包在哪里？ | [归档导航及清理记录](research/archive/README.md) |
 
 **从这里运行。** 在 PowerShell 中切换到本 README 所在的 `MastersThesis/history`。下列入口调用共享环境，并从这里的 `src` 导入源码。第一条检查理论反例，第二条检查组合修正，第三条核验既有基线。

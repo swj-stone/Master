@@ -1,40 +1,38 @@
-# Feature selection with single-peer ridge gains
+# Feature selection with sampled single-peer ridge gains
 
-[English manuscript (PDF)](main.pdf) · [Editable LaTeX source](main.tex)
+[English manuscript (PDF)](main.pdf) · [LaTeX source](main.tex)
 
-| Manuscript content | Data and implementation |
+The main experiment covers 405 configurations, including 74 with at most 32 input features and 331 with more. The training data, test data, seed, model and metric are paired across methods within each configuration. The implementation uses all individual peers at up to 32 features and a sampled peer panel above that threshold. [Selector](../../research/fast_single/selector.py) · [Ridge gain kernel](../../research/fast_single/panel_votes.c) · [Experiment protocol and replay commands](../../research/fast_single/README.md)
+
+| Manuscript content | Measurements and sources |
 |---|---|
-| Table 1. Data sources, splits, and configuration counts | [Experimental protocols](../../research/lowdim/comparison-protocol.md) · [Input fingerprints](../../research/lowdim/evidence/distinct-inputs.csv) |
-| Table 2. Retained widths, test scores and end-to-end runtimes | [Matched measurements on Abalone and Diabetes](../../research/peer_crossover/evidence/paired-cases.csv) |
-| Table 3. Results by prediction task | [All 387 paired configurations](../../research/peer_crossover/evidence/paired-cases.csv) · [Single-peer and its comparators by primary metric](../../research/peer_crossover/evidence/by-metric.csv) |
-| [Figure 1. Time saved on the 56 low-dimensional configurations](figures/lowdim-runtime.pdf) | [Generator](plot_runtime.py) · [Selection and end-to-end timings](../../research/peer_crossover/evidence/paired-cases.csv) |
-| [Figure 2. Fixed-width comparisons and exhaustive Abalone subset scores](figures/subset-quality.pdf) | [Generator](plot_subsets.py) · [31 ablation configurations](../../research/lowdim/peer_evidence/cases.csv) · [45 subset scores per split](../../research/lowdim/peer_evidence/abalone-subset-scores.csv) |
-| [Figure 3. Single-peer and its width-matched baselines at all input widths](figures/matched-curves.pdf) | [Generator](plot_matched_curves.py) · [Scores and two-process timings](../../research/peer_crossover/evidence/paired-cases.csv) |
-| [Companion plot. Single-peer score loss and end-to-end time against each comparator directly](figures/score-runtime.pdf) | [Generator](plot_tradeoff.py) · [Paired results](../../research/peer_crossover/evidence/paired-cases.csv) |
-| Peer-layer ablation and 32 random subsets per configuration | [Selected-set and score comparisons for 31 configurations](../../research/lowdim/peer_evidence/cases.csv) · [Exhaustive comparison of the 45 eight-column Abalone subsets](../../research/lowdim/peer_evidence/abalone-all-subsets.csv) |
-| Single-peer implementation for all input widths | [Selector entry point and wide-matrix implementation](../../research/peer_crossover/single.py) · [Tiled reduction](../../research/peer_crossover/all_peers.c) · [Original small-matrix kernel](../../research/lowdim/native_votes.c) · [Independent numerical check](../../research/peer_crossover/verify_native_reference.py) |
-| Background reading | [Notes on the two reference papers](../../research/theory/README.md) |
+| Benchmark composition and data splits | [405 configurations with input fingerprints](../../research/fast_single/evidence-extension/all-405.csv) · [Original 387 configurations](../../research/lowdim/comparison-protocol.md) · [18 additional low-dimensional configurations](../../research/fast_single/extension.py) |
+| Selected widths, test scores, paired timings and direct baseline comparisons | [405-configuration results](../../research/fast_single/evidence-extension/all-405.csv) · [Counts by group and method](../../research/fast_single/evidence-extension/by-source.csv) |
+| [Figure 1. Time saved against F and uniform random at matched width](figures/lowdim-runtime.pdf) | [Generator](plot_runtime.py) · [Primary benchmark](../../research/fast_single/evidence-extension/all-405.csv), restricted to the 74 low-dimensional configurations |
+| [Figure 2. Fixed-width comparisons and all eight-column subsets of Abalone](figures/subset-quality.pdf) | [Generator](plot_subsets.py) · [31 low-dimensional configurations at matched width](../../research/lowdim/peer_evidence/cases.csv) · [45 subset scores per Abalone split](../../research/lowdim/peer_evidence/abalone-subset-scores.csv) |
+| [Figure 3. Speedups across test-score loss thresholds](figures/matched-curves.pdf) | [Manuscript entry point](plot_matched_curves.py) · [Shared plotting code](../../research/fast_single/plot_figure3.py) · [405-configuration results](../../research/fast_single/evidence-extension/all-405.csv) |
+| Ablation of sampled peer gains and the width adjustment | [Per-configuration observations on 331 wider inputs](../../research/fast_single/evidence/ablation-cases.csv) · [Aggregation](../../research/fast_single/evidence/ablation.md) |
+| Four additional datasets | [All methods and seeds](../../research/fast_single/evidence/transfer.csv) · [Data loading and split definitions](../../research/fast_single/transfer.py) |
 
-The primary method is `research.peer_crossover.single.select_single(X, y, task=..., seed=...)`. The score, ranking and width rule are the same on both sides of 32 input columns. The crossover records label the primary method `single`, the full-feature predictor `full`, and the two comparisons at the single-peer width `F_single` and `random_single`. The `nested` arm is an internal comparator. The [replay protocol and commands](../../research/peer_crossover/README.md) reproduce both independent timing passes. Each pass has one warm-up and three timed deployments per distinct arm. Figure 2 draws on a separate fixed-width ablation using the same single-peer subsets and primary scores on those 31 configurations.
+The `fast` columns in the 405-configuration CSV contain the sampled Single-peer results. The `single` columns contain measurements for the [exhaustive comparator](../../research/peer_crossover/single.py). The `F_fast` and `random_fast` columns use the width chosen by the sampled method. The corresponding controls at the exhaustive method's width are `F_single` and `random_single`. The `full` columns describe the full-feature predictor. Read the CSV with `keep_default_na=False` in pandas to preserve the literal dataset name `null`.
 
-For Table 2, first take the median end-to-end runtime of the three repeated measurements within each process, separately for each method and configuration. Average the two process medians to obtain one runtime per configuration, then take the median across configurations for each dataset. Test scores in the table are arithmetic means over configurations within the same dataset. A configuration counts as faster only if both within-process comparisons show a shorter end-to-end time. Test-score loss in Figure 3 is the full-feature model score minus the score of the subset model. Full retention counts as a failure to reduce width. The rare-event example also uses [average precision and detection counts on the same credit-card split](../../research/lowdim/fraud_evidence/cases.csv).
+Each of two processes recorded three timed repetitions after a warm-up. The recorded time runs from feature selection through fitting and test prediction. For an absolute time in milliseconds, average the two within-process medians for each configuration before summarizing across configurations. To count a speedup, compare the two methods within each process and require a lower median time in both. Figure 1 plots the smaller percentage saving from these two comparisons. Figure 3 plots the proportion of all configurations in each width group satisfying the time and score conditions. Its lower panels also require fewer than all input features.
 
-The random-label simulation has the literal dataset name `null`. In pandas, read the CSV files with `keep_default_na=False` to preserve that name.
+Figure 2 uses a separate experiment on the same low-dimensional branch. The 31 selected supports, widths and primary scores match their entries in the 405-configuration table. The original experiment additionally scored 32 random subsets per configuration. On each of three Abalone splits it evaluated all 45 eight-column subsets. [Ablation records](../../research/lowdim/peer_evidence/README.md)
 
 ## Reproduce the figures
 
-From the `history` directory, run the following commands to regenerate the vector figures and their PNG previews from the recorded measurements. Figure 2 uses one copy of each Abalone split. Its 135 subset scores were extracted from the original per-seed `exhaustive_scores` arrays in `results/minpi-study/lowdim-peer-ablation-20261118a/`.
+From `MastersThesis/history`, run the commands below. Each writes the PDF used in the manuscript and a PNG preview.
 
 ```powershell
 .\thesis-python.ps1 paper/minpi-lowdim/plot_runtime.py
 .\thesis-python.ps1 paper/minpi-lowdim/plot_subsets.py
 .\thesis-python.ps1 paper/minpi-lowdim/plot_matched_curves.py
-.\thesis-python.ps1 paper/minpi-lowdim/plot_tradeoff.py
 ```
 
 ## Build the PDF
 
-Run XeLaTeX twice from this directory to resolve the references. The bibliography is included in the source.
+Run XeLaTeX twice from `paper/minpi-lowdim` to resolve the cross-references. The bibliography is included in the source.
 
 ```powershell
 xelatex -halt-on-error main.tex
