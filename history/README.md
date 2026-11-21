@@ -9,8 +9,8 @@
 | ANOVA F、随机对照、岭模型和自定义对照分别怎样计算？ | [基线的定义、适用范围和独立核验](research/baselines/README.md) |
 | 出处论文定义的离散 mRMR–MID 怎样实现、复核和比较？ | [论文基线实现与配对实验](research/comparators/README.md) |
 | 怎样判定一个配置达标，怎样解释原 69 组和额外 57 组？ | [评价协议与证据入口](research/evaluation/README.md) |
-| 所有数据放在一起，新版 minPI 相对旧版、全特征、同宽 F 和随机选列，用多少分数换了多少时间？ | [新版方法与全体结果](research/lowdim/README.md) · [全部数据对照表](research/lowdim/evidence/all-results.md) |
-| 低维条件岭收益的算法、配置和实证结论如何写成论文？ | [论文 PDF](paper/minpi-lowdim/main.pdf) · [源稿与配套数据](paper/minpi-lowdim/README.md) |
+| 在 387 组配置上，Single-peer 与全特征、同宽 F、随机和 Nested-peer 相比，用多少得分换了多少时间？ | [配对实验汇总](research/peer_crossover/evidence/summary.md) · [按数据集查看](research/peer_crossover/evidence/by-dataset.csv) |
+| 全部特征维度都使用 Single-peer 的论文、算法和图表在哪里？ | [论文 PDF](paper/minpi-lowdim/main.pdf) · [源稿与配套数据](paper/minpi-lowdim/README.md) · [算法入口](research/peer_crossover/single.py) |
 | 原固定预算稿、历史版本、数据和复现包在哪里？ | [归档导航及清理记录](research/archive/README.md) |
 
 **从这里运行。** 在 PowerShell 中切换到本 README 所在的 `MastersThesis/history`。下列入口调用共享环境，并从这里的 `src` 导入源码。第一条检查理论反例，第二条检查组合修正，第三条核验既有基线。

@@ -1,4 +1,4 @@
-"""Draw the score-loss and runtime comparison from the two-process replay."""
+"""Compare the all-width single-peer rule directly with each timed baseline."""
 
 from pathlib import Path
 
@@ -11,11 +11,11 @@ import pandas as pd
 
 
 PAPER = Path(__file__).resolve().parent
-CASES = PAPER.parents[1] / "research" / "lowdim" / "evidence" / "all-cases.csv"
+CASES = PAPER.parents[1] / "research" / "peer_crossover" / "evidence" / "paired-cases.csv"
 COMPARATORS = [
     ("full", "Full", "#006B70", "-"),
-    ("F", "Width-matched F", "#485469", "--"),
-    ("random", "Width-matched random", "#B15A24", ":"),
+    ("F_single", "Width-matched F", "#485469", "--"),
+    ("random_single", "Width-matched random", "#B15A24", ":"),
 ]
 SCORE_EPS = 1e-12  # The comparison protocol's tolerance for numerical ties.
 MAX_LOSS = 0.10
@@ -24,11 +24,11 @@ MAX_LOSS = 0.10
 def draw_panel(ax, cases):
     for key, label, color, style in COMPARATORS:
         qualifies = (
-            (cases.k_new < cases.p)
-            & (cases.ms1_new < cases[f"ms1_{key}"])
-            & (cases.ms2_new < cases[f"ms2_{key}"])
+            (cases.k_single < cases.p)
+            & (cases.total_ms1_single < cases[f"total_ms1_{key}"])
+            & (cases.total_ms2_single < cases[f"total_ms2_{key}"])
         )
-        losses = (cases.loc[qualifies, f"score_{key}"] - cases.loc[qualifies, "score_new"])
+        losses = (cases.loc[qualifies, f"score_{key}"] - cases.loc[qualifies, "score_single"])
         thresholds = np.sort(np.maximum(0, losses.to_numpy() - SCORE_EPS))
         cutoffs = np.unique(np.r_[0, thresholds[thresholds <= MAX_LOSS], MAX_LOSS])
         counts = np.searchsorted(thresholds, cutoffs, side="right")
@@ -68,7 +68,7 @@ def main():
         draw_panel(ax, panel)
         ax.set_title(title, loc="left", pad=7, fontweight="bold")
     axes[0].set_ylabel("Qualifying configurations (%)")
-    fig.text(.5, .16, "Allowed loss in primary test score", ha="center", fontsize=8.5)
+    fig.text(.5, .16, "Allowed loss of Single-peer relative to each comparator", ha="center", fontsize=8.5)
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, ncol=3, loc="lower center", frameon=False,
                bbox_to_anchor=(.5, .018), handlelength=2.4, columnspacing=1.7)

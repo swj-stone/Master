@@ -1,4 +1,4 @@
-"""Compare matched-width selectors against Full on either side of the 32-column cutoff."""
+"""Compare Single-peer and its matched-width baselines against Full in both width groups."""
 
 import matplotlib
 matplotlib.use("Agg")
@@ -6,18 +6,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from plot_tradeoff import CASES, MAX_LOSS, PAPER, SCORE_EPS
+from plot_runtime import DATA, PAPER
+from research.peer_crossover.summarize import EPS as SCORE_EPS
 
 
-BASELINES = [
-    ("F", "Width-matched F", "#515A82", (0, (4, 2.5)), 1.45),
-    ("random", "Width-matched random", "#AD572C", (0, (1.1, 1.65)), 1.8),
+MAX_LOSS = .10
+METHODS = [
+    ("single", "Single-peer rule", "#006B70", "-", 2.5),
+    ("F_single", "Width-matched F", "#515A82", (0, (4, 2.5)), 1.45),
+    ("random_single", "Width-matched random", "#AD572C", (0, (1.1, 1.65)), 1.8),
 ]
 
 
 def faster_cases(cases, method):
-    return ((cases[f"ms1_{method}"] < cases.ms1_full)
-            & (cases[f"ms2_{method}"] < cases.ms2_full))
+    return ((cases[f"total_ms1_{method}"] < cases.total_ms1_full)
+            & (cases[f"total_ms2_{method}"] < cases.total_ms2_full))
 
 
 def counts_by_loss(losses, bounds):
@@ -29,17 +32,16 @@ def counts_by_loss(losses, bounds):
 
 
 def main():
-    archive = pd.read_csv(CASES, keep_default_na=False)
+    archive = pd.read_csv(DATA, keep_default_na=False, float_precision="round_trip")
     low = archive.loc[archive.p <= 32]
     wide = archive.loc[archive.p > 32]
-    if (len(low), len(wide)) != (56, 331):
+    if (len(low), len(wide)) != (56, 331) or not archive.case_id.is_unique:
         raise ValueError("Expected 56 low-dimensional and 331 wider configurations")
-    if not (archive.k_new.eq(archive.k_F) & archive.k_new.eq(archive.k_random)).all():
+    if not (archive.k_single.eq(archive.k_F_single) & archive.k_single.eq(archive.k_random_single)).all():
         raise ValueError("Mismatched feature counts")
-    methods = ["new", *(baseline[0] for baseline in BASELINES)]
     fast_losses = {
         key: (archive.score_full - archive[f"score_{key}"]).loc[faster_cases(archive, key)]
-        for key in methods
+        for key, *_ in METHODS
     }
     observed = pd.concat(fast_losses.values())
     full_range = (np.floor(min(0, observed.min()) * 4) / 4,
@@ -51,13 +53,12 @@ def main():
     })
     fig, axes = plt.subplots(2, 2, sharey=True, figsize=(160 / 25.4, 116 / 25.4))
     fig.subplots_adjust(left=.105, right=.976, top=.850, bottom=.108, wspace=.18, hspace=.69)
-    panels = [(low, "≤32 features", "Single-peer rule"),
-              (wide, ">32 features", "Nested-peer rule")]
-    for col, (cases, title, rule) in enumerate(panels):
+    panels = [(low, "≤32 features"), (wide, ">32 features")]
+    for col, (cases, title) in enumerate(panels):
         speed_ax, joint_ax = axes[:, col]
         fig.text(speed_ax.get_position().x0, .982, f"{title} ({len(cases)} configurations)",
                  va="top", fontsize=9.5, fontweight="bold")
-        for key, label, color, style, width in [("new", rule, "#006B70", "-", 2.5), *BASELINES]:
+        for key, label, color, style, width in METHODS:
             losses = fast_losses[key]
             losses = losses.loc[losses.index.isin(cases.index)]
             reduced = cases.loc[losses.index, f"k_{key}"] < cases.loc[losses.index, "p"]
@@ -71,7 +72,7 @@ def main():
                         dash_capstyle="butt", zorder=3)
         speed_ax.set_xlim(full_range)
         speed_ax.axvspan(0, MAX_LOSS, color="#E3ECEE", zorder=0)
-        speed_ax.xaxis.set_major_locator(plt.MultipleLocator(.5))
+        speed_ax.xaxis.set_major_locator(plt.MultipleLocator(.25))
         joint_ax.set_xlim(0, MAX_LOSS)
         joint_ax.set_xticks([0, .02, .04, .06, .08, .10], ["0", ".02", ".04", ".06", ".08", ".10"])
         speed_ax.set_title(("(a)", "(b)")[col] + "  Faster than Full", loc="left", fontsize=8.6, pad=5)
