@@ -1,8 +1,0 @@
-{
-  "folds": 30,
-  "candidates": 106,
-  "distinct_masks": 760,
-  "maximum_absolute_error": 2.609024107869118e-14,
-  "near_tie_reversals": [],
-  "prediction_lock_sha256": "d9e6476007f5a05cf81826aec0072843e2ea075acfa24c191695d20ee85f568c"
-}

@@ -1,8 +1,0 @@
-dataset,fold,observer,ids,state,assignments
-spectf,2,three_candidates,4 7 8,010,8
-spectf,2,three_candidates,4 7 8,100,10
-spectf,2,three_candidates,4 7 8,110,56
-spectf,2,three_candidates,4 7 8,111,6
-spectf,2,all_nine_candidates,4 6 7 8 9 10 11 15 20,110001001,4
-spectf,2,all_nine_candidates,4 6 7 8 9 10 11 15 20,111001001,3
-spectf,2,all_nine_candidates,4 6 7 8 9 10 11 15 20,111011001,1

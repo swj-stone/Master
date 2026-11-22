@@ -1,9 +1,0 @@
-# Native downstream development check
-
-Evaluate an ordinary 100-round, depth-four XGBoost model on the original six prepared development sources at seed 42. Reuse the archived CUDA configuration and the fit-plus-vote training rows. Validate width on separate acceptance rows. Report held AUC and accuracy for classification and R², MAE and MAE divided by the fitting target standard deviation for regression. The two-score tolerance matches protocol.md. All thresholds and widths apply identically across arms.
-
-Compare the native Gain order, compensated Min order, and pooled backward order. Each ordering has two selectors. The direct selector checks widths from smallest to largest on a fixed dyadic grid ending at the complete feature set. The proposed accelerated selector begins at the smallest grid width that passes both clean predictive checks for a cheap ordinary linear ridge readout along that order. Starting there, it checks actual native refits in order of ascending width until the first native acceptance. All ranks can use this proxy so that saved native fits can be attributed to the proxy separately from voting. The proxy can skip smaller feasible subsets.
-
-Charge full model fitting, ranking, width search and outer prediction to each independent arm. Shared computations may be evaluated once, but their measured times are charged in full to each arm. Report per-arm number of native fits and support sizes. The full model is trained on the same fitting rows as every candidate native model. Report concurrency and CPU/GPU settings. These datasets have already been inspected in earlier experiments.
-
-Pre-run hardware amendment: the official timing campaign requires the local GPU. Use CPU hist and one thread for all arms of this development comparison, preserving the archived number of rounds, depth and learning rate. Do not compare absolute CPU time to the archived CUDA times.

@@ -1,9 +1,0 @@
-{
-  "scope": "Retrospective follow-up to the 704 historical proposal records",
-  "pairs": "Every unordered pair of distinct equal-width supports on the same fold, ordered by archived proposal index",
-  "fixed": "Development data, refitted anchor and both candidate models, outer feature-row dictionary and outer label sequence. Apply the same permutation of the feature vectors to all three models.",
-  "observers": ["development only", "union of empty-restoration queries for both candidates and their common anchor"],
-  "payoff": "Potential compression from passing the outer tolerance, relative to the original fold anchor. This conditions on putting a candidate through to the outer comparison. The historical proposals did not all receive a separate deployment guard.",
-  "metrics": "Macro one-vs-rest AUC (positive class for binary) and accuracy must both reach 97 percent of the paired refitted anchor, with original slack 1e-12. Average precision was inactive.",
-  "report": "Record attainable joint pass/fail patterns and the directional utility differences. Preserve unresolved patterns explicitly. No probability law over compatible permutations."
-}

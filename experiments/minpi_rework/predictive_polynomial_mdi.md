@@ -1,5 +1,0 @@
-# Cost of adding the MinPI path to impurity ranking
-
-Compare the deployed interval ranker plus MDI against MDI alone on the same four registered wide sources and seeds 42–46. Both train the same 100-tree RF and use the same optimized calibration-width scan, all-size quota, intact metric floors and forecast implementation. MDI alone omits the ranking-data path dictionary and Gram construction and checks only its own candidate path. The portfolio follows the signed wide convention that favors MDI at equal admissible width. Check each compressed support and forecast against the respective original signed MDI and portfolio arrays, retain all 20 jobs, and use no outer target values.
-
-Measure three interleaved warm fit-to-forecast runs on the same single core as the prior comparison, one BLAS thread. Show per-source median seconds, geometric paired time ratios, and four-source bootstrap. This additional comparison specifies an algorithm-level cost contrast after the earlier same-output timing experiments.

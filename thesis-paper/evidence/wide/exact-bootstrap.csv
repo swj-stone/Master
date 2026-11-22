@@ -1,6 +1,0 @@
-arm,reference,tasks,draws,u,u_low,u_high
-slack,point,6,46656,0.0,0.0,0.0
-vote,gain,6,46656,0.0,0.0,0.0
-slack,gain,6,46656,0.0,0.0,0.0
-slack,vote,6,46656,0.0,0.0,0.0
-point,gain,6,46656,0.0,0.0,0.0

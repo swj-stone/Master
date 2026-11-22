@@ -1,9 +1,0 @@
-panel,arm,stage,jobs,changed,max_increase,mean_increase,original_fail,active_fail,new_fail
-seven,original_mdi,acceptance,35,3,0.0002652650569662969,1.1227530128085589e-05,0,0,0
-seven,original_mdi,outer,35,0,0.0,-2.9738116731030977e-18,9,9,0
-seven,original_portfolio,acceptance,35,3,0.0002652650569662969,1.1227530128085589e-05,0,0,0
-seven,original_portfolio,outer,35,0,0.0,-2.9738116731030977e-18,10,10,0
-wide,original_mdi,acceptance,20,2,6.343435985500107e-05,3.369601171485104e-06,0,0,0
-wide,original_mdi,outer,20,2,9.61371678880052e-06,5.438502547250313e-07,3,3,0
-wide,original_portfolio,acceptance,20,1,6.343435985500107e-05,3.1717179927500533e-06,0,0,0
-wide,original_portfolio,outer,20,1,9.61371678880052e-06,4.80685839440026e-07,4,4,0

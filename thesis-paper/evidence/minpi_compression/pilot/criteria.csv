@@ -1,5 +1,0 @@
-task,baseline,quality,compression,time_and_width
-classification,full,False,False,
-classification,rfe,True,False,False
-regression,full,False,False,
-regression,rfe,True,False,False

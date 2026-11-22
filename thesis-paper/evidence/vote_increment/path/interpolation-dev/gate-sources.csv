@@ -1,7 +1,0 @@
-dataset,pass_both_seeds,pass_both_five_pct_seeds,pass_both_pareto_seeds,seeds,pass,pass_pareto
-abalone,0,0,0,1,False,False
-credit_card_fraud,1,1,0,1,True,False
-gisette,1,1,1,1,True,True
-isolet,1,1,0,1,True,False
-madelon,0,0,0,1,False,False
-spambase,1,1,0,1,True,False

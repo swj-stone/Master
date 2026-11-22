@@ -1,9 +1,0 @@
-task,dataset,splits,eligible_splits,inside_negatives,best_width_ratio,max_saving
-classification,magic,5,0,0,1.0,0.0
-classification,musk1,5,5,76,0.7674794970144055,0.23252050298559446
-classification,wall,5,0,0,1.0,0.0
-regression,estate,5,5,5,0.8,0.19999999999999996
-regression,fires,5,0,0,1.0,0.0
-regression,hardware,5,2,3,0.8325532074018731,0.1674467925981269
-classification,ALL,15,5,76,0.9155644628494136,0.08443553715058638
-regression,ALL,15,7,8,0.8733077785172493,0.12669222148275072

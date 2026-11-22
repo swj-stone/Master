@@ -1,9 +1,0 @@
-{
-  "folds": 30,
-  "policy_folds": 120,
-  "published_seal": "d9e6476007f5a05cf81826aec0072843e2ea075acfa24c191695d20ee85f568c",
-  "replay_seal": "1aefa8e7ff05110647bbadfae4ee74a12ba5bfcfdd8407e4d40b7956fef783d8",
-  "probability_hashes_match": true,
-  "sensitivity_probability_hashes_match": true,
-  "sensitivity_policy_folds": 12
-}

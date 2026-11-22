@@ -1,8 +1,0 @@
-{
-  "study": "prospective-pmlb-antichain-matched-r1",
-  "stage": "Added after the primary 14-task results were inspected to isolate column identity for the coded MinPI arm.",
-  "arm": "antichain_matched_gain",
-  "rows": "All 42 outer folds of prospective-pmlb-contexts-r1. Use the hash-verified primary selection record, its existing rank order and the antichain arm's realized k.",
-  "fit": "Independently refit the same XGBClassifier (100 trees, depth 4, lr .1, CPU hist, one thread, seed=20421+fold) on the leading k columns of that ranking. Median imputer fit on all outer development rows. Evaluate untouched outer fold. Donated k has no independent size-selection runtime. Record conditional refit/predict time only. Same row ordering as primary.",
-  "outputs": "Save support and donor IDs, receipt hashes, probabilities, labels, macro OvR AUC and accuracy. Keep all results, original protocol and results unchanged. Worker wall limit 3600s per fold."
-}
