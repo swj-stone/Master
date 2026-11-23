@@ -1,0 +1,61 @@
+{
+  "archive": "single-peer-paper-56f47fa.zip",
+  "sha256": "bb87ec4ee134da9f260577d681fd9e11bf78f852b1596ffa8344587ef30e0865",
+  "started_utc": "2026-11-23T17:59:44.482073+00:00",
+  "finished_utc": "2026-11-23T18:18:07.316825+00:00",
+  "stages": [
+    {
+      "stage": "isolated-imports",
+      "seconds": 8.64
+    },
+    {
+      "stage": "manifest",
+      "seconds": 7.21
+    },
+    {
+      "stage": "algorithm-tests",
+      "seconds": 1.01
+    },
+    {
+      "stage": "original-timing-tables",
+      "seconds": 47.68
+    },
+    {
+      "stage": "paper-and-three-figures",
+      "seconds": 20.12
+    },
+    {
+      "stage": "frozen-inputs-and-refits",
+      "seconds": 162.65
+    },
+    {
+      "stage": "fresh-two-process-experiment",
+      "seconds": 848.9
+    }
+  ],
+  "quality_counts": {
+    "main_cases": {
+      "original": 69,
+      "extra": 57,
+      "formal": 40,
+      "dense": 19,
+      "four_stage_ridge": 30,
+      "spectra": 36,
+      "mechanism": 64,
+      "archive_supplement": 33,
+      "conference_fraud": 1,
+      "text": 38
+    },
+    "extension_cases": 18,
+    "wide_ablation_cases": 331,
+    "supplementary_cases": 12,
+    "subset_checks": {
+      "cases": 31,
+      "uniform_draws_per_case": 32,
+      "verified_random_scores": 992,
+      "verified_exhaustive_abalone_scores": 405
+    },
+    "workspace_files": 1024,
+    "environment_data_files": 8
+  }
+}

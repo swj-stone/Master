@@ -1,0 +1,25 @@
+{
+  "main_cases": {
+    "original": 69,
+    "extra": 57,
+    "formal": 40,
+    "dense": 19,
+    "four_stage_ridge": 30,
+    "spectra": 36,
+    "mechanism": 64,
+    "archive_supplement": 33,
+    "conference_fraud": 1,
+    "text": 38
+  },
+  "extension_cases": 18,
+  "wide_ablation_cases": 331,
+  "supplementary_cases": 12,
+  "subset_checks": {
+    "cases": 31,
+    "uniform_draws_per_case": 32,
+    "verified_random_scores": 992,
+    "verified_exhaustive_abalone_scores": 405
+  },
+  "workspace_files": 1024,
+  "environment_data_files": 8
+}

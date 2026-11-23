@@ -1,0 +1,9 @@
+path,bytes,sha256,used_by
+Lib/site-packages/sklearn/datasets/data/breast_cancer.csv,120483,ff5fc1f247213db5fd49539610bcd5a98033bbd0307524fde3127251752aa073,figure2|main405
+Lib/site-packages/sklearn/datasets/data/diabetes_data_raw.csv.gz,7073,7fc0ded571454b1982210d3bb43f0aca44eae01a0b8654a3b24022bdb6b38009,figure2|main405
+Lib/site-packages/sklearn/datasets/data/diabetes_target.csv.gz,1050,8e53f65eb811df43c206f3534bb3af0e5fed213bc37ed6ba36310157d6023803,figure2|main405
+Lib/site-packages/sklearn/datasets/data/digits.csv.gz,57523,09f66e6debdee2cd2b5ae59e0d6abbb73fc2b0e0185d2e1957e9ebb51e23aa22,figure2|main405
+Lib/site-packages/sklearn/datasets/data/wine_data.csv,11336,a5f9961298dc86deafae12b9ee88a283508cefa03cd1f719e9dfe581ec898777,figure2|main405
+Lib/site-packages/statsmodels/datasets/anes96/anes96.csv,22535,36e55a0d7ca0c86304c1868d4201f302d2042dc078ba9d748b6e98f6ddbd5267,main405
+Lib/site-packages/statsmodels/datasets/fair/fair.csv,158183,102c76c3febbbe898e0fd203e2d5f8e1cdecd53875d56912eca351c8b865bde8,main405
+Lib/site-packages/statsmodels/datasets/macrodata/macrodata.csv,18033,7853fcc0d92a9b89b627cb6eb2d27faf4a00c7515e3b37a9a24001ef597ca8f0,figure2|main405

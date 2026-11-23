@@ -1,0 +1,30 @@
+{
+  "python": "3.13.9",
+  "system": "Windows",
+  "machine": "AMD64",
+  "packages": {
+    "numpy": "2.4.6",
+    "scipy": "1.18.0",
+    "pandas": "3.0.3",
+    "scikit-learn": "1.9.0",
+    "threadpoolctl": "3.6.0",
+    "matplotlib": "3.11.0",
+    "pillow": "12.3.0",
+    "statsmodels": "0.14.6",
+    "joblib": "1.5.3",
+    "numba": "0.66.0",
+    "llvmlite": "0.48.0",
+    "networkx": "3.6.1",
+    "pyyaml": "6.0.3",
+    "pytest": "8.4.2",
+    "shap": "0.52.0",
+    "xgboost": "3.3.0",
+    "tqdm": "4.68.3"
+  },
+  "tools": {
+    "gcc": "gcc (GCC) 16.1.0",
+    "xelatex": "XeTeX 3.141592653-2.6-0.999998 (TeX Live 2026)",
+    "pdftoppm": "pdftoppm version 26.07.0",
+    "pdftotext": "pdftotext version 25.02.0"
+  }
+}

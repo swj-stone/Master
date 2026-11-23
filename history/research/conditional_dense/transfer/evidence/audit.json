@@ -1,8 +1,0 @@
-{
-  "inputs": 8,
-  "model_cases": 32,
-  "raw_pipelines": 192,
-  "matched_frozen_supports": 48,
-  "rescored_predictions": 192,
-  "total_equals_sum_of_components": true
-}

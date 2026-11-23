@@ -1,7 +1,0 @@
-arm,faster,better,win_both,cut_faster_both,cut_faster_both_and_full_within_2pp,cut_faster_both_and_beat_arm,cut_faster_both_and_beat_arm_and_full_within_2pp
-F,11,10,7,11,7,7,5
-F_half,13,8,5,13,9,5,5
-conditional,13,4,3,12,8,3,3
-full,14,6,4,14,10,4,4
-random,0,14,0,0,0,0,0
-sketch_F,6,12,4,5,4,3,3

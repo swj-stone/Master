@@ -1,4 +1,0 @@
-source,n,width_min,width_max,mean_conditional,mean_sketch_F,mean_delta_full,win_quality_full,two_process_faster_full,mean_delta_sketch_F,win_quality_sketch_F,two_process_faster_sketch_F,mean_delta_zero,win_quality_zero,two_process_faster_zero,full_joint,both_sketch_F,all_criteria
-har,3,267,274,0.9500255009457618,0.9248309503473927,-0.008955358829962234,0,3,0.02519455059836906,3,0,0.02306163806721225,3,0,3,0,0
-isolet,2,355,360,0.9156410256410257,0.8953846153846154,-0.0028205128205127106,0,2,0.02025641025641023,2,1,0.020512820512820495,2,0,2,1,1
-spoken_arabic_digit,3,154,155,0.9372727272727274,0.9334848484848486,-0.0036363636363636966,0,2,0.0037878787878787845,3,1,0.004242424242424196,3,0,2,1,1
